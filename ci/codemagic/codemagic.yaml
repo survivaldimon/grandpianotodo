@@ -19,7 +19,7 @@ workflows:
       app_store_connect: Codemagic  # Имя интеграции в Codemagic UI
 
     environment:
-      flutter: stable
+      flutter: stable  # Последняя стабильная версия
       xcode: latest
       cocoapods: default
       ios_signing:
@@ -27,13 +27,22 @@ workflows:
         bundle_identifier: com.kabinet.kabinet
 
     scripts:
+      - name: Очистка проекта
+        script: |
+          flutter clean
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
+          rm -rf ios/.symlinks
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+
       - name: Получение зависимостей
         script: flutter pub get
 
       - name: Установка CocoaPods
         script: |
           cd ios
-          pod install
+          pod repo update
+          pod install --repo-update
 
       - name: Настройка подписи Xcode
         script: xcode-project use-profiles
@@ -41,7 +50,8 @@ workflows:
       - name: Увеличение номера сборки
         script: |
           cd ios
-          agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_ID") + 1))
+          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$APP_ID" 2>/dev/null || echo "0")
+          agvtool new-version -all $((LATEST_BUILD + 1))
 
       - name: Сборка iOS
         script: |
@@ -79,6 +89,9 @@ workflows:
       java: 17
 
     scripts:
+      - name: Очистка проекта
+        script: flutter clean
+
       - name: Получение зависимостей
         script: flutter pub get
 
