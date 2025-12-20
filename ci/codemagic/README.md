@@ -1,149 +1,97 @@
 # Codemagic CI/CD для Kabinet
 
+## Статус
+
+| Платформа | Сборка | Публикация | Работает |
+|-----------|--------|------------|----------|
+| Android | APK/AAB | Artifacts | Да |
+| iOS | IPA | TestFlight | Да (но crash) |
+
 ## Быстрый старт
 
-### 1. Регистрация в Codemagic
-1. Перейдите на [codemagic.io](https://codemagic.io)
-2. Войдите через GitHub/GitLab/Bitbucket
-3. Добавьте репозиторий Kabinet
+### 1. Codemagic
+1. Зарегистрируйтесь на [codemagic.io](https://codemagic.io)
+2. Подключите GitHub репозиторий
+3. Настройте App Store Connect интеграцию
 
-### 2. Активация конфигурации
-Скопируйте файл конфигурации в корень проекта:
+### 2. App Store Connect API
+1. Откройте [appstoreconnect.apple.com](https://appstoreconnect.apple.com)
+2. Users and Access → Integrations → App Store Connect API
+3. Создайте ключ с ролью Admin
+4. Скачайте .p8 файл (можно только 1 раз!)
+5. Запомните Issuer ID и Key ID
+
+### 3. Настройка в Codemagic
+1. App settings → Code signing → iOS
+2. Выберите "Automatic"
+3. Distribution type: `app_store`
+4. Bundle ID: `com.kabinet.kabinet`
+
+### 4. App Store Connect интеграция
+1. App settings → App Store Connect
+2. Загрузите .p8 файл
+3. Введите Issuer ID и Key ID
+
+### 5. Запуск сборки
+1. Start new build
+2. Выберите ветку `main`
+3. Ждите ~15-20 минут
+
+## Конфигурация
+
+Файл `codemagic.yaml` **не используется** — настройки через UI Codemagic.
+
+Если нужен yaml-based workflow:
 ```bash
 cp ci/codemagic/codemagic.yaml ./codemagic.yaml
-git add codemagic.yaml
-git commit -m "Add Codemagic CI/CD configuration"
-git push
 ```
 
-### 3. Настройка email уведомлений
-В файле `codemagic.yaml` замените:
+## Известные проблемы
+
+### iOS Crash при запуске
+
+Приложение крашится на iOS 18.x из-за бага в `path_provider_foundation`.
+
+**Статус:** Не решено
+
+**Workaround в pubspec.yaml:**
 ```yaml
-recipients:
-  - your-email@example.com  # ← Ваш email
+dependency_overrides:
+  path_provider: 2.0.15
+  path_provider_foundation: 2.2.4
 ```
 
----
+## Увеличение номера сборки
 
-## Доступные сборки
-
-| Workflow | Что делает | Требования |
-|----------|-----------|------------|
-| `android-build` | APK + AAB | Ничего (работает сразу) |
-| `ios-build` | IPA файл | Apple Developer Account |
-| `test-only` | Тесты + анализ | Ничего |
-
----
-
-## Android сборка (без Apple Developer)
-
-**Работает сразу после настройки!**
-
-После успешной сборки вы получите:
-- `app-debug.apk` — для тестирования
-- `app-release.apk` — для распространения
-- `app-release.aab` — для Google Play
-
-### Где скачать артефакты
-1. Codemagic → Builds → Выберите сборку
-2. Вкладка "Artifacts"
-3. Скачайте нужный файл
-
----
-
-## iOS сборка (требует $99/год)
-
-### Что нужно
-1. **Apple Developer Account** — [developer.apple.com](https://developer.apple.com)
-2. **Сертификат разработчика** (.p12 файл)
-3. **Provisioning Profile**
-
-### Настройка в Codemagic
-1. Settings → Code signing identities
-2. Загрузите iOS сертификаты
-3. Codemagic автоматически подпишет приложение
-
-### Подробная инструкция
-[docs.codemagic.io/code-signing-yaml/signing-ios](https://docs.codemagic.io/code-signing-yaml/signing-ios/)
-
----
-
-## Альтернативы без Apple Developer
-
-Если нет $99/год на Apple Developer Account:
-
-### Вариант 1: Sideloadly (Windows)
-1. Соберите IPA через Codemagic (нужен хотя бы бесплатный Apple ID)
-2. Установите [Sideloadly](https://sideloadly.io)
-3. Подключите iPhone к компьютеру
-4. Загрузите IPA через Sideloadly
-
-**Минус:** Приложение нужно переустанавливать каждые 7 дней
-
-### Вариант 2: AltStore
-1. Установите [AltServer](https://altstore.io) на Windows
-2. Установите AltStore на iPhone
-3. Загрузите IPA через AltStore
-
-**Минус:** Те же 7 дней
-
-### Вариант 3: Только Android
-Пока нет Apple Developer Account, распространяйте APK для Android.
-Позже добавите iOS.
-
----
-
-## Переменные окружения
-
-Если нужны секретные ключи (API ключи и т.д.):
-
-1. Codemagic → App settings → Environment variables
-2. Добавьте переменную (например `SUPABASE_KEY`)
-3. В коде используйте через `--dart-define`:
-
+Перед каждой новой сборкой в TestFlight:
 ```yaml
-scripts:
-  - name: Сборка с переменными
-    script: |
-      flutter build apk --release \
-        --dart-define=SUPABASE_URL=$SUPABASE_URL \
-        --dart-define=SUPABASE_KEY=$SUPABASE_KEY
+# pubspec.yaml
+version: 1.0.0+5  # Увеличить +N
 ```
 
----
-
-## Бесплатные лимиты Codemagic
+## Лимиты Codemagic (бесплатно)
 
 | Ресурс | Лимит |
 |--------|-------|
 | Время сборки | 500 минут/месяц |
-| M1 Mac mini | Включено |
 | Параллельные сборки | 1 |
-
-Для hobby-проекта обычно хватает.
-
----
+| M1 Mac mini | Включено |
 
 ## Troubleshooting
 
-### Сборка падает на CocoaPods
-```yaml
-- name: Очистка и установка pods
-  script: |
-    cd ios
-    rm -rf Pods Podfile.lock
-    pod install --repo-update
+### Build number already used
 ```
-
-### Ошибка подписи iOS
-Проверьте что:
-1. Bundle ID в Xcode совпадает с `bundle_identifier` в yaml
-2. Provisioning profile включает ваше устройство (для Ad Hoc)
-3. Сертификат не истёк
-
-### Flutter версия
-Для конкретной версии Flutter:
-```yaml
-environment:
-  flutter: 3.24.0  # вместо stable
+The bundle version must be higher than the previously uploaded version
 ```
+**Решение:** Увеличьте номер в `pubspec.yaml`: `1.0.0+N`
+
+### Code signing failed
+Проверьте:
+1. Bundle ID совпадает с App Store Connect
+2. .p8 ключ загружен
+3. Issuer ID и Key ID верные
+
+### Publishing failed
+Проверьте:
+1. Приложение создано в App Store Connect
+2. Интеграция настроена в Codemagic

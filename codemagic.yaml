@@ -1,22 +1,14 @@
 # Codemagic CI/CD для Kabinet
-#
-# ИНСТРУКЦИЯ:
-# 1. Скопируйте в корень: cp ci/codemagic/codemagic.yaml ./codemagic.yaml
-# 2. Замените YOUR_EMAIL на ваш email
-# 3. Настройте Apple интеграцию в Codemagic UI
-# 4. Push в репозиторий
+# Используем YAML-конфигурацию для контроля версий Xcode и Flutter
 
 workflows:
-  # =============================================
-  # iOS сборка + публикация в TestFlight
-  # =============================================
   ios-release:
     name: iOS Release → TestFlight
     max_build_duration: 90
     instance_type: mac_mini_m1
 
     integrations:
-      app_store_connect: Codemagic  # Имя интеграции в Codemagic UI
+      app_store_connect: Codemagic
 
     environment:
       flutter: 3.22.3  # Стабильная версия без багов path_provider
@@ -63,52 +55,8 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
 
     publishing:
-      email:
-        recipients:
-          - YOUR_EMAIL  # ← Замените на ваш email
-        notify:
-          success: true
-          failure: true
-
       app_store_connect:
         auth: integration
         submit_to_testflight: true
         beta_groups:
-          - Testers  # Создайте группу в App Store Connect
-
-  # =============================================
-  # Android сборка (бонус)
-  # =============================================
-  android-release:
-    name: Android Release
-    max_build_duration: 60
-    instance_type: mac_mini_m1
-
-    environment:
-      flutter: stable
-      java: 17
-
-    scripts:
-      - name: Очистка проекта
-        script: flutter clean
-
-      - name: Получение зависимостей
-        script: flutter pub get
-
-      - name: Сборка APK
-        script: flutter build apk --release
-
-      - name: Сборка AAB
-        script: flutter build appbundle --release
-
-    artifacts:
-      - build/**/outputs/**/*.apk
-      - build/**/outputs/**/*.aab
-
-    publishing:
-      email:
-        recipients:
-          - YOUR_EMAIL
-        notify:
-          success: true
-          failure: true
+          - Testers

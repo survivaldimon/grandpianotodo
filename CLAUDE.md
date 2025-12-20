@@ -66,6 +66,37 @@ UI (Screen/Widget) → Provider → Repository → Supabase
 - При любом изменении создаётся запись в `lesson_history`
 - Храним: кто изменил, когда, что было до, что стало после
 
+## CI/CD
+
+Проект использует **Codemagic** для сборки iOS и Android.
+
+| Платформа | Распространение | Статус |
+|-----------|-----------------|--------|
+| iOS | TestFlight | Настроено |
+| Android | APK/AAB | Настроено |
+
+### Конфигурация
+- `ci/codemagic/codemagic.yaml` — конфигурация CI/CD
+- `ci/codemagic/README.md` — инструкция по настройке
+
+### Известные проблемы iOS
+
+**path_provider_foundation crash** — плагин крашится при запуске на iOS 18.x и iOS 26 beta.
+- Ошибка: `EXC_BAD_ACCESS` в `swift_getObjectType`
+- Статус: **Не решено**
+- Workaround: используем `dependency_overrides` для понижения версии
+
+```yaml
+dependency_overrides:
+  path_provider: 2.0.15
+  path_provider_foundation: 2.2.4
+```
+
+### Настройки iOS
+- Минимальная версия: **iOS 15.0**
+- Bundle ID: `com.kabinet.kabinet`
+- Подпись: через Codemagic + App Store Connect API
+
 ## Команды
 
 ```bash
@@ -80,6 +111,9 @@ flutter test
 
 # Анализ кода
 flutter analyze
+
+# Очистка проекта
+flutter clean && flutter pub get
 ```
 
 ## Порядок работы над задачей
