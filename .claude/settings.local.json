@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter create:*)",
+      "Bash(/mnt/c/flutter/bin/flutter create:*)",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter create . --org com.kabinet --project-name kabinet --platforms android,ios\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter pub get\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter analyze\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter build apk --debug\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter clean && flutter pub get && flutter build apk --debug\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter analyze 2>&1\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter pub get && flutter analyze 2>&1\")",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(cmd.exe /c \"flutter analyze 2>&1\")",
+      "Bash(mkdir:*)"
+    ]
+  }
+}

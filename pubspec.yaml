@@ -1,0 +1,50 @@
+name: kabinet
+description: "Мобильное приложение для управления расписанием кабинетов"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Backend
+  supabase_flutter: ^2.8.3
+
+  # Navigation
+  go_router: ^14.6.2
+
+  # Utils
+  intl: ^0.20.2
+  uuid: ^4.5.1
+  equatable: ^2.0.7
+  fpdart: ^1.1.0
+  collection: ^1.18.0
+
+  # UI
+  flutter_svg: ^2.0.16
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+
+  # Icons
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.15
+  riverpod_generator: ^2.6.3
+  json_serializable: ^6.9.4
+  go_router_builder: ^2.7.1
+
+flutter:
+  uses-material-design: true

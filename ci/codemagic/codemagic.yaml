@@ -1,0 +1,101 @@
+# Codemagic CI/CD для Kabinet
+#
+# ИНСТРУКЦИЯ:
+# 1. Скопируйте в корень: cp ci/codemagic/codemagic.yaml ./codemagic.yaml
+# 2. Замените YOUR_EMAIL на ваш email
+# 3. Настройте Apple интеграцию в Codemagic UI
+# 4. Push в репозиторий
+
+workflows:
+  # =============================================
+  # iOS сборка + публикация в TestFlight
+  # =============================================
+  ios-release:
+    name: iOS Release → TestFlight
+    max_build_duration: 90
+    instance_type: mac_mini_m1
+
+    integrations:
+      app_store_connect: Codemagic  # Имя интеграции в Codemagic UI
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.kabinet.kabinet
+
+    scripts:
+      - name: Получение зависимостей
+        script: flutter pub get
+
+      - name: Установка CocoaPods
+        script: |
+          cd ios
+          pod install
+
+      - name: Настройка подписи Xcode
+        script: xcode-project use-profiles
+
+      - name: Увеличение номера сборки
+        script: |
+          cd ios
+          agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_ID") + 1))
+
+      - name: Сборка iOS
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - YOUR_EMAIL  # ← Замените на ваш email
+        notify:
+          success: true
+          failure: true
+
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Testers  # Создайте группу в App Store Connect
+
+  # =============================================
+  # Android сборка (бонус)
+  # =============================================
+  android-release:
+    name: Android Release
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+
+    environment:
+      flutter: stable
+      java: 17
+
+    scripts:
+      - name: Получение зависимостей
+        script: flutter pub get
+
+      - name: Сборка APK
+        script: flutter build apk --release
+
+      - name: Сборка AAB
+        script: flutter build appbundle --release
+
+    artifacts:
+      - build/**/outputs/**/*.apk
+      - build/**/outputs/**/*.aab
+
+    publishing:
+      email:
+        recipients:
+          - YOUR_EMAIL
+        notify:
+          success: true
+          failure: true
