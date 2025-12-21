@@ -11,8 +11,8 @@ workflows:
       app_store_connect: Codemagic
 
     environment:
-      flutter: 3.22.3  # Стабильная версия без багов path_provider
-      xcode: 15.4      # Последний стабильный Xcode (не beta!)
+      flutter: 3.38.1  # Последняя стабильная версия с полной поддержкой iOS 18
+      xcode: 16.2      # Стабильный Xcode для iOS 18 (не beta!)
       cocoapods: default
       ios_signing:
         distribution_type: app_store
