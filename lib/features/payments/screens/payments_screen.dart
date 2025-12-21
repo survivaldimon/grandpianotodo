@@ -9,6 +9,7 @@ import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/shared/models/payment.dart';
+import 'package:kabinet/shared/models/payment_plan.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:collection/collection.dart';
 
@@ -195,43 +196,70 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   }
 
   void _showAddPaymentDialog(BuildContext context) {
-    final studentsAsync = ref.read(studentsProvider(widget.institutionId));
-
-    studentsAsync.when(
-      loading: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Загрузка списка учеников...')),
-        );
-      },
-      error: (e, _) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки учеников: $e')),
-        );
-      },
-      data: (students) {
-        if (students.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Сначала добавьте учеников')),
-          );
-          return;
-        }
-        _showPaymentForm(context, students);
-      },
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _AddPaymentDialog(
+        institutionId: widget.institutionId,
+        onSuccess: () {
+          ref.invalidate(paymentsProvider(_periodParams));
+          ref.invalidate(periodTotalProvider(_periodParams));
+        },
+      ),
     );
   }
 
-  void _showPaymentForm(BuildContext context, List<Student> students) {
-    Student? selectedStudent;
-    final amountController = TextEditingController();
-    final lessonsController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
+}
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Добавить оплату'),
-          content: Form(
+/// Диалог добавления оплаты
+class _AddPaymentDialog extends ConsumerStatefulWidget {
+  final String institutionId;
+  final VoidCallback onSuccess;
+
+  const _AddPaymentDialog({
+    required this.institutionId,
+    required this.onSuccess,
+  });
+
+  @override
+  ConsumerState<_AddPaymentDialog> createState() => _AddPaymentDialogState();
+}
+
+class _AddPaymentDialogState extends ConsumerState<_AddPaymentDialog> {
+  Student? selectedStudent;
+  PaymentPlan? selectedPlan;
+  bool isCustomPayment = true;
+  final amountController = TextEditingController();
+  final lessonsController = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    amountController.dispose();
+    lessonsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+    final plansAsync = ref.watch(paymentPlansProvider(widget.institutionId));
+
+    return AlertDialog(
+      title: const Text('Добавить оплату'),
+      content: studentsAsync.when(
+        loading: () => const SizedBox(
+          height: 100,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (e, _) => Text('Ошибка: $e'),
+        data: (students) {
+          if (students.isEmpty) {
+            return const Text('Сначала добавьте учеников');
+          }
+
+          final plans = plansAsync.valueOrNull ?? [];
+
+          return Form(
             key: formKey,
             child: SingleChildScrollView(
               child: Column(
@@ -252,15 +280,49 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                     },
                     validator: (v) => v == null ? 'Выберите ученика' : null,
                   ),
+                  if (plans.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<PaymentPlan?>(
+                      decoration: const InputDecoration(
+                        labelText: 'Тариф',
+                        prefixIcon: Icon(Icons.card_membership),
+                      ),
+                      value: selectedPlan,
+                      items: [
+                        const DropdownMenuItem<PaymentPlan?>(
+                          value: null,
+                          child: Text('Свой вариант'),
+                        ),
+                        ...plans.map((p) => DropdownMenuItem<PaymentPlan?>(
+                          value: p,
+                          child: Text('${p.name} (${p.price.toStringAsFixed(0)} ₸)'),
+                        )),
+                      ],
+                      onChanged: (plan) {
+                        setState(() {
+                          selectedPlan = plan;
+                          isCustomPayment = plan == null;
+                          if (plan != null) {
+                            amountController.text = plan.price.toStringAsFixed(0);
+                            lessonsController.text = plan.lessonsCount.toString();
+                          } else {
+                            amountController.clear();
+                            lessonsController.clear();
+                          }
+                        });
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: amountController,
                     decoration: const InputDecoration(
                       labelText: 'Сумма',
                       prefixIcon: Icon(Icons.payments),
-                      suffixText: '₽',
+                      suffixText: '₸',
                     ),
                     keyboardType: TextInputType.number,
+                    enabled: isCustomPayment,
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Введите сумму';
                       if (double.tryParse(v) == null) return 'Неверная сумма';
@@ -275,6 +337,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                       prefixIcon: Icon(Icons.event),
                     ),
                     keyboardType: TextInputType.number,
+                    enabled: isCustomPayment,
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Введите количество';
                       if (int.tryParse(v) == null) return 'Неверное число';
@@ -284,41 +347,44 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 ],
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Отмена'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate() && selectedStudent != null) {
-                  final controller = ref.read(paymentControllerProvider.notifier);
-                  final payment = await controller.create(
-                    institutionId: widget.institutionId,
-                    studentId: selectedStudent!.id,
-                    amount: double.parse(amountController.text),
-                    lessonsCount: int.parse(lessonsController.text),
-                  );
-                  if (payment != null && dialogContext.mounted) {
-                    Navigator.pop(dialogContext);
-                    ref.invalidate(paymentsProvider(_periodParams));
-                    ref.invalidate(periodTotalProvider(_periodParams));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Оплата добавлена'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Добавить'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Отмена'),
+        ),
+        ElevatedButton(
+          onPressed: _submit,
+          child: const Text('Добавить'),
+        ),
+      ],
     );
+  }
+
+  Future<void> _submit() async {
+    if (!formKey.currentState!.validate() || selectedStudent == null) return;
+
+    final controller = ref.read(paymentControllerProvider.notifier);
+    final payment = await controller.create(
+      institutionId: widget.institutionId,
+      studentId: selectedStudent!.id,
+      paymentPlanId: selectedPlan?.id,
+      amount: double.parse(amountController.text),
+      lessonsCount: int.parse(lessonsController.text),
+    );
+
+    if (payment != null && mounted) {
+      Navigator.pop(context);
+      widget.onSuccess();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Оплата добавлена'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 }
 
@@ -357,7 +423,8 @@ class _PaymentCard extends ConsumerWidget {
     final formatter = NumberFormat('#,###', 'ru_RU');
     final amountStr = '${formatter.format(payment.amount.toInt())} ₸';
     final studentName = payment.student?.name ?? 'Ученик';
-    final planName = payment.paymentPlan?.name ?? (payment.isCorrection ? 'Корректировка' : 'Оплата');
+    final planName = payment.paymentPlan?.name ??
+        (payment.isCorrection ? 'Корректировка' : 'Свой вариант');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),

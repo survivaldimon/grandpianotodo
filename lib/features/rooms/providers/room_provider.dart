@@ -7,11 +7,11 @@ final roomRepositoryProvider = Provider<RoomRepository>((ref) {
   return RoomRepository();
 });
 
-/// Провайдер списка кабинетов заведения
+/// Провайдер списка кабинетов заведения (realtime)
 final roomsProvider =
-    FutureProvider.family<List<Room>, String>((ref, institutionId) async {
+    StreamProvider.family<List<Room>, String>((ref, institutionId) {
   final repo = ref.watch(roomRepositoryProvider);
-  return repo.getByInstitution(institutionId);
+  return repo.watchByInstitution(institutionId);
 });
 
 /// Провайдер кабинета по ID

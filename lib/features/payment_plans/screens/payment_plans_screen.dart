@@ -125,7 +125,7 @@ class PaymentPlansScreen extends ConsumerWidget {
                 TextFormField(
                   controller: priceController,
                   decoration: const InputDecoration(
-                    labelText: 'Цена (₽)',
+                    labelText: 'Цена (₸)',
                   ),
                   keyboardType: TextInputType.number,
                   validator: (v) {
@@ -208,7 +208,7 @@ class PaymentPlansScreen extends ConsumerWidget {
                 TextFormField(
                   controller: priceController,
                   decoration: const InputDecoration(
-                    labelText: 'Цена (₽)',
+                    labelText: 'Цена (₸)',
                   ),
                   keyboardType: TextInputType.number,
                   validator: (v) {
@@ -314,7 +314,7 @@ class _PaymentPlanCard extends StatelessWidget {
         ),
         title: Text(plan.name),
         subtitle: Text(
-          '${plan.price.toStringAsFixed(0)} ₽ • ${plan.pricePerLesson.toStringAsFixed(0)} ₽/занятие',
+          '${plan.price.toStringAsFixed(0)} ₸ • ${plan.pricePerLesson.toStringAsFixed(0)} ₸/занятие',
         ),
         trailing: PopupMenuButton<String>(
           onSelected: (value) {

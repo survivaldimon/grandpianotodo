@@ -13,7 +13,26 @@
       "Bash(cat:*)",
       "Bash(ls:*)",
       "Bash(cmd.exe /c \"flutter analyze 2>&1\")",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "WebSearch",
+      "WebFetch(domain:pub.dev)",
+      "WebFetch(domain:github.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(cmd.exe /c \"flutter analyze lib/features/dashboard/screens/main_shell.dart 2>&1\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\\\\\kabinet && flutter analyze:*)",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter analyze lib/features/dashboard/screens/dashboard_screen.dart 2>&1\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter analyze 2>&1 | head -50\")",
+      "Bash(/mnt/c/flutter/bin/flutter analyze:*)",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter analyze 2>&1 | head -60\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter analyze lib/features/statistics/screens/statistics_screen.dart 2>&1\")",
+      "Bash(cmd.exe /c \"cd /d F:\\\\kabinet && flutter analyze lib/core/router/app_router.dart lib/features/institution/screens/institutions_list_screen.dart lib/features/dashboard/screens/dashboard_screen.dart 2>&1 | head -30\")",
+      "Bash(cmd.exe /c:*)",
+      "Bash(flutter build:*)",
+      "Bash(/bin/bash:*)"
     ]
   }
 }

@@ -11,6 +11,7 @@ import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/institution/providers/subject_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
+import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/subject.dart';
@@ -282,7 +283,6 @@ class _TimeGrid extends StatelessWidget {
 
     final color = _getLessonColor(lesson);
     final participant = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
-    final subject = lesson.subject?.name ?? '';
 
     return Positioned(
       top: startOffset,
@@ -292,41 +292,29 @@ class _TimeGrid extends StatelessWidget {
         onTap: () => onLessonTap(lesson),
         child: Container(
           height: duration,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(AppSizes.radiusS),
             border: Border.all(color: color, width: 2),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          clipBehavior: Clip.hardEdge,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      participant,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (lesson.status == LessonStatus.completed)
-                    const Icon(Icons.check_circle, size: 16, color: AppColors.success),
-                  if (lesson.status == LessonStatus.cancelled)
-                    const Icon(Icons.cancel, size: 16, color: AppColors.error),
-                ],
-              ),
-              if (subject.isNotEmpty && duration > 40)
-                Text(
-                  subject,
+              Expanded(
+                child: Text(
+                  participant,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
                       ),
                   overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
+              ),
+              if (lesson.status == LessonStatus.completed)
+                const Icon(Icons.check_circle, size: 14, color: AppColors.success),
+              if (lesson.status == LessonStatus.cancelled)
+                const Icon(Icons.cancel, size: 14, color: AppColors.error),
             ],
           ),
         ),
@@ -349,7 +337,7 @@ class _TimeGrid extends StatelessWidget {
 }
 
 /// Детали занятия
-class _LessonDetailSheet extends ConsumerWidget {
+class _LessonDetailSheet extends ConsumerStatefulWidget {
   final Lesson lesson;
   final String institutionId;
   final VoidCallback onUpdated;
@@ -361,7 +349,23 @@ class _LessonDetailSheet extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LessonDetailSheet> createState() => _LessonDetailSheetState();
+}
+
+class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
+  late LessonStatus _currentStatus;
+  bool _isPaid = false;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStatus = widget.lesson.status;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lesson = widget.lesson;
     final controllerState = ref.watch(lessonControllerProvider);
 
     ref.listen(lessonControllerProvider, (prev, next) {
@@ -376,6 +380,13 @@ class _LessonDetailSheet extends ConsumerWidget {
     });
 
     final timeStr = '${lesson.startTime.hour.toString().padLeft(2, '0')}:${lesson.startTime.minute.toString().padLeft(2, '0')} — ${lesson.endTime.hour.toString().padLeft(2, '0')}:${lesson.endTime.minute.toString().padLeft(2, '0')}';
+
+    final hasPrice = lesson.lessonType?.defaultPrice != null &&
+                     lesson.lessonType!.defaultPrice! > 0;
+    final hasStudent = lesson.studentId != null;
+    final isCompleted = _currentStatus == LessonStatus.completed;
+    final isScheduled = _currentStatus == LessonStatus.scheduled;
+    final canEdit = isScheduled || isCompleted;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -397,7 +408,10 @@ class _LessonDetailSheet extends ConsumerWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  widget.onUpdated();
+                  Navigator.pop(context);
+                },
               ),
             ],
           ),
@@ -419,23 +433,29 @@ class _LessonDetailSheet extends ConsumerWidget {
                   ? 'Кабинет ${lesson.room!.number}'
                   : lesson.room!.name,
             ),
+          if (hasPrice && hasStudent)
+            _InfoRow(
+              icon: Icons.payments,
+              label: 'Цена',
+              value: '${lesson.lessonType!.defaultPrice!.toInt()} ₸',
+            ),
 
           // Статус
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: _getStatusColor(lesson.status).withValues(alpha: 0.1),
+              color: _getStatusColor(_currentStatus).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
-                Icon(_getStatusIcon(lesson.status), color: _getStatusColor(lesson.status)),
+                Icon(_getStatusIcon(_currentStatus), color: _getStatusColor(_currentStatus)),
                 const SizedBox(width: 8),
                 Text(
-                  _getStatusText(lesson.status),
+                  _getStatusText(_currentStatus),
                   style: TextStyle(
-                    color: _getStatusColor(lesson.status),
+                    color: _getStatusColor(_currentStatus),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -445,84 +465,261 @@ class _LessonDetailSheet extends ConsumerWidget {
 
           const SizedBox(height: 24),
 
-          // Кнопки действий
-          if (lesson.status == LessonStatus.scheduled) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: controllerState.isLoading
-                        ? null
-                        : () async {
-                            final controller = ref.read(lessonControllerProvider.notifier);
-                            final success = await controller.complete(
-                              lesson.id,
-                              lesson.roomId,
-                              lesson.date,
-                            );
-                            if (success && context.mounted) {
-                              onUpdated();
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Занятие отмечено как проведённое'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            }
-                          },
-                    icon: const Icon(Icons.check),
-                    label: const Text('Проведено'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.success,
-                      foregroundColor: Colors.white,
-                    ),
+          // Галочки для запланированных и проведённых занятий
+          if (canEdit) ...[
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Checkbox Проведено
+                  Column(
+                    children: [
+                      Checkbox(
+                        value: isCompleted,
+                        onChanged: (value) {
+                          if (value == true) {
+                            _handleComplete();
+                          } else {
+                            _handleUncomplete();
+                          }
+                        },
+                        activeColor: AppColors.success,
+                      ),
+                      const Text('Проведено'),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: controllerState.isLoading
-                        ? null
-                        : () async {
-                            final controller = ref.read(lessonControllerProvider.notifier);
-                            final success = await controller.cancel(
-                              lesson.id,
-                              lesson.roomId,
-                              lesson.date,
-                            );
-                            if (success && context.mounted) {
-                              onUpdated();
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Занятие отменено'),
-                                  backgroundColor: Colors.orange,
-                                ),
-                              );
-                            }
-                          },
-                    icon: const Icon(Icons.cancel_outlined),
-                    label: const Text('Отменить'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.error,
+                  // Checkbox Оплачено (только если есть цена и ученик)
+                  if (hasPrice && hasStudent) ...[
+                    const SizedBox(width: 32),
+                    Column(
+                      children: [
+                        Checkbox(
+                          value: _isPaid,
+                          onChanged: _isPaid
+                              ? null  // Уже оплачено - нельзя снять
+                              : (value) {
+                                  if (value == true) {
+                                    _handlePayment();
+                                  }
+                                },
+                          activeColor: AppColors.primary,
+                        ),
+                        const Text('Оплачено'),
+                      ],
                     ),
-                  ),
-                ),
-              ],
-            ),
+                  ],
+                ],
+              ),
+            const SizedBox(height: 16),
           ],
 
-          if (controllerState.isLoading)
+          // Кнопки действий
+          if (isScheduled) ...[
+            OutlinedButton.icon(
+              onPressed: controllerState.isLoading || _isLoading
+                  ? null
+                  : _handleCancel,
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Отменить занятие'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.warning,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          if (controllerState.isLoading && !_isLoading)
             const Padding(
               padding: EdgeInsets.only(top: 16),
               child: Center(child: CircularProgressIndicator()),
             ),
 
           const SizedBox(height: 8),
+
+          // Кнопка удаления
+          TextButton.icon(
+            onPressed: controllerState.isLoading || _isLoading
+                ? null
+                : _deleteLesson,
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Удалить занятие'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+            ),
+          ),
+
+          const SizedBox(height: 8),
         ],
       ),
     );
+  }
+
+  Future<void> _handleComplete() async {
+    setState(() => _isLoading = true);
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+    final success = await controller.complete(
+      widget.lesson.id,
+      widget.lesson.roomId,
+      widget.lesson.date,
+    );
+
+    if (success && mounted) {
+      setState(() {
+        _currentStatus = LessonStatus.completed;
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Занятие отмечено как проведённое'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleUncomplete() async {
+    setState(() => _isLoading = true);
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+    final success = await controller.uncomplete(
+      widget.lesson.id,
+      widget.lesson.roomId,
+      widget.lesson.date,
+    );
+
+    if (success && mounted) {
+      setState(() {
+        _currentStatus = LessonStatus.scheduled;
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Статус занятия изменён на "Запланировано"'),
+        ),
+      );
+    } else if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handlePayment() async {
+    final lesson = widget.lesson;
+    if (lesson.studentId == null || lesson.lessonType?.defaultPrice == null) return;
+
+    setState(() => _isLoading = true);
+
+    // Если занятие ещё не проведено - сначала помечаем как проведённое
+    if (_currentStatus != LessonStatus.completed) {
+      final lessonController = ref.read(lessonControllerProvider.notifier);
+      await lessonController.complete(
+        lesson.id,
+        lesson.roomId,
+        lesson.date,
+      );
+    }
+
+    // Создаём оплату
+    final paymentController = ref.read(paymentControllerProvider.notifier);
+    await paymentController.create(
+      institutionId: widget.institutionId,
+      studentId: lesson.studentId!,
+      amount: lesson.lessonType!.defaultPrice!,
+      lessonsCount: 1,
+      comment: lesson.lessonType?.name ?? 'Оплата занятия',
+    );
+
+    if (mounted) {
+      setState(() {
+        _currentStatus = LessonStatus.completed;
+        _isPaid = true;
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Оплата добавлена'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleCancel() async {
+    setState(() => _isLoading = true);
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+    final success = await controller.cancel(
+      widget.lesson.id,
+      widget.lesson.roomId,
+      widget.lesson.date,
+    );
+
+    if (success && mounted) {
+      widget.onUpdated();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Занятие отменено'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _deleteLesson() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить занятие?'),
+        content: const Text(
+          'Занятие будет удалено безвозвратно. Это действие нельзя отменить.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isLoading = true);
+
+      final controller = ref.read(lessonControllerProvider.notifier);
+      final success = await controller.delete(
+        widget.lesson.id,
+        widget.lesson.roomId,
+        widget.lesson.date,
+      );
+
+      if (success && mounted) {
+        widget.onUpdated();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Занятие удалено'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Color _getStatusColor(LessonStatus status) {

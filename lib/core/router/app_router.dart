@@ -69,7 +69,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Institutions
       GoRoute(
         path: '/institutions',
-        builder: (context, state) => const InstitutionsListScreen(),
+        builder: (context, state) {
+          final skipAuto = state.uri.queryParameters['skipAuto'] == 'true';
+          return InstitutionsListScreen(skipAutoNav: skipAuto);
+        },
       ),
       GoRoute(
         path: '/institutions/create',

@@ -585,10 +585,66 @@ class _LessonDetailSheet extends ConsumerWidget {
               child: Center(child: CircularProgressIndicator()),
             ),
 
+          const SizedBox(height: 16),
+
+          // Кнопка удаления
+          TextButton.icon(
+            onPressed: controllerState.isLoading
+                ? null
+                : () => _deleteLesson(context, ref),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Удалить занятие'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+            ),
+          ),
+
           const SizedBox(height: 8),
         ],
       ),
     );
+  }
+
+  Future<void> _deleteLesson(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить занятие?'),
+        content: const Text(
+          'Занятие будет удалено безвозвратно. Это действие нельзя отменить.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final controller = ref.read(lessonControllerProvider.notifier);
+      final success = await controller.delete(
+        lesson.id,
+        lesson.roomId,
+        lesson.date,
+      );
+
+      if (success && context.mounted) {
+        onUpdated();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Занятие удалено'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
   }
 
   String _formatTime(TimeOfDay time) {

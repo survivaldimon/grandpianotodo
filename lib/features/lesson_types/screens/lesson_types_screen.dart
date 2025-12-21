@@ -346,7 +346,7 @@ class _LessonTypeCard extends StatelessWidget {
         ),
         title: Text(lessonType.name),
         subtitle: Text(
-          '${lessonType.defaultDurationMinutes} мин${lessonType.defaultPrice != null ? ' • ${lessonType.defaultPrice!.toStringAsFixed(0)} ₽' : ''}',
+          '${lessonType.defaultDurationMinutes} мин${lessonType.defaultPrice != null ? ' • ${lessonType.defaultPrice!.toStringAsFixed(0)} ₸' : ''}',
         ),
         trailing: PopupMenuButton<String>(
           onSelected: (value) {

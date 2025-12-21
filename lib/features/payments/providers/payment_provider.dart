@@ -54,8 +54,12 @@ final studentPaymentsProvider =
 /// Провайдер суммы за период
 final periodTotalProvider =
     FutureProvider.family<double, PeriodParams>((ref, params) async {
-  final repo = ref.watch(paymentRepositoryProvider);
-  return repo.getTotalForPeriod(params.institutionId, from: params.from, to: params.to);
+  final payments = await ref.watch(paymentsProvider(params).future);
+  double total = 0.0;
+  for (final p in payments) {
+    total += p.amount;
+  }
+  return total;
 });
 
 /// Провайдер тарифов заведения
@@ -72,14 +76,19 @@ final paymentsStreamProvider =
   return repo.watchByInstitution(institutionId);
 });
 
-/// Провайдер суммы оплат за сегодня
+/// Провайдер суммы оплат за сегодня (realtime)
 final todayPaymentsTotalProvider =
-    FutureProvider.family<double, String>((ref, institutionId) async {
+    StreamProvider.family<double, String>((ref, institutionId) {
   final repo = ref.watch(paymentRepositoryProvider);
   final now = DateTime.now();
   final startOfDay = DateTime(now.year, now.month, now.day);
   final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
-  return repo.getTotalForPeriod(institutionId, from: startOfDay, to: endOfDay);
+
+  return repo.watchByInstitution(institutionId).map((payments) => payments
+      .where((p) =>
+          p.paidAt.isAfter(startOfDay.subtract(const Duration(seconds: 1))) &&
+          p.paidAt.isBefore(endOfDay.add(const Duration(seconds: 1))))
+      .fold(0.0, (sum, p) => sum + p.amount));
 });
 
 /// Контроллер оплат

@@ -94,7 +94,6 @@ class StudentsListScreen extends ConsumerWidget {
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(filteredStudentsProvider(institutionId));
-                    await ref.read(filteredStudentsProvider(institutionId).future);
                   },
                   child: ListView.builder(
                     padding: AppSizes.paddingHorizontalM,

@@ -8,18 +8,24 @@ final studentRepositoryProvider = Provider<StudentRepository>((ref) {
   return StudentRepository();
 });
 
-/// Провайдер списка учеников заведения
+/// Провайдер списка учеников заведения (realtime)
 final studentsProvider =
-    FutureProvider.family<List<Student>, String>((ref, institutionId) async {
+    StreamProvider.family<List<Student>, String>((ref, institutionId) {
   final repo = ref.watch(studentRepositoryProvider);
-  return repo.getByInstitution(institutionId);
+  return repo.watchByInstitution(institutionId).map(
+        (students) => students.where((s) => s.archivedAt == null).toList(),
+      );
 });
 
-/// Провайдер учеников с долгом
+/// Провайдер учеников с долгом (realtime)
 final studentsWithDebtProvider =
-    FutureProvider.family<List<Student>, String>((ref, institutionId) async {
+    StreamProvider.family<List<Student>, String>((ref, institutionId) {
   final repo = ref.watch(studentRepositoryProvider);
-  return repo.getByInstitution(institutionId, onlyWithDebt: true);
+  return repo.watchByInstitution(institutionId).map(
+        (students) => students
+            .where((s) => s.archivedAt == null && s.balance < 0)
+            .toList(),
+      );
 });
 
 /// Провайдер ученика по ID
@@ -50,20 +56,22 @@ final studentFilterProvider = StateProvider<StudentFilter>((ref) {
   return StudentFilter.all;
 });
 
-/// Провайдер отфильтрованных учеников
+/// Провайдер отфильтрованных учеников (realtime)
 final filteredStudentsProvider =
-    FutureProvider.family<List<Student>, String>((ref, institutionId) async {
+    StreamProvider.family<List<Student>, String>((ref, institutionId) {
   final repo = ref.watch(studentRepositoryProvider);
   final filter = ref.watch(studentFilterProvider);
 
-  switch (filter) {
-    case StudentFilter.all:
-      return repo.getByInstitution(institutionId);
-    case StudentFilter.withDebt:
-      return repo.getByInstitution(institutionId, onlyWithDebt: true);
-    case StudentFilter.archived:
-      return repo.getByInstitution(institutionId, includeArchived: true);
-  }
+  return repo.watchByInstitution(institutionId).map((students) {
+    switch (filter) {
+      case StudentFilter.all:
+        return students.where((s) => s.archivedAt == null).toList();
+      case StudentFilter.withDebt:
+        return students.where((s) => s.archivedAt == null && s.balance < 0).toList();
+      case StudentFilter.archived:
+        return students;
+    }
+  });
 });
 
 /// Контроллер учеников

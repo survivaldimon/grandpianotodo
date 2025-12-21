@@ -135,6 +135,19 @@ class InstitutionController extends StateNotifier<AsyncValue<void>> {
       return false;
     }
   }
+
+  Future<String?> regenerateInviteCode(String institutionId) async {
+    state = const AsyncValue.loading();
+    try {
+      final newCode = await _repo.regenerateInviteCode(institutionId);
+      _ref.invalidate(currentInstitutionProvider(institutionId));
+      state = const AsyncValue.data(null);
+      return newCode;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
 }
 
 /// Провайдер контроллера заведений

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/schedule/repositories/lesson_repository.dart';
 import 'package:kabinet/shared/models/lesson.dart';
+import 'package:kabinet/shared/providers/supabase_provider.dart';
 
 /// Провайдер репозитория занятий
 final lessonRepositoryProvider = Provider<LessonRepository>((ref) {
@@ -76,11 +78,11 @@ class InstitutionDateParams {
   int get hashCode => Object.hash(institutionId, date.year, date.month, date.day);
 }
 
-/// Провайдер занятий заведения за день (сегодня)
+/// Провайдер занятий заведения за день (сегодня) - realtime
 final institutionTodayLessonsProvider =
-    FutureProvider.family<List<Lesson>, String>((ref, institutionId) async {
+    StreamProvider.family<List<Lesson>, String>((ref, institutionId) {
   final repo = ref.watch(lessonRepositoryProvider);
-  return repo.getByInstitutionAndDate(institutionId, DateTime.now());
+  return repo.watchByInstitution(institutionId, DateTime.now());
 });
 
 /// Провайдер занятий заведения за указанную дату
@@ -93,6 +95,60 @@ final lessonsByInstitutionProvider =
 /// Провайдер выбранной даты
 final selectedDateProvider = StateProvider<DateTime>((ref) {
   return DateTime.now();
+});
+
+/// Провайдер неотмеченных занятий (FutureProvider)
+/// Для owner/admin - все занятия, для teacher - только его
+final unmarkedLessonsProvider =
+    FutureProvider.family<List<Lesson>, String>((ref, institutionId) async {
+  final repo = ref.watch(lessonRepositoryProvider);
+  final membership = await ref.watch(myMembershipProvider(institutionId).future);
+  final userId = ref.watch(currentUserIdProvider);
+
+  if (membership == null || userId == null) {
+    return [];
+  }
+
+  // Owner и admin видят все занятия
+  // roleName может быть на русском или английском
+  final role = membership.roleName.toLowerCase();
+  final isAdminOrOwner = role == 'owner' ||
+      role == 'admin' ||
+      role == 'владелец' ||
+      role == 'администратор';
+
+  return repo.getUnmarkedLessons(
+    institutionId: institutionId,
+    isAdminOrOwner: isAdminOrOwner,
+    teacherId: userId,
+  );
+});
+
+/// Провайдер неотмеченных занятий (StreamProvider - realtime)
+/// Для owner/admin - все занятия, для teacher - только его
+final unmarkedLessonsStreamProvider =
+    StreamProvider.family<List<Lesson>, String>((ref, institutionId) async* {
+  final repo = ref.watch(lessonRepositoryProvider);
+  final membership = await ref.watch(myMembershipProvider(institutionId).future);
+  final userId = ref.watch(currentUserIdProvider);
+
+  if (membership == null || userId == null) {
+    yield [];
+    return;
+  }
+
+  // Owner и admin видят все занятия
+  final role = membership.roleName.toLowerCase();
+  final isAdminOrOwner = role == 'owner' ||
+      role == 'admin' ||
+      role == 'владелец' ||
+      role == 'администратор';
+
+  yield* repo.watchUnmarkedLessons(
+    institutionId: institutionId,
+    isAdminOrOwner: isAdminOrOwner,
+    teacherId: userId,
+  );
 });
 
 /// Контроллер занятий
@@ -221,6 +277,20 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<bool> uncomplete(String id, String roomId, DateTime date) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.uncomplete(id);
+      _invalidateForRoom(roomId, date);
+      _ref.invalidate(lessonProvider(id));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
   Future<bool> cancel(String id, String roomId, DateTime date) async {
     state = const AsyncValue.loading();
     try {
@@ -239,6 +309,19 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await _repo.archive(id);
+      _invalidateForRoom(roomId, date);
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  Future<bool> delete(String id, String roomId, DateTime date) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.delete(id);
       _invalidateForRoom(roomId, date);
       state = const AsyncValue.data(null);
       return true;

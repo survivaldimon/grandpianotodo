@@ -11,11 +11,20 @@ import 'package:kabinet/features/institution/providers/institution_provider.dart
 import 'package:kabinet/shared/models/institution.dart';
 
 /// Экран списка заведений пользователя
-class InstitutionsListScreen extends ConsumerWidget {
-  const InstitutionsListScreen({super.key});
+class InstitutionsListScreen extends ConsumerStatefulWidget {
+  final bool skipAutoNav;
+
+  const InstitutionsListScreen({super.key, this.skipAutoNav = false});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InstitutionsListScreen> createState() => _InstitutionsListScreenState();
+}
+
+class _InstitutionsListScreenState extends ConsumerState<InstitutionsListScreen> {
+  bool _hasAutoNavigated = false;
+
+  @override
+  Widget build(BuildContext context) {
     final institutionsAsync = ref.watch(myInstitutionsProvider);
 
     return Scaffold(
@@ -45,6 +54,16 @@ class InstitutionsListScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(myInstitutionsProvider),
         ),
         data: (institutions) {
+          // Автонавигация если только одно заведение (не при явном переходе)
+          if (institutions.length == 1 && !_hasAutoNavigated && !widget.skipAutoNav) {
+            _hasAutoNavigated = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                context.go('/institutions/${institutions.first.id}');
+              }
+            });
+            return const LoadingIndicator();
+          }
           if (institutions.isEmpty) {
             return _buildEmptyState(context);
           }

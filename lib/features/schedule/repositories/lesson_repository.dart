@@ -229,6 +229,11 @@ class LessonRepository {
     return updateStatus(id, LessonStatus.completed);
   }
 
+  /// Вернуть статус "запланировано"
+  Future<Lesson> uncomplete(String id) async {
+    return updateStatus(id, LessonStatus.scheduled);
+  }
+
   /// Архивировать занятие
   Future<void> archive(String id) async {
     try {
@@ -238,6 +243,25 @@ class LessonRepository {
           .eq('id', id);
     } catch (e) {
       throw DatabaseException('Ошибка архивации занятия: $e');
+    }
+  }
+
+  /// Удалить занятие полностью
+  Future<void> delete(String id) async {
+    try {
+      // Сначала удаляем историю занятия
+      await _client
+          .from('lesson_history')
+          .delete()
+          .eq('lesson_id', id);
+
+      // Затем удаляем само занятие
+      await _client
+          .from('lessons')
+          .delete()
+          .eq('id', id);
+    } catch (e) {
+      throw DatabaseException('Ошибка удаления занятия: $e');
     }
   }
 
@@ -277,7 +301,8 @@ class LessonRepository {
           .eq('room_id', roomId)
           .eq('date', dateStr)
           .isFilter('archived_at', null)
-          .or('start_time.lt.$endStr,end_time.gt.$startStr');
+          .lt('start_time', endStr)
+          .gt('end_time', startStr);
 
       if (excludeLessonId != null) {
         query = query.neq('id', excludeLessonId);
@@ -287,6 +312,64 @@ class LessonRepository {
       return (data as List).isNotEmpty;
     } catch (e) {
       throw DatabaseException('Ошибка проверки конфликта: $e');
+    }
+  }
+
+  /// Получить неотмеченные занятия (прошедшие, но без статуса)
+  /// Для owner/admin возвращает все, для teacher - только его занятия
+  Future<List<Lesson>> getUnmarkedLessons({
+    required String institutionId,
+    required bool isAdminOrOwner,
+    String? teacherId,
+  }) async {
+    try {
+      final now = DateTime.now();
+
+      // Получаем занятия со статусом scheduled
+      var query = _client
+          .from('lessons')
+          .select('''
+            *,
+            rooms(*),
+            subjects(*),
+            lesson_types(*),
+            students(*),
+            student_groups(*)
+          ''')
+          .eq('institution_id', institutionId)
+          .eq('status', 'scheduled')
+          .isFilter('archived_at', null);
+
+      // Для преподавателя - только его занятия
+      if (!isAdminOrOwner && teacherId != null) {
+        query = query.eq('teacher_id', teacherId);
+      }
+
+      final data = await query.order('date').order('end_time');
+
+      // Фильтруем на клиенте: занятия, время которых полностью прошло
+      final today = DateTime(now.year, now.month, now.day);
+      final lessons = (data as List)
+          .map((item) => Lesson.fromJson(item))
+          .where((lesson) {
+        // Занятие в прошлом дне
+        if (lesson.date.isBefore(today)) {
+          return true;
+        }
+        // Занятие сегодня и время окончания уже прошло
+        if (lesson.date.year == now.year &&
+            lesson.date.month == now.month &&
+            lesson.date.day == now.day) {
+          final endMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
+          final nowMinutes = now.hour * 60 + now.minute;
+          return endMinutes <= nowMinutes;
+        }
+        return false;
+      }).toList();
+
+      return lessons;
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки неотмеченных занятий: $e');
     }
   }
 
@@ -304,5 +387,61 @@ class LessonRepository {
                 item['date'] == dateStr && item['archived_at'] == null)
             .map((item) => Lesson.fromJson(item))
             .toList());
+  }
+
+  /// Стрим занятий заведения за дату (realtime)
+  Stream<List<Lesson>> watchByInstitution(String institutionId, DateTime date) {
+    final dateStr = date.toIso8601String().split('T').first;
+
+    return _client
+        .from('lessons')
+        .stream(primaryKey: ['id'])
+        .eq('institution_id', institutionId)
+        .order('start_time')
+        .map((data) => data
+            .where((item) =>
+                item['date'] == dateStr && item['archived_at'] == null)
+            .map((item) => Lesson.fromJson(item))
+            .toList());
+  }
+
+  /// Стрим неотмеченных занятий (realtime)
+  /// Для owner/admin возвращает все, для teacher - только его занятия
+  Stream<List<Lesson>> watchUnmarkedLessons({
+    required String institutionId,
+    required bool isAdminOrOwner,
+    String? teacherId,
+  }) {
+    return _client
+        .from('lessons')
+        .stream(primaryKey: ['id'])
+        .eq('institution_id', institutionId)
+        .order('date')
+        .map((data) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      return data
+          .where((item) =>
+              item['status'] == 'scheduled' &&
+              item['archived_at'] == null &&
+              (isAdminOrOwner || item['teacher_id'] == teacherId))
+          .map((item) => Lesson.fromJson(item))
+          .where((lesson) {
+        // Занятие в прошлом дне
+        if (lesson.date.isBefore(today)) {
+          return true;
+        }
+        // Занятие сегодня и время окончания уже прошло
+        if (lesson.date.year == now.year &&
+            lesson.date.month == now.month &&
+            lesson.date.day == now.day) {
+          final endMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
+          final nowMinutes = now.hour * 60 + now.minute;
+          return endMinutes <= nowMinutes;
+        }
+        return false;
+      }).toList();
+    });
   }
 }

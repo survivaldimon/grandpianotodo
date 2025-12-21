@@ -82,6 +82,8 @@ class AppStrings {
   static const String rescheduled = 'Перенесено';
   static const String markCompleted = 'Отметить проведённым';
   static const String markCancelled = 'Отменить занятие';
+  static const String unmarkedLessons = 'Неотмеченные занятия';
+  static const String noUnmarkedLessons = 'Нет неотмеченных занятий';
 
   // Students
   static const String student = 'Ученик';

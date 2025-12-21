@@ -71,16 +71,32 @@ class SettingsScreen extends ConsumerWidget {
                 leading: const Icon(Icons.share),
                 title: const Text('Пригласить участника'),
                 subtitle: Text('Код: ${institution.inviteCode}'),
-                trailing: const Icon(Icons.copy),
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: institution.inviteCode));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Код скопирован в буфер обмена'),
-                      duration: Duration(seconds: 2),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.copy),
+                      tooltip: 'Скопировать код',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: institution.inviteCode));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Код скопирован в буфер обмена'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
+                    if (isOwner)
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'Сгенерировать новый код',
+                        onPressed: controllerState.isLoading
+                            ? null
+                            : () => _regenerateInviteCode(context, ref),
+                      ),
+                  ],
+                ),
               ),
               const Divider(),
               const _SectionHeader(title: 'УПРАВЛЕНИЕ'),
@@ -241,6 +257,41 @@ class SettingsScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  Future<void> _regenerateInviteCode(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Сгенерировать новый код?'),
+        content: const Text(
+          'Старый код перестанет работать. Все, кто ещё не присоединился по старому коду, не смогут это сделать.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Сгенерировать'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final controller = ref.read(institutionControllerProvider.notifier);
+      final newCode = await controller.regenerateInviteCode(institutionId);
+      if (newCode != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Новый код: $newCode'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   void _showEditNameDialog(BuildContext context, WidgetRef ref, String currentName) {

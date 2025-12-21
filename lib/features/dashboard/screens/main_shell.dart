@@ -60,7 +60,7 @@ class MainShell extends ConsumerWidget {
               context.go('/institutions/$institutionId/payments');
               break;
             case 4:
-              _showMoreMenu(context, institutionId);
+              context.go('/institutions/$institutionId/settings');
               break;
           }
         },
@@ -86,44 +86,9 @@ class MainShell extends ConsumerWidget {
             label: AppStrings.payments,
           ),
           NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more_horiz),
-            label: AppStrings.more,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showMoreMenu(BuildContext context, String institutionId) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.groups),
-            title: const Text(AppStrings.groups),
-            onTap: () {
-              Navigator.pop(context);
-              // TODO: Navigate to groups
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.bar_chart),
-            title: const Text(AppStrings.statistics),
-            onTap: () {
-              Navigator.pop(context);
-              // TODO: Navigate to statistics
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text(AppStrings.settings),
-            onTap: () {
-              Navigator.pop(context);
-              context.go('/institutions/$institutionId/settings');
-            },
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: AppStrings.settings,
           ),
         ],
       ),

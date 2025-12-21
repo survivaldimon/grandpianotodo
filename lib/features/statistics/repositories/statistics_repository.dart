@@ -69,6 +69,23 @@ class StudentStats {
   });
 }
 
+/// Статистика по тарифам оплаты
+class PaymentPlanStats {
+  final String? planId;
+  final String planName;
+  final int purchaseCount;
+  final double totalAmount;
+  final int totalLessons;
+
+  const PaymentPlanStats({
+    this.planId,
+    required this.planName,
+    required this.purchaseCount,
+    required this.totalAmount,
+    required this.totalLessons,
+  });
+}
+
 /// Репозиторий статистики
 class StatisticsRepository {
   final _client = SupabaseConfig.client;
@@ -86,7 +103,7 @@ class StatisticsRepository {
       // Получаем занятия за период
       final lessonsData = await _client
           .from('lessons')
-          .select('id, status, start_time, end_time')
+          .select('id, status, start_time, end_time, student_id')
           .eq('institution_id', institutionId)
           .gte('date', startStr)
           .lte('date', endStr)
@@ -350,6 +367,60 @@ class StatisticsRepository {
       }).toList();
     } catch (e) {
       throw DatabaseException('Ошибка загрузки должников: $e');
+    }
+  }
+
+  /// Получить статистику по тарифам оплаты
+  Future<List<PaymentPlanStats>> getPaymentPlanStats({
+    required String institutionId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      // Получаем оплаты за период с тарифами
+      final paymentsData = await _client
+          .from('payments')
+          .select('id, amount, lessons_count, payment_plan_id, payment_plans(id, name)')
+          .eq('institution_id', institutionId)
+          .gte('paid_at', startDate.toIso8601String())
+          .lte('paid_at', endDate.toIso8601String());
+
+      final payments = paymentsData as List;
+
+      // Группируем по тарифам
+      final planData = <String?, Map<String, dynamic>>{};
+      for (final payment in payments) {
+        final planId = payment['payment_plan_id'] as String?;
+        final plan = payment['payment_plans'] as Map<String, dynamic>?;
+        final planName = plan?['name'] as String? ?? 'Свой вариант';
+
+        if (!planData.containsKey(planId)) {
+          planData[planId] = {
+            'name': planName,
+            'count': 0,
+            'amount': 0.0,
+            'lessons': 0,
+          };
+        }
+        planData[planId]!['count'] = (planData[planId]!['count'] as int) + 1;
+        planData[planId]!['amount'] =
+            (planData[planId]!['amount'] as double) + (payment['amount'] as num).toDouble();
+        planData[planId]!['lessons'] =
+            (planData[planId]!['lessons'] as int) + (payment['lessons_count'] as int);
+      }
+
+      return planData.entries.map((e) {
+        return PaymentPlanStats(
+          planId: e.key,
+          planName: e.value['name'] as String,
+          purchaseCount: e.value['count'] as int,
+          totalAmount: e.value['amount'] as double,
+          totalLessons: e.value['lessons'] as int,
+        );
+      }).toList()
+        ..sort((a, b) => b.purchaseCount.compareTo(a.purchaseCount));
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки статистики по тарифам: $e');
     }
   }
 }
