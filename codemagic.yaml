@@ -8,7 +8,7 @@ workflows:
     instance_type: mac_mini_m1
 
     integrations:
-      app_store_connect: codemagic
+      app_store_connect: Codemagic
 
     environment:
       flutter: 3.38.1  # Последняя стабильная версия с полной поддержкой iOS 18
