@@ -79,18 +79,22 @@ UI (Screen/Widget) → Provider → Repository → Supabase
 - `ci/codemagic/codemagic.yaml` — конфигурация CI/CD
 - `ci/codemagic/README.md` — инструкция по настройке
 
-### Известные проблемы iOS
+### Решённые проблемы iOS
 
-**path_provider_foundation crash** — плагин крашится при запуске на iOS 18.x и iOS 26 beta.
-- Ошибка: `EXC_BAD_ACCESS` в `swift_getObjectType`
-- Статус: **Не решено**
-- Workaround: используем `dependency_overrides` для понижения версии
+**path_provider_foundation crash (РЕШЕНО)**
+- Ошибка: `EXC_BAD_ACCESS` в `swift_getObjectType` при запуске на iOS 18.x
+- Причина: Debug mode + старые версии Flutter/Xcode
+- **Решение:**
+  1. Flutter 3.38.1 (полная поддержка iOS 18)
+  2. Xcode 16.2 (не beta!)
+  3. **Release mode** (критично — Debug крашится!)
+  4. Убрать `dependency_overrides` — использовать актуальные версии
 
-```yaml
-dependency_overrides:
-  path_provider: 2.0.15
-  path_provider_foundation: 2.2.4
-```
+### Важно для iOS сборок
+
+- **ВСЕГДА собирать в Release mode** — Debug билды могут крашиться
+- Использовать **Default Workflow** в Codemagic (не YAML) для бесплатного аккаунта
+- Интеграция App Store Connect настраивается в User Settings (не Team)
 
 ### Настройки iOS
 - Минимальная версия: **iOS 15.0**
