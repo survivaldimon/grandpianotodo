@@ -8,8 +8,12 @@ class GeneralStats {
   final int cancelledLessons;
   final int scheduledLessons;
   final double totalPayments;
+  final double totalDiscounts;
+  final int discountedPaymentsCount;
   final int activeStudents;
   final double roomHours;
+  final double avgLessonCost; // Средняя стоимость занятия
+  final int paidLessonsCount; // Количество оплаченных занятий
 
   const GeneralStats({
     required this.totalLessons,
@@ -17,8 +21,12 @@ class GeneralStats {
     required this.cancelledLessons,
     required this.scheduledLessons,
     required this.totalPayments,
+    required this.totalDiscounts,
+    required this.discountedPaymentsCount,
     required this.activeStudents,
     required this.roomHours,
+    required this.avgLessonCost,
+    required this.paidLessonsCount,
   });
 }
 
@@ -29,6 +37,8 @@ class SubjectStats {
   final String? color;
   final int lessonsCount;
   final double percentage;
+  final double avgLessonCost; // Средняя стоимость занятия
+  final int paidLessonsCount; // Количество оплаченных занятий
 
   const SubjectStats({
     required this.subjectId,
@@ -36,6 +46,8 @@ class SubjectStats {
     this.color,
     required this.lessonsCount,
     required this.percentage,
+    this.avgLessonCost = 0,
+    this.paidLessonsCount = 0,
   });
 }
 
@@ -45,12 +57,16 @@ class TeacherStats {
   final String teacherName;
   final int lessonsCount;
   final List<String> subjects;
+  final double avgLessonCost; // Средняя стоимость занятия
+  final int paidLessonsCount; // Количество оплаченных занятий
 
   const TeacherStats({
     required this.teacherId,
     required this.teacherName,
     required this.lessonsCount,
     required this.subjects,
+    this.avgLessonCost = 0,
+    this.paidLessonsCount = 0,
   });
 }
 
@@ -86,6 +102,29 @@ class PaymentPlanStats {
   });
 }
 
+/// Статистика стоимости занятий ученика
+class StudentLessonCostStats {
+  final double avgLessonCost;
+  final int paidLessonsCount;
+  final double totalCost;
+  final double approxAvgCost; // Приблизительная стоимость (оплаты / занятия)
+  final bool isApproximate; // Используется ли приблизительное значение
+
+  const StudentLessonCostStats({
+    required this.avgLessonCost,
+    required this.paidLessonsCount,
+    required this.totalCost,
+    this.approxAvgCost = 0,
+    this.isApproximate = false,
+  });
+
+  /// Получить отображаемую стоимость (точную или приблизительную)
+  double get displayCost => avgLessonCost > 0 ? avgLessonCost : approxAvgCost;
+
+  /// Есть ли какие-либо данные для отображения
+  bool get hasData => avgLessonCost > 0 || approxAvgCost > 0;
+}
+
 /// Репозиторий статистики
 class StatisticsRepository {
   final _client = SupabaseConfig.client;
@@ -100,10 +139,10 @@ class StatisticsRepository {
       final startStr = startDate.toIso8601String().split('T').first;
       final endStr = endDate.toIso8601String().split('T').first;
 
-      // Получаем занятия за период
+      // Получаем занятия за период с subscription_id
       final lessonsData = await _client
           .from('lessons')
-          .select('id, status, start_time, end_time, student_id')
+          .select('id, status, start_time, end_time, student_id, subscription_id')
           .eq('institution_id', institutionId)
           .gte('date', startStr)
           .lte('date', endStr)
@@ -130,15 +169,97 @@ class StatisticsRepository {
       // Получаем оплаты за период
       final paymentsData = await _client
           .from('payments')
-          .select('amount')
+          .select('id, amount, comment, lessons_count')
           .eq('institution_id', institutionId)
           .gte('paid_at', startDate.toIso8601String())
           .lte('paid_at', endDate.toIso8601String());
 
       double totalPayments = 0;
+      double totalDiscounts = 0;
+      int discountedPaymentsCount = 0;
+
+      // Регулярка для парсинга скидки из комментария: "Скидка: 2000 ₸"
+      final discountRegex = RegExp(r'Скидка:\s*(\d+(?:\.\d+)?)\s*₸?');
+
+      // Карта: payment_id -> cost_per_lesson
+      final paymentCostMap = <String, double>{};
+
       for (final p in paymentsData as List) {
-        totalPayments += (p['amount'] as num).toDouble();
+        final amount = (p['amount'] as num).toDouble();
+        final lessonsCount = p['lessons_count'] as int? ?? 1;
+        totalPayments += amount;
+
+        // Сохраняем стоимость за занятие
+        paymentCostMap[p['id'] as String] = lessonsCount > 0 ? amount / lessonsCount : 0;
+
+        // Проверяем комментарий на наличие скидки
+        final comment = p['comment'] as String?;
+        if (comment != null) {
+          final match = discountRegex.firstMatch(comment);
+          if (match != null) {
+            final discountAmount = double.tryParse(match.group(1) ?? '0') ?? 0;
+            totalDiscounts += discountAmount;
+            discountedPaymentsCount++;
+          }
+        }
       }
+
+      // Считаем среднюю стоимость занятия
+      double totalLessonsCost = 0;
+      int paidLessonsCount = 0;
+
+      // Собираем subscription_id занятий за период
+      final subscriptionIds = <String>{};
+      for (final lesson in lessons) {
+        if (lesson['subscription_id'] != null) {
+          subscriptionIds.add(lesson['subscription_id'] as String);
+        }
+      }
+
+      // Получаем подписки и их оплаты
+      if (subscriptionIds.isNotEmpty) {
+        final subscriptionsData = await _client
+            .from('subscriptions')
+            .select('id, payment_id')
+            .inFilter('id', subscriptionIds.toList());
+
+        // Карта subscription_id -> payment_id
+        final subscriptionPaymentMap = <String, String>{};
+        for (final sub in subscriptionsData as List) {
+          if (sub['payment_id'] != null) {
+            subscriptionPaymentMap[sub['id'] as String] = sub['payment_id'] as String;
+          }
+        }
+
+        // Получаем оплаты подписок (могут быть из другого периода)
+        final subPaymentIds = subscriptionPaymentMap.values.toSet();
+        if (subPaymentIds.isNotEmpty) {
+          final subPaymentsData = await _client
+              .from('payments')
+              .select('id, amount, lessons_count')
+              .inFilter('id', subPaymentIds.toList());
+
+          for (final p in subPaymentsData as List) {
+            final amount = (p['amount'] as num).toDouble();
+            final lessonsCount = p['lessons_count'] as int? ?? 1;
+            paymentCostMap[p['id'] as String] = lessonsCount > 0 ? amount / lessonsCount : 0;
+          }
+        }
+
+        // Теперь считаем стоимость занятий
+        for (final lesson in lessons) {
+          final subId = lesson['subscription_id'] as String?;
+          if (subId != null && subscriptionPaymentMap.containsKey(subId)) {
+            final paymentId = subscriptionPaymentMap[subId]!;
+            if (paymentCostMap.containsKey(paymentId)) {
+              totalLessonsCost += paymentCostMap[paymentId]!;
+              paidLessonsCount++;
+            }
+          }
+        }
+      }
+
+      final avgLessonCost = paidLessonsCount > 0 ? totalLessonsCost / paidLessonsCount : 0.0;
 
       // Считаем уникальных учеников с занятиями
       final studentIds = <String>{};
@@ -154,8 +275,12 @@ class StatisticsRepository {
         cancelledLessons: cancelledLessons,
         scheduledLessons: scheduledLessons,
         totalPayments: totalPayments,
+        totalDiscounts: totalDiscounts,
+        discountedPaymentsCount: discountedPaymentsCount,
         activeStudents: studentIds.length,
         roomHours: roomHours,
+        avgLessonCost: avgLessonCost,
+        paidLessonsCount: paidLessonsCount,
       );
     } catch (e) {
       throw DatabaseException('Ошибка загрузки статистики: $e');
@@ -172,10 +297,10 @@ class StatisticsRepository {
       final startStr = startDate.toIso8601String().split('T').first;
       final endStr = endDate.toIso8601String().split('T').first;
 
-      // Получаем занятия с предметами
+      // Получаем занятия с предметами и subscription_id
       final lessonsData = await _client
           .from('lessons')
-          .select('subject_id, subjects(id, name, color)')
+          .select('id, subject_id, subscription_id, subjects(id, name, color)')
           .eq('institution_id', institutionId)
           .gte('date', startStr)
           .lte('date', endStr)
@@ -185,32 +310,89 @@ class StatisticsRepository {
       final lessons = lessonsData as List;
       final totalCount = lessons.length;
 
-      // Группируем по предметам
-      final subjectCounts = <String, Map<String, dynamic>>{};
+      // Группируем по предметам и собираем subscription_id
+      final subjectData = <String, Map<String, dynamic>>{};
+      final allSubscriptionIds = <String>{};
+
       for (final lesson in lessons) {
         final subjectId = lesson['subject_id'] as String;
         final subject = lesson['subjects'] as Map<String, dynamic>?;
 
         if (subject != null) {
-          if (!subjectCounts.containsKey(subjectId)) {
-            subjectCounts[subjectId] = {
+          if (!subjectData.containsKey(subjectId)) {
+            subjectData[subjectId] = {
               'name': subject['name'],
               'color': subject['color'],
               'count': 0,
+              'lessons': <Map<String, dynamic>>[],
             };
           }
-          subjectCounts[subjectId]!['count'] = (subjectCounts[subjectId]!['count'] as int) + 1;
+          subjectData[subjectId]!['count'] = (subjectData[subjectId]!['count'] as int) + 1;
+          (subjectData[subjectId]!['lessons'] as List<Map<String, dynamic>>).add(lesson);
+
+          if (lesson['subscription_id'] != null) {
+            allSubscriptionIds.add(lesson['subscription_id'] as String);
+          }
         }
       }
 
-      return subjectCounts.entries.map((e) {
+      // Получаем информацию о стоимости занятий
+      final paymentCostMap = <String, double>{};
+      final subscriptionPaymentMap = <String, String>{};
+
+      if (allSubscriptionIds.isNotEmpty) {
+        final subscriptionsData = await _client
+            .from('subscriptions')
+            .select('id, payment_id')
+            .inFilter('id', allSubscriptionIds.toList());
+
+        final paymentIds = <String>{};
+        for (final sub in subscriptionsData as List) {
+          if (sub['payment_id'] != null) {
+            subscriptionPaymentMap[sub['id'] as String] = sub['payment_id'] as String;
+            paymentIds.add(sub['payment_id'] as String);
+          }
+        }
+
+        if (paymentIds.isNotEmpty) {
+          final paymentsData = await _client
+              .from('payments')
+              .select('id, amount, lessons_count')
+              .inFilter('id', paymentIds.toList());
+
+          for (final p in paymentsData as List) {
+            final amount = (p['amount'] as num).toDouble();
+            final lessonsCount = p['lessons_count'] as int? ?? 1;
+            paymentCostMap[p['id'] as String] = lessonsCount > 0 ? amount / lessonsCount : 0;
+          }
+        }
+      }
+
+      return subjectData.entries.map((e) {
         final count = e.value['count'] as int;
+
+        // Считаем среднюю стоимость для предмета
+        double totalCost = 0;
+        int paidCount = 0;
+        for (final lesson in (e.value['lessons'] as List<Map<String, dynamic>>)) {
+          final subId = lesson['subscription_id'] as String?;
+          if (subId != null && subscriptionPaymentMap.containsKey(subId)) {
+            final paymentId = subscriptionPaymentMap[subId]!;
+            if (paymentCostMap.containsKey(paymentId)) {
+              totalCost += paymentCostMap[paymentId]!;
+              paidCount++;
+            }
+          }
+        }
+
         return SubjectStats(
           subjectId: e.key,
           subjectName: e.value['name'] as String,
           color: e.value['color'] as String?,
           lessonsCount: count,
           percentage: totalCount > 0 ? (count / totalCount) * 100 : 0,
+          avgLessonCost: paidCount > 0 ? totalCost / paidCount : 0,
+          paidLessonsCount: paidCount,
         );
       }).toList()
         ..sort((a, b) => b.lessonsCount.compareTo(a.lessonsCount));
@@ -229,10 +411,10 @@ class StatisticsRepository {
       final startStr = startDate.toIso8601String().split('T').first;
       final endStr = endDate.toIso8601String().split('T').first;
 
-      // Получаем занятия
+      // Получаем занятия с subscription_id
       final lessonsData = await _client
           .from('lessons')
-          .select('teacher_id, subject_id, subjects(name)')
+          .select('id, teacher_id, subject_id, subscription_id, subjects(name)')
           .eq('institution_id', institutionId)
           .gte('date', startStr)
           .lte('date', endStr)
@@ -242,6 +424,8 @@ class StatisticsRepository {
 
       // Группируем по преподавателям
       final teacherData = <String, Map<String, dynamic>>{};
+      final allSubscriptionIds = <String>{};
+
       for (final lesson in lessons) {
         final teacherId = lesson['teacher_id'] as String;
 
@@ -249,13 +433,19 @@ class StatisticsRepository {
           teacherData[teacherId] = {
             'count': 0,
             'subjects': <String>{},
+            'lessons': <Map<String, dynamic>>[],
           };
         }
         teacherData[teacherId]!['count'] = (teacherData[teacherId]!['count'] as int) + 1;
+        (teacherData[teacherId]!['lessons'] as List<Map<String, dynamic>>).add(lesson);
 
         final subject = lesson['subjects'] as Map<String, dynamic>?;
         if (subject != null) {
           (teacherData[teacherId]!['subjects'] as Set<String>).add(subject['name'] as String);
+        }
+
+        if (lesson['subscription_id'] != null) {
+          allSubscriptionIds.add(lesson['subscription_id'] as String);
         }
       }
 
@@ -273,12 +463,60 @@ class StatisticsRepository {
         profilesMap[p['id'] as String] = p['full_name'] as String;
       }
 
+      // Получаем информацию о стоимости занятий
+      final paymentCostMap = <String, double>{};
+      final subscriptionPaymentMap = <String, String>{};
+
+      if (allSubscriptionIds.isNotEmpty) {
+        final subscriptionsData = await _client
+            .from('subscriptions')
+            .select('id, payment_id')
+            .inFilter('id', allSubscriptionIds.toList());
+
+        final paymentIds = <String>{};
+        for (final sub in subscriptionsData as List) {
+          if (sub['payment_id'] != null) {
+            subscriptionPaymentMap[sub['id'] as String] = sub['payment_id'] as String;
+            paymentIds.add(sub['payment_id'] as String);
+          }
+        }
+
+        if (paymentIds.isNotEmpty) {
+          final paymentsData = await _client
+              .from('payments')
+              .select('id, amount, lessons_count')
+              .inFilter('id', paymentIds.toList());
+
+          for (final p in paymentsData as List) {
+            final amount = (p['amount'] as num).toDouble();
+            final lessonsCount = p['lessons_count'] as int? ?? 1;
+            paymentCostMap[p['id'] as String] = lessonsCount > 0 ? amount / lessonsCount : 0;
+          }
+        }
+      }
+
       return teacherData.entries.map((e) {
+        // Считаем среднюю стоимость для преподавателя
+        double totalCost = 0;
+        int paidCount = 0;
+        for (final lesson in (e.value['lessons'] as List<Map<String, dynamic>>)) {
+          final subId = lesson['subscription_id'] as String?;
+          if (subId != null && subscriptionPaymentMap.containsKey(subId)) {
+            final paymentId = subscriptionPaymentMap[subId]!;
+            if (paymentCostMap.containsKey(paymentId)) {
+              totalCost += paymentCostMap[paymentId]!;
+              paidCount++;
+            }
+          }
+        }
+
         return TeacherStats(
           teacherId: e.key,
           teacherName: profilesMap[e.key] ?? 'Неизвестный',
           lessonsCount: e.value['count'] as int,
           subjects: (e.value['subjects'] as Set<String>).toList(),
+          avgLessonCost: paidCount > 0 ? totalCost / paidCount : 0,
+          paidLessonsCount: paidCount,
         );
       }).toList()
         ..sort((a, b) => b.lessonsCount.compareTo(a.lessonsCount));
@@ -380,7 +618,7 @@ class StatisticsRepository {
       // Получаем оплаты за период с тарифами
       final paymentsData = await _client
           .from('payments')
-          .select('id, amount, lessons_count, payment_plan_id, payment_plans(id, name)')
+          .select('id, amount, lessons_count, payment_plan_id, comment, payment_plans(id, name)')
           .eq('institution_id', institutionId)
           .gte('paid_at', startDate.toIso8601String())
           .lte('paid_at', endDate.toIso8601String());
@@ -388,25 +626,42 @@ class StatisticsRepository {
       final payments = paymentsData as List;
 
       // Группируем по тарифам
-      final planData = <String?, Map<String, dynamic>>{};
+      final planData = <String, Map<String, dynamic>>{};
       for (final payment in payments) {
         final planId = payment['payment_plan_id'] as String?;
         final plan = payment['payment_plans'] as Map<String, dynamic>?;
-        final planName = plan?['name'] as String? ?? 'Свой вариант';
+        final comment = payment['comment'] as String?;
 
-        if (!planData.containsKey(planId)) {
-          planData[planId] = {
+        // Определяем название: тариф, тип занятия из comment, или "Свой вариант"
+        String planName;
+        String groupKey;
+
+        if (plan != null) {
+          planName = plan['name'] as String;
+          groupKey = planId!;
+        } else if (comment != null && comment.startsWith('lesson:')) {
+          // Формат: lesson:ID|TYPE_NAME
+          final pipeIndex = comment.indexOf('|');
+          planName = pipeIndex != -1 ? comment.substring(pipeIndex + 1) : 'Оплата занятия';
+          groupKey = 'lesson_type:$planName';
+        } else {
+          planName = 'Свой вариант';
+          groupKey = 'custom';
+        }
+
+        if (!planData.containsKey(groupKey)) {
+          planData[groupKey] = {
             'name': planName,
             'count': 0,
             'amount': 0.0,
             'lessons': 0,
           };
         }
-        planData[planId]!['count'] = (planData[planId]!['count'] as int) + 1;
-        planData[planId]!['amount'] =
-            (planData[planId]!['amount'] as double) + (payment['amount'] as num).toDouble();
-        planData[planId]!['lessons'] =
-            (planData[planId]!['lessons'] as int) + (payment['lessons_count'] as int);
+        planData[groupKey]!['count'] = (planData[groupKey]!['count'] as int) + 1;
+        planData[groupKey]!['amount'] =
+            (planData[groupKey]!['amount'] as double) + (payment['amount'] as num).toDouble();
+        planData[groupKey]!['lessons'] =
+            (planData[groupKey]!['lessons'] as int) + (payment['lessons_count'] as int);
       }
 
       return planData.entries.map((e) {
@@ -421,6 +676,123 @@ class StatisticsRepository {
         ..sort((a, b) => b.purchaseCount.compareTo(a.purchaseCount));
     } catch (e) {
       throw DatabaseException('Ошибка загрузки статистики по тарифам: $e');
+    }
+  }
+
+  /// Получить среднюю стоимость занятия для ученика
+  Future<StudentLessonCostStats> getStudentAvgLessonCost({
+    required String studentId,
+  }) async {
+    try {
+      // Получаем ВСЕ завершённые занятия ученика
+      final allLessonsData = await _client
+          .from('lessons')
+          .select('id, subscription_id')
+          .eq('student_id', studentId)
+          .eq('status', 'completed')
+          .isFilter('archived_at', null);
+
+      final allLessons = allLessonsData as List;
+      final totalCompletedLessons = allLessons.length;
+
+      // Получаем оплаты ученика для приблизительного расчёта
+      final studentPaymentsData = await _client
+          .from('payments')
+          .select('amount')
+          .eq('student_id', studentId);
+
+      double totalStudentPayments = 0;
+      for (final p in studentPaymentsData as List) {
+        totalStudentPayments += (p['amount'] as num).toDouble();
+      }
+
+      // Приблизительная стоимость: все оплаты / все завершённые занятия
+      final double approxAvgCost = totalCompletedLessons > 0 && totalStudentPayments > 0
+          ? totalStudentPayments / totalCompletedLessons
+          : 0;
+
+      // Занятия с subscription_id для точного расчёта
+      final lessonsWithSub = allLessons.where((l) => l['subscription_id'] != null).toList();
+
+      if (lessonsWithSub.isEmpty) {
+        return StudentLessonCostStats(
+          avgLessonCost: 0,
+          paidLessonsCount: 0,
+          totalCost: 0,
+          approxAvgCost: approxAvgCost,
+          isApproximate: approxAvgCost > 0,
+        );
+      }
+
+      // Собираем subscription_id
+      final subscriptionIds = <String>{};
+      for (final lesson in lessonsWithSub) {
+        subscriptionIds.add(lesson['subscription_id'] as String);
+      }
+
+      // Получаем подписки и их payment_id
+      final subscriptionsData = await _client
+          .from('subscriptions')
+          .select('id, payment_id')
+          .inFilter('id', subscriptionIds.toList());
+
+      final subscriptionPaymentMap = <String, String>{};
+      final paymentIds = <String>{};
+      for (final sub in subscriptionsData as List) {
+        if (sub['payment_id'] != null) {
+          subscriptionPaymentMap[sub['id'] as String] = sub['payment_id'] as String;
+          paymentIds.add(sub['payment_id'] as String);
+        }
+      }
+
+      if (paymentIds.isEmpty) {
+        return StudentLessonCostStats(
+          avgLessonCost: 0,
+          paidLessonsCount: lessonsWithSub.length,
+          totalCost: 0,
+          approxAvgCost: approxAvgCost,
+          isApproximate: approxAvgCost > 0,
+        );
+      }
+
+      // Получаем оплаты
+      final paymentsData = await _client
+          .from('payments')
+          .select('id, amount, lessons_count')
+          .inFilter('id', paymentIds.toList());
+
+      final paymentCostMap = <String, double>{};
+      for (final p in paymentsData as List) {
+        final amount = (p['amount'] as num).toDouble();
+        final lessonsCount = p['lessons_count'] as int? ?? 1;
+        paymentCostMap[p['id'] as String] = lessonsCount > 0 ? amount / lessonsCount : 0;
+      }
+
+      // Считаем общую стоимость
+      double totalCost = 0;
+      int paidCount = 0;
+      for (final lesson in lessonsWithSub) {
+        final subId = lesson['subscription_id'] as String;
+        if (subscriptionPaymentMap.containsKey(subId)) {
+          final paymentId = subscriptionPaymentMap[subId]!;
+          if (paymentCostMap.containsKey(paymentId)) {
+            totalCost += paymentCostMap[paymentId]!;
+            paidCount++;
+          }
+        }
+      }
+
+      final exactAvgCost = paidCount > 0 ? totalCost / paidCount : 0.0;
+
+      return StudentLessonCostStats(
+        avgLessonCost: exactAvgCost,
+        paidLessonsCount: paidCount,
+        totalCost: totalCost,
+        approxAvgCost: approxAvgCost,
+        isApproximate: exactAvgCost <= 0 && approxAvgCost > 0,
+      );
+    } catch (e) {
+      throw DatabaseException('Ошибка расчёта средней стоимости: $e');
     }
   }
 }

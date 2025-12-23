@@ -50,6 +50,8 @@ class Lesson extends BaseModel {
   final LessonStatus status;
   final String? comment;
   final String createdBy;
+  final String? repeatGroupId; // ID группы повторяющихся занятий
+  final String? subscriptionId; // ID подписки для расчёта стоимости
 
   /// Связанные объекты (join)
   final Room? room;
@@ -77,6 +79,8 @@ class Lesson extends BaseModel {
     this.status = LessonStatus.scheduled,
     this.comment,
     required this.createdBy,
+    this.repeatGroupId,
+    this.subscriptionId,
     this.room,
     this.teacher,
     this.subject,
@@ -84,6 +88,9 @@ class Lesson extends BaseModel {
     this.student,
     this.group,
   });
+
+  /// Является ли занятие частью повторяющейся серии
+  bool get isRepeating => repeatGroupId != null;
 
   /// Индивидуальное ли занятие
   bool get isIndividual => studentId != null;
@@ -125,6 +132,8 @@ class Lesson extends BaseModel {
         status: LessonStatus.fromString(json['status'] as String),
         comment: json['comment'] as String?,
         createdBy: json['created_by'] as String,
+        repeatGroupId: json['repeat_group_id'] as String?,
+        subscriptionId: json['subscription_id'] as String?,
         room: json['rooms'] != null
             ? Room.fromJson(json['rooms'] as Map<String, dynamic>)
             : null,
@@ -162,6 +171,8 @@ class Lesson extends BaseModel {
         'status': status.name,
         'comment': comment,
         'created_by': createdBy,
+        'repeat_group_id': repeatGroupId,
+        'subscription_id': subscriptionId,
       };
 
   Lesson copyWith({
@@ -176,6 +187,8 @@ class Lesson extends BaseModel {
     TimeOfDay? endTime,
     LessonStatus? status,
     String? comment,
+    String? repeatGroupId,
+    String? subscriptionId,
   }) =>
       Lesson(
         id: id,
@@ -195,6 +208,8 @@ class Lesson extends BaseModel {
         status: status ?? this.status,
         comment: comment ?? this.comment,
         createdBy: createdBy,
+        repeatGroupId: repeatGroupId ?? this.repeatGroupId,
+        subscriptionId: subscriptionId ?? this.subscriptionId,
         room: room,
         teacher: teacher,
         subject: subject,

@@ -256,12 +256,40 @@ CREATE TABLE teacher_subjects (
   subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   UNIQUE(user_id, subject_id)
 );
 
 CREATE INDEX idx_teacher_subjects_user ON teacher_subjects(user_id);
 CREATE INDEX idx_teacher_subjects_subject ON teacher_subjects(subject_id);
+
+-- Связь учеников с преподавателями (many-to-many)
+CREATE TABLE student_teachers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(student_id, user_id)
+);
+
+CREATE INDEX idx_student_teachers_student ON student_teachers(student_id);
+CREATE INDEX idx_student_teachers_user ON student_teachers(user_id);
+
+-- Связь учеников с предметами (many-to-many)
+CREATE TABLE student_subjects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(student_id, subject_id)
+);
+
+CREATE INDEX idx_student_subjects_student ON student_subjects(student_id);
+CREATE INDEX idx_student_subjects_subject ON student_subjects(subject_id);
 ```
 
 ### lesson_types

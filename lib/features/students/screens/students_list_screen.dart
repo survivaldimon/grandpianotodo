@@ -7,8 +7,13 @@ import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/empty_state.dart';
+import 'package:kabinet/features/institution/providers/member_provider.dart';
+import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
+import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/shared/models/student.dart';
+import 'package:kabinet/shared/models/subject.dart';
+import 'package:kabinet/shared/models/institution_member.dart';
 
 /// Экран списка учеников
 class StudentsListScreen extends ConsumerWidget {
@@ -54,6 +59,12 @@ class StudentsListScreen extends ConsumerWidget {
                   label: const Text('Все'),
                   selected: filter == StudentFilter.all,
                   onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.all,
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: const Text('Мои'),
+                  selected: filter == StudentFilter.myStudents,
+                  onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.myStudents,
                 ),
                 const SizedBox(width: 8),
                 FilterChip(
@@ -118,62 +129,390 @@ class StudentsListScreen extends ConsumerWidget {
   }
 
   void _showAddStudentDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final commentController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Новый ученик'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'ФИО'),
-                validator: (v) => v == null || v.isEmpty ? 'Введите имя' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: phoneController,
-                decoration: const InputDecoration(labelText: 'Телефон'),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: commentController,
-                decoration: const InputDecoration(labelText: 'Комментарий'),
-                maxLines: 2,
-              ),
-            ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dialogContext) => _AddStudentSheet(
+        institutionId: institutionId,
+      ),
+    );
+  }
+}
+
+/// Форма создания нового ученика
+class _AddStudentSheet extends ConsumerStatefulWidget {
+  final String institutionId;
+
+  const _AddStudentSheet({required this.institutionId});
+
+  @override
+  ConsumerState<_AddStudentSheet> createState() => _AddStudentSheetState();
+}
+
+class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _commentController = TextEditingController();
+
+  InstitutionMember? _selectedTeacher;
+  Subject? _selectedSubject;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createStudent() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final controller = ref.read(studentControllerProvider.notifier);
+      final student = await controller.create(
+        institutionId: widget.institutionId,
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.isEmpty ? null : _phoneController.text.trim(),
+        comment: _commentController.text.isEmpty ? null : _commentController.text.trim(),
+      );
+
+      if (student != null) {
+        // Создаём привязки если выбраны
+        if (_selectedTeacher != null || _selectedSubject != null) {
+          final bindingsController = ref.read(studentBindingsControllerProvider.notifier);
+
+          if (_selectedTeacher != null) {
+            await bindingsController.addTeacher(
+              studentId: student.id,
+              userId: _selectedTeacher!.userId,
+              institutionId: widget.institutionId,
+            );
+          }
+
+          if (_selectedSubject != null) {
+            await bindingsController.addSubject(
+              studentId: student.id,
+              subjectId: _selectedSubject!.id,
+              institutionId: widget.institutionId,
+            );
+          }
+        }
+
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ученик "${student.name}" создан'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Индикатор
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Заголовок
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.person_add,
+                        color: AppColors.primary,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Новый ученик',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Заполните данные ученика',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+
+                // ФИО
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'ФИО *',
+                    hintText: 'Иванов Иван Иванович',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя ученика' : null,
+                ),
+                const SizedBox(height: 16),
+
+                // Телефон
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: InputDecoration(
+                    labelText: 'Телефон',
+                    hintText: '+7 (777) 123-45-67',
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 16),
+
+                // Преподаватель
+                membersAsync.when(
+                  loading: () => _buildDropdownSkeleton('Преподаватель'),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (members) {
+                    // Показываем всех активных участников
+                    final activeMembers = members.where((m) => !m.isArchived).toList();
+
+                    if (activeMembers.isEmpty) {
+                      return InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Преподаватель',
+                          prefixIcon: const Icon(Icons.school_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        child: const Text(
+                          'Нет доступных преподавателей',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      );
+                    }
+
+                    return DropdownButtonFormField<InstitutionMember>(
+                      value: _selectedTeacher,
+                      decoration: InputDecoration(
+                        labelText: 'Преподаватель',
+                        prefixIcon: const Icon(Icons.school_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      hint: const Text('Выберите преподавателя'),
+                      items: activeMembers.map((member) => DropdownMenuItem(
+                        value: member,
+                        child: Text(
+                          member.profile?.fullName ?? 'Без имени',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )).toList(),
+                      onChanged: (value) => setState(() => _selectedTeacher = value),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Направление
+                subjectsAsync.when(
+                  loading: () => _buildDropdownSkeleton('Направление'),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (subjects) {
+                    final activeSubjects = subjects.where((s) => s.archivedAt == null).toList();
+
+                    return DropdownButtonFormField<Subject>(
+                      value: _selectedSubject,
+                      decoration: InputDecoration(
+                        labelText: 'Направление',
+                        prefixIcon: const Icon(Icons.category_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      hint: const Text('Выберите направление'),
+                      items: activeSubjects.map((subject) {
+                        final color = subject.color != null
+                            ? Color(int.parse('0xFF${subject.color!.replaceAll('#', '')}'))
+                            : AppColors.primary;
+                        return DropdownMenuItem(
+                          value: subject,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(subject.name),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) => setState(() => _selectedSubject = value),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Комментарий
+                TextFormField(
+                  controller: _commentController,
+                  decoration: InputDecoration(
+                    labelText: 'Комментарий',
+                    hintText: 'Дополнительная информация...',
+                    prefixIcon: const Icon(Icons.notes_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 28),
+
+                // Кнопки
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isLoading ? null : () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Отмена'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _createStudent,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text(
+                                'Создать ученика',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                final controller = ref.read(studentControllerProvider.notifier);
-                final student = await controller.create(
-                  institutionId: institutionId,
-                  name: nameController.text.trim(),
-                  phone: phoneController.text.isEmpty ? null : phoneController.text.trim(),
-                  comment: commentController.text.isEmpty ? null : commentController.text.trim(),
-                );
-                if (student != null && context.mounted) {
-                  Navigator.pop(context);
-                }
-              }
-            },
-            child: const Text('Создать'),
-          ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownSkeleton(String label) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Icon(Icons.hourglass_empty, color: Colors.grey[400]),
+          const SizedBox(width: 12),
+          Text(label, style: TextStyle(color: Colors.grey[500])),
         ],
       ),
     );

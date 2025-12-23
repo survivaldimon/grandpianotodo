@@ -44,6 +44,7 @@ class PaymentPlanRepository {
     required String name,
     required double price,
     required int lessonsCount,
+    int validityDays = 30,
   }) async {
     try {
       final data = await _client
@@ -53,6 +54,7 @@ class PaymentPlanRepository {
             'name': name,
             'price': price,
             'lessons_count': lessonsCount,
+            'validity_days': validityDays,
           })
           .select()
           .single();
@@ -69,12 +71,14 @@ class PaymentPlanRepository {
     String? name,
     double? price,
     int? lessonsCount,
+    int? validityDays,
   }) async {
     try {
       final updates = <String, dynamic>{};
       if (name != null) updates['name'] = name;
       if (price != null) updates['price'] = price;
       if (lessonsCount != null) updates['lessons_count'] = lessonsCount;
+      if (validityDays != null) updates['validity_days'] = validityDays;
 
       final data = await _client
           .from('payment_plans')

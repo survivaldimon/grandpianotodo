@@ -196,9 +196,11 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   }
 
   void _showAddPaymentDialog(BuildContext context) {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) => _AddPaymentDialog(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dialogContext) => _AddPaymentSheet(
         institutionId: widget.institutionId,
         onSuccess: () {
           ref.invalidate(paymentsProvider(_periodParams));
@@ -210,181 +212,573 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
 }
 
-/// Диалог добавления оплаты
-class _AddPaymentDialog extends ConsumerStatefulWidget {
+/// Форма добавления оплаты
+class _AddPaymentSheet extends ConsumerStatefulWidget {
   final String institutionId;
   final VoidCallback onSuccess;
 
-  const _AddPaymentDialog({
+  const _AddPaymentSheet({
     required this.institutionId,
     required this.onSuccess,
   });
 
   @override
-  ConsumerState<_AddPaymentDialog> createState() => _AddPaymentDialogState();
+  ConsumerState<_AddPaymentSheet> createState() => _AddPaymentSheetState();
 }
 
-class _AddPaymentDialogState extends ConsumerState<_AddPaymentDialog> {
-  Student? selectedStudent;
-  PaymentPlan? selectedPlan;
-  bool isCustomPayment = true;
-  final amountController = TextEditingController();
-  final lessonsController = TextEditingController();
-  final formKey = GlobalKey<FormState>();
+class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+  final _lessonsController = TextEditingController();
+  final _validityController = TextEditingController(text: '30');
+  final _discountController = TextEditingController();
+  final _commentController = TextEditingController();
+
+  Student? _selectedStudent;
+  PaymentPlan? _selectedPlan;
+  DateTime _selectedDate = DateTime.now();
+  bool _isLoading = false;
+  bool _hasDiscount = false;
+  double _originalPrice = 0;
 
   @override
   void dispose() {
-    amountController.dispose();
-    lessonsController.dispose();
+    _amountController.dispose();
+    _lessonsController.dispose();
+    _validityController.dispose();
+    _discountController.dispose();
+    _commentController.dispose();
     super.dispose();
+  }
+
+  void _onPlanSelected(PaymentPlan? plan) {
+    setState(() {
+      _selectedPlan = plan;
+      if (plan != null) {
+        _originalPrice = plan.price;
+        _lessonsController.text = plan.lessonsCount.toString();
+        _validityController.text = plan.validityDays.toString();
+        _updateFinalAmount();
+      } else {
+        _originalPrice = 0;
+        _hasDiscount = false;
+        _discountController.clear();
+        _amountController.clear();
+        _lessonsController.clear();
+      }
+    });
+  }
+
+  void _updateFinalAmount() {
+    if (_selectedPlan != null) {
+      double finalAmount = _originalPrice;
+      if (_hasDiscount && _discountController.text.isNotEmpty) {
+        final discount = double.tryParse(_discountController.text) ?? 0;
+        finalAmount = _originalPrice - discount;
+        if (finalAmount < 0) finalAmount = 0;
+      }
+      _amountController.text = finalAmount.toStringAsFixed(0);
+    }
+  }
+
+  Future<void> _selectDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (date != null) {
+      setState(() => _selectedDate = date);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate() || _selectedStudent == null) {
+      if (_selectedStudent == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Выберите ученика'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // Формируем комментарий со скидкой
+    String? comment = _commentController.text.trim();
+    if (_hasDiscount && _discountController.text.isNotEmpty) {
+      final discount = double.tryParse(_discountController.text) ?? 0;
+      if (discount > 0) {
+        final discountNote = 'Скидка: ${discount.toStringAsFixed(0)} ₸';
+        comment = comment.isEmpty ? discountNote : '$discountNote\n$comment';
+      }
+    }
+
+    final controller = ref.read(paymentControllerProvider.notifier);
+    final payment = await controller.create(
+      institutionId: widget.institutionId,
+      studentId: _selectedStudent!.id,
+      paymentPlanId: _selectedPlan?.id,
+      amount: double.parse(_amountController.text),
+      lessonsCount: int.parse(_lessonsController.text),
+      validityDays: int.parse(_validityController.text),
+      paidAt: _selectedDate,
+      comment: comment.isEmpty ? null : comment,
+    );
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (payment != null) {
+        widget.onSuccess();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Оплата добавлена'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
     final plansAsync = ref.watch(paymentPlansProvider(widget.institutionId));
+    final controllerState = ref.watch(paymentControllerProvider);
 
-    return AlertDialog(
-      title: const Text('Добавить оплату'),
-      content: studentsAsync.when(
-        loading: () => const SizedBox(
-          height: 100,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-        error: (e, _) => Text('Ошибка: $e'),
-        data: (students) {
-          if (students.isEmpty) {
-            return const Text('Сначала добавьте учеников');
-          }
-
-          final plans = plansAsync.valueOrNull ?? [];
-
-          return Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<Student>(
-                    decoration: const InputDecoration(
-                      labelText: 'Ученик',
-                      prefixIcon: Icon(Icons.person),
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Индикатор
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    value: selectedStudent,
-                    items: students.map((s) => DropdownMenuItem(
-                      value: s,
-                      child: Text(s.name),
-                    )).toList(),
-                    onChanged: (student) {
-                      setState(() => selectedStudent = student);
-                    },
-                    validator: (v) => v == null ? 'Выберите ученика' : null,
                   ),
-                  if (plans.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<PaymentPlan?>(
-                      decoration: const InputDecoration(
-                        labelText: 'Тариф',
-                        prefixIcon: Icon(Icons.card_membership),
+                ),
+                const SizedBox(height: 20),
+
+                // Заголовок
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      value: selectedPlan,
+                      child: const Icon(
+                        Icons.payments,
+                        color: AppColors.success,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Добавить оплату',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Выберите ученика и тариф',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Ученик
+                studentsAsync.when(
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, _) => Text('Ошибка: $e'),
+                  data: (students) {
+                    if (students.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text('Сначала добавьте учеников'),
+                      );
+                    }
+                    // Находим выбранного ученика по ID (после обновления списка ссылки меняются)
+                    final currentStudent = _selectedStudent != null
+                        ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                        : null;
+                    return DropdownButtonFormField<Student>(
+                      decoration: InputDecoration(
+                        labelText: 'Ученик',
+                        prefixIcon: const Icon(Icons.person_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      value: currentStudent,
+                      items: students.map((s) => DropdownMenuItem(
+                        value: s,
+                        child: Text(s.name),
+                      )).toList(),
+                      onChanged: (student) {
+                        setState(() => _selectedStudent = student);
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Дата оплаты
+                InkWell(
+                  onTap: _selectDate,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today, color: AppColors.primary),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Дата оплаты',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              DateFormat('dd MMMM yyyy', 'ru').format(_selectedDate),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Тариф
+                plansAsync.when(
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, _) => Text('Ошибка: $e'),
+                  data: (plans) {
+                    // Находим выбранный план по ID
+                    final currentPlan = _selectedPlan != null
+                        ? plans.where((p) => p.id == _selectedPlan!.id).firstOrNull
+                        : null;
+                    return DropdownButtonFormField<PaymentPlan?>(
+                      decoration: InputDecoration(
+                        labelText: 'Тариф',
+                        prefixIcon: const Icon(Icons.credit_card_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      value: currentPlan,
                       items: [
                         const DropdownMenuItem<PaymentPlan?>(
                           value: null,
                           child: Text('Свой вариант'),
                         ),
-                        ...plans.map((p) => DropdownMenuItem<PaymentPlan?>(
-                          value: p,
-                          child: Text('${p.name} (${p.price.toStringAsFixed(0)} ₸)'),
-                        )),
+                        ...plans.map((plan) => DropdownMenuItem<PaymentPlan?>(
+                              value: plan,
+                              child: Text(plan.displayNameWithValidity),
+                            )),
                       ],
-                      onChanged: (plan) {
-                        setState(() {
-                          selectedPlan = plan;
-                          isCustomPayment = plan == null;
-                          if (plan != null) {
-                            amountController.text = plan.price.toStringAsFixed(0);
-                            lessonsController.text = plan.lessonsCount.toString();
-                          } else {
-                            amountController.clear();
-                            lessonsController.clear();
-                          }
-                        });
-                      },
+                      onChanged: _onPlanSelected,
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Скидка (только если выбран тариф)
+                if (_selectedPlan != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _hasDiscount
+                          ? AppColors.warning.withValues(alpha: 0.1)
+                          : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: _hasDiscount
+                          ? Border.all(color: AppColors.warning.withValues(alpha: 0.3))
+                          : null,
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _hasDiscount,
+                              onChanged: (value) {
+                                setState(() {
+                                  _hasDiscount = value ?? false;
+                                  if (!_hasDiscount) {
+                                    _discountController.clear();
+                                  }
+                                  _updateFinalAmount();
+                                });
+                              },
+                              activeColor: AppColors.warning,
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.discount,
+                              color: _hasDiscount ? AppColors.warning : Colors.grey,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Скидка',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_hasDiscount) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _discountController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Размер скидки',
+                                    suffixText: '₸',
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (_) {
+                                    _updateFinalAmount();
+                                    setState(() {});
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'Было: ${_originalPrice.toStringAsFixed(0)} ₸',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                      decoration: TextDecoration.lineThrough,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Итого: ${_amountController.text} ₸',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.success,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Сумма
+                TextFormField(
+                  controller: _amountController,
+                  decoration: InputDecoration(
+                    labelText: 'Сумма',
+                    suffixText: '₸',
+                    prefixIcon: const Icon(Icons.payments_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Введите сумму';
+                    if (double.tryParse(v) == null) return 'Неверная сумма';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Количество занятий и Срок действия в одной строке
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _lessonsController,
+                        decoration: InputDecoration(
+                          labelText: 'Занятий',
+                          prefixIcon: const Icon(Icons.school_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Введите';
+                          if (int.tryParse(v) == null) return 'Число';
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _validityController,
+                        decoration: InputDecoration(
+                          labelText: 'Срок (дней)',
+                          prefixIcon: const Icon(Icons.timer_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Введите';
+                          final num = int.tryParse(v);
+                          if (num == null || num <= 0) return 'Ошибка';
+                          return null;
+                        },
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: amountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Сумма',
-                      prefixIcon: Icon(Icons.payments),
-                      suffixText: '₸',
+                ),
+                const SizedBox(height: 16),
+
+                // Комментарий
+                TextFormField(
+                  controller: _commentController,
+                  decoration: InputDecoration(
+                    labelText: 'Комментарий (необязательно)',
+                    prefixIcon: const Icon(Icons.comment_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    keyboardType: TextInputType.number,
-                    enabled: isCustomPayment,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Введите сумму';
-                      if (double.tryParse(v) == null) return 'Неверная сумма';
-                      return null;
-                    },
+                    filled: true,
+                    fillColor: Colors.grey[50],
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: lessonsController,
-                    decoration: const InputDecoration(
-                      labelText: 'Количество занятий',
-                      prefixIcon: Icon(Icons.event),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 24),
+
+                // Кнопка
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading || controllerState.isLoading ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    keyboardType: TextInputType.number,
-                    enabled: isCustomPayment,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Введите количество';
-                      if (int.tryParse(v) == null) return 'Неверное число';
-                      return null;
-                    },
+                    child: _isLoading || controllerState.isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.check),
+                              const SizedBox(width: 8),
+                              Text(
+                                _amountController.text.isNotEmpty
+                                    ? 'Добавить оплату ${_amountController.text} ₸'
+                                    : 'Добавить оплату',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Отмена'),
-        ),
-        ElevatedButton(
-          onPressed: _submit,
-          child: const Text('Добавить'),
-        ),
-      ],
     );
-  }
-
-  Future<void> _submit() async {
-    if (!formKey.currentState!.validate() || selectedStudent == null) return;
-
-    final controller = ref.read(paymentControllerProvider.notifier);
-    final payment = await controller.create(
-      institutionId: widget.institutionId,
-      studentId: selectedStudent!.id,
-      paymentPlanId: selectedPlan?.id,
-      amount: double.parse(amountController.text),
-      lessonsCount: int.parse(lessonsController.text),
-    );
-
-    if (payment != null && mounted) {
-      Navigator.pop(context);
-      widget.onSuccess();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Оплата добавлена'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
   }
 }
 
@@ -418,12 +812,26 @@ class _PaymentCard extends ConsumerWidget {
     required this.onChanged,
   });
 
+  /// Извлекает название типа занятия из comment если это оплата занятия
+  /// Формат: lesson:LESSON_ID|LESSON_TYPE_NAME
+  String? _extractLessonTypeName() {
+    final comment = payment.comment;
+    if (comment == null || !comment.startsWith('lesson:')) return null;
+    final pipeIndex = comment.indexOf('|');
+    if (pipeIndex == -1) return null;
+    return comment.substring(pipeIndex + 1);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final formatter = NumberFormat('#,###', 'ru_RU');
     final amountStr = '${formatter.format(payment.amount.toInt())} ₸';
     final studentName = payment.student?.name ?? 'Ученик';
-    final planName = payment.paymentPlan?.name ??
+
+    // Сначала проверяем, это оплата занятия (lesson:ID|TYPE_NAME)
+    final lessonTypeName = _extractLessonTypeName();
+    final planName = lessonTypeName ??
+        payment.paymentPlan?.name ??
         (payment.isCorrection ? 'Корректировка' : 'Свой вариант');
 
     return Card(

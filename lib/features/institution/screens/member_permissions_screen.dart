@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
+import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
+import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 
 /// Экран редактирования прав участника
@@ -28,6 +30,7 @@ class _MemberPermissionsScreenState
   bool _isSaving = false;
   String _memberName = '';
   String _roleName = '';
+  String _userId = '';
 
   @override
   void initState() {
@@ -43,6 +46,7 @@ class _MemberPermissionsScreenState
         _permissions = member.permissions;
         _memberName = member.profile?.fullName ?? 'Участник';
         _roleName = member.roleName;
+        _userId = member.userId;
         _isLoading = false;
       });
     } catch (e) {
@@ -128,6 +132,9 @@ class _MemberPermissionsScreenState
                     ],
                   ),
                 ),
+
+                // Секция: Направления (предметы)
+                if (_userId.isNotEmpty) _buildSubjectsSection(),
 
                 // Секция: Управление заведением
                 _buildSection(
@@ -308,5 +315,213 @@ class _MemberPermissionsScreenState
       onChanged: onChanged,
       activeColor: AppColors.primary,
     );
+  }
+
+  Widget _buildSubjectsSection() {
+    final params = TeacherSubjectsParams(
+      userId: _userId,
+      institutionId: widget.institutionId,
+    );
+    final teacherSubjectsAsync = ref.watch(teacherSubjectsProvider(params));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'НАПРАВЛЕНИЯ',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              TextButton.icon(
+                onPressed: () => _showAddSubjectDialog(),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Добавить'),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Предметы, которые ведёт преподаватель',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        teacherSubjectsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('Ошибка: $e'),
+          ),
+          data: (teacherSubjects) {
+            if (teacherSubjects.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppColors.textSecondary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Направления не указаны.\nДобавьте предметы, которые ведёт преподаватель.',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: teacherSubjects.map((ts) {
+                  final subject = ts.subject;
+                  final color = subject?.color != null
+                      ? Color(int.parse('0xFF${subject!.color!.replaceAll('#', '')}'))
+                      : AppColors.primary;
+
+                  return Chip(
+                    avatar: CircleAvatar(
+                      backgroundColor: color,
+                      radius: 12,
+                      child: const Icon(Icons.book, size: 14, color: Colors.white),
+                    ),
+                    label: Text(subject?.name ?? 'Неизвестный'),
+                    deleteIcon: const Icon(Icons.close, size: 18),
+                    onDeleted: () => _removeSubject(ts.subjectId),
+                  );
+                }).toList(),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        const Divider(),
+      ],
+    );
+  }
+
+  void _showAddSubjectDialog() {
+    showModalBottomSheet(
+      context: context,
+      builder: (dialogContext) => Consumer(
+        builder: (context, ref, _) {
+          final allSubjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
+          final teacherSubjectsAsync = ref.watch(teacherSubjectsProvider(
+            TeacherSubjectsParams(userId: _userId, institutionId: widget.institutionId),
+          ));
+
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Добавить направление',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Выберите предмет для $_memberName',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 16),
+                allSubjectsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Text('Ошибка: $e'),
+                  data: (allSubjects) {
+                    final existingIds = teacherSubjectsAsync.valueOrNull
+                            ?.map((ts) => ts.subjectId)
+                            .toSet() ??
+                        {};
+
+                    final available = allSubjects
+                        .where((s) => !existingIds.contains(s.id) && s.archivedAt == null)
+                        .toList();
+
+                    if (available.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('Все предметы уже добавлены'),
+                      );
+                    }
+
+                    return Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: available.length,
+                        itemBuilder: (context, index) {
+                          final subject = available[index];
+                          final color = subject.color != null
+                              ? Color(int.parse('0xFF${subject.color!.replaceAll('#', '')}'))
+                              : AppColors.primary;
+
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: color.withValues(alpha: 0.2),
+                              child: Icon(Icons.book, color: color),
+                            ),
+                            title: Text(subject.name),
+                            onTap: () async {
+                              Navigator.pop(dialogContext);
+                              await ref
+                                  .read(teacherSubjectsControllerProvider.notifier)
+                                  .addSubject(
+                                    userId: _userId,
+                                    subjectId: subject.id,
+                                    institutionId: widget.institutionId,
+                                  );
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Направление "${subject.name}" добавлено'),
+                                    backgroundColor: AppColors.success,
+                                  ),
+                                );
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _removeSubject(String subjectId) async {
+    await ref.read(teacherSubjectsControllerProvider.notifier).removeSubject(
+          userId: _userId,
+          subjectId: subjectId,
+          institutionId: widget.institutionId,
+        );
   }
 }

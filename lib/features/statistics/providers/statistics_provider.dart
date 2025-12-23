@@ -174,3 +174,10 @@ final paymentPlanStatsProvider =
     endDate: endDate,
   );
 });
+
+/// Провайдер средней стоимости занятий ученика
+final studentAvgCostProvider =
+    FutureProvider.family<StudentLessonCostStats, String>((ref, studentId) async {
+  final repo = ref.watch(statisticsRepositoryProvider);
+  return repo.getStudentAvgLessonCost(studentId: studentId);
+});

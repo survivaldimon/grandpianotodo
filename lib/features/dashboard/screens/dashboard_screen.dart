@@ -10,7 +10,9 @@ import 'package:kabinet/features/institution/providers/institution_provider.dart
 import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
+import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/shared/models/lesson.dart';
+import 'package:kabinet/shared/models/subscription.dart';
 
 /// Главный экран (Dashboard)
 class DashboardScreen extends ConsumerWidget {
@@ -26,6 +28,9 @@ class DashboardScreen extends ConsumerWidget {
     final debtorsAsync = ref.watch(studentsWithDebtProvider(institutionId));
     final todayPaymentsAsync = ref.watch(todayPaymentsTotalProvider(institutionId));
     final unmarkedLessonsAsync = ref.watch(unmarkedLessonsStreamProvider(institutionId));
+    final expiringSubscriptionsAsync = ref.watch(
+      expiringSubscriptionsProvider(ExpiringSubscriptionsParams(institutionId, days: 7)),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -56,6 +61,7 @@ class DashboardScreen extends ConsumerWidget {
           ref.invalidate(studentsWithDebtProvider(institutionId));
           ref.invalidate(todayPaymentsTotalProvider(institutionId));
           ref.invalidate(unmarkedLessonsProvider(institutionId));
+          ref.invalidate(expiringSubscriptionsProvider(ExpiringSubscriptionsParams(institutionId, days: 7)));
         },
         child: ListView(
           padding: AppSizes.paddingAllM,
@@ -220,6 +226,120 @@ class DashboardScreen extends ConsumerWidget {
                 onTap: () => context.go('/institutions/$institutionId/payments'),
               ),
             ),
+            const SizedBox(height: 12),
+
+            // Истекающие абонементы
+            expiringSubscriptionsAsync.when(
+              data: (subscriptions) {
+                if (subscriptions.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                final subtitle = subscriptions.take(2).map((s) {
+                  final name = s.student?.name ?? 'Ученик';
+                  final days = s.daysUntilExpiration;
+                  return '$name ($days дн.)';
+                }).join(', ');
+                return _DashboardCard(
+                  title: 'Истекающие абонементы',
+                  trailing: subscriptions.length.toString(),
+                  subtitle: subtitle,
+                  icon: Icons.timer,
+                  iconColor: AppColors.warning,
+                  onTap: () => _showExpiringSubscriptionsSheet(context, subscriptions),
+                );
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showExpiringSubscriptionsSheet(
+    BuildContext context,
+    List<Subscription> subscriptions,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.timer, color: AppColors.warning),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Истекающие абонементы (${subscriptions.length})',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: subscriptions.length,
+                itemBuilder: (context, index) {
+                  final sub = subscriptions[index];
+                  final studentName = sub.student?.name ?? 'Ученик';
+                  final expiresStr = DateFormat('dd.MM.yyyy').format(sub.expiresAt);
+                  final daysLeft = sub.daysUntilExpiration;
+
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: daysLeft <= 3
+                          ? AppColors.error.withOpacity(0.2)
+                          : AppColors.warning.withOpacity(0.2),
+                      child: Text(
+                        '$daysLeft',
+                        style: TextStyle(
+                          color: daysLeft <= 3 ? AppColors.error : AppColors.warning,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(studentName),
+                    subtitle: Text(
+                      '${sub.lessonsRemaining}/${sub.lessonsTotal} занятий • до $expiresStr',
+                    ),
+                    trailing: daysLeft <= 3
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Срочно',
+                              style: TextStyle(
+                                color: AppColors.error,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          )
+                        : null,
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.go('/institutions/$institutionId/students/${sub.studentId}');
+                    },
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -267,47 +387,176 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
+/// Состояние отметки занятия
+class _LessonMark {
+  bool isCompleted = false;
+  bool isCancelled = false;
+  bool isPaid = false;
+
+  bool get hasChanges => isCompleted || isCancelled || isPaid;
+}
+
 /// BottomSheet со списком неотмеченных занятий
-class _UnmarkedLessonsSheet extends ConsumerWidget {
+class _UnmarkedLessonsSheet extends ConsumerStatefulWidget {
   final String institutionId;
 
   const _UnmarkedLessonsSheet({required this.institutionId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final lessonsAsync = ref.watch(unmarkedLessonsStreamProvider(institutionId));
+  ConsumerState<_UnmarkedLessonsSheet> createState() => _UnmarkedLessonsSheetState();
+}
+
+class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
+  final Map<String, _LessonMark> _marks = {};
+  bool _isSaving = false;
+
+  void _updateMark(String lessonId, {bool? completed, bool? cancelled, bool? paid}) {
+    setState(() {
+      _marks.putIfAbsent(lessonId, () => _LessonMark());
+      final mark = _marks[lessonId]!;
+
+      if (completed != null) {
+        mark.isCompleted = completed;
+        if (completed) mark.isCancelled = false;
+      }
+      if (cancelled != null) {
+        mark.isCancelled = cancelled;
+        if (cancelled) {
+          mark.isCompleted = false;
+          mark.isPaid = false;
+        }
+      }
+      if (paid != null) {
+        mark.isPaid = paid;
+        if (paid) {
+          mark.isCompleted = true;
+          mark.isCancelled = false;
+        }
+      }
+    });
+  }
+
+  _LessonMark _getMark(String lessonId) {
+    return _marks.putIfAbsent(lessonId, () => _LessonMark());
+  }
+
+  bool get _hasAnyChanges => _marks.values.any((m) => m.hasChanges);
+
+  Future<void> _saveAll(List<Lesson> lessons) async {
+    if (!_hasAnyChanges) return;
+
+    setState(() => _isSaving = true);
+
+    final lessonController = ref.read(lessonControllerProvider.notifier);
+    final paymentController = ref.read(paymentControllerProvider.notifier);
+
+    // Собираем задачи для параллельного выполнения
+    final futures = <Future>[];
+    final affectedStudentIds = <String>{};
+
+    for (final lesson in lessons) {
+      final mark = _marks[lesson.id];
+      if (mark == null || !mark.hasChanges) continue;
+
+      if (lesson.studentId != null) {
+        affectedStudentIds.add(lesson.studentId!);
+      }
+
+      if (mark.isCompleted) {
+        futures.add(
+          lessonController.complete(lesson.id, lesson.roomId, lesson.date).then((_) async {
+            // Если оплачено - создать оплату
+            if (mark.isPaid && lesson.studentId != null && lesson.lessonType?.defaultPrice != null) {
+              final lessonTypeName = lesson.lessonType?.name ?? 'Оплата занятия';
+              await paymentController.create(
+                institutionId: widget.institutionId,
+                studentId: lesson.studentId!,
+                amount: lesson.lessonType!.defaultPrice!,
+                lessonsCount: 1,
+                comment: 'lesson:${lesson.id}|$lessonTypeName',
+              );
+            }
+          }),
+        );
+      } else if (mark.isCancelled) {
+        futures.add(
+          lessonController.cancel(lesson.id, lesson.roomId, lesson.date),
+        );
+      }
+    }
+
+    // Выполняем все операции параллельно
+    await Future.wait(futures);
+
+    // Инвалидируем провайдеры
+    ref.invalidate(unmarkedLessonsProvider(widget.institutionId));
+    ref.invalidate(unmarkedLessonsStreamProvider(widget.institutionId));
+    ref.invalidate(todayPaymentsTotalProvider(widget.institutionId));
+
+    // Инвалидируем подписки затронутых студентов
+    for (final studentId in affectedStudentIds) {
+      ref.invalidate(studentSubscriptionsProvider(studentId));
+      ref.invalidate(subscriptionsStreamProvider(studentId));
+    }
+
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+        _marks.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Изменения сохранены'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lessonsAsync = ref.watch(unmarkedLessonsStreamProvider(widget.institutionId));
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.6,
+      initialChildSize: 0.7,
       minChildSize: 0.3,
-      maxChildSize: 0.9,
+      maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) => Column(
         children: [
+          // Header
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 const Icon(Icons.pending_actions, color: AppColors.error),
                 const SizedBox(width: 12),
-                lessonsAsync.when(
-                  data: (lessons) => Text(
-                    '${AppStrings.unmarkedLessons} (${lessons.length})',
-                    style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: lessonsAsync.when(
+                    data: (lessons) => Text(
+                      '${AppStrings.unmarkedLessons} (${lessons.length})',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    loading: () => Text(
+                      '${AppStrings.unmarkedLessons} (...)',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    error: (_, __) => Text(
+                      AppStrings.unmarkedLessons,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
-                  loading: () => Text(
-                    '${AppStrings.unmarkedLessons} (...)',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  error: (_, __) => Text(
-                    AppStrings.unmarkedLessons,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
           ),
           const Divider(height: 1),
+
+          // Lesson list
           Expanded(
             child: lessonsAsync.when(
               data: (lessons) {
@@ -321,14 +570,24 @@ class _UnmarkedLessonsSheet extends ConsumerWidget {
                     ),
                   );
                 }
-                return ListView.builder(
+                return ListView.separated(
                   controller: scrollController,
                   itemCount: lessons.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final lesson = lessons[index];
-                    return _UnmarkedLessonTile(
+                    final mark = _getMark(lesson.id);
+                    final hasPrice = lesson.lessonType?.defaultPrice != null &&
+                                     lesson.lessonType!.defaultPrice! > 0;
+                    final hasStudent = lesson.studentId != null;
+
+                    return _UnmarkedLessonItem(
                       lesson: lesson,
-                      institutionId: institutionId,
+                      mark: mark,
+                      showPaid: hasPrice && hasStudent,
+                      onCompletedChanged: (v) => _updateMark(lesson.id, completed: v),
+                      onCancelledChanged: (v) => _updateMark(lesson.id, cancelled: v),
+                      onPaidChanged: (v) => _updateMark(lesson.id, paid: v),
                     );
                   },
                 );
@@ -337,6 +596,39 @@ class _UnmarkedLessonsSheet extends ConsumerWidget {
               error: (e, _) => Center(child: Text('Ошибка: $e')),
             ),
           ),
+
+          // Save button
+          if (_hasAnyChanges || _isSaving)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: lessonsAsync.when(
+                data: (lessons) => SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : () => _saveAll(lessons),
+                    child: _isSaving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Сохранить'),
+                  ),
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+            ),
         ],
       ),
     );
@@ -424,245 +716,153 @@ class _DashboardCard extends StatelessWidget {
 }
 
 /// Элемент списка неотмеченного занятия
-class _UnmarkedLessonTile extends ConsumerStatefulWidget {
+class _UnmarkedLessonItem extends StatelessWidget {
   final Lesson lesson;
-  final String institutionId;
+  final _LessonMark mark;
+  final bool showPaid;
+  final ValueChanged<bool> onCompletedChanged;
+  final ValueChanged<bool> onCancelledChanged;
+  final ValueChanged<bool> onPaidChanged;
 
-  const _UnmarkedLessonTile({
+  const _UnmarkedLessonItem({
     required this.lesson,
-    required this.institutionId,
+    required this.mark,
+    required this.showPaid,
+    required this.onCompletedChanged,
+    required this.onCancelledChanged,
+    required this.onPaidChanged,
   });
 
   @override
-  ConsumerState<_UnmarkedLessonTile> createState() => _UnmarkedLessonTileState();
-}
-
-class _UnmarkedLessonTileState extends ConsumerState<_UnmarkedLessonTile> {
-  bool _isCompleted = false;
-  bool _isPaid = false;
-  bool _isLoading = false;
-
-  @override
   Widget build(BuildContext context) {
-    final lesson = widget.lesson;
     final date = AppDateUtils.formatDayMonth(lesson.date);
     final time =
         '${lesson.startTime.hour.toString().padLeft(2, '0')}:${lesson.startTime.minute.toString().padLeft(2, '0')}';
     final participant = lesson.student?.name ?? lesson.group?.name ?? '—';
     final room = lesson.room?.name ?? '—';
 
-    final hasPrice = lesson.lessonType?.defaultPrice != null &&
-                     lesson.lessonType!.defaultPrice! > 0;
-    final hasStudent = lesson.studentId != null;
-
-    return ListTile(
-      title: Text('$date, $time — $participant'),
-      subtitle: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(room),
-          if (hasPrice && hasStudent)
-            Text(
-              '${lesson.lessonType?.name ?? "Занятие"}: ${lesson.lessonType!.defaultPrice!.toInt()} ₸',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.primary,
-              ),
-            ),
-        ],
-      ),
-      trailing: _isLoading
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Checkbox Проведено
-                Column(
-                  mainAxisSize: MainAxisSize.min,
+          // Info row
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Checkbox(
-                      value: _isCompleted,
-                      onChanged: (value) async {
-                        if (value == true) {
-                          await _handleComplete();
-                        } else {
-                          setState(() {
-                            _isCompleted = false;
-                            _isPaid = false;
-                          });
-                        }
-                      },
-                      activeColor: AppColors.success,
+                    Text(
+                      '$date, $time',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      participant,
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
                     Text(
-                      'Проведено',
-                      style: Theme.of(context).textTheme.labelSmall,
+                      room,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
-                // Checkbox Оплачено (только если есть цена и ученик)
-                if (hasPrice && hasStudent) ...[
-                  const SizedBox(width: 8),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Checkbox(
-                        value: _isPaid,
-                        onChanged: _isCompleted
-                            ? null
-                            : (value) async {
-                                setState(() => _isPaid = value ?? false);
-                                if (value == true) {
-                                  await _handleCompleteWithPayment();
-                                }
-                              },
-                        activeColor: AppColors.primary,
-                      ),
-                      Text(
-                        'Оплачено',
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                    ],
+              ),
+              if (showPaid)
+                Text(
+                  '${lesson.lessonType!.defaultPrice!.toInt()} ₸',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
-                const SizedBox(width: 8),
-                // Кнопка Отмена
-                IconButton(
-                  icon: const Icon(Icons.cancel_outlined),
-                  color: AppColors.warning,
-                  tooltip: AppStrings.markCancelled,
-                  onPressed: _markCancelled,
                 ),
-                // Кнопка Удалить
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  color: AppColors.error,
-                  tooltip: 'Удалить',
-                  onPressed: _deleteLesson,
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Checkboxes row
+          Row(
+            children: [
+              // Проведено
+              _LessonCheckbox(
+                label: 'Проведено',
+                value: mark.isCompleted,
+                onChanged: onCompletedChanged,
+                activeColor: AppColors.success,
+              ),
+              const SizedBox(width: 16),
+              // Отменено
+              _LessonCheckbox(
+                label: 'Отменено',
+                value: mark.isCancelled,
+                onChanged: onCancelledChanged,
+                activeColor: AppColors.warning,
+              ),
+              // Оплачено
+              if (showPaid) ...[
+                const SizedBox(width: 16),
+                _LessonCheckbox(
+                  label: 'Оплачено',
+                  value: mark.isPaid,
+                  onChanged: onPaidChanged,
+                  activeColor: AppColors.primary,
                 ),
               ],
-            ),
-    );
-  }
-
-  Future<void> _handleComplete() async {
-    setState(() => _isLoading = true);
-
-    final controller = ref.read(lessonControllerProvider.notifier);
-    await controller.complete(
-      widget.lesson.id,
-      widget.lesson.roomId,
-      widget.lesson.date,
-    );
-    ref.invalidate(unmarkedLessonsProvider(widget.institutionId));
-
-    if (mounted) {
-      setState(() {
-        _isCompleted = true;
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _handleCompleteWithPayment() async {
-    setState(() => _isLoading = true);
-
-    final lesson = widget.lesson;
-
-    // Сначала помечаем занятие как проведённое
-    final lessonController = ref.read(lessonControllerProvider.notifier);
-    await lessonController.complete(
-      lesson.id,
-      lesson.roomId,
-      lesson.date,
-    );
-
-    // Затем создаём оплату
-    if (lesson.studentId != null && lesson.lessonType?.defaultPrice != null) {
-      final paymentController = ref.read(paymentControllerProvider.notifier);
-      await paymentController.create(
-        institutionId: widget.institutionId,
-        studentId: lesson.studentId!,
-        amount: lesson.lessonType!.defaultPrice!,
-        lessonsCount: 1,
-        comment: lesson.lessonType?.name ?? 'Оплата занятия',
-      );
-    }
-
-    ref.invalidate(unmarkedLessonsProvider(widget.institutionId));
-    ref.invalidate(todayPaymentsTotalProvider(widget.institutionId));
-
-    if (mounted) {
-      setState(() {
-        _isCompleted = true;
-        _isPaid = true;
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _markCancelled() async {
-    setState(() => _isLoading = true);
-
-    final controller = ref.read(lessonControllerProvider.notifier);
-    await controller.cancel(
-      widget.lesson.id,
-      widget.lesson.roomId,
-      widget.lesson.date,
-    );
-    ref.invalidate(unmarkedLessonsProvider(widget.institutionId));
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _deleteLesson() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Удалить занятие?'),
-        content: const Text(
-          'Занятие будет удалено безвозвратно. Это действие нельзя отменить.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+            ],
           ),
         ],
       ),
     );
+  }
+}
 
-    if (confirmed == true && mounted) {
-      setState(() => _isLoading = true);
+/// Чекбокс с подписью для занятия
+class _LessonCheckbox extends StatelessWidget {
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Color activeColor;
 
-      final controller = ref.read(lessonControllerProvider.notifier);
-      final success = await controller.delete(
-        widget.lesson.id,
-        widget.lesson.roomId,
-        widget.lesson.date,
-      );
+  const _LessonCheckbox({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.activeColor,
+  });
 
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Занятие удалено'),
-            backgroundColor: Colors.green,
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: value,
+              onChanged: (v) => onChanged(v ?? false),
+              activeColor: activeColor,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
           ),
-        );
-      }
-
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: value ? activeColor : AppColors.textSecondary,
+              fontWeight: value ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

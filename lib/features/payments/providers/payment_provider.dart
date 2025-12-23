@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/features/payments/repositories/payment_repository.dart';
+import 'package:kabinet/features/subscriptions/repositories/subscription_repository.dart';
+import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/shared/models/payment.dart';
 import 'package:kabinet/shared/models/payment_plan.dart';
 
@@ -94,21 +96,25 @@ final todayPaymentsTotalProvider =
 /// Контроллер оплат
 class PaymentController extends StateNotifier<AsyncValue<void>> {
   final PaymentRepository _repo;
+  final SubscriptionRepository _subscriptionRepo;
   final Ref _ref;
 
-  PaymentController(this._repo, this._ref) : super(const AsyncValue.data(null));
+  PaymentController(this._repo, this._subscriptionRepo, this._ref) : super(const AsyncValue.data(null));
 
+  /// Создать оплату и подписку
   Future<Payment?> create({
     required String institutionId,
     required String studentId,
     String? paymentPlanId,
     required double amount,
     required int lessonsCount,
+    int validityDays = 30, // Срок действия подписки
     DateTime? paidAt,
     String? comment,
   }) async {
     state = const AsyncValue.loading();
     try {
+      // Создаём платёж
       final payment = await _repo.create(
         institutionId: institutionId,
         studentId: studentId,
@@ -118,6 +124,21 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         paidAt: paidAt,
         comment: comment,
       );
+
+      // Создаём подписку ТОЛЬКО для абонементов (пакет > 1 занятия)
+      // Разовая оплата (1 занятие) НЕ создаёт подписку
+      if (lessonsCount > 1) {
+        final expiresAt = DateTime.now().add(Duration(days: validityDays));
+        await _subscriptionRepo.create(
+          institutionId: institutionId,
+          studentId: studentId,
+          paymentId: payment.id,
+          lessonsTotal: lessonsCount,
+          expiresAt: expiresAt,
+        );
+        _ref.invalidate(studentSubscriptionsProvider(studentId));
+        _ref.invalidate(activeSubscriptionsProvider(studentId));
+      }
 
       _ref.invalidate(studentPaymentsProvider(studentId));
       state = const AsyncValue.data(null);
@@ -161,6 +182,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     required String name,
     required double price,
     required int lessonsCount,
+    int validityDays = 30,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -169,6 +191,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         name: name,
         price: price,
         lessonsCount: lessonsCount,
+        validityDays: validityDays,
       );
 
       _ref.invalidate(paymentPlansProvider(institutionId));
@@ -186,10 +209,11 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     String? name,
     double? price,
     int? lessonsCount,
+    int? validityDays,
   }) async {
     state = const AsyncValue.loading();
     try {
-      await _repo.updatePlan(id, name: name, price: price, lessonsCount: lessonsCount);
+      await _repo.updatePlan(id, name: name, price: price, lessonsCount: lessonsCount, validityDays: validityDays);
       _ref.invalidate(paymentPlansProvider(institutionId));
       state = const AsyncValue.data(null);
       return true;
@@ -253,11 +277,33 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
       return false;
     }
   }
+
+  /// Найти оплату по ID занятия
+  Future<Payment?> findByLessonId(String lessonId) async {
+    return _repo.findByLessonId(lessonId);
+  }
+
+  /// Удалить оплату по ID занятия
+  Future<bool> deleteByLessonId(String lessonId, {String? studentId}) async {
+    state = const AsyncValue.loading();
+    try {
+      final success = await _repo.deleteByLessonId(lessonId);
+      if (success && studentId != null) {
+        _ref.invalidate(studentPaymentsProvider(studentId));
+      }
+      state = const AsyncValue.data(null);
+      return success;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
 }
 
 /// Провайдер контроллера оплат
 final paymentControllerProvider =
     StateNotifierProvider<PaymentController, AsyncValue<void>>((ref) {
   final repo = ref.watch(paymentRepositoryProvider);
-  return PaymentController(repo, ref);
+  final subscriptionRepo = ref.watch(subscriptionRepositoryProvider);
+  return PaymentController(repo, subscriptionRepo, ref);
 });

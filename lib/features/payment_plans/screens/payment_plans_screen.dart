@@ -86,6 +86,7 @@ class PaymentPlansScreen extends ConsumerWidget {
     final nameController = TextEditingController();
     final priceController = TextEditingController();
     final lessonsController = TextEditingController();
+    final validityController = TextEditingController(text: '30');
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -135,6 +136,21 @@ class PaymentPlansScreen extends ConsumerWidget {
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: validityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Срок действия (дней)',
+                    hintText: '30',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Введите срок';
+                    final num = int.tryParse(v);
+                    if (num == null || num <= 0) return 'Некорректное значение';
+                    return null;
+                  },
+                ),
               ],
             ),
           ),
@@ -154,6 +170,7 @@ class PaymentPlansScreen extends ConsumerWidget {
                   name: nameController.text.trim(),
                   lessonsCount: int.parse(lessonsController.text),
                   price: double.parse(priceController.text),
+                  validityDays: int.parse(validityController.text),
                 );
                 if (plan != null && context.mounted) {
                   Navigator.pop(context);
@@ -172,6 +189,8 @@ class PaymentPlansScreen extends ConsumerWidget {
     final priceController = TextEditingController(text: plan.price.toString());
     final lessonsController =
         TextEditingController(text: plan.lessonsCount.toString());
+    final validityController =
+        TextEditingController(text: plan.validityDays.toString());
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -218,6 +237,20 @@ class PaymentPlansScreen extends ConsumerWidget {
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: validityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Срок действия (дней)',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Введите срок';
+                    final num = int.tryParse(v);
+                    if (num == null || num <= 0) return 'Некорректное значение';
+                    return null;
+                  },
+                ),
               ],
             ),
           ),
@@ -238,6 +271,7 @@ class PaymentPlansScreen extends ConsumerWidget {
                   name: nameController.text.trim(),
                   lessonsCount: int.parse(lessonsController.text),
                   price: double.parse(priceController.text),
+                  validityDays: int.parse(validityController.text),
                 );
                 if (success && context.mounted) {
                   Navigator.pop(context);
@@ -314,7 +348,7 @@ class _PaymentPlanCard extends StatelessWidget {
         ),
         title: Text(plan.name),
         subtitle: Text(
-          '${plan.price.toStringAsFixed(0)} ₸ • ${plan.pricePerLesson.toStringAsFixed(0)} ₸/занятие',
+          '${plan.price.toStringAsFixed(0)} ₸ • ${plan.pricePerLesson.toStringAsFixed(0)} ₸/занятие • ${plan.validityDays} дн.',
         ),
         trailing: PopupMenuButton<String>(
           onSelected: (value) {

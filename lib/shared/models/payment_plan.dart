@@ -6,6 +6,7 @@ class PaymentPlan extends BaseModel {
   final String name;
   final double price;
   final int lessonsCount;
+  final int validityDays; // Срок действия абонемента в днях
 
   const PaymentPlan({
     required super.id,
@@ -16,6 +17,7 @@ class PaymentPlan extends BaseModel {
     required this.name,
     required this.price,
     required this.lessonsCount,
+    this.validityDays = 30,
   });
 
   /// Цена за одно занятие
@@ -23,6 +25,9 @@ class PaymentPlan extends BaseModel {
 
   /// Отображение: "8 занятий — 20 000 ₸"
   String get displayName => '$lessonsCount занятий — ${price.toStringAsFixed(0)} ₸';
+
+  /// Отображение со сроком: "8 занятий — 20 000 ₸ (30 дней)"
+  String get displayNameWithValidity => '$lessonsCount занятий — ${price.toStringAsFixed(0)} ₸ ($validityDays дн.)';
 
   factory PaymentPlan.fromJson(Map<String, dynamic> json) => PaymentPlan(
         id: json['id'] as String,
@@ -35,6 +40,7 @@ class PaymentPlan extends BaseModel {
         name: json['name'] as String,
         price: (json['price'] as num).toDouble(),
         lessonsCount: json['lessons_count'] as int,
+        validityDays: json['validity_days'] as int? ?? 30,
       );
 
   Map<String, dynamic> toJson() => {
@@ -42,12 +48,14 @@ class PaymentPlan extends BaseModel {
         'name': name,
         'price': price,
         'lessons_count': lessonsCount,
+        'validity_days': validityDays,
       };
 
   PaymentPlan copyWith({
     String? name,
     double? price,
     int? lessonsCount,
+    int? validityDays,
   }) =>
       PaymentPlan(
         id: id,
@@ -58,5 +66,6 @@ class PaymentPlan extends BaseModel {
         name: name ?? this.name,
         price: price ?? this.price,
         lessonsCount: lessonsCount ?? this.lessonsCount,
+        validityDays: validityDays ?? this.validityDays,
       );
 }

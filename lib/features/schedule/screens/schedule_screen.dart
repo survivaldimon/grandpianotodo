@@ -7,16 +7,19 @@ import 'package:kabinet/core/utils/date_utils.dart';
 import 'package:kabinet/core/utils/validators.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
 import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
+import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/institution/providers/subject_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
+import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/subject.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/models/lesson_type.dart';
+import 'package:kabinet/shared/models/subscription.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
 
 /// Экран расписания кабинета
@@ -938,8 +941,13 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                         value: s,
                         child: Text(s.name),
                       )).toList(),
-                      onChanged: (student) {
+                      onChanged: (student) async {
                         setState(() => _selectedStudent = student);
+
+                        // Автозаполнение из последнего занятия
+                        if (student != null) {
+                          _autoFillFromLastLesson(student.id);
+                        }
                       },
                     ),
                     const SizedBox(height: 8),
@@ -1105,6 +1113,39 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
       return;
     }
 
+    // Проверка подписки студента
+    final subscriptionsResult = await ref.read(activeSubscriptionsProvider(_selectedStudent!.id).future);
+
+    // Проверка на заморозку
+    final isFrozen = subscriptionsResult.any((sub) => sub.status == SubscriptionStatus.frozen);
+    if (isFrozen) {
+      final shouldContinue = await _showFrozenWarning();
+      if (!shouldContinue) return;
+    }
+
+    // Проверка на отсутствие активной подписки
+    final hasActiveSubscription = subscriptionsResult.any((sub) => sub.isActive);
+    if (!hasActiveSubscription && !isFrozen) {
+      final shouldContinue = await _showNoSubscriptionWarning();
+      if (!shouldContinue) return;
+    }
+
+    // Проверка на истекающую подписку
+    final expiringSubscription = subscriptionsResult
+        .where((sub) => sub.isActive && sub.isExpiringSoon)
+        .firstOrNull;
+    if (expiringSubscription != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Внимание: абонемент истекает через ${expiringSubscription.daysUntilExpiration} дн.',
+          ),
+          backgroundColor: AppColors.warning,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+
     final controller = ref.read(lessonControllerProvider.notifier);
     final teacherId = _selectedTeacher?.userId ?? currentUserId;
     final lesson = await controller.create(
@@ -1120,6 +1161,14 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
     );
 
     if (lesson != null && mounted) {
+      // Автоматически создаём привязки ученик-преподаватель и ученик-предмет
+      ref.read(studentBindingsControllerProvider.notifier).createBindingsFromLesson(
+        studentId: _selectedStudent!.id,
+        teacherId: teacherId,
+        subjectId: _selectedSubject?.id,
+        institutionId: widget.institutionId,
+      );
+
       ref.invalidate(lessonsByRoomProvider(RoomDateParams(widget.roomId, widget.date)));
       widget.onCreated();
       Navigator.pop(context);
@@ -1129,6 +1178,120 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
           backgroundColor: Colors.green,
         ),
       );
+    }
+  }
+
+  Future<bool> _showFrozenWarning() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.ac_unit, color: AppColors.info),
+            const SizedBox(width: 8),
+            const Text('Абонемент заморожен'),
+          ],
+        ),
+        content: const Text(
+          'Абонемент этого ученика заморожен. '
+          'Вы уверены, что хотите создать занятие?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Создать всё равно'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<bool> _showNoSubscriptionWarning() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: AppColors.warning),
+            const SizedBox(width: 8),
+            const Text('Нет активного абонемента'),
+          ],
+        ),
+        content: const Text(
+          'У этого ученика нет активного абонемента или занятия закончились. '
+          'Вы уверены, что хотите создать занятие?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Создать всё равно'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  /// Автозаполнение полей из последнего занятия ученика
+  Future<void> _autoFillFromLastLesson(String studentId) async {
+    try {
+      final lastLesson = await ref.read(studentLastLessonProvider(studentId).future);
+
+      if (lastLesson != null && mounted) {
+        final subjectsAsync = ref.read(subjectsProvider(widget.institutionId));
+        final lessonTypesAsync = ref.read(lessonTypesProvider(widget.institutionId));
+        final membersAsync = ref.read(membersProvider(widget.institutionId));
+
+        setState(() {
+          // Автозаполнение предмета
+          if (lastLesson.subject != null) {
+            final subjects = subjectsAsync.valueOrNull ?? [];
+            _selectedSubject = subjects.firstWhere(
+              (s) => s.id == lastLesson.subjectId,
+              orElse: () => lastLesson.subject!,
+            );
+          }
+
+          // Автозаполнение типа занятия
+          if (lastLesson.lessonType != null) {
+            final lessonTypes = lessonTypesAsync.valueOrNull ?? [];
+            _selectedLessonType = lessonTypes.firstWhere(
+              (lt) => lt.id == lastLesson.lessonTypeId,
+              orElse: () => lastLesson.lessonType!,
+            );
+
+            // Пересчёт времени окончания по умолчанию
+            final startMinutes = _startTime.hour * 60 + _startTime.minute;
+            final endMinutes = startMinutes + lastLesson.lessonType!.defaultDurationMinutes;
+            _endTime = TimeOfDay(
+              hour: endMinutes ~/ 60,
+              minute: endMinutes % 60,
+            );
+          }
+
+          // Автозаполнение преподавателя
+          final members = membersAsync.valueOrNull ?? [];
+          final matchingMember = members.cast<InstitutionMember?>().firstWhere(
+            (m) => m?.userId == lastLesson.teacherId,
+            orElse: () => null,
+          );
+          if (matchingMember != null) {
+            _selectedTeacher = matchingMember;
+          }
+        });
+      }
+    } catch (e) {
+      // Ошибка автозаполнения не критична - просто игнорируем
+      debugPrint('Ошибка автозаполнения: $e');
     }
   }
 

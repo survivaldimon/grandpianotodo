@@ -176,6 +176,7 @@ class PaymentRepository {
     required String name,
     required double price,
     required int lessonsCount,
+    int validityDays = 30,
   }) async {
     try {
       final data = await _client
@@ -185,6 +186,7 @@ class PaymentRepository {
             'name': name,
             'price': price,
             'lessons_count': lessonsCount,
+            'validity_days': validityDays,
           })
           .select()
           .single();
@@ -201,12 +203,14 @@ class PaymentRepository {
     String? name,
     double? price,
     int? lessonsCount,
+    int? validityDays,
   }) async {
     try {
       final updates = <String, dynamic>{};
       if (name != null) updates['name'] = name;
       if (price != null) updates['price'] = price;
       if (lessonsCount != null) updates['lessons_count'] = lessonsCount;
+      if (validityDays != null) updates['validity_days'] = validityDays;
 
       final data = await _client
           .from('payment_plans')
@@ -275,6 +279,37 @@ class PaymentRepository {
       await _client.from('payments').delete().eq('id', paymentId);
     } catch (e) {
       throw DatabaseException('Ошибка удаления оплаты: $e');
+    }
+  }
+
+  /// Найти оплату по ID занятия (ищет по comment с префиксом lesson:)
+  Future<Payment?> findByLessonId(String lessonId) async {
+    try {
+      final data = await _client
+          .from('payments')
+          .select('*, students(*), payment_plans(*)')
+          .like('comment', 'lesson:$lessonId|%')
+          .maybeSingle();
+
+      if (data == null) return null;
+      return Payment.fromJson(data);
+    } catch (e) {
+      return null; // Не выбрасываем ошибку, просто возвращаем null
+    }
+  }
+
+  /// Удалить оплату по ID занятия
+  Future<bool> deleteByLessonId(String lessonId) async {
+    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+
+    try {
+      await _client
+          .from('payments')
+          .delete()
+          .like('comment', 'lesson:$lessonId|%');
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 }

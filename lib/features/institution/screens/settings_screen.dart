@@ -101,6 +101,14 @@ class SettingsScreen extends ConsumerWidget {
               const Divider(),
               const _SectionHeader(title: 'УПРАВЛЕНИЕ'),
               ListTile(
+                leading: const Icon(Icons.door_front_door),
+                title: const Text(AppStrings.rooms),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  context.push('/institutions/$institutionId/rooms');
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.bar_chart),
                 title: const Text('Статистика'),
                 trailing: const Icon(Icons.chevron_right),

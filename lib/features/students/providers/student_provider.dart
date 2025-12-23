@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
+import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/features/students/repositories/student_repository.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/student_group.dart';
@@ -49,7 +51,7 @@ final studentGroupsProvider =
 });
 
 /// Фильтр учеников
-enum StudentFilter { all, withDebt, archived }
+enum StudentFilter { all, withDebt, archived, myStudents }
 
 /// Состояние фильтра учеников
 final studentFilterProvider = StateProvider<StudentFilter>((ref) {
@@ -58,20 +60,43 @@ final studentFilterProvider = StateProvider<StudentFilter>((ref) {
 
 /// Провайдер отфильтрованных учеников (realtime)
 final filteredStudentsProvider =
-    StreamProvider.family<List<Student>, String>((ref, institutionId) {
+    StreamProvider.family<List<Student>, String>((ref, institutionId) async* {
   final repo = ref.watch(studentRepositoryProvider);
   final filter = ref.watch(studentFilterProvider);
 
-  return repo.watchByInstitution(institutionId).map((students) {
+  // Для фильтра "Мои ученики" получаем ID текущего пользователя
+  Set<String>? myStudentIds;
+  if (filter == StudentFilter.myStudents) {
+    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+    if (currentUserId != null) {
+      final bindingsRepo = ref.read(studentBindingsRepositoryProvider);
+      final ids = await bindingsRepo.getTeacherStudentIds(
+        currentUserId,
+        institutionId,
+      );
+      myStudentIds = ids.toSet();
+    }
+  }
+
+  await for (final students in repo.watchByInstitution(institutionId)) {
     switch (filter) {
       case StudentFilter.all:
-        return students.where((s) => s.archivedAt == null).toList();
+        yield students.where((s) => s.archivedAt == null).toList();
       case StudentFilter.withDebt:
-        return students.where((s) => s.archivedAt == null && s.balance < 0).toList();
+        yield students
+            .where((s) => s.archivedAt == null && s.balance < 0)
+            .toList();
       case StudentFilter.archived:
-        return students;
+        yield students;
+      case StudentFilter.myStudents:
+        yield students
+            .where((s) =>
+                s.archivedAt == null &&
+                myStudentIds != null &&
+                myStudentIds.contains(s.id))
+            .toList();
     }
-  });
+  }
 });
 
 /// Контроллер учеников

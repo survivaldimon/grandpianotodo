@@ -106,19 +106,21 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
 
-          // Rooms & Schedule
+          // Schedule (расписание всех кабинетов)
+          GoRoute(
+            path: '/institutions/:institutionId/schedule',
+            builder: (context, state) => AllRoomsScheduleScreen(
+              institutionId: state.pathParameters['institutionId']!,
+            ),
+          ),
+
+          // Rooms (настройки кабинетов - для редактирования из Настроек)
           GoRoute(
             path: '/institutions/:institutionId/rooms',
             builder: (context, state) => RoomsScreen(
               institutionId: state.pathParameters['institutionId']!,
             ),
             routes: [
-              GoRoute(
-                path: 'all',
-                builder: (context, state) => AllRoomsScheduleScreen(
-                  institutionId: state.pathParameters['institutionId']!,
-                ),
-              ),
               GoRoute(
                 path: ':roomId/schedule',
                 builder: (context, state) => ScheduleScreen(

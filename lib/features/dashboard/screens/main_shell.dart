@@ -18,7 +18,7 @@ class MainShell extends ConsumerWidget {
 
     // Определяем текущий индекс на основе маршрута
     int currentIndex = 0;
-    if (location.contains('/rooms')) {
+    if (location.contains('/schedule')) {
       currentIndex = 1;
     } else if (location.contains('/students')) {
       currentIndex = 2;
@@ -51,7 +51,7 @@ class MainShell extends ConsumerWidget {
               context.go('/institutions/$institutionId/dashboard');
               break;
             case 1:
-              context.go('/institutions/$institutionId/rooms');
+              context.go('/institutions/$institutionId/schedule');
               break;
             case 2:
               context.go('/institutions/$institutionId/students');
@@ -71,9 +71,9 @@ class MainShell extends ConsumerWidget {
             label: AppStrings.dashboard,
           ),
           NavigationDestination(
-            icon: Icon(Icons.door_front_door_outlined),
-            selectedIcon: Icon(Icons.door_front_door),
-            label: AppStrings.rooms,
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: AppStrings.schedule,
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outline),
