@@ -231,6 +231,7 @@ class _TimeGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

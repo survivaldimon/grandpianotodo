@@ -739,6 +739,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
         // Сетка расписания
         Expanded(
           child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
             child: SizedBox(
               height: totalHeight,
               child: Row(
@@ -1093,6 +1094,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             // Сетка дней и занятий
             Expanded(
               child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
                 child: Column(
                   children: List.generate(7, (dayIndex) {
                     final date = widget.weekStart.add(Duration(days: dayIndex));
