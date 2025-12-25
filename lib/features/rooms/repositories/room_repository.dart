@@ -115,16 +115,13 @@ class RoomRepository {
   }
 
   /// Стрим кабинетов (realtime)
-  Stream<List<Room>> watchByInstitution(String institutionId) {
-    return _client
-        .from('rooms')
-        .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)
-        .order('sort_order')
-        .map((data) => data
-            .where((item) => item['archived_at'] == null)
-            .map((item) => Room.fromJson(item))
-            .toList());
+  /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
+  Stream<List<Room>> watchByInstitution(String institutionId) async* {
+    await for (final _ in _client.from('rooms').stream(primaryKey: ['id'])) {
+      // При любом изменении загружаем актуальные данные
+      final rooms = await getByInstitution(institutionId);
+      yield rooms;
+    }
   }
 
   /// Изменить порядок кабинетов

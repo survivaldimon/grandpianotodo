@@ -145,16 +145,13 @@ class StudentRepository {
   }
 
   /// Стрим учеников (realtime)
-  Stream<List<Student>> watchByInstitution(String institutionId) {
-    return _client
-        .from('students')
-        .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)
-        .order('name')
-        .map((data) => data
-            .where((item) => item['archived_at'] == null)
-            .map((item) => Student.fromJson(item))
-            .toList());
+  /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
+  Stream<List<Student>> watchByInstitution(String institutionId) async* {
+    await for (final _ in _client.from('students').stream(primaryKey: ['id'])) {
+      // При любом изменении загружаем актуальные данные
+      final students = await getByInstitution(institutionId);
+      yield students;
+    }
   }
 
   // === Группы ===

@@ -331,13 +331,13 @@ class SubscriptionRepository {
   }
 
   /// Стрим подписок студента (realtime)
-  Stream<List<Subscription>> watchByStudent(String studentId) {
-    return _client
-        .from('subscriptions')
-        .stream(primaryKey: ['id'])
-        .eq('student_id', studentId)
-        .order('created_at', ascending: false)
-        .map((data) => data.map((item) => Subscription.fromJson(item)).toList());
+  /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
+  Stream<List<Subscription>> watchByStudent(String studentId) async* {
+    await for (final _ in _client.from('subscriptions').stream(primaryKey: ['id'])) {
+      // При любом изменении загружаем актуальные данные
+      final subscriptions = await getByStudent(studentId);
+      yield subscriptions;
+    }
   }
 
   /// Получить истекающие подписки заведения (в течение N дней)

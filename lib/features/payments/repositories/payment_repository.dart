@@ -139,15 +139,29 @@ class PaymentRepository {
     }
   }
 
+  /// Получить все оплаты заведения
+  Future<List<Payment>> getByInstitution(String institutionId) async {
+    try {
+      final data = await _client
+          .from('payments')
+          .select('*, students(*), payment_plans(*)')
+          .eq('institution_id', institutionId)
+          .order('paid_at', ascending: false);
+
+      return (data as List).map((item) => Payment.fromJson(item)).toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки оплат: $e');
+    }
+  }
+
   /// Стрим оплат (realtime)
-  Stream<List<Payment>> watchByInstitution(String institutionId) {
-    return _client
-        .from('payments')
-        .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)
-        .order('paid_at', ascending: false)
-        .map((data) =>
-            data.map((item) => Payment.fromJson(item)).toList());
+  /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
+  Stream<List<Payment>> watchByInstitution(String institutionId) async* {
+    await for (final _ in _client.from('payments').stream(primaryKey: ['id'])) {
+      // При любом изменении загружаем актуальные данные
+      final payments = await getByInstitution(institutionId);
+      yield payments;
+    }
   }
 
   // === Тарифы ===

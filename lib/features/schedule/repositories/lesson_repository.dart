@@ -607,19 +607,13 @@ class LessonRepository {
   }
 
   /// Стрим занятий кабинета (realtime)
-  Stream<List<Lesson>> watchByRoom(String roomId, DateTime date) {
-    final dateStr = date.toIso8601String().split('T').first;
-
-    return _client
-        .from('lessons')
-        .stream(primaryKey: ['id'])
-        .eq('room_id', roomId)
-        .order('start_time')
-        .map((data) => data
-            .where((item) =>
-                item['date'] == dateStr && item['archived_at'] == null)
-            .map((item) => Lesson.fromJson(item))
-            .toList());
+  /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
+  Stream<List<Lesson>> watchByRoom(String roomId, DateTime date) async* {
+    await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
+      // При любом изменении загружаем актуальные данные
+      final lessons = await getByRoomAndDate(roomId, date);
+      yield lessons;
+    }
   }
 
   /// Стрим занятий заведения за дату (realtime)
@@ -640,17 +634,14 @@ class LessonRepository {
 
   /// Стрим неотмеченных занятий (realtime)
   /// Для owner/admin возвращает все, для teacher - только его занятия
-  /// Стрим неотмеченных занятий с полными данными (students, rooms и т.д.)
+  /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
   Stream<List<Lesson>> watchUnmarkedLessons({
     required String institutionId,
     required bool isAdminOrOwner,
     String? teacherId,
   }) async* {
-    // Используем стрим для отслеживания изменений
-    await for (final _ in _client
-        .from('lessons')
-        .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)) {
+    // Используем стрим для отслеживания изменений (без фильтра для DELETE событий)
+    await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
       // При любом изменении - загружаем полные данные с joins
       final lessons = await getUnmarkedLessons(
         institutionId: institutionId,
