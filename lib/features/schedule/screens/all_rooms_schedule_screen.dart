@@ -521,6 +521,7 @@ class _WeekDaySelectorState extends State<_WeekDaySelector> {
       child: ListView.builder(
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
+        physics: const ClampingScrollPhysics(),
         itemCount: _daysRange * 2 + 1, // 365 назад + сегодня + 365 вперёд
         padding: const EdgeInsets.symmetric(horizontal: 8),
         itemBuilder: (context, index) {
@@ -689,6 +690,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                 child: SingleChildScrollView(
                   controller: _headerScrollController,
                   scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
                   child: Row(
                     children: [
                       for (int index = 0; index < widget.allRooms.length; index++)
@@ -768,6 +770,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                     child: SingleChildScrollView(
                       controller: _gridScrollController,
                       scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
                       child: SizedBox(
                         width: rooms.length * roomColumnWidth,
                         child: Stack(
@@ -1146,7 +1149,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                                 ? SingleChildScrollView(
                                     controller: dayIndex == 0 ? _mainScrollController : _dayControllers[dayIndex],
                                     scrollDirection: Axis.horizontal,
-                                    physics: dayIndex == 0 ? null : const NeverScrollableScrollPhysics(),
+                                    physics: dayIndex == 0 ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics(),
                                     child: _buildDayCells(rooms, dayLessons, date, roomColumnWidth),
                                   )
                                 : _buildDayCells(rooms, dayLessons, date, roomColumnWidth),

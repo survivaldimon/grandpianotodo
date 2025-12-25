@@ -157,6 +157,7 @@ class _WeekDaySelector extends StatelessWidget {
       height: 80,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        physics: const ClampingScrollPhysics(),
         itemCount: 7,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         itemBuilder: (context, index) {
