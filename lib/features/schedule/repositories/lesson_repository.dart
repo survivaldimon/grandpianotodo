@@ -623,19 +623,17 @@ class LessonRepository {
   }
 
   /// Стрим занятий заведения за дату (realtime)
-  Stream<List<Lesson>> watchByInstitution(String institutionId, DateTime date) {
-    final dateStr = date.toIso8601String().split('T').first;
-
-    return _client
+  /// При любом изменении загружает полные данные с joins
+  Stream<List<Lesson>> watchByInstitution(String institutionId, DateTime date) async* {
+    // Используем стрим для отслеживания изменений
+    await for (final _ in _client
         .from('lessons')
         .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)
-        .order('start_time')
-        .map((data) => data
-            .where((item) =>
-                item['date'] == dateStr && item['archived_at'] == null)
-            .map((item) => Lesson.fromJson(item))
-            .toList());
+        .eq('institution_id', institutionId)) {
+      // При любом изменении - загружаем полные данные с joins
+      final lessons = await getByInstitutionAndDate(institutionId, date);
+      yield lessons;
+    }
   }
 
   /// Стрим неотмеченных занятий (realtime)

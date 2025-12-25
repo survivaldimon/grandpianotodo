@@ -79,7 +79,7 @@ class DashboardScreen extends ConsumerWidget {
                 title: 'Занятия сегодня',
                 trailing: lessons.length.toString(),
                 icon: Icons.event_note,
-                onTap: () => context.go('/institutions/$institutionId/rooms'),
+                onTap: () => context.go('/institutions/$institutionId/schedule'),
               ),
               loading: () => _DashboardCard(
                 title: 'Занятия сегодня',
@@ -91,7 +91,7 @@ class DashboardScreen extends ConsumerWidget {
                 title: 'Занятия сегодня',
                 trailing: '—',
                 icon: Icons.event_note,
-                onTap: () => context.go('/institutions/$institutionId/rooms'),
+                onTap: () => context.go('/institutions/$institutionId/schedule'),
               ),
             ),
             const SizedBox(height: 12),
@@ -492,6 +492,9 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
     ref.invalidate(unmarkedLessonsProvider(widget.institutionId));
     ref.invalidate(unmarkedLessonsStreamProvider(widget.institutionId));
     ref.invalidate(todayPaymentsTotalProvider(widget.institutionId));
+
+    // Примечание: lessonsByInstitutionStreamProvider и institutionTodayLessonsProvider
+    // используют StreamProvider и обновляются автоматически через Supabase Realtime
 
     // Инвалидируем подписки затронутых студентов
     for (final studentId in affectedStudentIds) {

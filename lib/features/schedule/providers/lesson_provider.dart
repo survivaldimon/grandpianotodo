@@ -98,6 +98,13 @@ final lessonsByInstitutionProvider =
   return repo.getByInstitutionAndDate(params.institutionId, params.date);
 });
 
+/// Провайдер занятий заведения за указанную дату (realtime)
+final lessonsByInstitutionStreamProvider =
+    StreamProvider.family<List<Lesson>, InstitutionDateParams>((ref, params) {
+  final repo = ref.watch(lessonRepositoryProvider);
+  return repo.watchByInstitution(params.institutionId, params.date);
+});
+
 /// Параметры для загрузки занятий за неделю
 class InstitutionWeekParams {
   final String institutionId;

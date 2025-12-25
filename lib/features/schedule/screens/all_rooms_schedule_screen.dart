@@ -117,7 +117,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   Widget build(BuildContext context) {
     final roomsAsync = ref.watch(roomsProvider(widget.institutionId));
     final lessonsAsync = ref.watch(
-      lessonsByInstitutionProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
+      lessonsByInstitutionStreamProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
     );
 
     // Получаем название выбранного кабинета для заголовка
