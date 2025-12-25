@@ -503,10 +503,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
     }
 
     if (mounted) {
-      setState(() {
-        _isSaving = false;
-        _marks.clear();
-      });
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Изменения сохранены'),
