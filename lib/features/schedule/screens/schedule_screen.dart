@@ -10,6 +10,7 @@ import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
 import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/institution/providers/subject_provider.dart';
+import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
@@ -393,6 +394,13 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     final isScheduled = _currentStatus == LessonStatus.scheduled;
     final canEdit = isScheduled || isCompleted;
 
+    // Проверка прав на удаление
+    final currentUserId = ref.watch(currentUserIdProvider);
+    final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
+    final isOwnLesson = lesson.teacherId == currentUserId;
+    final canDelete = (permissions?.deleteAllLessons ?? false) ||
+                      (isOwnLesson && (permissions?.deleteOwnLessons ?? false));
+
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -543,17 +551,18 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
 
           const SizedBox(height: 8),
 
-          // Кнопка удаления
-          TextButton.icon(
-            onPressed: controllerState.isLoading || _isLoading
-                ? null
-                : _deleteLesson,
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Удалить занятие'),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
+          // Кнопка удаления (только если есть право)
+          if (canDelete)
+            TextButton.icon(
+              onPressed: controllerState.isLoading || _isLoading
+                  ? null
+                  : _deleteLesson,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Удалить занятие'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.error,
+              ),
             ),
-          ),
 
           const SizedBox(height: 8),
         ],

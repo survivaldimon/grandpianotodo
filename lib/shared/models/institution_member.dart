@@ -13,7 +13,8 @@ class MemberPermissions {
   final bool createLessons;
   final bool editOwnLessons;
   final bool editAllLessons;
-  final bool deleteLessons;
+  final bool deleteOwnLessons;
+  final bool deleteAllLessons;
   final bool viewAllSchedule;
   final bool managePayments;
   final bool viewPayments;
@@ -32,7 +33,8 @@ class MemberPermissions {
     this.createLessons = true,
     this.editOwnLessons = true,
     this.editAllLessons = false,
-    this.deleteLessons = false,
+    this.deleteOwnLessons = false,
+    this.deleteAllLessons = false,
     this.viewAllSchedule = true,
     this.managePayments = false,
     this.viewPayments = false,
@@ -53,7 +55,8 @@ class MemberPermissions {
         createLessons: true,
         editOwnLessons: true,
         editAllLessons: true,
-        deleteLessons: true,
+        deleteOwnLessons: true,
+        deleteAllLessons: true,
         viewAllSchedule: true,
         managePayments: true,
         viewPayments: true,
@@ -77,7 +80,8 @@ class MemberPermissions {
         createLessons: json['create_lessons'] as bool? ?? true,
         editOwnLessons: json['edit_own_lessons'] as bool? ?? true,
         editAllLessons: json['edit_all_lessons'] as bool? ?? false,
-        deleteLessons: json['delete_lessons'] as bool? ?? false,
+        deleteOwnLessons: json['delete_own_lessons'] as bool? ?? json['delete_lessons'] as bool? ?? false,
+        deleteAllLessons: json['delete_all_lessons'] as bool? ?? false,
         viewAllSchedule: json['view_all_schedule'] as bool? ?? true,
         managePayments: json['manage_payments'] as bool? ?? false,
         viewPayments: json['view_payments'] as bool? ?? false,
@@ -97,7 +101,8 @@ class MemberPermissions {
         'create_lessons': createLessons,
         'edit_own_lessons': editOwnLessons,
         'edit_all_lessons': editAllLessons,
-        'delete_lessons': deleteLessons,
+        'delete_own_lessons': deleteOwnLessons,
+        'delete_all_lessons': deleteAllLessons,
         'view_all_schedule': viewAllSchedule,
         'manage_payments': managePayments,
         'view_payments': viewPayments,
@@ -117,7 +122,8 @@ class MemberPermissions {
     bool? createLessons,
     bool? editOwnLessons,
     bool? editAllLessons,
-    bool? deleteLessons,
+    bool? deleteOwnLessons,
+    bool? deleteAllLessons,
     bool? viewAllSchedule,
     bool? managePayments,
     bool? viewPayments,
@@ -136,7 +142,8 @@ class MemberPermissions {
         createLessons: createLessons ?? this.createLessons,
         editOwnLessons: editOwnLessons ?? this.editOwnLessons,
         editAllLessons: editAllLessons ?? this.editAllLessons,
-        deleteLessons: deleteLessons ?? this.deleteLessons,
+        deleteOwnLessons: deleteOwnLessons ?? this.deleteOwnLessons,
+        deleteAllLessons: deleteAllLessons ?? this.deleteAllLessons,
         viewAllSchedule: viewAllSchedule ?? this.viewAllSchedule,
         managePayments: managePayments ?? this.managePayments,
         viewPayments: viewPayments ?? this.viewPayments,
