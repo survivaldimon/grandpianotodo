@@ -31,6 +31,7 @@
 - `SESSION_2025_12_21_FEATURES.md` — улучшения функциональности
 - `SESSION_2025_12_23_IMPROVEMENTS.md` — исправления багов, интеграция абонементов, средняя стоимость занятий
 - `SESSION_2025_12_25_SUBSCRIPTIONS_REALTIME.md` — исправление Realtime обновлений подписок
+- `SESSION_2025_12_25_PERMISSIONS.md` — система прав участников, разделение прав на удаление занятий
 
 ## Валюта
 
@@ -159,6 +160,37 @@ await Future.wait([
 Приблизительный расчёт используется когда:
 - Миграция `subscription_id` не выполнена
 - У занятий нет привязки к подпискам
+
+### 14. Права участников (Permissions)
+Права хранятся в JSON поле `permissions` таблицы `institution_members`.
+
+**Структура прав удаления занятий:**
+```dart
+deleteOwnLessons: bool  // Удаление только своих занятий
+deleteAllLessons: bool  // Удаление занятий любого преподавателя
+```
+
+**Проверка прав на удаление:**
+```dart
+final canDelete = isOwner ||
+                  (permissions?.deleteAllLessons ?? false) ||
+                  (isOwnLesson && (permissions?.deleteOwnLessons ?? false));
+```
+
+**Realtime обновление прав:**
+- `myMembershipProvider` — StreamProvider для отслеживания изменений прав
+- `myPermissionsProvider` — извлекает права из membership
+- При открытии деталей занятия вызывается `ref.invalidate(myMembershipProvider)` для гарантированного обновления
+
+**Обратная совместимость с RLS:**
+В `toJson()` добавляется поле `delete_lessons: deleteOwnLessons || deleteAllLessons` для совместимости с RLS политикой в Supabase.
+
+### 15. Получение текущего пользователя
+Для надёжного получения ID текущего пользователя в UI используй прямой доступ:
+```dart
+final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+```
+Это надёжнее, чем `currentUserIdProvider`, который зависит от стрима.
 
 ## CI/CD
 
