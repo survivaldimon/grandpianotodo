@@ -89,7 +89,7 @@ class StudentDetailScreen extends ConsumerWidget {
             onRefresh: () async {
               ref.invalidate(studentProvider(studentId));
               ref.invalidate(studentPaymentsProvider(studentId));
-              // subscriptionsStreamProvider обновляется автоматически через Supabase Realtime
+              ref.invalidate(subscriptionsStreamProvider(studentId));
             },
             child: ListView(
               padding: AppSizes.paddingAllM,
@@ -333,7 +333,7 @@ class StudentDetailScreen extends ConsumerWidget {
         onCreated: () {
           ref.invalidate(studentProvider(studentId));
           ref.invalidate(studentPaymentsProvider(studentId));
-          // subscriptionsStreamProvider обновляется автоматически через Supabase Realtime
+          ref.invalidate(subscriptionsStreamProvider(studentId));
         },
       ),
     );

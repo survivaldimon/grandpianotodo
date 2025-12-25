@@ -671,6 +671,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE lessons;
 ALTER PUBLICATION supabase_realtime ADD TABLE students;
 ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
 ALTER PUBLICATION supabase_realtime ADD TABLE payments;
+ALTER PUBLICATION supabase_realtime ADD TABLE subscriptions;
 ```
 
 ## Индексы для производительности

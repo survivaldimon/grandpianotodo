@@ -200,6 +200,8 @@ class SubscriptionController extends StateNotifier<AsyncValue<void>> {
     _ref.invalidate(activeSubscriptionsProvider(studentId));
     _ref.invalidate(studentActiveBalanceProvider(studentId));
     _ref.invalidate(isStudentFrozenProvider(studentId));
+    // Также инвалидируем StreamProvider для принудительного обновления
+    _ref.invalidate(subscriptionsStreamProvider(studentId));
   }
 }
 
