@@ -34,18 +34,18 @@ final institutionMembersProvider =
   return repo.getMembers(institutionId);
 });
 
-/// Провайдер текущего членства пользователя
+/// Провайдер текущего членства пользователя (realtime)
 final myMembershipProvider =
-    FutureProvider.family<InstitutionMember?, String>((ref, institutionId) async {
+    StreamProvider.family<InstitutionMember?, String>((ref, institutionId) {
   final repo = ref.watch(institutionRepositoryProvider);
-  return repo.getMyMembership(institutionId);
+  return repo.watchMyMembership(institutionId);
 });
 
-/// Провайдер прав пользователя в заведении
+/// Провайдер прав пользователя в заведении (realtime)
 final myPermissionsProvider =
-    FutureProvider.family<MemberPermissions?, String>((ref, institutionId) async {
-  final membership = await ref.watch(myMembershipProvider(institutionId).future);
-  return membership?.permissions;
+    Provider.family<MemberPermissions?, String>((ref, institutionId) {
+  final membershipAsync = ref.watch(myMembershipProvider(institutionId));
+  return membershipAsync.valueOrNull?.permissions;
 });
 
 /// Контроллер заведений

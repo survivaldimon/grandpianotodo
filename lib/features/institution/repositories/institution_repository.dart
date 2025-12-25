@@ -171,6 +171,21 @@ class InstitutionRepository {
     }
   }
 
+  /// Стрим моего членства в заведении (realtime)
+  /// Обновляется автоматически при изменении прав
+  Stream<InstitutionMember?> watchMyMembership(String institutionId) async* {
+    if (_userId == null) {
+      yield null;
+      return;
+    }
+
+    await for (final _ in _client.from('institution_members').stream(primaryKey: ['id'])) {
+      // При любом изменении загружаем актуальные данные
+      final membership = await getMyMembership(institutionId);
+      yield membership;
+    }
+  }
+
   /// Обновить права участника
   Future<void> updateMemberPermissions(
     String memberId,

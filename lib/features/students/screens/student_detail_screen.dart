@@ -6,6 +6,7 @@ import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
+import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
@@ -48,6 +49,9 @@ class StudentDetailScreen extends ConsumerWidget {
       ),
       data: (student) {
         final hasDebt = student.balance < 0;
+        // Проверяем права на архивирование
+        final permissions = ref.watch(myPermissionsProvider(institutionId));
+        final canArchive = permissions?.archiveData ?? false;
 
         return Scaffold(
           appBar: AppBar(
@@ -59,25 +63,26 @@ class StudentDetailScreen extends ConsumerWidget {
                   _showEditStudentDialog(context, ref, student);
                 },
               ),
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'archive') {
-                    _confirmArchive(context, ref, student);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'archive',
-                    child: Row(
-                      children: [
-                        Icon(Icons.archive, color: Colors.orange),
-                        SizedBox(width: 8),
-                        Text('Архивировать', style: TextStyle(color: Colors.orange)),
-                      ],
+              if (canArchive)
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'archive') {
+                      _confirmArchive(context, ref, student);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'archive',
+                      child: Row(
+                        children: [
+                          Icon(Icons.archive, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text('Архивировать', style: TextStyle(color: Colors.orange)),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
           body: RefreshIndicator(

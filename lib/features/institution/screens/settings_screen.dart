@@ -54,6 +54,9 @@ class SettingsScreen extends ConsumerWidget {
         ),
         data: (institution) {
           final isOwner = institution.ownerId == currentUserId;
+          // Проверяем права на управление заведением
+          final permissions = ref.watch(myPermissionsProvider(institutionId));
+          final canManageInstitution = isOwner || (permissions?.manageInstitution ?? false);
 
           return ListView(
             children: [
@@ -62,8 +65,8 @@ class SettingsScreen extends ConsumerWidget {
                 leading: const Icon(Icons.business),
                 title: const Text('Название'),
                 subtitle: Text(institution.name),
-                trailing: isOwner ? const Icon(Icons.chevron_right) : null,
-                onTap: isOwner
+                trailing: canManageInstitution ? const Icon(Icons.chevron_right) : null,
+                onTap: canManageInstitution
                     ? () => _showEditNameDialog(context, ref, institution.name)
                     : null,
               ),
@@ -87,7 +90,7 @@ class SettingsScreen extends ConsumerWidget {
                         );
                       },
                     ),
-                    if (isOwner)
+                    if (canManageInstitution)
                       IconButton(
                         icon: const Icon(Icons.refresh),
                         tooltip: 'Сгенерировать новый код',

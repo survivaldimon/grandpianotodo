@@ -58,6 +58,10 @@ class MembersScreen extends ConsumerWidget {
             orElse: () => null,
           );
 
+          // Проверяем права на управление участниками (владелец или с разрешением)
+          final permissions = ref.watch(myPermissionsProvider(institutionId));
+          final canManageMembers = isOwner || (permissions?.manageMembers ?? false);
+
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: members.length,
@@ -68,7 +72,7 @@ class MembersScreen extends ConsumerWidget {
 
               return _MemberTile(
                 member: member,
-                isOwner: isOwner,
+                canManageMembers: canManageMembers,
                 isCurrentUser: isCurrentUser,
                 isMemberOwner: isMemberOwner,
                 institutionId: institutionId,
@@ -83,14 +87,14 @@ class MembersScreen extends ConsumerWidget {
 
 class _MemberTile extends ConsumerWidget {
   final InstitutionMember member;
-  final bool isOwner;
+  final bool canManageMembers;
   final bool isCurrentUser;
   final bool isMemberOwner;
   final String institutionId;
 
   const _MemberTile({
     required this.member,
-    required this.isOwner,
+    required this.canManageMembers,
     required this.isCurrentUser,
     required this.isMemberOwner,
     required this.institutionId,
@@ -155,7 +159,7 @@ class _MemberTile extends ConsumerWidget {
             ),
         ],
       ),
-      trailing: isOwner && !isMemberOwner
+      trailing: canManageMembers && !isMemberOwner && !isCurrentUser
           ? PopupMenuButton<String>(
               onSelected: (value) {
                 switch (value) {
@@ -204,7 +208,7 @@ class _MemberTile extends ConsumerWidget {
               ],
             )
           : null,
-      onTap: isOwner && !isMemberOwner
+      onTap: canManageMembers && !isMemberOwner && !isCurrentUser
           ? () => context.push('/institutions/$institutionId/members/${member.id}/permissions')
           : null,
     );
