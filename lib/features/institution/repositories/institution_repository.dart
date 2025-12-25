@@ -183,16 +183,14 @@ class InstitutionRepository {
     final initialMembership = await getMyMembership(institutionId);
     yield initialMembership;
 
-    // Слушаем изменения только для текущего пользователя в этом заведении
+    // Слушаем изменения в заведении (stream поддерживает только один eq)
     await for (final data in _client
         .from('institution_members')
         .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)
-        .eq('user_id', _userId!)) {
+        .eq('institution_id', institutionId)) {
       // Находим запись текущего пользователя
       final myData = data.where((item) =>
         item['user_id'] == _userId &&
-        item['institution_id'] == institutionId &&
         item['archived_at'] == null
       ).firstOrNull;
 
