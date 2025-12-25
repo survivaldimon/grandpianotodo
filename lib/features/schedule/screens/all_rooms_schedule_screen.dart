@@ -981,6 +981,26 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     for (int i = 0; i < _dayControllers.length; i++) {
       _dayControllers[i].addListener(() => _syncFromDay(i));
     }
+    // Добавляем listener для заголовка
+    _headerScrollController.addListener(_syncFromHeader);
+  }
+
+  void _syncFromHeader() {
+    if (_isSyncing) return;
+    if (!_headerScrollController.hasClients) return;
+
+    _isSyncing = true;
+
+    final offset = _headerScrollController.offset;
+
+    // Синхронизируем все дни с заголовком
+    for (int i = 0; i < _dayControllers.length; i++) {
+      if (_dayControllers[i].hasClients) {
+        _dayControllers[i].jumpTo(offset);
+      }
+    }
+
+    _isSyncing = false;
   }
 
   void _syncFromDay(int sourceIndex) {
@@ -1085,7 +1105,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                         ? SingleChildScrollView(
                             controller: _headerScrollController,
                             scrollDirection: Axis.horizontal,
-                            physics: const NeverScrollableScrollPhysics(),
+                            physics: const ClampingScrollPhysics(),
                             child: _buildRoomHeaders(rooms, roomColumnWidth),
                           )
                         : _buildRoomHeaders(rooms, roomColumnWidth),
