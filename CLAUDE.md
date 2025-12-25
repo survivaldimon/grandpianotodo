@@ -30,6 +30,7 @@
 - `SESSION_2025_12_20_IOS_DEPLOYMENT.md` — деплой iOS на TestFlight
 - `SESSION_2025_12_21_FEATURES.md` — улучшения функциональности
 - `SESSION_2025_12_23_IMPROVEMENTS.md` — исправления багов, интеграция абонементов, средняя стоимость занятий
+- `SESSION_2025_12_25_SUBSCRIPTIONS_REALTIME.md` — исправление Realtime обновлений подписок
 
 ## Валюта
 
@@ -61,6 +62,38 @@ UI (Screen/Widget) → Provider → Repository → Supabase
 - Подписки на Supabase Realtime создаются через `StreamProvider`
 - При уходе с экрана подписки автоматически отменяются (Riverpod это делает)
 - Используй `.family` модификатор для параметризованных провайдеров
+
+### 5a. Гибридный Realtime Pattern (ВАЖНО!)
+**Всегда комбинируй Realtime Stream + Manual Invalidation для надежности:**
+
+```dart
+// В контроллере ВСЕГДА инвалидируй StreamProvider после операций
+void _invalidateForEntity(String entityId) {
+  _ref.invalidate(entityStreamProvider(entityId));  // ← ОБЯЗАТЕЛЬНО!
+  _ref.invalidate(entityFutureProvider(entityId));
+  _ref.invalidate(relatedDataProvider(entityId));
+}
+
+Future<Entity?> updateEntity(String id) async {
+  final entity = await _repo.update(id);
+  _invalidateForEntity(id);  // ← Принудительное обновление
+  return entity;
+}
+```
+
+**Зачем нужна ручная инвалидация:**
+- ✅ UI обновляется **всегда** — даже если Realtime не настроен
+- ✅ Работает **между пользователями** — когда Realtime активен
+- ✅ Гарантия обновления — после операций через контроллер
+- ✅ Работает при pull-to-refresh
+
+**Настройка Realtime в Supabase:**
+```sql
+-- Добавляй таблицы в публикацию сразу при создании
+ALTER PUBLICATION supabase_realtime ADD TABLE table_name;
+```
+
+**Проверка:** Все таблицы должны быть в DATABASE.md → секция Realtime
 
 ### 6. Архивация vs Удаление
 - "Удаление" сущностей = установка `archived_at` timestamp

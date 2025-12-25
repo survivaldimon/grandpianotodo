@@ -132,6 +132,35 @@ final lessonsStreamProvider = StreamProvider.family<List<Lesson>, String>((ref, 
 });
 ```
 
+**ВАЖНО: Гибридный Realtime подход**
+
+Всегда комбинируй StreamProvider + ручную инвалидацию для надежности:
+
+```dart
+// В контроллере
+class EntityController extends StateNotifier<AsyncValue<void>> {
+  final EntityRepository _repo;
+  final Ref _ref;
+
+  void _invalidateForEntity(String entityId) {
+    // ОБЯЗАТЕЛЬНО инвалидируй StreamProvider!
+    _ref.invalidate(entityStreamProvider(entityId));
+    _ref.invalidate(entityDataProvider(entityId));
+  }
+
+  Future<Entity?> update(String id) async {
+    final entity = await _repo.update(id);
+    _invalidateForEntity(id);  // Гарантирует обновление UI
+    return entity;
+  }
+}
+```
+
+Это обеспечивает:
+- ✅ Обновление UI всегда (даже если Realtime не настроен)
+- ✅ Синхронизацию между пользователями (когда Realtime работает)
+- ✅ Pull-to-refresh работает корректно
+
 **FutureProvider** — для одноразовых запросов:
 ```dart
 final studentProvider = FutureProvider.family<Student?, String>((ref, studentId) {
