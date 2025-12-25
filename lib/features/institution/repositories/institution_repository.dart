@@ -112,11 +112,17 @@ class InstitutionRepository {
         throw ValidationException('Вы уже состоите в этом заведении');
       }
 
-      // Добавить как участника
+      // Добавить как участника с правами на управление учениками
       await _client.from('institution_members').insert({
         'institution_id': institution.id,
         'user_id': _userId,
         'role_name': 'Преподаватель',
+        'permissions': {
+          'manage_students': true,
+          'create_lessons': true,
+          'edit_own_lessons': true,
+          'view_all_schedule': true,
+        },
       });
 
       return institution;
