@@ -1431,9 +1431,12 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
 
     // Проверка прав на удаление
     final currentUserId = ref.watch(currentUserIdProvider);
+    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+    final isOwner = institutionAsync.valueOrNull?.ownerId == currentUserId;
     final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
     final isOwnLesson = lesson.teacherId == currentUserId;
-    final canDelete = (permissions?.deleteAllLessons ?? false) ||
+    final canDelete = isOwner ||
+                      (permissions?.deleteAllLessons ?? false) ||
                       (isOwnLesson && (permissions?.deleteOwnLessons ?? false));
 
     ref.listen(lessonControllerProvider, (prev, next) {
