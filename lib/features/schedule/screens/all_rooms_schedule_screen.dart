@@ -20,6 +20,7 @@ import 'package:kabinet/shared/models/subject.dart';
 import 'package:kabinet/shared/models/lesson_type.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 
 /// Класс для хранения состояния фильтров расписания
@@ -1429,12 +1430,12 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     final hasPrice = lesson.lessonType?.defaultPrice != null;
     final hasStudent = lesson.studentId != null;
 
-    // Проверка прав на удаление
-    final currentUserId = ref.watch(currentUserIdProvider);
+    // Проверка прав на удаление (используем прямой доступ к userId для надёжности)
+    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
     final isOwner = institutionAsync.valueOrNull?.ownerId == currentUserId;
     final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
-    final isOwnLesson = lesson.teacherId == currentUserId;
+    final isOwnLesson = currentUserId != null && lesson.teacherId == currentUserId;
     final canDelete = isOwner ||
                       (permissions?.deleteAllLessons ?? false) ||
                       (isOwnLesson && (permissions?.deleteOwnLessons ?? false));

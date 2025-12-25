@@ -22,6 +22,7 @@ import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/models/lesson_type.dart';
 import 'package:kabinet/shared/models/subscription.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
 
 /// Экран расписания кабинета
 class ScheduleScreen extends ConsumerStatefulWidget {
@@ -394,12 +395,12 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     final isScheduled = _currentStatus == LessonStatus.scheduled;
     final canEdit = isScheduled || isCompleted;
 
-    // Проверка прав на удаление
-    final currentUserId = ref.watch(currentUserIdProvider);
+    // Проверка прав на удаление (используем прямой доступ к userId для надёжности)
+    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
     final isOwner = institutionAsync.valueOrNull?.ownerId == currentUserId;
     final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
-    final isOwnLesson = lesson.teacherId == currentUserId;
+    final isOwnLesson = currentUserId != null && lesson.teacherId == currentUserId;
     final canDelete = isOwner ||
                       (permissions?.deleteAllLessons ?? false) ||
                       (isOwnLesson && (permissions?.deleteOwnLessons ?? false));
