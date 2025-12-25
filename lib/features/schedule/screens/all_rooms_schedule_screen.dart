@@ -968,7 +968,6 @@ class _WeekTimeGrid extends StatefulWidget {
 }
 
 class _WeekTimeGridState extends State<_WeekTimeGrid> {
-  final ScrollController _mainScrollController = ScrollController();
   final ScrollController _headerScrollController = ScrollController();
   final List<ScrollController> _dayControllers = List.generate(7, (_) => ScrollController());
   bool _isSyncing = false;
@@ -978,25 +977,29 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   @override
   void initState() {
     super.initState();
-    // Синхронизация скроллов - главный контроллер управляет всеми
-    _mainScrollController.addListener(_syncAllScrolls);
+    // Добавляем listeners для всех контроллеров дней
+    for (int i = 0; i < _dayControllers.length; i++) {
+      _dayControllers[i].addListener(() => _syncFromDay(i));
+    }
   }
 
-  void _syncAllScrolls() {
+  void _syncFromDay(int sourceIndex) {
     if (_isSyncing) return;
+    if (!_dayControllers[sourceIndex].hasClients) return;
+
     _isSyncing = true;
 
-    final offset = _mainScrollController.offset;
+    final offset = _dayControllers[sourceIndex].offset;
 
     // Синхронизируем заголовок
     if (_headerScrollController.hasClients) {
       _headerScrollController.jumpTo(offset);
     }
 
-    // Синхронизируем все дни
-    for (final controller in _dayControllers) {
-      if (controller.hasClients && controller != _mainScrollController) {
-        controller.jumpTo(offset);
+    // Синхронизируем все остальные дни
+    for (int i = 0; i < _dayControllers.length; i++) {
+      if (i != sourceIndex && _dayControllers[i].hasClients) {
+        _dayControllers[i].jumpTo(offset);
       }
     }
 
@@ -1005,12 +1008,11 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
 
   @override
   void dispose() {
-    _mainScrollController.removeListener(_syncAllScrolls);
-    _mainScrollController.dispose();
-    _headerScrollController.dispose();
+    // Удаляем listeners от всех контроллеров
     for (final controller in _dayControllers) {
       controller.dispose();
     }
+    _headerScrollController.dispose();
     super.dispose();
   }
 
@@ -1149,9 +1151,9 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                           Expanded(
                             child: needsHorizontalScroll
                                 ? SingleChildScrollView(
-                                    controller: dayIndex == 0 ? _mainScrollController : _dayControllers[dayIndex],
+                                    controller: _dayControllers[dayIndex],
                                     scrollDirection: Axis.horizontal,
-                                    physics: dayIndex == 0 ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics(),
+                                    physics: const ClampingScrollPhysics(),
                                     child: _buildDayCells(rooms, dayLessons, date, roomColumnWidth),
                                   )
                                 : _buildDayCells(rooms, dayLessons, date, roomColumnWidth),
