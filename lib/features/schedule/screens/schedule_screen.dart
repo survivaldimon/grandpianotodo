@@ -368,6 +368,10 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
   void initState() {
     super.initState();
     _currentStatus = widget.lesson.status;
+    // Принудительно обновляем права при открытии
+    Future.microtask(() {
+      ref.invalidate(myMembershipProvider(widget.institutionId));
+    });
   }
 
   @override

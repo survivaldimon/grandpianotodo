@@ -1403,6 +1403,10 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     super.initState();
     _currentStatus = widget.lesson.status;
     _loadPaymentStatus();
+    // Принудительно обновляем права при открытии
+    Future.microtask(() {
+      ref.invalidate(myMembershipProvider(widget.institutionId));
+    });
   }
 
   /// Загружаем статус оплаты для этого занятия
