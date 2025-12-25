@@ -311,7 +311,11 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         lesson: lesson,
         institutionId: widget.institutionId,
         onUpdated: () {
+          // Инвалидируем оба провайдера для гарантированного обновления
           ref.invalidate(lessonsByInstitutionProvider(
+            InstitutionDateParams(widget.institutionId, _selectedDate),
+          ));
+          ref.invalidate(lessonsByInstitutionStreamProvider(
             InstitutionDateParams(widget.institutionId, _selectedDate),
           ));
         },
@@ -329,7 +333,11 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         startHour: hour,
         institutionId: widget.institutionId,
         onCreated: () {
+          // Инвалидируем оба провайдера для гарантированного обновления
           ref.invalidate(lessonsByInstitutionProvider(
+            InstitutionDateParams(widget.institutionId, _selectedDate),
+          ));
+          ref.invalidate(lessonsByInstitutionStreamProvider(
             InstitutionDateParams(widget.institutionId, _selectedDate),
           ));
         },
