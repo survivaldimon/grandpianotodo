@@ -110,7 +110,7 @@ class AllRoomsScheduleScreen extends ConsumerStatefulWidget {
 class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen> {
   DateTime _selectedDate = DateTime.now();
   String? _selectedRoomId; // null = все кабинеты
-  String? _lastSelectedRoomId; // Последний выбранный кабинет для восстановления позиции
+  double? _savedScrollOffset; // Сохранённая позиция скролла для восстановления
   ScheduleFilters _filters = const ScheduleFilters();
   ScheduleViewMode _viewMode = ScheduleViewMode.day;
 
@@ -235,17 +235,17 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             selectedDate: _selectedDate,
             institutionId: widget.institutionId,
             selectedRoomId: _selectedRoomId,
-            scrollToRoomId: _lastSelectedRoomId,
+            restoreScrollOffset: _savedScrollOffset,
             onLessonTap: _showLessonDetail,
-            onRoomTap: (roomId) {
+            onRoomTap: (roomId, currentOffset) {
               setState(() {
                 if (_selectedRoomId == roomId) {
-                  // Возвращаемся к общему виду, сохраняем ID для прокрутки
-                  _lastSelectedRoomId = roomId;
+                  // Возвращаемся к общему виду
                   _selectedRoomId = null;
                 } else {
+                  // Сохраняем позицию скролла перед переходом к одному кабинету
+                  _savedScrollOffset = currentOffset;
                   _selectedRoomId = roomId;
-                  _lastSelectedRoomId = null;
                 }
               });
             },
@@ -285,16 +285,16 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             weekStart: weekStart,
             institutionId: widget.institutionId,
             selectedRoomId: _selectedRoomId,
-            scrollToRoomId: _lastSelectedRoomId,
-            onRoomTap: (roomId) {
+            restoreScrollOffset: _savedScrollOffset,
+            onRoomTap: (roomId, currentOffset) {
               setState(() {
                 if (_selectedRoomId == roomId) {
-                  // Возвращаемся к общему виду, сохраняем ID для прокрутки
-                  _lastSelectedRoomId = roomId;
+                  // Возвращаемся к общему виду
                   _selectedRoomId = null;
                 } else {
+                  // Сохраняем позицию скролла перед переходом к одному кабинету
+                  _savedScrollOffset = currentOffset;
                   _selectedRoomId = roomId;
-                  _lastSelectedRoomId = null;
                 }
               });
             },
@@ -597,9 +597,9 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final DateTime selectedDate;
   final String institutionId;
   final String? selectedRoomId;
-  final String? scrollToRoomId; // Кабинет к которому прокрутить при возврате из одиночного режима
+  final double? restoreScrollOffset; // Позиция скролла для восстановления
   final void Function(Lesson) onLessonTap;
-  final void Function(String roomId) onRoomTap;
+  final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, int hour) onAddLesson;
 
   const _AllRoomsTimeGrid({
@@ -612,7 +612,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
     required this.onRoomTap,
     required this.onAddLesson,
     this.selectedRoomId,
-    this.scrollToRoomId,
+    this.restoreScrollOffset,
   });
 
   static const startHour = 8;
@@ -625,13 +625,17 @@ class _AllRoomsTimeGrid extends StatefulWidget {
 }
 
 class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
-  final ScrollController _headerScrollController = ScrollController();
-  final ScrollController _gridScrollController = ScrollController();
+  late ScrollController _headerScrollController;
+  late ScrollController _gridScrollController;
   bool _isSyncing = false;
 
   @override
   void initState() {
     super.initState();
+    // Создаём контроллеры с начальной позицией если она есть
+    final initialOffset = widget.restoreScrollOffset ?? 0.0;
+    _headerScrollController = ScrollController(initialScrollOffset: initialOffset);
+    _gridScrollController = ScrollController(initialScrollOffset: initialOffset);
     // Синхронизация заголовков -> сетка
     _headerScrollController.addListener(_syncGridFromHeader);
     // Синхронизация сетки -> заголовки
@@ -641,22 +645,16 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
   @override
   void didUpdateWidget(covariant _AllRoomsTimeGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Если вернулись из одиночного режима и есть кабинет для прокрутки
+    // Если вернулись из одиночного режима и есть сохранённая позиция
     if (oldWidget.selectedRoomId != null &&
         widget.selectedRoomId == null &&
-        widget.scrollToRoomId != null) {
-      // Прокручиваем к выбранному кабинету после build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToRoom(widget.scrollToRoomId!);
-      });
+        widget.restoreScrollOffset != null) {
+      // Восстанавливаем позицию скролла сразу
+      _restoreScrollPosition(widget.restoreScrollOffset!);
     }
   }
 
-  void _scrollToRoom(String roomId) {
-    final roomIndex = widget.allRooms.indexWhere((r) => r.id == roomId);
-    if (roomIndex == -1) return;
-
-    final offset = roomIndex * _AllRoomsTimeGrid.roomColumnWidth;
+  void _restoreScrollPosition(double offset) {
     if (_headerScrollController.hasClients) {
       _headerScrollController.jumpTo(offset);
     }
@@ -741,7 +739,10 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                     children: [
                       for (int index = 0; index < widget.allRooms.length; index++)
                         GestureDetector(
-                          onTap: () => widget.onRoomTap(widget.allRooms[index].id),
+                          onTap: () => widget.onRoomTap(
+                            widget.allRooms[index].id,
+                            _headerScrollController.hasClients ? _headerScrollController.offset : 0,
+                          ),
                           child: Container(
                             // Заголовки всегда используют фиксированную ширину
                             width: _AllRoomsTimeGrid.roomColumnWidth,
@@ -990,8 +991,8 @@ class _WeekTimeGrid extends StatefulWidget {
   final DateTime weekStart;
   final String institutionId;
   final String? selectedRoomId;
-  final String? scrollToRoomId; // Кабинет к которому прокрутить при возврате из одиночного режима
-  final void Function(String roomId) onRoomTap;
+  final double? restoreScrollOffset; // Позиция скролла для восстановления
+  final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, DateTime date) onCellTap;
 
   const _WeekTimeGrid({
@@ -1003,7 +1004,7 @@ class _WeekTimeGrid extends StatefulWidget {
     required this.onRoomTap,
     required this.onCellTap,
     this.selectedRoomId,
-    this.scrollToRoomId,
+    this.restoreScrollOffset,
   });
 
   static const minRoomColumnWidth = 100.0;
@@ -1016,8 +1017,8 @@ class _WeekTimeGrid extends StatefulWidget {
 }
 
 class _WeekTimeGridState extends State<_WeekTimeGrid> {
-  final ScrollController _headerScrollController = ScrollController();
-  final List<ScrollController> _dayControllers = List.generate(7, (_) => ScrollController());
+  late ScrollController _headerScrollController;
+  late List<ScrollController> _dayControllers;
   bool _isSyncing = false;
 
   static const _weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -1025,6 +1026,13 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   @override
   void initState() {
     super.initState();
+    // Создаём контроллеры с начальной позицией если она есть
+    final initialOffset = widget.restoreScrollOffset ?? 0.0;
+    _headerScrollController = ScrollController(initialScrollOffset: initialOffset);
+    _dayControllers = List.generate(
+      7,
+      (_) => ScrollController(initialScrollOffset: initialOffset),
+    );
     // Добавляем listeners для всех контроллеров дней
     for (int i = 0; i < _dayControllers.length; i++) {
       _dayControllers[i].addListener(() => _syncFromDay(i));
@@ -1036,22 +1044,16 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   @override
   void didUpdateWidget(covariant _WeekTimeGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Если вернулись из одиночного режима и есть кабинет для прокрутки
+    // Если вернулись из одиночного режима и есть сохранённая позиция
     if (oldWidget.selectedRoomId != null &&
         widget.selectedRoomId == null &&
-        widget.scrollToRoomId != null) {
-      // Прокручиваем к выбранному кабинету после build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToRoom(widget.scrollToRoomId!);
-      });
+        widget.restoreScrollOffset != null) {
+      // Восстанавливаем позицию скролла сразу
+      _restoreScrollPosition(widget.restoreScrollOffset!);
     }
   }
 
-  void _scrollToRoom(String roomId) {
-    final roomIndex = widget.allRooms.indexWhere((r) => r.id == roomId);
-    if (roomIndex == -1) return;
-
-    final offset = roomIndex * _WeekTimeGrid.minRoomColumnWidth;
+  void _restoreScrollPosition(double offset) {
     if (_headerScrollController.hasClients) {
       _headerScrollController.jumpTo(offset);
     }
@@ -1273,7 +1275,10 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
       children: rooms.map((room) {
         final isSelected = widget.selectedRoomId == room.id;
         return GestureDetector(
-          onTap: () => widget.onRoomTap(room.id),
+          onTap: () => widget.onRoomTap(
+            room.id,
+            _headerScrollController.hasClients ? _headerScrollController.offset : 0,
+          ),
           child: Container(
             width: roomColumnWidth,
             alignment: Alignment.center,
