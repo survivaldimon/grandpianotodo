@@ -183,11 +183,24 @@ class InstitutionRepository {
     final initialMembership = await getMyMembership(institutionId);
     yield initialMembership;
 
-    // Затем слушаем изменения
-    await for (final _ in _client.from('institution_members').stream(primaryKey: ['id'])) {
-      // При любом изменении загружаем актуальные данные
-      final membership = await getMyMembership(institutionId);
-      yield membership;
+    // Слушаем изменения только для текущего пользователя в этом заведении
+    await for (final data in _client
+        .from('institution_members')
+        .stream(primaryKey: ['id'])
+        .eq('institution_id', institutionId)
+        .eq('user_id', _userId!)) {
+      // Находим запись текущего пользователя
+      final myData = data.where((item) =>
+        item['user_id'] == _userId &&
+        item['institution_id'] == institutionId &&
+        item['archived_at'] == null
+      ).firstOrNull;
+
+      if (myData != null) {
+        yield InstitutionMember.fromJson(myData);
+      } else {
+        yield null;
+      }
     }
   }
 
