@@ -103,6 +103,8 @@ class MemberPermissions {
         'edit_all_lessons': editAllLessons,
         'delete_own_lessons': deleteOwnLessons,
         'delete_all_lessons': deleteAllLessons,
+        // Для обратной совместимости с RLS политикой в Supabase
+        'delete_lessons': deleteOwnLessons || deleteAllLessons,
         'view_all_schedule': viewAllSchedule,
         'manage_payments': managePayments,
         'view_payments': viewPayments,
