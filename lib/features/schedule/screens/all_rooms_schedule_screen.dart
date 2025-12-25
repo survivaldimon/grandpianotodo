@@ -632,8 +632,11 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
   @override
   void initState() {
     super.initState();
-    // Создаём контроллеры с начальной позицией если она есть
-    final initialOffset = widget.restoreScrollOffset ?? 0.0;
+    // Создаём контроллеры с начальной позицией только если показываем все кабинеты
+    // При просмотре одного кабинета скролл не нужен (initialOffset = 0)
+    final initialOffset = (widget.selectedRoomId == null && widget.restoreScrollOffset != null)
+        ? widget.restoreScrollOffset!
+        : 0.0;
     _headerScrollController = ScrollController(initialScrollOffset: initialOffset);
     _gridScrollController = ScrollController(initialScrollOffset: initialOffset);
     // Синхронизация заголовков -> сетка
@@ -1026,8 +1029,11 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   @override
   void initState() {
     super.initState();
-    // Создаём контроллеры с начальной позицией если она есть
-    final initialOffset = widget.restoreScrollOffset ?? 0.0;
+    // Создаём контроллеры с начальной позицией только если показываем все кабинеты
+    // При просмотре одного кабинета скролл не нужен (initialOffset = 0)
+    final initialOffset = (widget.selectedRoomId == null && widget.restoreScrollOffset != null)
+        ? widget.restoreScrollOffset!
+        : 0.0;
     _headerScrollController = ScrollController(initialScrollOffset: initialOffset);
     _dayControllers = List.generate(
       7,
@@ -1154,7 +1160,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
 
         return Column(
           children: [
-            // Заголовки кабинетов
+            // Заголовки кабинетов (всегда показываем все, как в режиме День)
             Container(
               height: 40,
               decoration: const BoxDecoration(
@@ -1178,16 +1184,14 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                       ),
                     ),
                   ),
-                  // Заголовки кабинетов
+                  // Заголовки кабинетов (всегда все кабинеты, всегда скроллируемые)
                   Expanded(
-                    child: needsHorizontalScroll
-                        ? SingleChildScrollView(
-                            controller: _headerScrollController,
-                            scrollDirection: Axis.horizontal,
-                            physics: const ClampingScrollPhysics(),
-                            child: _buildRoomHeaders(rooms, roomColumnWidth),
-                          )
-                        : _buildRoomHeaders(rooms, roomColumnWidth),
+                    child: SingleChildScrollView(
+                      controller: _headerScrollController,
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      child: _buildRoomHeaders(widget.allRooms, _WeekTimeGrid.minRoomColumnWidth),
+                    ),
                   ),
                 ],
               ),
@@ -1246,16 +1250,14 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                               ],
                             ),
                           ),
-                          // Ячейки с занятиями
+                          // Ячейки с занятиями (всегда скроллируемые, синхронизированы с заголовками)
                           Expanded(
-                            child: needsHorizontalScroll
-                                ? SingleChildScrollView(
-                                    controller: _dayControllers[dayIndex],
-                                    scrollDirection: Axis.horizontal,
-                                    physics: const ClampingScrollPhysics(),
-                                    child: _buildDayCells(rooms, dayLessons, date, roomColumnWidth),
-                                  )
-                                : _buildDayCells(rooms, dayLessons, date, roomColumnWidth),
+                            child: SingleChildScrollView(
+                              controller: _dayControllers[dayIndex],
+                              scrollDirection: Axis.horizontal,
+                              physics: const ClampingScrollPhysics(),
+                              child: _buildDayCells(widget.allRooms, dayLessons, date, _WeekTimeGrid.minRoomColumnWidth),
+                            ),
                           ),
                         ],
                       ),
