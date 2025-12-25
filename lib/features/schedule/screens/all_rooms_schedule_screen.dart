@@ -110,6 +110,7 @@ class AllRoomsScheduleScreen extends ConsumerStatefulWidget {
 class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen> {
   DateTime _selectedDate = DateTime.now();
   String? _selectedRoomId; // null = все кабинеты
+  String? _lastSelectedRoomId; // Последний выбранный кабинет для восстановления позиции
   ScheduleFilters _filters = const ScheduleFilters();
   ScheduleViewMode _viewMode = ScheduleViewMode.day;
 
@@ -234,13 +235,17 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             selectedDate: _selectedDate,
             institutionId: widget.institutionId,
             selectedRoomId: _selectedRoomId,
+            scrollToRoomId: _lastSelectedRoomId,
             onLessonTap: _showLessonDetail,
             onRoomTap: (roomId) {
               setState(() {
                 if (_selectedRoomId == roomId) {
+                  // Возвращаемся к общему виду, сохраняем ID для прокрутки
+                  _lastSelectedRoomId = roomId;
                   _selectedRoomId = null;
                 } else {
                   _selectedRoomId = roomId;
+                  _lastSelectedRoomId = null;
                 }
               });
             },
@@ -280,12 +285,16 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             weekStart: weekStart,
             institutionId: widget.institutionId,
             selectedRoomId: _selectedRoomId,
+            scrollToRoomId: _lastSelectedRoomId,
             onRoomTap: (roomId) {
               setState(() {
                 if (_selectedRoomId == roomId) {
+                  // Возвращаемся к общему виду, сохраняем ID для прокрутки
+                  _lastSelectedRoomId = roomId;
                   _selectedRoomId = null;
                 } else {
                   _selectedRoomId = roomId;
+                  _lastSelectedRoomId = null;
                 }
               });
             },
@@ -588,6 +597,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final DateTime selectedDate;
   final String institutionId;
   final String? selectedRoomId;
+  final String? scrollToRoomId; // Кабинет к которому прокрутить при возврате из одиночного режима
   final void Function(Lesson) onLessonTap;
   final void Function(String roomId) onRoomTap;
   final void Function(Room room, int hour) onAddLesson;
@@ -602,6 +612,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
     required this.onRoomTap,
     required this.onAddLesson,
     this.selectedRoomId,
+    this.scrollToRoomId,
   });
 
   static const startHour = 8;
@@ -625,6 +636,33 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     _headerScrollController.addListener(_syncGridFromHeader);
     // Синхронизация сетки -> заголовки
     _gridScrollController.addListener(_syncHeaderFromGrid);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AllRoomsTimeGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Если вернулись из одиночного режима и есть кабинет для прокрутки
+    if (oldWidget.selectedRoomId != null &&
+        widget.selectedRoomId == null &&
+        widget.scrollToRoomId != null) {
+      // Прокручиваем к выбранному кабинету после build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToRoom(widget.scrollToRoomId!);
+      });
+    }
+  }
+
+  void _scrollToRoom(String roomId) {
+    final roomIndex = widget.allRooms.indexWhere((r) => r.id == roomId);
+    if (roomIndex == -1) return;
+
+    final offset = roomIndex * _AllRoomsTimeGrid.roomColumnWidth;
+    if (_headerScrollController.hasClients) {
+      _headerScrollController.jumpTo(offset);
+    }
+    if (_gridScrollController.hasClients) {
+      _gridScrollController.jumpTo(offset);
+    }
   }
 
   void _syncGridFromHeader() {
@@ -952,6 +990,7 @@ class _WeekTimeGrid extends StatefulWidget {
   final DateTime weekStart;
   final String institutionId;
   final String? selectedRoomId;
+  final String? scrollToRoomId; // Кабинет к которому прокрутить при возврате из одиночного режима
   final void Function(String roomId) onRoomTap;
   final void Function(Room room, DateTime date) onCellTap;
 
@@ -964,6 +1003,7 @@ class _WeekTimeGrid extends StatefulWidget {
     required this.onRoomTap,
     required this.onCellTap,
     this.selectedRoomId,
+    this.scrollToRoomId,
   });
 
   static const minRoomColumnWidth = 100.0;
@@ -991,6 +1031,35 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     }
     // Добавляем listener для заголовка
     _headerScrollController.addListener(_syncFromHeader);
+  }
+
+  @override
+  void didUpdateWidget(covariant _WeekTimeGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Если вернулись из одиночного режима и есть кабинет для прокрутки
+    if (oldWidget.selectedRoomId != null &&
+        widget.selectedRoomId == null &&
+        widget.scrollToRoomId != null) {
+      // Прокручиваем к выбранному кабинету после build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToRoom(widget.scrollToRoomId!);
+      });
+    }
+  }
+
+  void _scrollToRoom(String roomId) {
+    final roomIndex = widget.allRooms.indexWhere((r) => r.id == roomId);
+    if (roomIndex == -1) return;
+
+    final offset = roomIndex * _WeekTimeGrid.minRoomColumnWidth;
+    if (_headerScrollController.hasClients) {
+      _headerScrollController.jumpTo(offset);
+    }
+    for (final controller in _dayControllers) {
+      if (controller.hasClients) {
+        controller.jumpTo(offset);
+      }
+    }
   }
 
   void _syncFromHeader() {
