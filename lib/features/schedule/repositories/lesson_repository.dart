@@ -624,13 +624,15 @@ class LessonRepository {
 
   /// Стрим занятий заведения за дату (realtime)
   /// При любом изменении загружает полные данные с joins
+  /// Примечание: слушаем ВСЕ изменения в таблице без фильтра,
+  /// т.к. Supabase Realtime не отправляет DELETE события с фильтром корректно
   Stream<List<Lesson>> watchByInstitution(String institutionId, DateTime date) async* {
-    // Используем стрим для отслеживания изменений
+    // Используем стрим для отслеживания изменений (без фильтра для DELETE событий)
     await for (final _ in _client
         .from('lessons')
-        .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)) {
+        .stream(primaryKey: ['id'])) {
       // При любом изменении - загружаем полные данные с joins
+      // Фильтрация по institution_id происходит в getByInstitutionAndDate
       final lessons = await getByInstitutionAndDate(institutionId, date);
       yield lessons;
     }
