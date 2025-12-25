@@ -179,6 +179,11 @@ class InstitutionRepository {
       return;
     }
 
+    // Сначала выдаём текущее значение
+    final initialMembership = await getMyMembership(institutionId);
+    yield initialMembership;
+
+    // Затем слушаем изменения
     await for (final _ in _client.from('institution_members').stream(primaryKey: ['id'])) {
       // При любом изменении загружаем актуальные данные
       final membership = await getMyMembership(institutionId);
