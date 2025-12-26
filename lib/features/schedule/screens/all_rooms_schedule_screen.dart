@@ -740,48 +740,51 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                   controller: _headerScrollController,
                   scrollDirection: Axis.horizontal,
                   physics: const ClampingScrollPhysics(),
-                  child: Row(
-                    children: [
-                      for (int index = 0; index < widget.rooms.length; index++)
-                        GestureDetector(
-                          onTap: () => widget.onRoomTap(
-                            widget.rooms[index].id,
-                            _headerScrollController.hasClients ? _headerScrollController.offset : 0,
-                          ),
-                          child: Container(
-                            // Заголовки используют вычисленную ширину (растягиваются для одного кабинета)
-                            width: roomColumnWidth,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: widget.selectedRoomId == widget.rooms[index].id
-                                  ? AppColors.primary.withValues(alpha: 0.15)
-                                  : null,
-                              border: Border(
-                                left: BorderSide(
-                                  color: index == 0 ? Colors.transparent : AppColors.border,
-                                  width: 0.5,
-                                ),
-                                bottom: widget.selectedRoomId == widget.rooms[index].id
-                                    ? BorderSide(color: AppColors.primary, width: 2)
-                                    : BorderSide.none,
-                              ),
+                  child: SizedBox(
+                    width: rooms.length * roomColumnWidth,
+                    child: Row(
+                      children: [
+                        for (int index = 0; index < widget.rooms.length; index++)
+                          GestureDetector(
+                            onTap: () => widget.onRoomTap(
+                              widget.rooms[index].id,
+                              _headerScrollController.hasClients ? _headerScrollController.offset : 0,
                             ),
-                            child: Text(
-                              widget.rooms[index].number != null
-                                  ? '№${widget.rooms[index].number}'
-                                  : widget.rooms[index].name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                            child: Container(
+                              // Заголовки используют вычисленную ширину (растягиваются для одного кабинета)
+                              width: roomColumnWidth,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
                                 color: widget.selectedRoomId == widget.rooms[index].id
-                                    ? AppColors.primary
+                                    ? AppColors.primary.withValues(alpha: 0.15)
                                     : null,
+                                border: Border(
+                                  left: BorderSide(
+                                    color: index == 0 ? Colors.transparent : AppColors.border,
+                                    width: 0.5,
+                                  ),
+                                  bottom: widget.selectedRoomId == widget.rooms[index].id
+                                      ? BorderSide(color: AppColors.primary, width: 2)
+                                      : BorderSide.none,
+                                ),
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              child: Text(
+                                widget.rooms[index].number != null
+                                    ? '№${widget.rooms[index].number}'
+                                    : widget.rooms[index].name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: widget.selectedRoomId == widget.rooms[index].id
+                                      ? AppColors.primary
+                                      : null,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1192,7 +1195,10 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                       controller: _headerScrollController,
                       scrollDirection: Axis.horizontal,
                       physics: const ClampingScrollPhysics(),
-                      child: _buildRoomHeaders(widget.rooms, roomColumnWidth),
+                      child: SizedBox(
+                        width: rooms.length * roomColumnWidth,
+                        child: _buildRoomHeaders(widget.rooms, roomColumnWidth),
+                      ),
                     ),
                   ),
                 ],
@@ -1258,7 +1264,10 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                               controller: _dayControllers[dayIndex],
                               scrollDirection: Axis.horizontal,
                               physics: const ClampingScrollPhysics(),
-                              child: _buildDayCells(widget.rooms, dayLessons, date, roomColumnWidth),
+                              child: SizedBox(
+                                width: rooms.length * roomColumnWidth,
+                                child: _buildDayCells(widget.rooms, dayLessons, date, roomColumnWidth),
+                              ),
                             ),
                           ),
                         ],
