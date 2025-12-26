@@ -158,7 +158,7 @@ class SettingsScreen extends ConsumerWidget {
                 title: const Text(AppStrings.profile),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  // TODO: Navigate to profile
+                  context.push('/institutions/$institutionId/profile');
                 },
               ),
               ListTile(

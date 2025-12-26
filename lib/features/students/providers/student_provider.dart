@@ -87,7 +87,7 @@ final filteredStudentsProvider =
             .where((s) => s.archivedAt == null && s.balance < 0)
             .toList();
       case StudentFilter.archived:
-        yield students;
+        yield students.where((s) => s.archivedAt != null).toList();
       case StudentFilter.myStudents:
         yield students
             .where((s) =>
@@ -154,6 +154,21 @@ class StudentController extends StateNotifier<AsyncValue<void>> {
     try {
       await _repo.archive(id);
       _ref.invalidate(studentsProvider(institutionId));
+      _ref.invalidate(studentProvider(id));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  Future<bool> restore(String id, String institutionId) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.restore(id);
+      _ref.invalidate(studentsProvider(institutionId));
+      _ref.invalidate(studentProvider(id));
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {

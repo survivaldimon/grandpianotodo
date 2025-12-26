@@ -91,16 +91,7 @@ class StudentsListScreen extends ConsumerWidget {
               ),
               data: (students) {
                 if (students.isEmpty) {
-                  return EmptyState(
-                    icon: Icons.person_outlined,
-                    title: 'Нет учеников',
-                    subtitle: 'Добавьте первого ученика',
-                    action: ElevatedButton.icon(
-                      onPressed: () => _showAddStudentDialog(context, ref),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Добавить ученика'),
-                    ),
-                  );
+                  return _buildEmptyState(context, ref, filter);
                 }
                 return RefreshIndicator(
                   onRefresh: () async {
@@ -126,6 +117,40 @@ class StudentsListScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildEmptyState(BuildContext context, WidgetRef ref, StudentFilter filter) {
+    switch (filter) {
+      case StudentFilter.archived:
+        return const EmptyState(
+          icon: Icons.archive_outlined,
+          title: 'Архив пуст',
+          subtitle: 'Здесь будут отображаться архивированные ученики',
+        );
+      case StudentFilter.withDebt:
+        return const EmptyState(
+          icon: Icons.check_circle_outlined,
+          title: 'Нет учеников с долгом',
+          subtitle: 'У всех учеников положительный баланс',
+        );
+      case StudentFilter.myStudents:
+        return const EmptyState(
+          icon: Icons.person_outlined,
+          title: 'Нет привязанных учеников',
+          subtitle: 'К вам пока не привязаны ученики',
+        );
+      case StudentFilter.all:
+        return EmptyState(
+          icon: Icons.person_outlined,
+          title: 'Нет учеников',
+          subtitle: 'Добавьте первого ученика',
+          action: ElevatedButton.icon(
+            onPressed: () => _showAddStudentDialog(context, ref),
+            icon: const Icon(Icons.add),
+            label: const Text('Добавить ученика'),
+          ),
+        );
+    }
   }
 
   void _showAddStudentDialog(BuildContext context, WidgetRef ref) {

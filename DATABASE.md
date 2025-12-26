@@ -167,6 +167,8 @@ CREATE TABLE institution_members (
     "create_lessons": true,
     "edit_own_lessons": true,
     "edit_all_lessons": false,
+    "delete_own_lessons": false,
+    "delete_all_lessons": false,
     "delete_lessons": false,
     "view_all_schedule": true,
     "manage_payments": false,
@@ -525,8 +527,20 @@ CREATE POLICY "Can edit all lessons"
   ON lessons FOR UPDATE
   USING (has_permission(institution_id, 'edit_all_lessons'));
 
--- Удаление (архивация): с правом delete_lessons
-CREATE POLICY "Can delete lessons"
+-- Удаление своих занятий: с правом delete_own_lessons
+CREATE POLICY "Can delete own lessons"
+  ON lessons FOR DELETE
+  USING (
+    teacher_id = auth.uid() AND has_permission(institution_id, 'delete_own_lessons')
+  );
+
+-- Удаление всех занятий: с правом delete_all_lessons
+CREATE POLICY "Can delete all lessons"
+  ON lessons FOR DELETE
+  USING (has_permission(institution_id, 'delete_all_lessons'));
+
+-- Обратная совместимость: с правом delete_lessons (устаревшее)
+CREATE POLICY "Can delete lessons (legacy)"
   ON lessons FOR DELETE
   USING (has_permission(institution_id, 'delete_lessons'));
 ```

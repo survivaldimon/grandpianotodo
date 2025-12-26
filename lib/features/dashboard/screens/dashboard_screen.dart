@@ -151,7 +151,7 @@ class DashboardScreen extends ConsumerWidget {
                   subtitle: _formatNextLesson(nextLesson),
                   icon: Icons.schedule,
                   onTap: () {
-                    // Navigate to lesson detail
+                    context.go('/institutions/$institutionId/schedule');
                   },
                 );
               },
@@ -182,7 +182,10 @@ class DashboardScreen extends ConsumerWidget {
                   subtitle: subtitle,
                   icon: Icons.warning_amber,
                   iconColor: debtors.isEmpty ? AppColors.success : AppColors.warning,
-                  onTap: () => context.go('/institutions/$institutionId/students'),
+                  onTap: () {
+                    ref.read(studentFilterProvider.notifier).state = StudentFilter.withDebt;
+                    context.go('/institutions/$institutionId/students');
+                  },
                 );
               },
               loading: () => _DashboardCard(
@@ -197,7 +200,10 @@ class DashboardScreen extends ConsumerWidget {
                 trailing: '—',
                 icon: Icons.warning_amber,
                 iconColor: AppColors.warning,
-                onTap: () => context.go('/institutions/$institutionId/students'),
+                onTap: () {
+                  ref.read(studentFilterProvider.notifier).state = StudentFilter.withDebt;
+                  context.go('/institutions/$institutionId/students');
+                },
               ),
             ),
             const SizedBox(height: 12),

@@ -1177,11 +1177,14 @@ class _StatCard extends StatelessWidget {
             children: [
               Icon(item.icon, size: 20, color: item.color),
               const SizedBox(width: 8),
-              Text(
-                item.label,
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
+              Expanded(
+                child: Text(
+                  item.label,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

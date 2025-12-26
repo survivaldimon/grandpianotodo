@@ -68,19 +68,33 @@ class StudentDetailScreen extends ConsumerWidget {
                   onSelected: (value) {
                     if (value == 'archive') {
                       _confirmArchive(context, ref, student);
+                    } else if (value == 'restore') {
+                      _confirmRestore(context, ref, student);
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'archive',
-                      child: Row(
-                        children: [
-                          Icon(Icons.archive, color: Colors.orange),
-                          SizedBox(width: 8),
-                          Text('Архивировать', style: TextStyle(color: Colors.orange)),
-                        ],
+                    if (student.isArchived)
+                      const PopupMenuItem(
+                        value: 'restore',
+                        child: Row(
+                          children: [
+                            Icon(Icons.unarchive, color: Colors.green),
+                            SizedBox(width: 8),
+                            Text('Разархивировать', style: TextStyle(color: Colors.green)),
+                          ],
+                        ),
+                      )
+                    else
+                      const PopupMenuItem(
+                        value: 'archive',
+                        child: Row(
+                          children: [
+                            Icon(Icons.archive, color: Colors.orange),
+                            SizedBox(width: 8),
+                            Text('Архивировать', style: TextStyle(color: Colors.orange)),
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
             ],
@@ -94,6 +108,45 @@ class StudentDetailScreen extends ConsumerWidget {
             child: ListView(
               padding: AppSizes.paddingAllM,
               children: [
+                // Archived banner
+                if (student.isArchived) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.archive, color: Colors.orange),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Ученик архивирован',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                              Text(
+                                DateFormat('dd.MM.yyyy').format(student.archivedAt!),
+                                style: TextStyle(
+                                  color: Colors.orange.shade700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 // Contact info
                 Card(
                   child: Padding(
@@ -316,6 +369,43 @@ class StudentDetailScreen extends ConsumerWidget {
             child: const Text(
               'Архивировать',
               style: TextStyle(color: Colors.orange),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmRestore(BuildContext context, WidgetRef ref, Student student) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Разархивировать ученика?'),
+        content: Text(
+          'Вы уверены, что хотите вернуть "${student.name}" из архива?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final controller = ref.read(studentControllerProvider.notifier);
+              final success = await controller.restore(studentId, institutionId);
+              if (success && context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Ученик восстановлен из архива'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            child: const Text(
+              'Разархивировать',
+              style: TextStyle(color: Colors.green),
             ),
           ),
         ],
@@ -688,6 +778,24 @@ class _PaymentItem extends StatelessWidget {
                           fontSize: 16,
                         ),
                       ),
+                      if (payment.paymentPlan != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            payment.paymentPlan!.name,
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                       if (hasDiscount) ...[
                         const SizedBox(width: 8),
                         Container(
@@ -832,7 +940,25 @@ class _SubscriptionCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (subscription.isExpiringSoon && status == SubscriptionStatus.active)
+                // Payment plan name badge
+                if (subscription.paymentPlanName != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      subscription.paymentPlanName!,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                if (subscription.isExpiringSoon && status == SubscriptionStatus.active) ...[
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -847,6 +973,7 @@ class _SubscriptionCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                ],
               ],
             ),
             const SizedBox(height: 12),

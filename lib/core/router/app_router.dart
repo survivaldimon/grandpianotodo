@@ -24,6 +24,7 @@ import 'package:kabinet/features/statistics/screens/statistics_screen.dart';
 import 'package:kabinet/features/lesson_types/screens/lesson_types_screen.dart';
 import 'package:kabinet/features/payment_plans/screens/payment_plans_screen.dart';
 import 'package:kabinet/features/subjects/screens/subjects_screen.dart';
+import 'package:kabinet/features/profile/screens/profile_screen.dart';
 
 /// Провайдер роутера
 final routerProvider = Provider<GoRouter>((ref) {
@@ -226,6 +227,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => SubjectsScreen(
               institutionId: state.pathParameters['institutionId']!,
             ),
+          ),
+
+          // Profile
+          GoRoute(
+            path: '/institutions/:institutionId/profile',
+            builder: (context, state) => const ProfileScreen(),
           ),
         ],
       ),

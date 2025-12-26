@@ -148,8 +148,8 @@ class StudentRepository {
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
   Stream<List<Student>> watchByInstitution(String institutionId) async* {
     await for (final _ in _client.from('students').stream(primaryKey: ['id'])) {
-      // При любом изменении загружаем актуальные данные
-      final students = await getByInstitution(institutionId);
+      // При любом изменении загружаем актуальные данные (включая архивированных)
+      final students = await getByInstitution(institutionId, includeArchived: true);
       yield students;
     }
   }
