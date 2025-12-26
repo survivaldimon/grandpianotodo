@@ -657,11 +657,27 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     if (oldWidget.selectedRoomId != null &&
         widget.selectedRoomId == null &&
         widget.restoreScrollOffset != null) {
-      // Восстанавливаем позицию скролла после построения виджетов
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _restoreScrollPosition(widget.restoreScrollOffset!);
-      });
+      // Пересоздаём контроллеры с правильным offset для избежания визуального прыжка
+      _recreateControllersWithOffset(widget.restoreScrollOffset!);
     }
+  }
+
+  void _recreateControllersWithOffset(double offset) {
+    // Удаляем старые listeners
+    _headerScrollController.removeListener(_syncGridFromHeader);
+    _gridScrollController.removeListener(_syncHeaderFromGrid);
+
+    // Dispose старых контроллеров
+    _headerScrollController.dispose();
+    _gridScrollController.dispose();
+
+    // Создаём новые контроллеры с нужным offset
+    _headerScrollController = ScrollController(initialScrollOffset: offset);
+    _gridScrollController = ScrollController(initialScrollOffset: offset);
+
+    // Добавляем listeners обратно
+    _headerScrollController.addListener(_syncGridFromHeader);
+    _gridScrollController.addListener(_syncHeaderFromGrid);
   }
 
   void _restoreScrollPosition(double offset) {
@@ -1131,11 +1147,36 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     if (oldWidget.selectedRoomId != null &&
         widget.selectedRoomId == null &&
         widget.restoreScrollOffset != null) {
-      // Восстанавливаем позицию скролла после построения виджетов
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _restoreScrollPosition(widget.restoreScrollOffset!);
-      });
+      // Пересоздаём контроллеры с правильным offset для избежания визуального прыжка
+      _recreateControllersWithOffset(widget.restoreScrollOffset!);
     }
+  }
+
+  void _recreateControllersWithOffset(double offset) {
+    // Удаляем старые listeners
+    _headerScrollController.removeListener(_syncFromHeader);
+    for (int i = 0; i < _dayControllers.length; i++) {
+      _dayControllers[i].removeListener(() => _syncFromDay(i));
+    }
+
+    // Dispose старых контроллеров
+    _headerScrollController.dispose();
+    for (final controller in _dayControllers) {
+      controller.dispose();
+    }
+
+    // Создаём новые контроллеры с нужным offset
+    _headerScrollController = ScrollController(initialScrollOffset: offset);
+    _dayControllers = List.generate(
+      7,
+      (_) => ScrollController(initialScrollOffset: offset),
+    );
+
+    // Добавляем listeners обратно
+    for (int i = 0; i < _dayControllers.length; i++) {
+      _dayControllers[i].addListener(() => _syncFromDay(i));
+    }
+    _headerScrollController.addListener(_syncFromHeader);
   }
 
   void _restoreScrollPosition(double offset) {
