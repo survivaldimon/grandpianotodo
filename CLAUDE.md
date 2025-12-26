@@ -38,6 +38,11 @@
 - `SESSION_2025_12_25_SUBSCRIPTIONS_REALTIME.md` — детальный отчет об исправлении Realtime подписок
 - `SESSION_2025_12_25_PERMISSIONS.md` — система прав участников, разделение прав на удаление занятий
 - `SESSION_2025_12_26_UI_IMPROVEMENTS.md` — UI улучшения, экран профиля, исправление архивации учеников
+- **`SESSION_2025_12_27_PERMISSIONS.md`** — расширение системы прав:
+  - Разделение прав на управление учениками (свои/все)
+  - Скрытие кода приглашения (только владельцу)
+  - Режим "только просмотр" для карточек учеников
+  - Исправление ошибки при отметке занятия
 
 ## Валюта
 
@@ -176,11 +181,25 @@ deleteOwnLessons: bool  // Удаление только своих заняти
 deleteAllLessons: bool  // Удаление занятий любого преподавателя
 ```
 
-**Проверка прав на удаление:**
+**Структура прав управления учениками:**
+```dart
+manageOwnStudents: bool  // Управление своими учениками (привязанными)
+manageAllStudents: bool  // Управление всеми учениками заведения
+```
+
+**Проверка прав на удаление занятий:**
 ```dart
 final canDelete = isOwner ||
                   (permissions?.deleteAllLessons ?? false) ||
                   (isOwnLesson && (permissions?.deleteOwnLessons ?? false));
+```
+
+**Проверка прав на редактирование ученика:**
+```dart
+final isMyStudent = isMyStudentProvider(IsMyStudentParams(studentId, institutionId));
+final canEditStudent = isOwner ||
+                       (permissions?.manageAllStudents ?? false) ||
+                       (isMyStudent && (permissions?.manageOwnStudents ?? false));
 ```
 
 **Realtime обновление прав:**
@@ -189,7 +208,18 @@ final canDelete = isOwner ||
 - При открытии деталей занятия вызывается `ref.invalidate(myMembershipProvider)` для гарантированного обновления
 
 **Обратная совместимость с RLS:**
-В `toJson()` добавляется поле `delete_lessons: deleteOwnLessons || deleteAllLessons` для совместимости с RLS политикой в Supabase.
+В `toJson()` добавляются поля для совместимости с RLS политикой в Supabase:
+- `delete_lessons: deleteOwnLessons || deleteAllLessons`
+- `manage_students: manageOwnStudents || manageAllStudents`
+
+**Базовые права для новых участников (по умолчанию):**
+- `createLessons: true`
+- `editOwnLessons: true`
+- `viewAllSchedule: true`
+- `manageOwnStudents: true`
+- `manageGroups: true`
+- `deleteOwnLessons: true`
+- `viewPayments: true`
 
 ### 15. Получение текущего пользователя
 Для надёжного получения ID текущего пользователя в UI используй прямой доступ:
@@ -217,7 +247,36 @@ lib/features/profile/
 - Просмотр email (только чтение)
 - Дата регистрации
 
-### 17. Архивация учеников
+### 17. Код приглашения (invite_code)
+Код приглашения позволяет новым участникам присоединиться к заведению.
+
+**Безопасность:**
+- Код виден **только владельцу** заведения
+- На экране списка заведений код **не отображается**
+- Код доступен только в настройках заведения (для владельца)
+
+**Функции:**
+- Копирование кода в буфер обмена
+- Генерация нового кода (сбрасывает старый)
+
+### 18. Режим "только просмотр" для учеников
+Участники без прав на редактирование ученика видят карточку в режиме только просмотр.
+
+**Скрываются элементы:**
+- Кнопка редактирования (карандаш)
+- Кнопка добавления оплаты
+- Кнопки управления абонементами (заморозить/разморозить/продлить)
+- Кнопки добавления/удаления преподавателей
+- Кнопки добавления/удаления предметов
+
+**Логика определения прав:**
+```dart
+final canEditStudent = isOwner ||
+    (permissions?.manageAllStudents ?? false) ||
+    (isMyStudent && (permissions?.manageOwnStudents ?? false));
+```
+
+### 19. Архивация учеников
 При архивации/разархивации учеников:
 - Активный ученик → меню "Архивировать" (оранжевый)
 - Архивированный → меню "Разархивировать" (зелёный)
