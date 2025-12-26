@@ -335,12 +335,18 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       await _repo.complete(id);
 
       // Списываем занятие с абонемента и привязываем к подписке
+      // Ошибка списания НЕ должна влиять на успешное изменение статуса
       if (lesson.studentId != null) {
-        final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
+        try {
+          final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
 
-        // Привязываем занятие к подписке для расчёта стоимости
-        if (subscriptionId != null) {
-          await _repo.setSubscriptionId(id, subscriptionId);
+          // Привязываем занятие к подписке для расчёта стоимости
+          if (subscriptionId != null) {
+            await _repo.setSubscriptionId(id, subscriptionId);
+          }
+        } catch (e) {
+          // Не критичная ошибка - занятие проведено, но подписка не списана
+          debugPrint('Error deducting subscription: $e');
         }
       }
 
@@ -363,15 +369,21 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       await _repo.uncomplete(id);
 
       // Возвращаем занятие на абонемент, если это индивидуальное занятие
+      // Ошибка возврата НЕ должна влиять на успешное изменение статуса
       if (lesson.studentId != null) {
-        await _subscriptionRepo.returnLesson(
-          lesson.studentId!,
-          subscriptionId: lesson.subscriptionId, // Возвращаем на ту же подписку
-        );
+        try {
+          await _subscriptionRepo.returnLesson(
+            lesson.studentId!,
+            subscriptionId: lesson.subscriptionId, // Возвращаем на ту же подписку
+          );
 
-        // Убираем привязку к подписке
-        if (lesson.subscriptionId != null) {
-          await _repo.clearSubscriptionId(id);
+          // Убираем привязку к подписке
+          if (lesson.subscriptionId != null) {
+            await _repo.clearSubscriptionId(id);
+          }
+        } catch (e) {
+          // Не критичная ошибка - статус изменён, но подписка не возвращена
+          debugPrint('Error returning subscription: $e');
         }
       }
 
