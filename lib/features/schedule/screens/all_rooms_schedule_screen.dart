@@ -241,12 +241,13 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             onLessonTap: _showLessonDetail,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
+                // Всегда сохраняем текущую позицию скролла
+                _savedScrollOffset = currentOffset;
                 if (_selectedRoomId == roomId) {
                   // Возвращаемся к общему виду
                   _selectedRoomId = null;
                 } else {
-                  // Сохраняем позицию скролла перед переходом к одному кабинету
-                  _savedScrollOffset = currentOffset;
+                  // Переходим к одному кабинету
                   _selectedRoomId = roomId;
                 }
               });
@@ -290,12 +291,13 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             restoreScrollOffset: _savedScrollOffset,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
+                // Всегда сохраняем текущую позицию скролла
+                _savedScrollOffset = currentOffset;
                 if (_selectedRoomId == roomId) {
                   // Возвращаемся к общему виду
                   _selectedRoomId = null;
                 } else {
-                  // Сохраняем позицию скролла перед переходом к одному кабинету
-                  _savedScrollOffset = currentOffset;
+                  // Переходим к одному кабинету
                   _selectedRoomId = roomId;
                 }
               });
