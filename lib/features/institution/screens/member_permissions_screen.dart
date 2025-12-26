@@ -6,6 +6,7 @@ import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран редактирования прав участника
 class MemberPermissionsScreen extends ConsumerStatefulWidget {
@@ -197,10 +198,16 @@ class _MemberPermissionsScreenState
                   'Ученики и группы',
                   [
                     _buildPermissionTile(
-                      'Управление учениками',
-                      'Добавление, редактирование учеников',
-                      _permissions.manageStudents,
-                      (v) => setState(() => _permissions = _permissions.copyWith(manageStudents: v)),
+                      'Управление своими учениками',
+                      'Добавление, редактирование своих учеников',
+                      _permissions.manageOwnStudents,
+                      (v) => setState(() => _permissions = _permissions.copyWith(manageOwnStudents: v)),
+                    ),
+                    _buildPermissionTile(
+                      'Управление всеми учениками',
+                      'Редактирование учеников любого преподавателя',
+                      _permissions.manageAllStudents,
+                      (v) => setState(() => _permissions = _permissions.copyWith(manageAllStudents: v)),
                     ),
                     _buildPermissionTile(
                       'Управление группами',
@@ -371,7 +378,7 @@ class _MemberPermissionsScreenState
           ),
           error: (e, _) => Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('Ошибка: $e'),
+            child: ErrorView.inline(e),
           ),
           data: (teacherSubjects) {
             if (teacherSubjects.isEmpty) {
@@ -457,7 +464,7 @@ class _MemberPermissionsScreenState
                 const SizedBox(height: 16),
                 allSubjectsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => ErrorView.inline(e),
                   data: (allSubjects) {
                     final existingIds = teacherSubjectsAsync.valueOrNull
                             ?.map((ts) => ts.subjectId)

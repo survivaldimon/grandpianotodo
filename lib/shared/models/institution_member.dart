@@ -6,7 +6,8 @@ class MemberPermissions {
   final bool manageRooms;
   final bool manageMembers;
   final bool manageSubjects;
-  final bool manageStudents;
+  final bool manageOwnStudents;
+  final bool manageAllStudents;
   final bool manageGroups;
   final bool manageLessonTypes;
   final bool managePaymentPlans;
@@ -26,7 +27,8 @@ class MemberPermissions {
     this.manageRooms = false,
     this.manageMembers = false,
     this.manageSubjects = false,
-    this.manageStudents = true,
+    this.manageOwnStudents = true,
+    this.manageAllStudents = false,
     this.manageGroups = true,
     this.manageLessonTypes = false,
     this.managePaymentPlans = false,
@@ -48,7 +50,8 @@ class MemberPermissions {
         manageRooms: true,
         manageMembers: true,
         manageSubjects: true,
-        manageStudents: true,
+        manageOwnStudents: true,
+        manageAllStudents: true,
         manageGroups: true,
         manageLessonTypes: true,
         managePaymentPlans: true,
@@ -73,7 +76,9 @@ class MemberPermissions {
         manageRooms: json['manage_rooms'] as bool? ?? false,
         manageMembers: json['manage_members'] as bool? ?? false,
         manageSubjects: json['manage_subjects'] as bool? ?? false,
-        manageStudents: json['manage_students'] as bool? ?? false,
+        // Обратная совместимость: старое manage_students -> manageOwnStudents
+        manageOwnStudents: json['manage_own_students'] as bool? ?? json['manage_students'] as bool? ?? false,
+        manageAllStudents: json['manage_all_students'] as bool? ?? false,
         manageGroups: json['manage_groups'] as bool? ?? false,
         manageLessonTypes: json['manage_lesson_types'] as bool? ?? false,
         managePaymentPlans: json['manage_payment_plans'] as bool? ?? false,
@@ -94,7 +99,10 @@ class MemberPermissions {
         'manage_rooms': manageRooms,
         'manage_members': manageMembers,
         'manage_subjects': manageSubjects,
-        'manage_students': manageStudents,
+        'manage_own_students': manageOwnStudents,
+        'manage_all_students': manageAllStudents,
+        // Для обратной совместимости с RLS политикой в Supabase
+        'manage_students': manageOwnStudents || manageAllStudents,
         'manage_groups': manageGroups,
         'manage_lesson_types': manageLessonTypes,
         'manage_payment_plans': managePaymentPlans,
@@ -117,7 +125,8 @@ class MemberPermissions {
     bool? manageRooms,
     bool? manageMembers,
     bool? manageSubjects,
-    bool? manageStudents,
+    bool? manageOwnStudents,
+    bool? manageAllStudents,
     bool? manageGroups,
     bool? manageLessonTypes,
     bool? managePaymentPlans,
@@ -137,7 +146,8 @@ class MemberPermissions {
         manageRooms: manageRooms ?? this.manageRooms,
         manageMembers: manageMembers ?? this.manageMembers,
         manageSubjects: manageSubjects ?? this.manageSubjects,
-        manageStudents: manageStudents ?? this.manageStudents,
+        manageOwnStudents: manageOwnStudents ?? this.manageOwnStudents,
+        manageAllStudents: manageAllStudents ?? this.manageAllStudents,
         manageGroups: manageGroups ?? this.manageGroups,
         manageLessonTypes: manageLessonTypes ?? this.manageLessonTypes,
         managePaymentPlans: managePaymentPlans ?? this.managePaymentPlans,

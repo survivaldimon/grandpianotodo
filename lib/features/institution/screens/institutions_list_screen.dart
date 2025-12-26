@@ -49,8 +49,8 @@ class _InstitutionsListScreenState extends ConsumerState<InstitutionsListScreen>
       ),
       body: institutionsAsync.when(
         loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView(
-          message: error.toString(),
+        error: (error, _) => ErrorView.fromException(
+          error,
           onRetry: () => ref.invalidate(myInstitutionsProvider),
         ),
         data: (institutions) {
@@ -204,23 +204,11 @@ class _InstitutionCard extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      institution.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Код: ${institution.inviteCode}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.outline,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  institution.name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               Icon(
@@ -251,7 +239,7 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );
@@ -277,20 +265,9 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
         Expanded(
           child: archivedAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('Ошибка: $error'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => ref.invalidate(archivedInstitutionsProvider),
-                    child: const Text('Повторить'),
-                  ),
-                ],
-              ),
+            error: (error, _) => ErrorView.fromException(
+              error,
+              onRetry: () => ref.invalidate(archivedInstitutionsProvider),
             ),
             data: (institutions) {
               if (institutions.isEmpty) {

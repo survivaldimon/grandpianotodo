@@ -207,3 +207,36 @@ final studentControllerProvider =
   final repo = ref.watch(studentRepositoryProvider);
   return StudentController(repo, ref);
 });
+
+/// Параметры для проверки "своего" ученика
+class IsMyStudentParams {
+  final String studentId;
+  final String institutionId;
+
+  const IsMyStudentParams(this.studentId, this.institutionId);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IsMyStudentParams &&
+          studentId == other.studentId &&
+          institutionId == other.institutionId;
+
+  @override
+  int get hashCode => studentId.hashCode ^ institutionId.hashCode;
+}
+
+/// Провайдер для проверки, является ли ученик "своим" (привязан к текущему пользователю)
+final isMyStudentProvider =
+    FutureProvider.family<bool, IsMyStudentParams>((ref, params) async {
+  final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+  if (currentUserId == null) return false;
+
+  final bindingsRepo = ref.read(studentBindingsRepositoryProvider);
+  final myStudentIds = await bindingsRepo.getTeacherStudentIds(
+    currentUserId,
+    params.institutionId,
+  );
+
+  return myStudentIds.contains(params.studentId);
+});

@@ -6,6 +6,7 @@ import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/features/auth/providers/auth_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран настроек заведения
 class SettingsScreen extends ConsumerWidget {
@@ -24,7 +25,7 @@ class SettingsScreen extends ConsumerWidget {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );
@@ -70,27 +71,28 @@ class SettingsScreen extends ConsumerWidget {
                     ? () => _showEditNameDialog(context, ref, institution.name)
                     : null,
               ),
-              ListTile(
-                leading: const Icon(Icons.share),
-                title: const Text('Пригласить участника'),
-                subtitle: Text('Код: ${institution.inviteCode}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.copy),
-                      tooltip: 'Скопировать код',
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: institution.inviteCode));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Код скопирован в буфер обмена'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                    if (canManageInstitution)
+              // Код приглашения виден только владельцу
+              if (isOwner)
+                ListTile(
+                  leading: const Icon(Icons.share),
+                  title: const Text('Пригласить участника'),
+                  subtitle: Text('Код: ${institution.inviteCode}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.copy),
+                        tooltip: 'Скопировать код',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: institution.inviteCode));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Код скопирован в буфер обмена'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
                       IconButton(
                         icon: const Icon(Icons.refresh),
                         tooltip: 'Сгенерировать новый код',
@@ -98,9 +100,9 @@ class SettingsScreen extends ConsumerWidget {
                             ? null
                             : () => _regenerateInviteCode(context, ref),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               const Divider(),
               const _SectionHeader(title: 'УПРАВЛЕНИЕ'),
               ListTile(

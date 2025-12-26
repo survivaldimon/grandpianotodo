@@ -8,6 +8,8 @@ import 'package:kabinet/core/widgets/loading_indicator.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/empty_state.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
+import 'package:kabinet/features/institution/providers/institution_provider.dart';
+import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
@@ -26,6 +28,17 @@ class StudentsListScreen extends ConsumerWidget {
     final filter = ref.watch(studentFilterProvider);
     final studentsAsync = ref.watch(filteredStudentsProvider(institutionId));
 
+    // Проверяем права на добавление учеников
+    final permissions = ref.watch(myPermissionsProvider(institutionId));
+    final institutionAsync = ref.watch(currentInstitutionProvider(institutionId));
+    final isOwner = institutionAsync.maybeWhen(
+      data: (inst) => inst.ownerId == ref.watch(currentUserIdProvider),
+      orElse: () => false,
+    );
+    final canAddStudent = isOwner ||
+        (permissions?.manageOwnStudents ?? false) ||
+        (permissions?.manageAllStudents ?? false);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.students),
@@ -41,10 +54,11 @@ class StudentsListScreen extends ConsumerWidget {
               // TODO: Search
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddStudentDialog(context, ref),
-          ),
+          if (canAddStudent)
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () => _showAddStudentDialog(context, ref),
+            ),
         ],
       ),
       body: Column(
@@ -85,8 +99,8 @@ class StudentsListScreen extends ConsumerWidget {
           Expanded(
             child: studentsAsync.when(
               loading: () => const LoadingIndicator(),
-              error: (error, _) => ErrorView(
-                message: error.toString(),
+              error: (error, _) => ErrorView.fromException(
+                error,
                 onRetry: () => ref.invalidate(filteredStudentsProvider(institutionId)),
               ),
               data: (students) {

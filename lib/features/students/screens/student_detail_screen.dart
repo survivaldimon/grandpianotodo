@@ -8,6 +8,7 @@ import 'package:kabinet/core/widgets/loading_indicator.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
+import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart' hide paymentPlansProvider;
@@ -42,27 +43,46 @@ class StudentDetailScreen extends ConsumerWidget {
       loading: () => const Scaffold(body: LoadingIndicator()),
       error: (e, _) => Scaffold(
         appBar: AppBar(),
-        body: ErrorView(
-          message: e.toString(),
+        body: ErrorView.fromException(
+          e,
           onRetry: () => ref.invalidate(studentProvider(studentId)),
         ),
       ),
       data: (student) {
         final hasDebt = student.balance < 0;
-        // Проверяем права на архивирование
+        // Проверяем права
         final permissions = ref.watch(myPermissionsProvider(institutionId));
+        final institutionAsync = ref.watch(currentInstitutionProvider(institutionId));
+        final isMyStudentAsync = ref.watch(isMyStudentProvider(
+          IsMyStudentParams(studentId, institutionId),
+        ));
+
         final canArchive = permissions?.archiveData ?? false;
+
+        // Проверяем права на редактирование ученика
+        final isOwner = institutionAsync.maybeWhen(
+          data: (inst) => inst.ownerId == ref.watch(currentUserIdProvider),
+          orElse: () => false,
+        );
+        final isMyStudent = isMyStudentAsync.maybeWhen(
+          data: (v) => v,
+          orElse: () => false,
+        );
+        final canEditStudent = isOwner ||
+            (permissions?.manageAllStudents ?? false) ||
+            (isMyStudent && (permissions?.manageOwnStudents ?? false));
 
         return Scaffold(
           appBar: AppBar(
             title: Text(student.name),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () {
-                  _showEditStudentDialog(context, ref, student);
-                },
-              ),
+              if (canEditStudent)
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () {
+                    _showEditStudentDialog(context, ref, student);
+                  },
+                ),
               if (canArchive)
                 PopupMenuButton<String>(
                   onSelected: (value) {
@@ -193,7 +213,7 @@ class StudentDetailScreen extends ConsumerWidget {
                   student: student,
                   hasDebt: hasDebt,
                   studentId: studentId,
-                  onAddPayment: () => _showAddPaymentDialog(context, ref),
+                  onAddPayment: canEditStudent ? () => _showAddPaymentDialog(context, ref) : null,
                 ),
                 const SizedBox(height: 24),
 
@@ -205,7 +225,7 @@ class StudentDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 subscriptionsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => ErrorView.inline(e),
                   data: (subscriptions) {
                     if (subscriptions.isEmpty) {
                       return const Card(
@@ -221,9 +241,9 @@ class StudentDetailScreen extends ConsumerWidget {
                     return Column(
                       children: subscriptions.map((sub) => _SubscriptionCard(
                         subscription: sub,
-                        onFreeze: () => _showFreezeDialog(context, ref, sub),
-                        onUnfreeze: () => _unfreezeSubscription(context, ref, sub),
-                        onExtend: () => _showExtendDialog(context, ref, sub),
+                        onFreeze: canEditStudent ? () => _showFreezeDialog(context, ref, sub) : null,
+                        onUnfreeze: canEditStudent ? () => _unfreezeSubscription(context, ref, sub) : null,
+                        onExtend: canEditStudent ? () => _showExtendDialog(context, ref, sub) : null,
                       )).toList(),
                     );
                   },
@@ -234,6 +254,7 @@ class StudentDetailScreen extends ConsumerWidget {
                 _TeachersSection(
                   studentId: studentId,
                   institutionId: institutionId,
+                  canEdit: canEditStudent,
                 ),
                 const SizedBox(height: 24),
 
@@ -241,6 +262,7 @@ class StudentDetailScreen extends ConsumerWidget {
                 _SubjectsSection(
                   studentId: studentId,
                   institutionId: institutionId,
+                  canEdit: canEditStudent,
                 ),
                 const SizedBox(height: 24),
 
@@ -252,7 +274,7 @@ class StudentDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 paymentsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => ErrorView.inline(e),
                   data: (payments) {
                     if (payments.isEmpty) {
                       return const Text(
@@ -586,13 +608,13 @@ class _BalanceAndCostCard extends ConsumerWidget {
   final Student student;
   final bool hasDebt;
   final String studentId;
-  final VoidCallback onAddPayment;
+  final VoidCallback? onAddPayment;
 
   const _BalanceAndCostCard({
     required this.student,
     required this.hasDebt,
     required this.studentId,
-    required this.onAddPayment,
+    this.onAddPayment,
   });
 
   @override
@@ -714,13 +736,15 @@ class _BalanceAndCostCard extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            // Кнопка добавить оплату
-            ElevatedButton.icon(
-              onPressed: onAddPayment,
-              icon: const Icon(Icons.add),
-              label: const Text(AppStrings.addPayment),
-            ),
+            if (onAddPayment != null) ...[
+              const SizedBox(height: 16),
+              // Кнопка добавить оплату
+              ElevatedButton.icon(
+                onPressed: onAddPayment,
+                icon: const Icon(Icons.add),
+                label: const Text(AppStrings.addPayment),
+              ),
+            ],
           ],
         ),
       ),
@@ -873,15 +897,15 @@ class _PaymentItem extends StatelessWidget {
 
 class _SubscriptionCard extends StatelessWidget {
   final Subscription subscription;
-  final VoidCallback onFreeze;
-  final VoidCallback onUnfreeze;
-  final VoidCallback onExtend;
+  final VoidCallback? onFreeze;
+  final VoidCallback? onUnfreeze;
+  final VoidCallback? onExtend;
 
   const _SubscriptionCard({
     required this.subscription,
-    required this.onFreeze,
-    required this.onUnfreeze,
-    required this.onExtend,
+    this.onFreeze,
+    this.onUnfreeze,
+    this.onExtend,
   });
 
   @override
@@ -1043,14 +1067,14 @@ class _SubscriptionCard extends StatelessWidget {
               backgroundColor: statusColor.withOpacity(0.2),
               valueColor: AlwaysStoppedAnimation(statusColor),
             ),
-            // Action buttons
-            if (status != SubscriptionStatus.exhausted) ...[
+            // Action buttons (only if can edit)
+            if (status != SubscriptionStatus.exhausted && (onFreeze != null || onUnfreeze != null || onExtend != null)) ...[
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (status == SubscriptionStatus.active)
+                  if (status == SubscriptionStatus.active && onFreeze != null)
                     OutlinedButton.icon(
                       onPressed: onFreeze,
                       icon: Icon(Icons.ac_unit, size: 18, color: AppColors.info),
@@ -1061,7 +1085,7 @@ class _SubscriptionCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
-                  if (status == SubscriptionStatus.frozen)
+                  if (status == SubscriptionStatus.frozen && onUnfreeze != null)
                     ElevatedButton.icon(
                       onPressed: onUnfreeze,
                       icon: const Icon(Icons.play_arrow, size: 18),
@@ -1072,7 +1096,7 @@ class _SubscriptionCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
-                  if (status == SubscriptionStatus.active || status == SubscriptionStatus.expired)
+                  if ((status == SubscriptionStatus.active || status == SubscriptionStatus.expired) && onExtend != null)
                     OutlinedButton.icon(
                       onPressed: onExtend,
                       icon: Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
@@ -1227,7 +1251,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(next.error.toString()),
+                content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
                 backgroundColor: Colors.red,
               ),
             );
@@ -1351,7 +1375,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 // Тариф
                 plansAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => ErrorView.inline(e),
                   data: (plans) {
                     // Находим выбранный план по ID
                     final currentPlan = _selectedPlan != null
@@ -1629,10 +1653,12 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
 class _TeachersSection extends ConsumerWidget {
   final String studentId;
   final String institutionId;
+  final bool canEdit;
 
   const _TeachersSection({
     required this.studentId,
     required this.institutionId,
+    this.canEdit = true,
   });
 
   @override
@@ -1649,17 +1675,18 @@ class _TeachersSection extends ConsumerWidget {
               'Преподаватели',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            IconButton(
-              icon: const Icon(Icons.add, size: 20),
-              onPressed: () => _showAddTeacherDialog(context, ref),
-              tooltip: 'Добавить преподавателя',
-            ),
+            if (canEdit)
+              IconButton(
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: () => _showAddTeacherDialog(context, ref),
+                tooltip: 'Добавить преподавателя',
+              ),
           ],
         ),
         const SizedBox(height: 8),
         teachersAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text('Ошибка: $e'),
+          error: (e, _) => ErrorView.inline(e),
           data: (teachers) {
             if (teachers.isEmpty) {
               return const Card(
@@ -1680,8 +1707,8 @@ class _TeachersSection extends ConsumerWidget {
                 return Chip(
                   avatar: const Icon(Icons.person, size: 18),
                   label: Text(name),
-                  deleteIcon: const Icon(Icons.close, size: 18),
-                  onDeleted: () => _removeTeacher(context, ref, binding.userId),
+                  deleteIcon: canEdit ? const Icon(Icons.close, size: 18) : null,
+                  onDeleted: canEdit ? () => _removeTeacher(context, ref, binding.userId) : null,
                 );
               }).toList(),
             );
@@ -1713,7 +1740,7 @@ class _TeachersSection extends ConsumerWidget {
                 const SizedBox(height: 16),
                 membersAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => ErrorView.inline(e),
                   data: (members) {
                     final available = members
                         .where((m) => !existingIds.contains(m.userId))
@@ -1797,10 +1824,12 @@ class _TeachersSection extends ConsumerWidget {
 class _SubjectsSection extends ConsumerWidget {
   final String studentId;
   final String institutionId;
+  final bool canEdit;
 
   const _SubjectsSection({
     required this.studentId,
     required this.institutionId,
+    this.canEdit = true,
   });
 
   @override
@@ -1817,17 +1846,18 @@ class _SubjectsSection extends ConsumerWidget {
               'Предметы',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            IconButton(
-              icon: const Icon(Icons.add, size: 20),
-              onPressed: () => _showAddSubjectDialog(context, ref),
-              tooltip: 'Добавить предмет',
-            ),
+            if (canEdit)
+              IconButton(
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: () => _showAddSubjectDialog(context, ref),
+                tooltip: 'Добавить предмет',
+              ),
           ],
         ),
         const SizedBox(height: 8),
         subjectsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text('Ошибка: $e'),
+          error: (e, _) => ErrorView.inline(e),
           data: (subjects) {
             if (subjects.isEmpty) {
               return const Card(
@@ -1851,8 +1881,8 @@ class _SubjectsSection extends ConsumerWidget {
                 return Chip(
                   avatar: Icon(Icons.book, size: 18, color: color),
                   label: Text(name),
-                  deleteIcon: const Icon(Icons.close, size: 18),
-                  onDeleted: () => _removeSubject(context, ref, binding.subjectId),
+                  deleteIcon: canEdit ? const Icon(Icons.close, size: 18) : null,
+                  onDeleted: canEdit ? () => _removeSubject(context, ref, binding.subjectId) : null,
                 );
               }).toList(),
             );
@@ -1884,7 +1914,7 @@ class _SubjectsSection extends ConsumerWidget {
                 const SizedBox(height: 16),
                 subjectsListAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => ErrorView.inline(e),
                   data: (subjects) {
                     final available = subjects
                         .where((s) => !existingIds.contains(s.id) && s.archivedAt == null)
