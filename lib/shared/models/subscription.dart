@@ -1,3 +1,4 @@
+import 'package:kabinet/shared/models/payment.dart';
 import 'package:kabinet/shared/models/student.dart';
 
 /// Статус подписки (абонемента)
@@ -32,8 +33,9 @@ class Subscription {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  /// Связанный студент (join)
+  /// Связанные объекты (join)
   final Student? student;
+  final Payment? payment;
 
   const Subscription({
     required this.id,
@@ -50,6 +52,7 @@ class Subscription {
     required this.createdAt,
     required this.updatedAt,
     this.student,
+    this.payment,
   });
 
   /// Использованные занятия
@@ -112,6 +115,9 @@ class Subscription {
     }
   }
 
+  /// Название тарифа (если есть)
+  String? get paymentPlanName => payment?.paymentPlan?.name;
+
   factory Subscription.fromJson(Map<String, dynamic> json) => Subscription(
         id: json['id'] as String,
         institutionId: json['institution_id'] as String,
@@ -130,6 +136,9 @@ class Subscription {
         updatedAt: DateTime.parse(json['updated_at'] as String),
         student: json['students'] != null
             ? Student.fromJson(json['students'] as Map<String, dynamic>)
+            : null,
+        payment: json['payments'] != null
+            ? Payment.fromJson(json['payments'] as Map<String, dynamic>)
             : null,
       );
 
@@ -168,6 +177,7 @@ class Subscription {
         createdAt: createdAt,
         updatedAt: updatedAt,
         student: student,
+        payment: payment,
       );
 }
 

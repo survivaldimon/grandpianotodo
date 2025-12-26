@@ -12,7 +12,7 @@ class SubscriptionRepository {
     try {
       final data = await _client
           .from('subscriptions')
-          .select('*')
+          .select('*, payments(*, payment_plans(*))')
           .eq('student_id', studentId)
           .order('created_at', ascending: false);
 
@@ -29,7 +29,7 @@ class SubscriptionRepository {
 
       final data = await _client
           .from('subscriptions')
-          .select('*')
+          .select('*, payments(*, payment_plans(*))')
           .eq('student_id', studentId)
           .gt('lessons_remaining', 0)
           .or('expires_at.gte.$today,is_frozen.eq.true')
@@ -46,7 +46,7 @@ class SubscriptionRepository {
     try {
       final data = await _client
           .from('subscriptions')
-          .select('*, students(*)')
+          .select('*, students(*), payments(*, payment_plans(*))')
           .eq('id', id)
           .single();
 
@@ -351,7 +351,7 @@ class SubscriptionRepository {
 
       final data = await _client
           .from('subscriptions')
-          .select('*, students(*)')
+          .select('*, students(*), payments(*, payment_plans(*))')
           .eq('institution_id', institutionId)
           .gt('lessons_remaining', 0)
           .eq('is_frozen', false)
@@ -370,7 +370,7 @@ class SubscriptionRepository {
     try {
       final data = await _client
           .from('subscriptions')
-          .select('*, students(*)')
+          .select('*, students(*), payments(*, payment_plans(*))')
           .eq('institution_id', institutionId)
           .eq('is_frozen', true)
           .order('frozen_until', ascending: true);
