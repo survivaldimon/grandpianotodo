@@ -657,8 +657,10 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     if (oldWidget.selectedRoomId != null &&
         widget.selectedRoomId == null &&
         widget.restoreScrollOffset != null) {
-      // Восстанавливаем позицию скролла сразу
-      _restoreScrollPosition(widget.restoreScrollOffset!);
+      // Восстанавливаем позицию скролла после построения виджетов
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _restoreScrollPosition(widget.restoreScrollOffset!);
+      });
     }
   }
 
@@ -1129,8 +1131,10 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     if (oldWidget.selectedRoomId != null &&
         widget.selectedRoomId == null &&
         widget.restoreScrollOffset != null) {
-      // Восстанавливаем позицию скролла сразу
-      _restoreScrollPosition(widget.restoreScrollOffset!);
+      // Восстанавливаем позицию скролла после построения виджетов
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _restoreScrollPosition(widget.restoreScrollOffset!);
+      });
     }
   }
 
