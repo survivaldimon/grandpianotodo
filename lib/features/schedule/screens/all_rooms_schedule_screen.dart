@@ -736,57 +736,96 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
               SizedBox(width: AppSizes.timeGridWidth),
               // Заголовки кабинетов (кликабельные для фильтрации)
               Expanded(
-                child: SingleChildScrollView(
-                  controller: _headerScrollController,
-                  scrollDirection: Axis.horizontal,
-                  physics: const ClampingScrollPhysics(),
-                  child: SizedBox(
-                    width: rooms.length * roomColumnWidth,
-                    child: Row(
-                      children: [
-                        for (int index = 0; index < widget.rooms.length; index++)
-                          GestureDetector(
-                            onTap: () => widget.onRoomTap(
-                              widget.rooms[index].id,
-                              _headerScrollController.hasClients ? _headerScrollController.offset : 0,
-                            ),
-                            child: Container(
-                              // Заголовки используют вычисленную ширину (растягиваются для одного кабинета)
-                              width: roomColumnWidth,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: widget.selectedRoomId == widget.rooms[index].id
-                                    ? AppColors.primary.withValues(alpha: 0.15)
-                                    : null,
-                                border: Border(
-                                  left: BorderSide(
-                                    color: index == 0 ? Colors.transparent : AppColors.border,
-                                    width: 0.5,
-                                  ),
-                                  bottom: widget.selectedRoomId == widget.rooms[index].id
-                                      ? BorderSide(color: AppColors.primary, width: 2)
-                                      : BorderSide.none,
-                                ),
+                child: isSingleRoom
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => widget.onRoomTap(
+                                widget.rooms[0].id,
+                                0,
                               ),
-                              child: Text(
-                                widget.rooms[index].number != null
-                                    ? '№${widget.rooms[index].number}'
-                                    : widget.rooms[index].name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: widget.selectedRoomId == widget.rooms[index].id
-                                      ? AppColors.primary
+                              child: Container(
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: widget.selectedRoomId == widget.rooms[0].id
+                                      ? AppColors.primary.withValues(alpha: 0.15)
                                       : null,
+                                  border: BorderDirectional(
+                                    bottom: widget.selectedRoomId == widget.rooms[0].id
+                                        ? BorderSide(color: AppColors.primary, width: 2)
+                                        : BorderSide.none,
+                                  ),
                                 ),
-                                overflow: TextOverflow.ellipsis,
+                                child: Text(
+                                  widget.rooms[0].number != null
+                                      ? '№${widget.rooms[0].number}'
+                                      : widget.rooms[0].name,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: widget.selectedRoomId == widget.rooms[0].id
+                                        ? AppColors.primary
+                                        : null,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                ),
+                        ],
+                      )
+                    : SingleChildScrollView(
+                        controller: _headerScrollController,
+                        scrollDirection: Axis.horizontal,
+                        physics: const ClampingScrollPhysics(),
+                        child: SizedBox(
+                          width: rooms.length * roomColumnWidth,
+                          child: Row(
+                            children: [
+                              for (int index = 0; index < widget.rooms.length; index++)
+                                GestureDetector(
+                                  onTap: () => widget.onRoomTap(
+                                    widget.rooms[index].id,
+                                    _headerScrollController.hasClients ? _headerScrollController.offset : 0,
+                                  ),
+                                  child: Container(
+                                    // Заголовки используют вычисленную ширину
+                                    width: roomColumnWidth,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: widget.selectedRoomId == widget.rooms[index].id
+                                          ? AppColors.primary.withValues(alpha: 0.15)
+                                          : null,
+                                      border: Border(
+                                        left: BorderSide(
+                                          color: index == 0 ? Colors.transparent : AppColors.border,
+                                          width: 0.5,
+                                        ),
+                                        bottom: widget.selectedRoomId == widget.rooms[index].id
+                                            ? BorderSide(color: AppColors.primary, width: 2)
+                                            : BorderSide.none,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      widget.rooms[index].number != null
+                                          ? '№${widget.rooms[index].number}'
+                                          : widget.rooms[index].name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        color: widget.selectedRoomId == widget.rooms[index].id
+                                            ? AppColors.primary
+                                            : null,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -823,43 +862,66 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                   ),
                   // Колонки кабинетов
                   Expanded(
-                    child: SingleChildScrollView(
-                      controller: _gridScrollController,
-                      scrollDirection: Axis.horizontal,
-                      physics: const ClampingScrollPhysics(),
-                      child: SizedBox(
-                        width: rooms.length * roomColumnWidth,
-                        child: Stack(
-                          children: [
-                            // Сетка с кликабельными ячейками
-                            Row(
-                              children: [
-                                for (int i = 0; i < rooms.length; i++)
-                                  Container(
-                                    width: roomColumnWidth,
-                                    decoration: BoxDecoration(
-                                      border: Border(
-                                        left: BorderSide(
-                                          color: i == 0 ? Colors.transparent : AppColors.border,
-                                          width: 0.5,
-                                        ),
+                    child: isSingleRoom
+                        ? Stack(
+                            children: [
+                              // Сетка с кликабельными ячейками
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      decoration: const BoxDecoration(),
+                                      child: Column(
+                                        children: [
+                                          for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
+                                            _buildCell(rooms[0], hour, lessons),
+                                        ],
                                       ),
                                     ),
-                                    child: Column(
-                                      children: [
-                                        for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
-                                          _buildCell(rooms[i], hour, lessons),
-                                      ],
-                                    ),
                                   ),
-                              ],
+                                ],
+                              ),
+                              // Занятия
+                              ...lessons.map((lesson) => _buildLessonBlock(context, lesson, roomColumnWidth)),
+                            ],
+                          )
+                        : SingleChildScrollView(
+                            controller: _gridScrollController,
+                            scrollDirection: Axis.horizontal,
+                            physics: const ClampingScrollPhysics(),
+                            child: SizedBox(
+                              width: rooms.length * roomColumnWidth,
+                              child: Stack(
+                                children: [
+                                  // Сетка с кликабельными ячейками
+                                  Row(
+                                    children: [
+                                      for (int i = 0; i < rooms.length; i++)
+                                        Container(
+                                          width: roomColumnWidth,
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              left: BorderSide(
+                                                color: i == 0 ? Colors.transparent : AppColors.border,
+                                                width: 0.5,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
+                                                _buildCell(rooms[i], hour, lessons),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  // Занятия
+                                  ...lessons.map((lesson) => _buildLessonBlock(context, lesson, roomColumnWidth)),
+                                ],
+                              ),
                             ),
-                            // Занятия
-                            ...lessons.map((lesson) => _buildLessonBlock(context, lesson, roomColumnWidth)),
-                          ],
-                        ),
-                      ),
-                    ),
+                          ),
                   ),
                 ],
               ),
@@ -1189,17 +1251,19 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                       ),
                     ),
                   ),
-                  // Заголовки кабинетов (всегда все кабинеты, всегда скроллируемые)
+                  // Заголовки кабинетов
                   Expanded(
-                    child: SingleChildScrollView(
-                      controller: _headerScrollController,
-                      scrollDirection: Axis.horizontal,
-                      physics: const ClampingScrollPhysics(),
-                      child: SizedBox(
-                        width: rooms.length * roomColumnWidth,
-                        child: _buildRoomHeaders(widget.rooms, roomColumnWidth),
-                      ),
-                    ),
+                    child: rooms.length == 1
+                        ? _buildRoomHeaders(widget.rooms, roomColumnWidth)
+                        : SingleChildScrollView(
+                            controller: _headerScrollController,
+                            scrollDirection: Axis.horizontal,
+                            physics: const ClampingScrollPhysics(),
+                            child: SizedBox(
+                              width: totalWidth,
+                              child: _buildRoomHeaders(widget.rooms, roomColumnWidth),
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -1258,17 +1322,19 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                               ],
                             ),
                           ),
-                          // Ячейки с занятиями (всегда скроллируемые, синхронизированы с заголовками)
+                          // Ячейки с занятиями
                           Expanded(
-                            child: SingleChildScrollView(
-                              controller: _dayControllers[dayIndex],
-                              scrollDirection: Axis.horizontal,
-                              physics: const ClampingScrollPhysics(),
-                              child: SizedBox(
-                                width: rooms.length * roomColumnWidth,
-                                child: _buildDayCells(widget.rooms, dayLessons, date, roomColumnWidth),
-                              ),
-                            ),
+                            child: rooms.length == 1
+                                ? _buildDayCells(widget.rooms, dayLessons, date, roomColumnWidth)
+                                : SingleChildScrollView(
+                                    controller: _dayControllers[dayIndex],
+                                    scrollDirection: Axis.horizontal,
+                                    physics: const ClampingScrollPhysics(),
+                                    child: SizedBox(
+                                      width: totalWidth,
+                                      child: _buildDayCells(widget.rooms, dayLessons, date, roomColumnWidth),
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
@@ -1284,16 +1350,17 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   }
 
   Widget _buildRoomHeaders(List<Room> rooms, double roomColumnWidth) {
+    final isSingleRoom = rooms.length == 1;
     return Row(
       children: rooms.map((room) {
         final isSelected = widget.selectedRoomId == room.id;
-        return GestureDetector(
+        final content = GestureDetector(
           onTap: () => widget.onRoomTap(
             room.id,
             _headerScrollController.hasClients ? _headerScrollController.offset : 0,
           ),
           child: Container(
-            width: roomColumnWidth,
+            width: isSingleRoom ? double.infinity : roomColumnWidth,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: isSelected ? AppColors.primary.withValues(alpha: 0.15) : null,
@@ -1312,11 +1379,13 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             ),
           ),
         );
+        return isSingleRoom ? Expanded(child: content) : content;
       }).toList(),
     );
   }
 
   Widget _buildDayCells(List<Room> rooms, List<Lesson> dayLessons, DateTime date, double roomColumnWidth) {
+    final isSingleRoom = rooms.length == 1;
     return Row(
       children: rooms.map((room) {
         final roomLessons = dayLessons
@@ -1328,10 +1397,10 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             return aMinutes.compareTo(bMinutes);
           });
 
-        return GestureDetector(
+        final content = GestureDetector(
           onTap: () => widget.onCellTap(room, date),
           child: Container(
-            width: roomColumnWidth,
+            width: isSingleRoom ? double.infinity : roomColumnWidth,
             decoration: const BoxDecoration(
               border: Border(
                 left: BorderSide(color: AppColors.border, width: 0.5),
@@ -1343,6 +1412,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                 : _buildLessonsList(roomLessons),
           ),
         );
+        return isSingleRoom ? Expanded(child: content) : content;
       }).toList(),
     );
   }
