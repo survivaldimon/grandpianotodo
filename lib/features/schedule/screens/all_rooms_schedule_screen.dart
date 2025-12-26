@@ -630,6 +630,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
   late ScrollController _headerScrollController;
   late ScrollController _gridScrollController;
   bool _isSyncing = false;
+  double _lastScrollOffset = 0.0; // Храним последнюю позицию скролла
 
   @override
   void initState() {
@@ -673,6 +674,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     // Не синхронизируем когда выбран один кабинет (разные ширины)
     if (widget.selectedRoomId != null) return;
     _isSyncing = true;
+    _lastScrollOffset = _headerScrollController.offset; // Сохраняем позицию
     if (_gridScrollController.hasClients) {
       _gridScrollController.jumpTo(_headerScrollController.offset);
     }
@@ -684,6 +686,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     // Не синхронизируем когда выбран один кабинет (разные ширины)
     if (widget.selectedRoomId != null) return;
     _isSyncing = true;
+    _lastScrollOffset = _gridScrollController.offset; // Сохраняем позицию
     if (_headerScrollController.hasClients) {
       _headerScrollController.jumpTo(_gridScrollController.offset);
     }
@@ -741,10 +744,9 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => widget.onRoomTap(
-                                widget.rooms[0].id,
-                                0,
-                              ),
+                              onTap: () {
+                                widget.onRoomTap(widget.rooms[0].id, _lastScrollOffset);
+                              },
                               child: Container(
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
@@ -785,10 +787,13 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                             children: [
                               for (int index = 0; index < widget.rooms.length; index++)
                                 GestureDetector(
-                                  onTap: () => widget.onRoomTap(
-                                    widget.rooms[index].id,
-                                    _headerScrollController.hasClients ? _headerScrollController.offset : 0,
-                                  ),
+                                  onTap: () {
+                                    // Сохраняем текущую позицию перед переключением
+                                    if (_headerScrollController.hasClients) {
+                                      _lastScrollOffset = _headerScrollController.offset;
+                                    }
+                                    widget.onRoomTap(widget.rooms[index].id, _lastScrollOffset);
+                                  },
                                   child: Container(
                                     // Заголовки используют вычисленную ширину
                                     width: roomColumnWidth,
@@ -1090,6 +1095,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   late ScrollController _headerScrollController;
   late List<ScrollController> _dayControllers;
   bool _isSyncing = false;
+  double _lastScrollOffset = 0.0; // Храним последнюю позицию скролла
 
   static const _weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
@@ -1144,6 +1150,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     _isSyncing = true;
 
     final offset = _headerScrollController.offset;
+    _lastScrollOffset = offset; // Сохраняем позицию
 
     // Синхронизируем все дни с заголовком
     for (int i = 0; i < _dayControllers.length; i++) {
@@ -1162,6 +1169,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     _isSyncing = true;
 
     final offset = _dayControllers[sourceIndex].offset;
+    _lastScrollOffset = offset; // Сохраняем позицию
 
     // Синхронизируем заголовок
     if (_headerScrollController.hasClients) {
@@ -1355,10 +1363,13 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
       children: rooms.map((room) {
         final isSelected = widget.selectedRoomId == room.id;
         final content = GestureDetector(
-          onTap: () => widget.onRoomTap(
-            room.id,
-            _headerScrollController.hasClients ? _headerScrollController.offset : 0,
-          ),
+          onTap: () {
+            // Сохраняем текущую позицию перед переключением
+            if (_headerScrollController.hasClients) {
+              _lastScrollOffset = _headerScrollController.offset;
+            }
+            widget.onRoomTap(room.id, _lastScrollOffset);
+          },
           child: Container(
             width: isSingleRoom ? double.infinity : roomColumnWidth,
             alignment: Alignment.center,
