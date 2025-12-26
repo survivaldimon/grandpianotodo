@@ -742,18 +742,18 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                   physics: const ClampingScrollPhysics(),
                   child: Row(
                     children: [
-                      for (int index = 0; index < widget.allRooms.length; index++)
+                      for (int index = 0; index < widget.rooms.length; index++)
                         GestureDetector(
                           onTap: () => widget.onRoomTap(
-                            widget.allRooms[index].id,
+                            widget.rooms[index].id,
                             _headerScrollController.hasClients ? _headerScrollController.offset : 0,
                           ),
                           child: Container(
-                            // Заголовки всегда используют фиксированную ширину
-                            width: _AllRoomsTimeGrid.roomColumnWidth,
+                            // Заголовки используют вычисленную ширину (растягиваются для одного кабинета)
+                            width: roomColumnWidth,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: widget.selectedRoomId == widget.allRooms[index].id
+                              color: widget.selectedRoomId == widget.rooms[index].id
                                   ? AppColors.primary.withValues(alpha: 0.15)
                                   : null,
                               border: Border(
@@ -761,19 +761,19 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                   color: index == 0 ? Colors.transparent : AppColors.border,
                                   width: 0.5,
                                 ),
-                                bottom: widget.selectedRoomId == widget.allRooms[index].id
+                                bottom: widget.selectedRoomId == widget.rooms[index].id
                                     ? BorderSide(color: AppColors.primary, width: 2)
                                     : BorderSide.none,
                               ),
                             ),
                             child: Text(
-                              widget.allRooms[index].number != null
-                                  ? '№${widget.allRooms[index].number}'
-                                  : widget.allRooms[index].name,
+                              widget.rooms[index].number != null
+                                  ? '№${widget.rooms[index].number}'
+                                  : widget.rooms[index].name,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
-                                color: widget.selectedRoomId == widget.allRooms[index].id
+                                color: widget.selectedRoomId == widget.rooms[index].id
                                     ? AppColors.primary
                                     : null,
                               ),
@@ -1192,7 +1192,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                       controller: _headerScrollController,
                       scrollDirection: Axis.horizontal,
                       physics: const ClampingScrollPhysics(),
-                      child: _buildRoomHeaders(widget.allRooms, _WeekTimeGrid.minRoomColumnWidth),
+                      child: _buildRoomHeaders(widget.rooms, roomColumnWidth),
                     ),
                   ),
                 ],
@@ -1258,7 +1258,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                               controller: _dayControllers[dayIndex],
                               scrollDirection: Axis.horizontal,
                               physics: const ClampingScrollPhysics(),
-                              child: _buildDayCells(widget.allRooms, dayLessons, date, _WeekTimeGrid.minRoomColumnWidth),
+                              child: _buildDayCells(widget.rooms, dayLessons, date, roomColumnWidth),
                             ),
                           ),
                         ],

@@ -33,8 +33,12 @@
       "Bash(flutter build:*)",
       "Bash(/bin/bash:*)",
       "Bash(grep:*)",
+      "Bash(/mnt/r/flutter/bin/flutter analyze:*)",
+      "Bash(git restore:*)",
+      "Bash(git stash:*)",
+      "Bash(git show:*)",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(dart analyze:*)"
     ]
   }
 }
