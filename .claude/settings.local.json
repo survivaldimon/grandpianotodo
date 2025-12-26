@@ -32,7 +32,9 @@
       "Bash(cmd.exe /c:*)",
       "Bash(flutter build:*)",
       "Bash(/bin/bash:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)"
     ]
   }
 }
