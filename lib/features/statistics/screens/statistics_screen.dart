@@ -996,6 +996,34 @@ class _PaymentPlansTab extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  // Средняя стоимость занятия
+                  if (totalLessons > 0) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.trending_up, color: AppColors.success, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Средняя стоимость занятия: ',
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          _formatMoney(totalAmount / totalLessons),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.success,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1115,39 +1143,169 @@ class _PaymentPlanStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formatter = NumberFormat.currency(locale: 'ru_RU', symbol: '₸', decimalDigits: 0);
+    final avgCost = stat.totalLessons > 0 ? stat.totalAmount / stat.totalLessons : 0.0;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: stat.planId != null
-              ? AppColors.primary.withOpacity(0.2)
-              : AppColors.textSecondary.withOpacity(0.2),
-          child: Icon(
-            stat.planId != null ? Icons.card_membership : Icons.edit,
-            color: stat.planId != null ? AppColors.primary : AppColors.textSecondary,
-          ),
-        ),
-        title: Text(stat.planName),
-        subtitle: Text(
-          '${stat.totalLessons} занятий • ${formatter.format(stat.totalAmount)}',
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            '${stat.purchaseCount}',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-              fontSize: 16,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Заголовок с названием и количеством покупок
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: stat.planId != null && stat.planId != 'custom'
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : AppColors.textSecondary.withValues(alpha: 0.2),
+                  child: Icon(
+                    stat.planId != null && stat.planId != 'custom'
+                        ? Icons.card_membership
+                        : Icons.edit,
+                    color: stat.planId != null && stat.planId != 'custom'
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    stat.planName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${stat.purchaseCount} покуп.',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
+            const SizedBox(height: 16),
+            // Детализация
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  // Сумма и занятия
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _DetailRow(
+                          icon: Icons.payments,
+                          label: 'Сумма',
+                          value: formatter.format(stat.totalAmount),
+                          color: AppColors.success,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _DetailRow(
+                          icon: Icons.event,
+                          label: 'Занятий',
+                          value: stat.totalLessons.toString(),
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Средняя стоимость
+                  if (stat.totalLessons > 0) ...[
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.trending_up, size: 18, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Ср. занятие: ',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          formatter.format(avgCost),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+/// Строка детализации
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[500],
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
