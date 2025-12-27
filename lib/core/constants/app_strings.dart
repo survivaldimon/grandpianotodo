@@ -131,4 +131,6 @@ class AppStrings {
   static const String fieldRequired = 'Это поле обязательно';
   static const String passwordsDoNotMatch = 'Пароли не совпадают';
   static const String minPasswordLength = 'Минимум 8 символов';
+  static const String passwordNeedsUppercase = 'Нужна хотя бы одна заглавная буква';
+  static const String passwordNeedsSpecialChar = 'Нужен хотя бы один спецсимвол (!@#\$%^&*)';
 }

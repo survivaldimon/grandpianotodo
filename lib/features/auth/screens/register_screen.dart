@@ -119,6 +119,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   decoration: InputDecoration(
                     labelText: AppStrings.password,
                     prefixIcon: const Icon(Icons.lock_outlined),
+                    helperText: 'Мин. 8 символов, заглавная буква, спецсимвол',
+                    helperMaxLines: 2,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword

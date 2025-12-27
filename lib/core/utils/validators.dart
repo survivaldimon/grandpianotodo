@@ -16,13 +16,24 @@ class Validators {
     return null;
   }
 
-  /// Пароль валидатор (минимум 8 символов)
+  /// Пароль валидатор
+  /// - Минимум 8 символов
+  /// - Хотя бы одна заглавная буква
+  /// - Хотя бы один спецсимвол (!@#$%^&* и т.д.)
   static String? password(String? value) {
     if (value == null || value.isEmpty) {
       return AppStrings.fieldRequired;
     }
     if (value.length < 8) {
       return AppStrings.minPasswordLength;
+    }
+    // Проверка на заглавную букву
+    if (!RegExp(r'[A-ZА-ЯЁ]').hasMatch(value)) {
+      return AppStrings.passwordNeedsUppercase;
+    }
+    // Проверка на спецсимвол
+    if (!RegExp(r'[!@#$%^&*()_+\-=\[\]{};:"\\|,.<>\/?~`]').hasMatch(value)) {
+      return AppStrings.passwordNeedsSpecialChar;
     }
     return null;
   }
