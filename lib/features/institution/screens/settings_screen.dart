@@ -89,6 +89,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ? () => _showEditNameDialog(context, ref, institution.name)
                     : null,
               ),
+              ListTile(
+                leading: const Icon(Icons.access_time),
+                title: const Text('Рабочее время'),
+                subtitle: Text(
+                  '${institution.workStartHour.toString().padLeft(2, '0')}:00 — ${institution.workEndHour.toString().padLeft(2, '0')}:00',
+                ),
+                trailing: canManageInstitution ? const Icon(Icons.chevron_right) : null,
+                onTap: canManageInstitution
+                    ? () => _showWorkingHoursDialog(
+                          context,
+                          ref,
+                          institution.workStartHour,
+                          institution.workEndHour,
+                        )
+                    : null,
+              ),
               // Код приглашения виден владельцу и администратору
               if (hasFullAccess)
                 ListTile(
@@ -376,6 +392,123 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: const Text('Сохранить'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showWorkingHoursDialog(
+    BuildContext context,
+    WidgetRef ref,
+    int currentStartHour,
+    int currentEndHour,
+  ) {
+    int startHour = currentStartHour;
+    int endHour = currentEndHour;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Рабочее время'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Это время будет отображаться в сетке расписания',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Начало', style: TextStyle(fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<int>(
+                          value: startHour,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          items: List.generate(24, (i) => i)
+                              .map((h) => DropdownMenuItem(
+                                    value: h,
+                                    child: Text('${h.toString().padLeft(2, '0')}:00'),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() {
+                                startHour = v;
+                                if (endHour <= startHour) {
+                                  endHour = startHour + 1;
+                                  if (endHour > 23) endHour = 23;
+                                }
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Конец', style: TextStyle(fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<int>(
+                          value: endHour,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          items: List.generate(24 - startHour, (i) => startHour + i + 1)
+                              .map((h) => DropdownMenuItem(
+                                    value: h,
+                                    child: Text('${h.toString().padLeft(2, '0')}:00'),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => endHour = v);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Отмена'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final controller = ref.read(institutionControllerProvider.notifier);
+                final success = await controller.updateWorkingHours(
+                  widget.institutionId,
+                  startHour,
+                  endHour,
+                );
+                if (success && context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Рабочее время обновлено')),
+                  );
+                }
+              },
+              child: const Text('Сохранить'),
+            ),
+          ],
+        ),
       ),
     );
   }

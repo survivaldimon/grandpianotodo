@@ -6,6 +6,12 @@ class Institution extends BaseModel {
   final String ownerId;
   final String inviteCode;
 
+  /// Начало рабочего времени (час, 0-23). По умолчанию 8.
+  final int workStartHour;
+
+  /// Конец рабочего времени (час, 0-23). По умолчанию 22.
+  final int workEndHour;
+
   const Institution({
     required super.id,
     required super.createdAt,
@@ -14,6 +20,8 @@ class Institution extends BaseModel {
     required this.name,
     required this.ownerId,
     required this.inviteCode,
+    this.workStartHour = 8,
+    this.workEndHour = 22,
   });
 
   factory Institution.fromJson(Map<String, dynamic> json) => Institution(
@@ -26,6 +34,8 @@ class Institution extends BaseModel {
         name: json['name'] as String,
         ownerId: json['owner_id'] as String,
         inviteCode: json['invite_code'] as String,
+        workStartHour: (json['work_start_hour'] as int?) ?? 8,
+        workEndHour: (json['work_end_hour'] as int?) ?? 22,
       );
 
   Map<String, dynamic> toJson() => {
@@ -35,6 +45,8 @@ class Institution extends BaseModel {
 
   Institution copyWith({
     String? name,
+    int? workStartHour,
+    int? workEndHour,
   }) =>
       Institution(
         id: id,
@@ -44,5 +56,7 @@ class Institution extends BaseModel {
         name: name ?? this.name,
         ownerId: ownerId,
         inviteCode: inviteCode,
+        workStartHour: workStartHour ?? this.workStartHour,
+        workEndHour: workEndHour ?? this.workEndHour,
       );
 }

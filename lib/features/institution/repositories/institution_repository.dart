@@ -81,6 +81,29 @@ class InstitutionRepository {
     }
   }
 
+  /// Обновить рабочее время заведения
+  Future<Institution> updateWorkingHours(
+    String id, {
+    required int startHour,
+    required int endHour,
+  }) async {
+    try {
+      final data = await _client
+          .from('institutions')
+          .update({
+            'work_start_hour': startHour,
+            'work_end_hour': endHour,
+          })
+          .eq('id', id)
+          .select()
+          .single();
+
+      return Institution.fromJson(data);
+    } catch (e) {
+      throw DatabaseException('Ошибка обновления рабочего времени: $e');
+    }
+  }
+
   /// Присоединиться к заведению по коду
   Future<Institution> joinByCode(String code) async {
     if (_userId == null) throw AuthAppException('Пользователь не авторизован');

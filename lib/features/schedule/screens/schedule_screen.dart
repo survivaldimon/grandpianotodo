@@ -71,6 +71,11 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
     final lessonsAsync = ref.watch(
       lessonsByRoomProvider(RoomDateParams(widget.roomId, _selectedDate)),
     );
+    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+
+    // Получаем рабочее время из заведения
+    final workStartHour = institutionAsync.valueOrNull?.workStartHour ?? 8;
+    final workEndHour = institutionAsync.valueOrNull?.workEndHour ?? 22;
 
     return Scaffold(
       appBar: AppBar(
@@ -111,6 +116,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
                 institutionId: widget.institutionId,
                 lessons: lessons,
                 onLessonTap: (lesson) => _showLessonDetail(context, lesson),
+                startHour: workStartHour,
+                endHour: workEndHour,
               ),
             ),
           ),
@@ -244,6 +251,8 @@ class _TimeGrid extends StatelessWidget {
   final String institutionId;
   final List<Lesson> lessons;
   final void Function(Lesson) onLessonTap;
+  final int startHour;
+  final int endHour;
 
   const _TimeGrid({
     required this.selectedDate,
@@ -251,10 +260,10 @@ class _TimeGrid extends StatelessWidget {
     required this.institutionId,
     required this.lessons,
     required this.onLessonTap,
+    required this.startHour,
+    required this.endHour,
   });
 
-  static const startHour = 8;
-  static const endHour = 22;
   static const hourHeight = 60.0;
 
   @override

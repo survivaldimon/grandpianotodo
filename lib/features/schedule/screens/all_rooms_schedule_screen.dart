@@ -158,6 +158,10 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     );
     final canManageRooms = isOwner || (permissions?.manageRooms ?? false);
 
+    // Получаем рабочее время из заведения
+    final workStartHour = institutionAsync.valueOrNull?.workStartHour ?? 8;
+    final workEndHour = institutionAsync.valueOrNull?.workEndHour ?? 22;
+
     // Получаем название выбранного кабинета для заголовка
     String title = 'Расписание';
     if (_selectedRoomId != null) {
@@ -240,8 +244,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           const Divider(height: 1),
           Expanded(
             child: _viewMode == ScheduleViewMode.day
-                ? _buildDayView(roomsAsync, lessonsAsync, canManageRooms)
-                : _buildWeekView(roomsAsync, canManageRooms),
+                ? _buildDayView(roomsAsync, lessonsAsync, canManageRooms, workStartHour, workEndHour)
+                : _buildWeekView(roomsAsync, canManageRooms, workStartHour, workEndHour),
           ),
         ],
       ),
@@ -252,6 +256,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     AsyncValue<List<Room>> roomsAsync,
     AsyncValue<List<Lesson>> lessonsAsync,
     bool canManageRooms,
+    int workStartHour,
+    int workEndHour,
   ) {
     return roomsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -275,6 +281,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             selectedRoomId: _selectedRoomId,
             restoreScrollOffset: _savedScrollOffset,
             canManageRooms: canManageRooms,
+            startHour: workStartHour,
+            endHour: workEndHour,
             onLessonTap: _showLessonDetail,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
@@ -296,7 +304,12 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     );
   }
 
-  Widget _buildWeekView(AsyncValue<List<Room>> roomsAsync, bool canManageRooms) {
+  Widget _buildWeekView(
+    AsyncValue<List<Room>> roomsAsync,
+    bool canManageRooms,
+    int workStartHour,
+    int workEndHour,
+  ) {
     final weekStart = InstitutionWeekParams.getWeekStart(_selectedDate);
     final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
     final weekLessonsAsync = ref.watch(lessonsByInstitutionWeekProvider(weekParams));
@@ -327,6 +340,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             selectedRoomId: _selectedRoomId,
             restoreScrollOffset: _savedScrollOffset,
             canManageRooms: canManageRooms,
+            startHour: workStartHour,
+            endHour: workEndHour,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
                 // Всегда сохраняем текущую позицию скролла
@@ -645,6 +660,8 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final String? selectedRoomId;
   final double? restoreScrollOffset; // Позиция скролла для восстановления
   final bool canManageRooms; // Может ли пользователь управлять кабинетами
+  final int startHour;
+  final int endHour;
   final void Function(Lesson) onLessonTap;
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, int hour) onAddLesson;
@@ -658,13 +675,13 @@ class _AllRoomsTimeGrid extends StatefulWidget {
     required this.onLessonTap,
     required this.onRoomTap,
     required this.onAddLesson,
+    required this.startHour,
+    required this.endHour,
     this.selectedRoomId,
     this.restoreScrollOffset,
     this.canManageRooms = false,
   });
 
-  static const startHour = 8;
-  static const endHour = 22;
   static const hourHeight = 60.0;
   static const roomColumnWidth = 120.0; // Базовая ширина для многих кабинетов
 
@@ -804,7 +821,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
       );
     }
 
-    final totalHeight = (_AllRoomsTimeGrid.endHour - _AllRoomsTimeGrid.startHour + 1) * _AllRoomsTimeGrid.hourHeight;
+    final totalHeight = (widget.endHour - widget.startHour + 1) * _AllRoomsTimeGrid.hourHeight;
 
     // Если выбран один кабинет - используем всю доступную ширину
     return LayoutBuilder(builder: (context, constraints) {
@@ -954,7 +971,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                     width: AppSizes.timeGridWidth,
                     child: Column(
                       children: [
-                        for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
+                        for (int hour = widget.startHour; hour <= widget.endHour; hour++)
                           SizedBox(
                             height: _AllRoomsTimeGrid.hourHeight,
                             child: Align(
@@ -991,7 +1008,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                         ),
                                         child: Column(
                                           children: [
-                                            for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
+                                            for (int hour = widget.startHour; hour <= widget.endHour; hour++)
                                               _buildCell(rooms[i], hour, lessons),
                                           ],
                                         ),
@@ -1027,7 +1044,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                           ),
                                           child: Column(
                                             children: [
-                                              for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
+                                              for (int hour = widget.startHour; hour <= widget.endHour; hour++)
                                                 _buildCell(rooms[i], hour, lessons),
                                             ],
                                           ),
@@ -1095,7 +1112,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
 
     final startMinutes = lesson.startTime.hour * 60 + lesson.startTime.minute;
     final endMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
-    final startOffset = (startMinutes - _AllRoomsTimeGrid.startHour * 60) / 60 * _AllRoomsTimeGrid.hourHeight;
+    final startOffset = (startMinutes - widget.startHour * 60) / 60 * _AllRoomsTimeGrid.hourHeight;
     final duration = (endMinutes - startMinutes) / 60 * _AllRoomsTimeGrid.hourHeight;
 
     final color = _getLessonColor(lesson);
@@ -1181,6 +1198,8 @@ class _WeekTimeGrid extends StatefulWidget {
   final String? selectedRoomId;
   final double? restoreScrollOffset; // Позиция скролла для восстановления
   final bool canManageRooms; // Может ли пользователь управлять кабинетами
+  final int startHour;
+  final int endHour;
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, DateTime date) onCellTap;
 
@@ -1192,6 +1211,8 @@ class _WeekTimeGrid extends StatefulWidget {
     required this.institutionId,
     required this.onRoomTap,
     required this.onCellTap,
+    required this.startHour,
+    required this.endHour,
     this.selectedRoomId,
     this.restoreScrollOffset,
     this.canManageRooms = false,

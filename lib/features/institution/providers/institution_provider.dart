@@ -155,6 +155,19 @@ class InstitutionController extends StateNotifier<AsyncValue<void>> {
       return null;
     }
   }
+
+  Future<bool> updateWorkingHours(String id, int startHour, int endHour) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.updateWorkingHours(id, startHour: startHour, endHour: endHour);
+      _ref.invalidate(currentInstitutionProvider(id));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
 }
 
 /// Провайдер контроллера заведений
