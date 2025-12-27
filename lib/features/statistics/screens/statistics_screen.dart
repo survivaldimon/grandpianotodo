@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
+import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/features/statistics/repositories/statistics_repository.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
@@ -20,7 +22,52 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
   final _dateFormat = DateFormat('dd.MM.yyyy', 'ru');
 
   @override
+  void initState() {
+    super.initState();
+    // Принудительно обновляем права при открытии экрана статистики
+    Future.microtask(() {
+      ref.invalidate(myMembershipProvider(widget.institutionId));
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Проверяем права на просмотр статистики
+    final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
+    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+
+    final isOwner = institutionAsync.maybeWhen(
+      data: (inst) => inst.ownerId == currentUserId,
+      orElse: () => false,
+    );
+
+    final canViewStatistics = isOwner || (permissions?.viewStatistics ?? false);
+
+    if (!canViewStatistics) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Статистика')),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_outline, size: 64, color: AppColors.textSecondary),
+              SizedBox(height: 16),
+              Text(
+                'Нет доступа к статистике',
+                style: TextStyle(fontSize: 18, color: AppColors.textSecondary),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Обратитесь к владельцу заведения',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final period = ref.watch(statsPeriodProvider);
     final customRange = ref.watch(customDateRangeProvider);
 

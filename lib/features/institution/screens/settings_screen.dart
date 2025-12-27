@@ -9,13 +9,28 @@ import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран настроек заведения
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   final String institutionId;
 
   const SettingsScreen({super.key, required this.institutionId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Принудительно обновляем права при открытии экрана настроек
+    Future.microtask(() {
+      ref.invalidate(myMembershipProvider(widget.institutionId));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final institutionId = widget.institutionId;
     final institutionAsync = ref.watch(currentInstitutionProvider(institutionId));
     final currentUserId = ref.watch(currentUserIdProvider);
     final controllerState = ref.watch(institutionControllerProvider);
@@ -113,14 +128,16 @@ class SettingsScreen extends ConsumerWidget {
                   context.push('/institutions/$institutionId/rooms');
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.bar_chart),
-                title: const Text('Статистика'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  context.push('/institutions/$institutionId/statistics');
-                },
-              ),
+              // Статистика — только если есть право viewStatistics
+              if (isOwner || (permissions?.viewStatistics ?? false))
+                ListTile(
+                  leading: const Icon(Icons.bar_chart),
+                  title: const Text('Статистика'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    context.push('/institutions/$institutionId/statistics');
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.people),
                 title: const Text(AppStrings.teamMembers),
@@ -295,7 +312,7 @@ class SettingsScreen extends ConsumerWidget {
 
     if (confirmed == true && context.mounted) {
       final controller = ref.read(institutionControllerProvider.notifier);
-      final newCode = await controller.regenerateInviteCode(institutionId);
+      final newCode = await controller.regenerateInviteCode(widget.institutionId);
       if (newCode != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -334,7 +351,7 @@ class SettingsScreen extends ConsumerWidget {
               if (formKey.currentState!.validate()) {
                 final controller = ref.read(institutionControllerProvider.notifier);
                 final success = await controller.update(
-                  institutionId,
+                  widget.institutionId,
                   nameController.text.trim(),
                 );
                 if (success && context.mounted) {
