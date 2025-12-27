@@ -155,6 +155,7 @@ CREATE TABLE institution_members (
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role_name TEXT NOT NULL DEFAULT 'Преподаватель',
+  is_admin BOOLEAN DEFAULT FALSE, -- Администратор имеет все права владельца, кроме удаления заведения
   permissions JSONB NOT NULL DEFAULT '{
     "manage_institution": false,
     "manage_rooms": false,
@@ -173,6 +174,8 @@ CREATE TABLE institution_members (
     "delete_all_lessons": false,
     "delete_lessons": true,
     "view_all_schedule": true,
+    "add_payments_for_own_students": true,
+    "add_payments_for_all_students": false,
     "manage_payments": false,
     "view_payments": true,
     "view_statistics": false,
@@ -180,7 +183,7 @@ CREATE TABLE institution_members (
   }'::jsonb,
   joined_at TIMESTAMPTZ DEFAULT NOW(),
   archived_at TIMESTAMPTZ,
-  
+
   UNIQUE(institution_id, user_id)
 );
 ```

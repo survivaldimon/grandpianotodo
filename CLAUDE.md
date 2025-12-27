@@ -220,6 +220,27 @@ final canEditStudent = isOwner ||
 - `manageGroups: true`
 - `deleteOwnLessons: true`
 - `viewPayments: true`
+- `addPaymentsForOwnStudents: true`
+
+**Роль администратора (isAdmin):**
+- Администратор имеет все права владельца, **кроме удаления заведения**
+- Поле `is_admin` хранится в таблице `institution_members`
+- Только владелец может назначать/снимать роль администратора
+- Проверка прав: `isOwner || isAdmin` (используется `hasFullAccess`)
+
+**Провайдер:**
+```dart
+final isAdminProvider = Provider.family<bool, String>((ref, institutionId) {
+  final membershipAsync = ref.watch(myMembershipProvider(institutionId));
+  return membershipAsync.valueOrNull?.isAdmin ?? false;
+});
+```
+
+**Использование:**
+```dart
+final isAdmin = ref.watch(isAdminProvider(institutionId));
+final hasFullAccess = isOwner || isAdmin;
+```
 
 ### 15. Получение текущего пользователя
 Для надёжного получения ID текущего пользователя в UI используй прямой доступ:

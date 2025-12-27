@@ -70,9 +70,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
         data: (institution) {
           final isOwner = institution.ownerId == currentUserId;
+          final isAdmin = ref.watch(isAdminProvider(institutionId));
+          // Админ имеет все права владельца, кроме удаления заведения
+          final hasFullAccess = isOwner || isAdmin;
           // Проверяем права на управление заведением
           final permissions = ref.watch(myPermissionsProvider(institutionId));
-          final canManageInstitution = isOwner || (permissions?.manageInstitution ?? false);
+          final canManageInstitution = hasFullAccess || (permissions?.manageInstitution ?? false);
 
           return ListView(
             children: [
@@ -86,8 +89,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ? () => _showEditNameDialog(context, ref, institution.name)
                     : null,
               ),
-              // Код приглашения виден только владельцу
-              if (isOwner)
+              // Код приглашения виден владельцу и администратору
+              if (hasFullAccess)
                 ListTile(
                   leading: const Icon(Icons.share),
                   title: const Text('Пригласить участника'),
@@ -121,7 +124,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const Divider(),
               const _SectionHeader(title: 'УПРАВЛЕНИЕ'),
               // Кабинеты — только если есть право manageRooms
-              if (isOwner || (permissions?.manageRooms ?? false))
+              if (hasFullAccess || (permissions?.manageRooms ?? false))
                 ListTile(
                   leading: const Icon(Icons.door_front_door),
                   title: const Text(AppStrings.rooms),
@@ -131,7 +134,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   },
                 ),
               // Статистика — только если есть право viewStatistics
-              if (isOwner || (permissions?.viewStatistics ?? false))
+              if (hasFullAccess || (permissions?.viewStatistics ?? false))
                 ListTile(
                   leading: const Icon(Icons.bar_chart),
                   title: const Text('Статистика'),
@@ -149,7 +152,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 },
               ),
               // Предметы — только если есть право manageSubjects
-              if (isOwner || (permissions?.manageSubjects ?? false))
+              if (hasFullAccess || (permissions?.manageSubjects ?? false))
                 ListTile(
                   leading: const Icon(Icons.music_note),
                   title: const Text(AppStrings.subjects),
@@ -159,7 +162,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   },
                 ),
               // Типы занятий — только если есть право manageLessonTypes
-              if (isOwner || (permissions?.manageLessonTypes ?? false))
+              if (hasFullAccess || (permissions?.manageLessonTypes ?? false))
                 ListTile(
                   leading: const Icon(Icons.event_note),
                   title: const Text(AppStrings.lessonTypes),
@@ -169,7 +172,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   },
                 ),
               // Тарифы оплаты — только если есть право managePaymentPlans
-              if (isOwner || (permissions?.managePaymentPlans ?? false))
+              if (hasFullAccess || (permissions?.managePaymentPlans ?? false))
                 ListTile(
                   leading: const Icon(Icons.credit_card),
                   title: const Text(AppStrings.paymentPlans),

@@ -42,7 +42,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       orElse: () => false,
     );
 
-    final canViewStatistics = isOwner || (permissions?.viewStatistics ?? false);
+    final isAdmin = ref.watch(isAdminProvider(widget.institutionId));
+    final hasFullAccess = isOwner || isAdmin;
+
+    final canViewStatistics = hasFullAccess || (permissions?.viewStatistics ?? false);
 
     if (!canViewStatistics) {
       return Scaffold(

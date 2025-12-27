@@ -35,7 +35,9 @@ class StudentsListScreen extends ConsumerWidget {
       data: (inst) => inst.ownerId == ref.watch(currentUserIdProvider),
       orElse: () => false,
     );
-    final canAddStudent = isOwner ||
+    final isAdmin = ref.watch(isAdminProvider(institutionId));
+    final hasFullAccess = isOwner || isAdmin;
+    final canAddStudent = hasFullAccess ||
         (permissions?.manageOwnStudents ?? false) ||
         (permissions?.manageAllStudents ?? false);
 

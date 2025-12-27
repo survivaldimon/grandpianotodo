@@ -212,6 +212,18 @@ class InstitutionRepository {
     }
   }
 
+  /// Обновить статус администратора
+  Future<void> updateMemberAdminStatus(String memberId, bool isAdmin) async {
+    try {
+      await _client
+          .from('institution_members')
+          .update({'is_admin': isAdmin})
+          .eq('id', memberId);
+    } catch (e) {
+      throw DatabaseException('Ошибка обновления статуса администратора: $e');
+    }
+  }
+
   /// Обновить название роли участника
   Future<void> updateMemberRole(String memberId, String roleName) async {
     try {

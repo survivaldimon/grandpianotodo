@@ -6,6 +6,7 @@ import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
+import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран редактирования прав участника
@@ -29,6 +30,8 @@ class _MemberPermissionsScreenState
   late MemberPermissions _permissions;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isAdmin = false;
+  bool _isOwnerViewing = false;
   String _memberName = '';
   String _roleName = '';
   String _userId = '';
@@ -43,8 +46,15 @@ class _MemberPermissionsScreenState
     try {
       final members = await ref.read(membersProvider(widget.institutionId).future);
       final member = members.firstWhere((m) => m.id == widget.memberId);
+
+      // Проверяем, является ли текущий пользователь владельцем
+      final institution = await ref.read(currentInstitutionProvider(widget.institutionId).future);
+      final currentUserId = ref.read(currentUserIdProvider);
+
       setState(() {
         _permissions = member.permissions;
+        _isAdmin = member.isAdmin;
+        _isOwnerViewing = institution.ownerId == currentUserId;
         _memberName = member.profile?.fullName ?? 'Участник';
         _roleName = member.roleName;
         _userId = member.userId;
@@ -65,8 +75,14 @@ class _MemberPermissionsScreenState
 
     try {
       final repo = ref.read(institutionRepositoryProvider);
-      await repo.updateMemberPermissions(widget.memberId, _permissions);
+      // Сохраняем права и статус администратора параллельно
+      await Future.wait([
+        repo.updateMemberPermissions(widget.memberId, _permissions),
+        if (_isOwnerViewing) repo.updateMemberAdminStatus(widget.memberId, _isAdmin),
+      ]);
       ref.invalidate(membersProvider(widget.institutionId));
+      // Инвалидируем права для обновления по всему приложению
+      ref.invalidate(myMembershipProvider(widget.institutionId));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -122,17 +138,55 @@ class _MemberPermissionsScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _memberName,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      Text(
-                        _roleName,
-                        style: TextStyle(color: AppColors.textSecondary),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _memberName,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                Text(
+                                  _roleName,
+                                  style: TextStyle(color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_isAdmin)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: AppColors.primary),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.admin_panel_settings, size: 16, color: AppColors.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Админ',
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
                 ),
+
+                // Секция: Администратор (только для владельца)
+                if (_isOwnerViewing) _buildAdminSection(),
 
                 // Секция: Направления (предметы)
                 if (_userId.isNotEmpty) _buildSubjectsSection(),
@@ -304,6 +358,73 @@ class _MemberPermissionsScreenState
     );
   }
 
+  Widget _buildAdminSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+          child: Text(
+            'СТАТУС',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ),
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          color: _isAdmin ? AppColors.primary.withValues(alpha: 0.05) : null,
+          child: SwitchListTile(
+            secondary: Icon(
+              Icons.admin_panel_settings,
+              color: _isAdmin ? AppColors.primary : null,
+            ),
+            title: const Text('Администратор'),
+            subtitle: Text(
+              _isAdmin
+                  ? 'Имеет все права, кроме удаления заведения'
+                  : 'Дать полные права управления заведением',
+              style: const TextStyle(fontSize: 12),
+            ),
+            value: _isAdmin,
+            onChanged: (v) => setState(() => _isAdmin = v),
+            activeColor: AppColors.primary,
+          ),
+        ),
+        if (_isAdmin)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Все права ниже автоматически включены для администратора',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        const Divider(),
+      ],
+    );
+  }
+
   Widget _buildSection(String title, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,15 +451,25 @@ class _MemberPermissionsScreenState
     bool value,
     ValueChanged<bool> onChanged,
   ) {
-    return SwitchListTile(
-      title: Text(title),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontSize: 12),
+    // Если включён админ - все права включены и заблокированы
+    final isDisabled = _isAdmin;
+    final displayValue = isDisabled ? true : value;
+
+    return Opacity(
+      opacity: isDisabled ? 0.5 : 1.0,
+      child: SwitchListTile(
+        title: Text(title),
+        subtitle: Text(
+          isDisabled ? 'Включено для администратора' : subtitle,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDisabled ? AppColors.textTertiary : null,
+          ),
+        ),
+        value: displayValue,
+        onChanged: isDisabled ? null : onChanged,
+        activeColor: AppColors.primary,
       ),
-      value: value,
-      onChanged: onChanged,
-      activeColor: AppColors.primary,
     );
   }
 

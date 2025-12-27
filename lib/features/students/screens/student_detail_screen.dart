@@ -64,11 +64,13 @@ class StudentDetailScreen extends ConsumerWidget {
           data: (inst) => inst.ownerId == ref.watch(currentUserIdProvider),
           orElse: () => false,
         );
+        final isAdmin = ref.watch(isAdminProvider(institutionId));
+        final hasFullAccess = isOwner || isAdmin;
         final isMyStudent = isMyStudentAsync.maybeWhen(
           data: (v) => v,
           orElse: () => false,
         );
-        final canEditStudent = isOwner ||
+        final canEditStudent = hasFullAccess ||
             (permissions?.manageAllStudents ?? false) ||
             (isMyStudent && (permissions?.manageOwnStudents ?? false));
 

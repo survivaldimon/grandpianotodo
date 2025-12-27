@@ -48,6 +48,13 @@ final myPermissionsProvider =
   return membershipAsync.valueOrNull?.permissions;
 });
 
+/// Провайдер статуса администратора (realtime)
+final isAdminProvider =
+    Provider.family<bool, String>((ref, institutionId) {
+  final membershipAsync = ref.watch(myMembershipProvider(institutionId));
+  return membershipAsync.valueOrNull?.isAdmin ?? false;
+});
+
 /// Контроллер заведений
 class InstitutionController extends StateNotifier<AsyncValue<void>> {
   final InstitutionRepository _repo;

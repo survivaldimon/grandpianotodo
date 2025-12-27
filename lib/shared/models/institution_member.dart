@@ -186,6 +186,7 @@ class InstitutionMember {
   final String userId;
   final String roleName;
   final MemberPermissions permissions;
+  final bool isAdmin;
   final DateTime joinedAt;
   final DateTime? archivedAt;
 
@@ -198,6 +199,7 @@ class InstitutionMember {
     required this.userId,
     required this.roleName,
     required this.permissions,
+    this.isAdmin = false,
     required this.joinedAt,
     this.archivedAt,
     this.profile,
@@ -213,6 +215,7 @@ class InstitutionMember {
         roleName: json['role_name'] as String,
         permissions: MemberPermissions.fromJson(
             json['permissions'] as Map<String, dynamic>),
+        isAdmin: json['is_admin'] as bool? ?? false,
         joinedAt: DateTime.parse(json['joined_at'] as String),
         archivedAt: json['archived_at'] != null
             ? DateTime.parse(json['archived_at'] as String)
@@ -233,6 +236,7 @@ class InstitutionMember {
         userId: member.userId,
         roleName: member.roleName,
         permissions: member.permissions,
+        isAdmin: member.isAdmin,
         joinedAt: member.joinedAt,
         archivedAt: member.archivedAt,
         profile: Profile.fromJson(profileData),
@@ -243,5 +247,6 @@ class InstitutionMember {
         'user_id': userId,
         'role_name': roleName,
         'permissions': permissions.toJson(),
+        'is_admin': isAdmin,
       };
 }

@@ -1580,9 +1580,11 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
     final isOwner = institutionAsync.valueOrNull?.ownerId == currentUserId;
+    final isAdmin = ref.watch(isAdminProvider(widget.institutionId));
+    final hasFullAccess = isOwner || isAdmin;
     final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
     final isOwnLesson = currentUserId != null && lesson.teacherId == currentUserId;
-    final canDelete = isOwner ||
+    final canDelete = hasFullAccess ||
                       (permissions?.deleteAllLessons ?? false) ||
                       (isOwnLesson && (permissions?.deleteOwnLessons ?? false));
 

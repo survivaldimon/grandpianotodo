@@ -51,19 +51,21 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
     final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
 
-    // Проверяем, является ли пользователь владельцем
+    // Проверяем, является ли пользователь владельцем или админом
     final isOwner = institutionAsync.maybeWhen(
       data: (inst) => inst.ownerId == currentUserId,
       orElse: () => false,
     );
+    final isAdmin = ref.watch(isAdminProvider(widget.institutionId));
+    final hasFullAccess = isOwner || isAdmin;
 
     // Право на добавление оплат (для своих или для всех)
-    final canAddPayments = isOwner ||
+    final canAddPayments = hasFullAccess ||
         (permissions?.addPaymentsForOwnStudents ?? false) ||
         (permissions?.addPaymentsForAllStudents ?? false);
 
     // Право на добавление оплат для всех учеников
-    final canAddForAllStudents = isOwner ||
+    final canAddForAllStudents = hasFullAccess ||
         (permissions?.addPaymentsForAllStudents ?? false);
 
     return Scaffold(

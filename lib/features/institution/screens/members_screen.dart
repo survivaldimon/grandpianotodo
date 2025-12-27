@@ -10,15 +10,29 @@ import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран управления участниками заведения
-class MembersScreen extends ConsumerWidget {
+class MembersScreen extends ConsumerStatefulWidget {
   final String institutionId;
 
   const MembersScreen({super.key, required this.institutionId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final membersAsync = ref.watch(membersProvider(institutionId));
-    final institutionAsync = ref.watch(currentInstitutionProvider(institutionId));
+  ConsumerState<MembersScreen> createState() => _MembersScreenState();
+}
+
+class _MembersScreenState extends ConsumerState<MembersScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Обновляем список участников при открытии экрана
+    Future.microtask(() {
+      ref.invalidate(membersProvider(widget.institutionId));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
     final currentUserId = ref.watch(currentUserIdProvider);
 
     return Scaffold(
@@ -29,7 +43,7 @@ class MembersScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorView.fromException(
           e,
-          onRetry: () => ref.invalidate(membersProvider(institutionId)),
+          onRetry: () => ref.invalidate(membersProvider(widget.institutionId)),
         ),
         data: (members) {
           if (members.isEmpty) {
@@ -48,9 +62,13 @@ class MembersScreen extends ConsumerWidget {
             orElse: () => null,
           );
 
-          // Проверяем права на управление участниками (владелец или с разрешением)
-          final permissions = ref.watch(myPermissionsProvider(institutionId));
-          final canManageMembers = isOwner || (permissions?.manageMembers ?? false);
+          // Проверяем статус администратора текущего пользователя
+          final isAdmin = ref.watch(isAdminProvider(widget.institutionId));
+          final hasFullAccess = isOwner || isAdmin;
+
+          // Проверяем права на управление участниками (владелец, админ или с разрешением)
+          final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
+          final canManageMembers = hasFullAccess || (permissions?.manageMembers ?? false);
 
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -65,7 +83,8 @@ class MembersScreen extends ConsumerWidget {
                 canManageMembers: canManageMembers,
                 isCurrentUser: isCurrentUser,
                 isMemberOwner: isMemberOwner,
-                institutionId: institutionId,
+                isViewerOwner: isOwner,
+                institutionId: widget.institutionId,
               );
             },
           );
@@ -80,6 +99,7 @@ class _MemberTile extends ConsumerWidget {
   final bool canManageMembers;
   final bool isCurrentUser;
   final bool isMemberOwner;
+  final bool isViewerOwner;
   final String institutionId;
 
   const _MemberTile({
@@ -87,6 +107,7 @@ class _MemberTile extends ConsumerWidget {
     required this.canManageMembers,
     required this.isCurrentUser,
     required this.isMemberOwner,
+    required this.isViewerOwner,
     required this.institutionId,
   });
 
@@ -94,13 +115,26 @@ class _MemberTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final name = member.profile?.fullName ?? 'Без имени';
     final email = member.profile?.email ?? '';
+    final isMemberAdmin = member.isAdmin;
+
+    // Только владелец может редактировать администраторов
+    final canEditThisMember = canManageMembers && !isMemberOwner && !isCurrentUser &&
+        (!isMemberAdmin || isViewerOwner);
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: isMemberOwner ? AppColors.primary : AppColors.surfaceVariant,
+        backgroundColor: isMemberOwner
+            ? AppColors.primary
+            : isMemberAdmin
+                ? AppColors.primary.withValues(alpha: 0.7)
+                : AppColors.surfaceVariant,
         child: Icon(
-          isMemberOwner ? Icons.star : Icons.person,
-          color: isMemberOwner ? Colors.white : AppColors.textSecondary,
+          isMemberOwner
+              ? Icons.star
+              : isMemberAdmin
+                  ? Icons.admin_panel_settings
+                  : Icons.person,
+          color: (isMemberOwner || isMemberAdmin) ? Colors.white : AppColors.textSecondary,
         ),
       ),
       title: Row(
@@ -111,6 +145,24 @@ class _MemberTile extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (isMemberAdmin && !isMemberOwner)
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: const Text(
+                'Админ',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
           if (isCurrentUser)
             Container(
               margin: const EdgeInsets.only(left: 8),
@@ -149,7 +201,7 @@ class _MemberTile extends ConsumerWidget {
             ),
         ],
       ),
-      trailing: canManageMembers && !isMemberOwner && !isCurrentUser
+      trailing: canEditThisMember
           ? PopupMenuButton<String>(
               onSelected: (value) {
                 switch (value) {
@@ -198,7 +250,7 @@ class _MemberTile extends ConsumerWidget {
               ],
             )
           : null,
-      onTap: canManageMembers && !isMemberOwner && !isCurrentUser
+      onTap: canEditThisMember
           ? () => context.push('/institutions/$institutionId/members/${member.id}/permissions')
           : null,
     );
