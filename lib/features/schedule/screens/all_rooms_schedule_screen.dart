@@ -249,6 +249,13 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           ),
         ],
       ),
+      floatingActionButton: (isOwner || (permissions?.createLessons ?? false))
+          ? FloatingActionButton(
+              onPressed: () => _showQuickAddLessonSheet(roomsAsync.valueOrNull ?? []),
+              tooltip: 'Добавить занятие',
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 
@@ -270,6 +277,13 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
               ? lessons
               : lessons.where((l) => _filters.matchesLesson(l)).toList();
 
+          // Вычисляем эффективные часы с учётом занятий вне рабочего времени
+          final effectiveHours = _calculateEffectiveHours(
+            lessons: lessons,
+            workStartHour: workStartHour,
+            workEndHour: workEndHour,
+          );
+
           return _AllRoomsTimeGrid(
             rooms: _selectedRoomId != null
                 ? rooms.where((r) => r.id == _selectedRoomId).toList()
@@ -281,8 +295,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             selectedRoomId: _selectedRoomId,
             restoreScrollOffset: _savedScrollOffset,
             canManageRooms: canManageRooms,
-            startHour: workStartHour,
-            endHour: workEndHour,
+            startHour: effectiveHours.$1,
+            endHour: effectiveHours.$2,
             onLessonTap: _showLessonDetail,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
@@ -302,6 +316,39 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         },
       ),
     );
+  }
+
+  /// Вычисляет эффективные часы отображения сетки
+  /// Расширяет диапазон, если есть занятия вне рабочего времени
+  (int, int) _calculateEffectiveHours({
+    required List<Lesson> lessons,
+    required int workStartHour,
+    required int workEndHour,
+  }) {
+    int effectiveStart = workStartHour;
+    int effectiveEnd = workEndHour;
+
+    for (final lesson in lessons) {
+      // Час начала занятия
+      final lessonStartHour = lesson.startTime.hour;
+      // Час окончания занятия (если минуты > 0, нужен следующий час)
+      final lessonEndHour = lesson.endTime.minute > 0
+          ? lesson.endTime.hour + 1
+          : lesson.endTime.hour;
+
+      if (lessonStartHour < effectiveStart) {
+        effectiveStart = lessonStartHour;
+      }
+      if (lessonEndHour > effectiveEnd) {
+        effectiveEnd = lessonEndHour;
+      }
+    }
+
+    // Ограничиваем разумными пределами (0-24)
+    effectiveStart = effectiveStart.clamp(0, 23);
+    effectiveEnd = effectiveEnd.clamp(1, 24);
+
+    return (effectiveStart, effectiveEnd);
   }
 
   Widget _buildWeekView(
@@ -329,6 +376,14 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
                 : entry.value.where((l) => _filters.matchesLesson(l)).toList();
           }
 
+          // Вычисляем эффективные часы для всей недели
+          final allLessons = lessonsByDay.values.expand((list) => list).toList();
+          final effectiveHours = _calculateEffectiveHours(
+            lessons: allLessons,
+            workStartHour: workStartHour,
+            workEndHour: workEndHour,
+          );
+
           return _WeekTimeGrid(
             rooms: _selectedRoomId != null
                 ? rooms.where((r) => r.id == _selectedRoomId).toList()
@@ -340,8 +395,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             selectedRoomId: _selectedRoomId,
             restoreScrollOffset: _savedScrollOffset,
             canManageRooms: canManageRooms,
-            startHour: workStartHour,
-            endHour: workEndHour,
+            startHour: effectiveHours.$1,
+            endHour: effectiveHours.$2,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
                 // Всегда сохраняем текущую позицию скролла
@@ -410,6 +465,51 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           ref.invalidate(lessonsByInstitutionStreamProvider(
             InstitutionDateParams(widget.institutionId, _selectedDate),
           ));
+        },
+      ),
+    );
+  }
+
+  /// Показывает форму быстрого добавления занятия (из FAB)
+  void _showQuickAddLessonSheet(List<Room> rooms) {
+    if (rooms.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Сначала добавьте кабинет'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Инвалидируем кеш справочников для получения актуальных данных
+    ref.invalidate(subjectsProvider(widget.institutionId));
+    ref.invalidate(lessonTypesProvider(widget.institutionId));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _QuickAddLessonSheet(
+        rooms: rooms,
+        initialDate: _selectedDate,
+        institutionId: widget.institutionId,
+        onCreated: (DateTime createdDate) {
+          // Инвалидируем провайдеры для выбранной даты
+          ref.invalidate(lessonsByInstitutionProvider(
+            InstitutionDateParams(widget.institutionId, createdDate),
+          ));
+          ref.invalidate(lessonsByInstitutionStreamProvider(
+            InstitutionDateParams(widget.institutionId, createdDate),
+          ));
+          // Также инвалидируем для текущей выбранной даты
+          if (createdDate != _selectedDate) {
+            ref.invalidate(lessonsByInstitutionProvider(
+              InstitutionDateParams(widget.institutionId, _selectedDate),
+            ));
+            ref.invalidate(lessonsByInstitutionStreamProvider(
+              InstitutionDateParams(widget.institutionId, _selectedDate),
+            ));
+          }
         },
       ),
     );
@@ -3005,6 +3105,12 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
               loading: () => const CircularProgressIndicator(),
               error: (e, _) => ErrorView.inline(e),
               data: (students) {
+                // Находим выбранного студента по ID в текущем списке
+                // (объекты могут быть разными после перезагрузки)
+                final currentStudent = _selectedStudent != null
+                    ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                    : null;
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -3019,7 +3125,7 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                           labelText: 'Ученик *',
                           prefixIcon: Icon(Icons.person),
                         ),
-                        value: _selectedStudent,
+                        value: currentStudent,
                         items: students.map((s) => DropdownMenuItem<Student?>(
                           value: s,
                           child: Text(s.name),
@@ -4377,6 +4483,463 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
       spacing: 4,
       runSpacing: 4,
       children: days,
+    );
+  }
+}
+
+/// Форма быстрого добавления занятия (из FAB)
+/// Позволяет выбрать кабинет, дату и время
+class _QuickAddLessonSheet extends ConsumerStatefulWidget {
+  final List<Room> rooms;
+  final DateTime initialDate;
+  final String institutionId;
+  final void Function(DateTime createdDate) onCreated;
+
+  const _QuickAddLessonSheet({
+    required this.rooms,
+    required this.initialDate,
+    required this.institutionId,
+    required this.onCreated,
+  });
+
+  @override
+  ConsumerState<_QuickAddLessonSheet> createState() => _QuickAddLessonSheetState();
+}
+
+class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
+  late DateTime _selectedDate;
+  late Room? _selectedRoom;
+  late TimeOfDay _startTime;
+  late TimeOfDay _endTime;
+  Student? _selectedStudent;
+  Subject? _selectedSubject;
+  LessonType? _selectedLessonType;
+  InstitutionMember? _selectedTeacher;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+    _selectedRoom = widget.rooms.isNotEmpty ? widget.rooms.first : null;
+    final now = TimeOfDay.now();
+    // Округляем до ближайшего часа
+    _startTime = TimeOfDay(hour: now.hour, minute: 0);
+    _endTime = TimeOfDay(hour: now.hour + 1, minute: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+    final subjectsAsync = ref.watch(subjectsProvider(widget.institutionId));
+    final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
+    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final controllerState = ref.watch(lessonControllerProvider);
+
+    ref.listen(lessonControllerProvider, (prev, next) {
+      if (next.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Новое занятие',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Кабинет
+            DropdownButtonFormField<Room>(
+              decoration: const InputDecoration(
+                labelText: 'Кабинет *',
+                prefixIcon: Icon(Icons.door_front_door),
+              ),
+              value: _selectedRoom,
+              items: widget.rooms.map((r) => DropdownMenuItem<Room>(
+                value: r,
+                child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
+              )).toList(),
+              onChanged: (room) {
+                setState(() => _selectedRoom = room);
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Дата
+            InkWell(
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate,
+                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (date != null) {
+                  setState(() => _selectedDate = date);
+                }
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Дата *',
+                  prefixIcon: Icon(Icons.calendar_today),
+                ),
+                child: Text(AppDateUtils.formatDayMonth(_selectedDate)),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Время
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: _startTime,
+                      );
+                      if (time != null) {
+                        setState(() {
+                          _startTime = time;
+                          final endMinutes = time.hour * 60 + time.minute + 60;
+                          _endTime = TimeOfDay(
+                            hour: endMinutes ~/ 60,
+                            minute: endMinutes % 60,
+                          );
+                        });
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Начало',
+                        prefixIcon: Icon(Icons.access_time),
+                      ),
+                      child: Text(_formatTime(_startTime)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: _endTime,
+                      );
+                      if (time != null) {
+                        setState(() => _endTime = time);
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Конец',
+                        prefixIcon: Icon(Icons.access_time),
+                      ),
+                      child: Text(_formatTime(_endTime)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Ученик
+            studentsAsync.when(
+              loading: () => const CircularProgressIndicator(),
+              error: (e, _) => ErrorView.inline(e),
+              data: (students) {
+                // Находим выбранного студента по ID в текущем списке
+                // (объекты могут быть разными после перезагрузки)
+                final currentStudent = _selectedStudent != null
+                    ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                    : null;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (students.isEmpty)
+                      const Text(
+                        'Нет учеников. Добавьте ученика ниже.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      )
+                    else
+                      DropdownButtonFormField<Student?>(
+                        decoration: const InputDecoration(
+                          labelText: 'Ученик *',
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        value: currentStudent,
+                        items: students.map((s) => DropdownMenuItem<Student?>(
+                          value: s,
+                          child: Text(s.name),
+                        )).toList(),
+                        onChanged: (student) {
+                          setState(() => _selectedStudent = student);
+                        },
+                      ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => _showAddStudentDialog(),
+                      icon: const Icon(Icons.person_add, size: 18),
+                      label: const Text('Добавить нового ученика'),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Преподаватель
+            membersAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => const SizedBox.shrink(),
+              data: (members) {
+                final activeMembers = members.where((m) => !m.isArchived).toList();
+                if (activeMembers.length <= 1) return const SizedBox.shrink();
+
+                // Установить текущего пользователя по умолчанию
+                final currentUserId = ref.read(currentUserIdProvider);
+                _selectedTeacher ??= activeMembers.where((m) => m.userId == currentUserId).firstOrNull;
+
+                return DropdownButtonFormField<InstitutionMember?>(
+                  decoration: const InputDecoration(
+                    labelText: 'Преподаватель',
+                    prefixIcon: Icon(Icons.school),
+                  ),
+                  value: _selectedTeacher,
+                  items: activeMembers.map((m) => DropdownMenuItem<InstitutionMember?>(
+                    value: m,
+                    child: Text(m.profile?.fullName ?? 'Без имени'),
+                  )).toList(),
+                  onChanged: (member) async {
+                    setState(() => _selectedTeacher = member);
+
+                    // Автозаполнение предмета если у преподавателя один привязанный
+                    if (member != null) {
+                      _autoFillSubjectFromTeacher(member.userId);
+                    }
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Предмет
+            subjectsAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => const SizedBox.shrink(),
+              data: (subjects) {
+                if (subjects.isEmpty) return const SizedBox.shrink();
+                return DropdownButtonFormField<Subject?>(
+                  decoration: const InputDecoration(
+                    labelText: 'Предмет',
+                    prefixIcon: Icon(Icons.music_note),
+                  ),
+                  value: _selectedSubject,
+                  items: [
+                    const DropdownMenuItem<Subject?>(
+                      value: null,
+                      child: Text('Не выбран'),
+                    ),
+                    ...subjects.map((s) => DropdownMenuItem<Subject?>(
+                      value: s,
+                      child: Text(s.name),
+                    )),
+                  ],
+                  onChanged: (subject) {
+                    setState(() => _selectedSubject = subject);
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Тип занятия
+            lessonTypesAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => const SizedBox.shrink(),
+              data: (lessonTypes) {
+                if (lessonTypes.isEmpty) return const SizedBox.shrink();
+                return DropdownButtonFormField<LessonType?>(
+                  decoration: const InputDecoration(
+                    labelText: 'Тип занятия',
+                    prefixIcon: Icon(Icons.category),
+                  ),
+                  value: _selectedLessonType,
+                  items: [
+                    const DropdownMenuItem<LessonType?>(
+                      value: null,
+                      child: Text('Не выбран'),
+                    ),
+                    ...lessonTypes.map((lt) => DropdownMenuItem<LessonType?>(
+                      value: lt,
+                      child: Text('${lt.name} (${lt.defaultDurationMinutes} мин)'),
+                    )),
+                  ],
+                  onChanged: (lessonType) {
+                    setState(() {
+                      _selectedLessonType = lessonType;
+                      if (lessonType != null) {
+                        final startMinutes = _startTime.hour * 60 + _startTime.minute;
+                        final endMinutes = startMinutes + lessonType.defaultDurationMinutes;
+                        _endTime = TimeOfDay(
+                          hour: endMinutes ~/ 60,
+                          minute: endMinutes % 60,
+                        );
+                      }
+                    });
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // Кнопка создания
+            ElevatedButton.icon(
+              onPressed: controllerState.isLoading || _selectedStudent == null || _selectedRoom == null
+                  ? null
+                  : _createLesson,
+              icon: const Icon(Icons.add),
+              label: const Text('Создать занятие'),
+            ),
+
+            if (controllerState.isLoading)
+              const Padding(
+                padding: EdgeInsets.only(top: 16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createLesson() async {
+    if (_selectedStudent == null || _selectedRoom == null) return;
+
+    final currentUserId = ref.read(currentUserIdProvider);
+    if (currentUserId == null) return;
+
+    // Используем выбранного преподавателя или текущего пользователя
+    final teacherId = _selectedTeacher?.userId ?? currentUserId;
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+
+    final lesson = await controller.create(
+      institutionId: widget.institutionId,
+      roomId: _selectedRoom!.id,
+      teacherId: teacherId,
+      date: _selectedDate,
+      startTime: _startTime,
+      endTime: _endTime,
+      studentId: _selectedStudent!.id,
+      subjectId: _selectedSubject?.id,
+      lessonTypeId: _selectedLessonType?.id,
+    );
+
+    if (lesson != null && mounted) {
+      // Автоматически создаём привязки ученик-преподаватель и ученик-предмет
+      _createBindings(teacherId);
+
+      widget.onCreated(_selectedDate);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Занятие создано'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  /// Создаёт привязки ученик-преподаватель и ученик-предмет (upsert - не падает если уже есть)
+  void _createBindings(String teacherId) {
+    if (_selectedStudent == null) return;
+
+    // Запускаем в фоне, не блокируем UI
+    ref.read(studentBindingsControllerProvider.notifier).createBindingsFromLesson(
+      studentId: _selectedStudent!.id,
+      teacherId: teacherId,
+      subjectId: _selectedSubject?.id,
+      institutionId: widget.institutionId,
+    );
+  }
+
+  /// Автозаполнение предмета из привязок преподавателя (если у него один предмет)
+  Future<void> _autoFillSubjectFromTeacher(String userId) async {
+    try {
+      final teacherSubjects = await ref.read(
+        teacherSubjectsProvider(TeacherSubjectsParams(
+          userId: userId,
+          institutionId: widget.institutionId,
+        )).future,
+      );
+
+      // Если у преподавателя ровно один привязанный предмет — автозаполняем
+      if (teacherSubjects.length == 1 && mounted) {
+        final teacherSubject = teacherSubjects.first;
+        if (teacherSubject.subjectId.isNotEmpty) {
+          // Ищем предмет в общем списке по ID (важно для совпадения ссылок в dropdown)
+          final allSubjects = await ref.read(subjectsProvider(widget.institutionId).future);
+          final matchingSubject = allSubjects.where((s) => s.id == teacherSubject.subjectId).firstOrNull;
+          if (matchingSubject != null && mounted) {
+            setState(() => _selectedSubject = matchingSubject);
+          }
+        }
+      }
+    } catch (e) {
+      // Игнорируем ошибки — это не критично
+    }
+  }
+
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showAddStudentDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dialogContext) => _QuickAddStudentSheet(
+        institutionId: widget.institutionId,
+        onStudentCreated: (student) {
+          ref.invalidate(studentsProvider(widget.institutionId));
+          ref.read(studentsProvider(widget.institutionId).future).then((students) {
+            final newStudent = students.where((s) => s.id == student.id).firstOrNull;
+            if (mounted) {
+              setState(() => _selectedStudent = newStudent);
+            }
+          });
+        },
+      ),
     );
   }
 }
