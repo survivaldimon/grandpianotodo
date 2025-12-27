@@ -265,11 +265,13 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
   final _commentController = TextEditingController();
 
   Student? _selectedStudent;
+  List<Student> _selectedFamilyStudents = [];
   PaymentPlan? _selectedPlan;
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
   bool _hasDiscount = false;
   double _originalPrice = 0;
+  bool _isFamilyMode = false;
 
   @override
   void dispose() {
@@ -324,7 +326,20 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() || _selectedStudent == null) {
+    // Валидация
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_isFamilyMode) {
+      if (_selectedFamilyStudents.length < 2) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Выберите минимум 2 ученика для семейного абонемента'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    } else {
       if (_selectedStudent == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -332,8 +347,8 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
             backgroundColor: Colors.red,
           ),
         );
+        return;
       }
-      return;
     }
 
     setState(() => _isLoading = true);
@@ -349,16 +364,33 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
     }
 
     final controller = ref.read(paymentControllerProvider.notifier);
-    final payment = await controller.create(
-      institutionId: widget.institutionId,
-      studentId: _selectedStudent!.id,
-      paymentPlanId: _selectedPlan?.id,
-      amount: double.parse(_amountController.text),
-      lessonsCount: int.parse(_lessonsController.text),
-      validityDays: int.parse(_validityController.text),
-      paidAt: _selectedDate,
-      comment: comment.isEmpty ? null : comment,
-    );
+    Payment? payment;
+
+    if (_isFamilyMode) {
+      // Семейный абонемент
+      payment = await controller.createFamilyPayment(
+        institutionId: widget.institutionId,
+        studentIds: _selectedFamilyStudents.map((s) => s.id).toList(),
+        paymentPlanId: _selectedPlan?.id,
+        amount: double.parse(_amountController.text),
+        lessonsCount: int.parse(_lessonsController.text),
+        validityDays: int.parse(_validityController.text),
+        paidAt: _selectedDate,
+        comment: comment.isEmpty ? null : comment,
+      );
+    } else {
+      // Обычная оплата
+      payment = await controller.create(
+        institutionId: widget.institutionId,
+        studentId: _selectedStudent!.id,
+        paymentPlanId: _selectedPlan?.id,
+        amount: double.parse(_amountController.text),
+        lessonsCount: int.parse(_lessonsController.text),
+        validityDays: int.parse(_validityController.text),
+        paidAt: _selectedDate,
+        comment: comment.isEmpty ? null : comment,
+      );
+    }
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -366,8 +398,10 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
         widget.onSuccess();
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Оплата добавлена'),
+          SnackBar(
+            content: Text(_isFamilyMode
+                ? 'Семейный абонемент добавлен'
+                : 'Оплата добавлена'),
             backgroundColor: Colors.green,
           ),
         );
@@ -456,7 +490,72 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 ),
                 const SizedBox(height: 24),
 
-                // Ученик
+                // Переключатель семейного абонемента
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _isFamilyMode
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                    border: _isFamilyMode
+                        ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
+                        : null,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.family_restroom,
+                        color: _isFamilyMode ? AppColors.primary : Colors.grey,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Семейный абонемент',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              'Один абонемент на несколько учеников',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _isFamilyMode,
+                        onChanged: (value) {
+                          setState(() {
+                            _isFamilyMode = value;
+                            if (value) {
+                              // Переносим выбранного ученика в список
+                              if (_selectedStudent != null) {
+                                _selectedFamilyStudents = [_selectedStudent!];
+                              }
+                            } else {
+                              // Переносим первого выбранного в одиночный выбор
+                              _selectedStudent = _selectedFamilyStudents.isNotEmpty
+                                  ? _selectedFamilyStudents.first
+                                  : null;
+                              _selectedFamilyStudents = [];
+                            }
+                          });
+                        },
+                        activeColor: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Ученик / Ученики
                 studentsAsync.when(
                   loading: () => const LinearProgressIndicator(),
                   error: (e, _) => ErrorView.inline(e),
@@ -471,29 +570,125 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                         child: const Text('Сначала добавьте учеников'),
                       );
                     }
-                    // Находим выбранного ученика по ID (после обновления списка ссылки меняются)
-                    final currentStudent = _selectedStudent != null
-                        ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
-                        : null;
-                    return DropdownButtonFormField<Student>(
-                      decoration: InputDecoration(
-                        labelText: 'Ученик',
-                        prefixIcon: const Icon(Icons.person_outline),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+
+                    if (_isFamilyMode) {
+                      // Мультивыбор для семейного абонемента - список с чекбоксами
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Выберите участников',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${_selectedFamilyStudents.length} из ${students.length}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _selectedFamilyStudents.length >= 2
+                                      ? AppColors.success
+                                      : Colors.orange[700],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey[300]!),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            constraints: const BoxConstraints(maxHeight: 200),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: students.length,
+                              itemBuilder: (context, index) {
+                                final student = students[index];
+                                final isSelected = _selectedFamilyStudents.any((s) => s.id == student.id);
+                                return CheckboxListTile(
+                                  value: isSelected,
+                                  onChanged: (checked) {
+                                    setState(() {
+                                      if (checked == true) {
+                                        _selectedFamilyStudents.add(student);
+                                      } else {
+                                        _selectedFamilyStudents.removeWhere((s) => s.id == student.id);
+                                      }
+                                    });
+                                  },
+                                  title: Text(student.name),
+                                  secondary: CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: isSelected
+                                        ? AppColors.primary
+                                        : Colors.grey[200],
+                                    child: Text(
+                                      student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isSelected ? Colors.white : Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                  controlAffinity: ListTileControlAffinity.trailing,
+                                  activeColor: AppColors.primary,
+                                  dense: true,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                                );
+                              },
+                            ),
+                          ),
+                          if (_selectedFamilyStudents.length < 2)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline, size: 16, color: Colors.orange[700]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Выберите минимум 2 ученика',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.orange[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      );
+                    } else {
+                      // Одиночный выбор
+                      final currentStudent = _selectedStudent != null
+                          ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                          : null;
+                      return DropdownButtonFormField<Student>(
+                        decoration: InputDecoration(
+                          labelText: 'Ученик',
+                          prefixIcon: const Icon(Icons.person_outline),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
                         ),
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                      ),
-                      value: currentStudent,
-                      items: students.map((s) => DropdownMenuItem(
-                        value: s,
-                        child: Text(s.name),
-                      )).toList(),
-                      onChanged: (student) {
-                        setState(() => _selectedStudent = student);
-                      },
-                    );
+                        value: currentStudent,
+                        items: students.map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s.name),
+                        )).toList(),
+                        onChanged: (student) {
+                          setState(() => _selectedStudent = student);
+                        },
+                      );
+                    }
                   },
                 ),
                 const SizedBox(height: 16),
@@ -859,7 +1054,11 @@ class _PaymentCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final formatter = NumberFormat('#,###', 'ru_RU');
     final amountStr = '${formatter.format(payment.amount.toInt())} ₸';
-    final studentName = payment.student?.name ?? 'Ученик';
+
+    // Для семейных абонементов показываем всех участников
+    final displayName = payment.displayMemberNames.isNotEmpty
+        ? payment.displayMemberNames
+        : 'Ученик';
 
     // Сначала проверяем, это оплата занятия (lesson:ID|TYPE_NAME)
     final lessonTypeName = _extractLessonTypeName();
@@ -874,7 +1073,17 @@ class _PaymentCard extends ConsumerWidget {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: Text(studentName, overflow: TextOverflow.ellipsis)),
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(child: Text(displayName, overflow: TextOverflow.ellipsis)),
+                  if (payment.isFamilySubscription) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.family_restroom, size: 16, color: Colors.purple[400]),
+                  ],
+                ],
+              ),
+            ),
             Text(
               amountStr,
               style: TextStyle(

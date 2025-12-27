@@ -7,11 +7,18 @@ final subscriptionRepositoryProvider = Provider<SubscriptionRepository>((ref) {
   return SubscriptionRepository();
 });
 
-/// Провайдер подписок студента
+/// Провайдер подписок студента (только личные)
 final studentSubscriptionsProvider =
     FutureProvider.family<List<Subscription>, String>((ref, studentId) async {
   final repo = ref.watch(subscriptionRepositoryProvider);
   return repo.getByStudent(studentId);
+});
+
+/// Провайдер всех подписок студента (личные + семейные)
+final studentAllSubscriptionsProvider =
+    FutureProvider.family<List<Subscription>, String>((ref, studentId) async {
+  final repo = ref.watch(subscriptionRepositoryProvider);
+  return repo.getByStudentIncludingFamily(studentId);
 });
 
 /// Провайдер активных подписок студента
@@ -21,11 +28,18 @@ final activeSubscriptionsProvider =
   return repo.getActiveByStudent(studentId);
 });
 
-/// Стрим подписок студента (realtime)
+/// Стрим подписок студента (realtime, только личные)
 final subscriptionsStreamProvider =
     StreamProvider.family<List<Subscription>, String>((ref, studentId) {
   final repo = ref.watch(subscriptionRepositoryProvider);
   return repo.watchByStudent(studentId);
+});
+
+/// Стрим всех подписок студента (личные + семейные, realtime)
+final allSubscriptionsStreamProvider =
+    StreamProvider.family<List<Subscription>, String>((ref, studentId) {
+  final repo = ref.watch(subscriptionRepositoryProvider);
+  return repo.watchByStudentIncludingFamily(studentId);
 });
 
 /// Провайдер активного баланса студента
@@ -195,13 +209,89 @@ class SubscriptionController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// Создать семейный абонемент
+  Future<Subscription?> createFamily({
+    required String institutionId,
+    required List<String> studentIds,
+    String? paymentId,
+    required int lessonsTotal,
+    required DateTime expiresAt,
+    DateTime? startsAt,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final subscription = await _repo.createFamily(
+        institutionId: institutionId,
+        studentIds: studentIds,
+        paymentId: paymentId,
+        lessonsTotal: lessonsTotal,
+        expiresAt: expiresAt,
+        startsAt: startsAt,
+      );
+
+      // Инвалидируем провайдеры для всех участников
+      _invalidateForStudents(studentIds);
+      state = const AsyncValue.data(null);
+      return subscription;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
+  /// Добавить участника в семейный абонемент
+  Future<bool> addMember(
+    String subscriptionId,
+    String studentId,
+    List<String> allMemberIds,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.addFamilyMember(subscriptionId, studentId);
+      // Инвалидируем провайдеры для всех участников + нового
+      _invalidateForStudents([...allMemberIds, studentId]);
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Удалить участника из семейного абонемента
+  Future<bool> removeMember(
+    String subscriptionId,
+    String studentId,
+    List<String> allMemberIds,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.removeFamilyMember(subscriptionId, studentId);
+      // Инвалидируем провайдеры для всех участников (включая удалённого)
+      _invalidateForStudents(allMemberIds);
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
   void _invalidateForStudent(String studentId) {
     _ref.invalidate(studentSubscriptionsProvider(studentId));
+    _ref.invalidate(studentAllSubscriptionsProvider(studentId));
     _ref.invalidate(activeSubscriptionsProvider(studentId));
     _ref.invalidate(studentActiveBalanceProvider(studentId));
     _ref.invalidate(isStudentFrozenProvider(studentId));
     // Также инвалидируем StreamProvider для принудительного обновления
     _ref.invalidate(subscriptionsStreamProvider(studentId));
+  }
+
+  /// Инвалидировать провайдеры для нескольких студентов (для семейных абонементов)
+  void _invalidateForStudents(List<String> studentIds) {
+    for (final studentId in studentIds) {
+      _invalidateForStudent(studentId);
+    }
   }
 }
 

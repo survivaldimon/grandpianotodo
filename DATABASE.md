@@ -436,6 +436,69 @@ CREATE INDEX idx_payments_student ON payments(student_id);
 CREATE INDEX idx_payments_institution_date ON payments(institution_id, paid_at);
 ```
 
+### subscriptions
+
+```sql
+CREATE TABLE subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+
+  -- Занятия
+  lessons_total INT NOT NULL CHECK (lessons_total > 0),
+  lessons_remaining INT NOT NULL DEFAULT 0,
+
+  -- Сроки действия
+  starts_at DATE NOT NULL DEFAULT CURRENT_DATE,
+  expires_at DATE NOT NULL,
+
+  -- Заморозка
+  is_frozen BOOLEAN NOT NULL DEFAULT FALSE,
+  frozen_until DATE,
+  frozen_days_total INT NOT NULL DEFAULT 0,
+
+  -- Семейный абонемент
+  is_family BOOLEAN NOT NULL DEFAULT FALSE,
+
+  -- Метаданные
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT lessons_remaining_valid CHECK (lessons_remaining >= 0 AND lessons_remaining <= lessons_total),
+  CONSTRAINT expires_after_starts CHECK (expires_at >= starts_at)
+);
+
+CREATE INDEX idx_subscriptions_student_id ON subscriptions(student_id);
+CREATE INDEX idx_subscriptions_institution_id ON subscriptions(institution_id);
+CREATE INDEX idx_subscriptions_expires_at ON subscriptions(expires_at) WHERE lessons_remaining > 0;
+CREATE INDEX idx_subscriptions_is_frozen ON subscriptions(is_frozen) WHERE is_frozen = TRUE;
+```
+
+### subscription_members (для семейных абонементов)
+
+```sql
+-- Участники семейного абонемента
+-- Позволяет нескольким ученикам делить один пул занятий
+CREATE TABLE subscription_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE(subscription_id, student_id)
+);
+
+CREATE INDEX idx_subscription_members_subscription ON subscription_members(subscription_id);
+CREATE INDEX idx_subscription_members_student ON subscription_members(student_id);
+```
+
+**Логика семейных абонементов:**
+- `is_family = FALSE`: обычный индивидуальный абонемент (student_id обязателен)
+- `is_family = TRUE`: семейный абонемент (участники в subscription_members)
+- При списании занятия сначала ищется личная подписка, затем семейная
+- Все участники делят общий пул занятий (lessons_remaining)
+
 ## Row Level Security (RLS)
 
 ### Принцип
@@ -697,6 +760,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students;
 ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
 ALTER PUBLICATION supabase_realtime ADD TABLE payments;
 ALTER PUBLICATION supabase_realtime ADD TABLE subscriptions;
+ALTER PUBLICATION supabase_realtime ADD TABLE subscription_members;  -- Для семейных абонементов
 ALTER PUBLICATION supabase_realtime ADD TABLE institutions;          -- Для синхронизации рабочего времени
 ALTER PUBLICATION supabase_realtime ADD TABLE institution_members;   -- Для синхронизации прав участников
 ```

@@ -15,6 +15,7 @@ class StudentRepository {
     bool onlyWithDebt = false,
   }) async {
     try {
+      // 1. Загружаем учеников
       var query = _client
           .from('students')
           .select()
@@ -24,13 +25,31 @@ class StudentRepository {
         query = query.isFilter('archived_at', null);
       }
 
-      if (onlyWithDebt) {
-        query = query.lt('prepaid_lessons_count', 0);
-      }
-
       final data = await query.order('name');
 
-      return (data as List).map((item) => Student.fromJson(item)).toList();
+      // 2. Загружаем балансы из VIEW (учитывает семейные подписки)
+      final balancesData = await _client
+          .from('student_subscription_summary')
+          .select('student_id, active_balance')
+          .eq('institution_id', institutionId);
+
+      // Создаём map для быстрого поиска баланса
+      final balanceMap = <String, int>{};
+      for (final b in balancesData as List) {
+        balanceMap[b['student_id'] as String] = (b['active_balance'] as num?)?.toInt() ?? 0;
+      }
+
+      // 3. Объединяем данные
+      return (data as List).map((item) {
+        final studentId = item['id'] as String;
+        final activeBalance = balanceMap[studentId] ?? 0;
+
+        // Подменяем prepaid_lessons_count на актуальный баланс из VIEW
+        final studentData = Map<String, dynamic>.from(item);
+        studentData['prepaid_lessons_count'] = activeBalance;
+
+        return Student.fromJson(studentData);
+      }).toList();
     } catch (e) {
       throw DatabaseException('Ошибка загрузки учеников: $e');
     }
@@ -39,13 +58,27 @@ class StudentRepository {
   /// Получить ученика по ID
   Future<Student> getById(String id) async {
     try {
+      // 1. Загружаем ученика
       final data = await _client
           .from('students')
           .select()
           .eq('id', id)
           .single();
 
-      return Student.fromJson(data);
+      // 2. Загружаем баланс из VIEW (учитывает семейные подписки)
+      final balanceData = await _client
+          .from('student_subscription_summary')
+          .select('active_balance')
+          .eq('student_id', id)
+          .maybeSingle();
+
+      final activeBalance = (balanceData?['active_balance'] as num?)?.toInt() ?? 0;
+
+      // 3. Подменяем prepaid_lessons_count
+      final studentData = Map<String, dynamic>.from(data);
+      studentData['prepaid_lessons_count'] = activeBalance;
+
+      return Student.fromJson(studentData);
     } catch (e) {
       throw DatabaseException('Ошибка загрузки ученика: $e');
     }

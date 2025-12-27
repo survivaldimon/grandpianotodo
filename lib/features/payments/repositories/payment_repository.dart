@@ -17,9 +17,10 @@ class PaymentRepository {
     required DateTime to,
   }) async {
     try {
+      // Добавляем subscriptions с subscription_members для семейных абонементов
       final data = await _client
           .from('payments')
-          .select('*, students(*), payment_plans(*)')
+          .select('*, students(*), payment_plans(*), subscriptions(*, subscription_members(*, students(*)))')
           .eq('institution_id', institutionId)
           .gte('paid_at', from.toIso8601String())
           .lte('paid_at', to.toIso8601String())

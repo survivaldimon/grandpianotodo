@@ -37,7 +37,7 @@ class StudentDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final studentAsync = ref.watch(studentProvider(studentId));
     final paymentsAsync = ref.watch(studentPaymentsProvider(studentId));
-    final subscriptionsAsync = ref.watch(subscriptionsStreamProvider(studentId));
+    final subscriptionsAsync = ref.watch(allSubscriptionsStreamProvider(studentId));
 
     return studentAsync.when(
       loading: () => const Scaffold(body: LoadingIndicator()),
@@ -128,7 +128,7 @@ class StudentDetailScreen extends ConsumerWidget {
             onRefresh: () async {
               ref.invalidate(studentProvider(studentId));
               ref.invalidate(studentPaymentsProvider(studentId));
-              ref.invalidate(subscriptionsStreamProvider(studentId));
+              ref.invalidate(allSubscriptionsStreamProvider(studentId));
             },
             child: ListView(
               padding: AppSizes.paddingAllM,
@@ -246,6 +246,7 @@ class StudentDetailScreen extends ConsumerWidget {
                     return Column(
                       children: subscriptions.map((sub) => _SubscriptionCard(
                         subscription: sub,
+                        currentStudentId: studentId,
                         onFreeze: canEditStudent ? () => _showFreezeDialog(context, ref, sub) : null,
                         onUnfreeze: canEditStudent ? () => _unfreezeSubscription(context, ref, sub) : null,
                         onExtend: canEditStudent ? () => _showExtendDialog(context, ref, sub) : null,
@@ -902,12 +903,14 @@ class _PaymentItem extends StatelessWidget {
 
 class _SubscriptionCard extends StatelessWidget {
   final Subscription subscription;
+  final String currentStudentId;
   final VoidCallback? onFreeze;
   final VoidCallback? onUnfreeze;
   final VoidCallback? onExtend;
 
   const _SubscriptionCard({
     required this.subscription,
+    required this.currentStudentId,
     this.onFreeze,
     this.onUnfreeze,
     this.onExtend,
@@ -1003,6 +1006,36 @@ class _SubscriptionCard extends StatelessWidget {
                     ),
                   ),
                 ],
+                // Family badge
+                if (subscription.isFamilySubscription) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.family_restroom,
+                          size: 14,
+                          color: Colors.purple,
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'Семейный',
+                          style: TextStyle(
+                            color: Colors.purple,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -1072,6 +1105,51 @@ class _SubscriptionCard extends StatelessWidget {
               backgroundColor: statusColor.withOpacity(0.2),
               valueColor: AlwaysStoppedAnimation(statusColor),
             ),
+            // Family members (only for family subscriptions)
+            if (subscription.isFamilySubscription && subscription.members != null && subscription.members!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.people,
+                    size: 18,
+                    color: Colors.purple,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: subscription.members!
+                          .where((m) => m.student != null)
+                          .map((member) {
+                        final isCurrentStudent = member.studentId == currentStudentId;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isCurrentStudent
+                                ? Colors.purple.withOpacity(0.2)
+                                : Colors.grey.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: isCurrentStudent
+                                ? Border.all(color: Colors.purple.withOpacity(0.5))
+                                : null,
+                          ),
+                          child: Text(
+                            member.student!.name,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isCurrentStudent ? FontWeight.bold : FontWeight.normal,
+                              color: isCurrentStudent ? Colors.purple : AppColors.textSecondary,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             // Action buttons (only if can edit)
             if (status != SubscriptionStatus.exhausted && (onFreeze != null || onUnfreeze != null || onExtend != null)) ...[
               const SizedBox(height: 12),

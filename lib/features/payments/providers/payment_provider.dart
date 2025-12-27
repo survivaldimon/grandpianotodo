@@ -298,6 +298,58 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
       return false;
     }
   }
+
+  /// Создать семейную оплату и подписку
+  Future<Payment?> createFamilyPayment({
+    required String institutionId,
+    required List<String> studentIds,
+    String? paymentPlanId,
+    required double amount,
+    required int lessonsCount,
+    int validityDays = 30,
+    DateTime? paidAt,
+    String? comment,
+  }) async {
+    if (studentIds.isEmpty) return null;
+
+    state = const AsyncValue.loading();
+    try {
+      // Создаём платёж, привязываем к первому ученику
+      final payment = await _repo.create(
+        institutionId: institutionId,
+        studentId: studentIds.first,
+        paymentPlanId: paymentPlanId,
+        amount: amount,
+        lessonsCount: lessonsCount,
+        paidAt: paidAt,
+        comment: comment,
+      );
+
+      // Создаём семейную подписку
+      final expiresAt = DateTime.now().add(Duration(days: validityDays));
+      await _subscriptionRepo.createFamily(
+        institutionId: institutionId,
+        studentIds: studentIds,
+        paymentId: payment.id,
+        lessonsTotal: lessonsCount,
+        expiresAt: expiresAt,
+      );
+
+      // Инвалидируем провайдеры для всех участников
+      for (final studentId in studentIds) {
+        _ref.invalidate(studentPaymentsProvider(studentId));
+        _ref.invalidate(studentSubscriptionsProvider(studentId));
+        _ref.invalidate(studentAllSubscriptionsProvider(studentId));
+        _ref.invalidate(activeSubscriptionsProvider(studentId));
+      }
+
+      state = const AsyncValue.data(null);
+      return payment;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
 }
 
 /// Провайдер контроллера оплат

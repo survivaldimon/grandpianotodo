@@ -9,11 +9,44 @@ enum SubscriptionStatus {
   exhausted, // Занятия закончились
 }
 
+/// Участник семейного абонемента
+class SubscriptionMember {
+  final String id;
+  final String subscriptionId;
+  final String studentId;
+  final DateTime createdAt;
+  final Student? student;
+
+  const SubscriptionMember({
+    required this.id,
+    required this.subscriptionId,
+    required this.studentId,
+    required this.createdAt,
+    this.student,
+  });
+
+  factory SubscriptionMember.fromJson(Map<String, dynamic> json) =>
+      SubscriptionMember(
+        id: json['id'] as String,
+        subscriptionId: json['subscription_id'] as String,
+        studentId: json['student_id'] as String,
+        createdAt: DateTime.parse(json['created_at'] as String),
+        student: json['students'] != null
+            ? Student.fromJson(json['students'] as Map<String, dynamic>)
+            : null,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'subscription_id': subscriptionId,
+        'student_id': studentId,
+      };
+}
+
 /// Абонемент студента
 class Subscription {
   final String id;
   final String institutionId;
-  final String studentId;
+  final String? studentId; // nullable для семейных абонементов
   final String? paymentId;
 
   /// Занятия
@@ -29,6 +62,9 @@ class Subscription {
   final DateTime? frozenUntil;
   final int frozenDaysTotal;
 
+  /// Семейный абонемент
+  final bool isFamily;
+
   /// Метаданные
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -36,11 +72,12 @@ class Subscription {
   /// Связанные объекты (join)
   final Student? student;
   final Payment? payment;
+  final List<SubscriptionMember>? members; // Участники семейного абонемента
 
   const Subscription({
     required this.id,
     required this.institutionId,
-    required this.studentId,
+    this.studentId,
     this.paymentId,
     required this.lessonsTotal,
     required this.lessonsRemaining,
@@ -49,10 +86,12 @@ class Subscription {
     this.isFrozen = false,
     this.frozenUntil,
     this.frozenDaysTotal = 0,
+    this.isFamily = false,
     required this.createdAt,
     required this.updatedAt,
     this.student,
     this.payment,
+    this.members,
   });
 
   /// Использованные занятия
@@ -118,10 +157,34 @@ class Subscription {
   /// Название тарифа (если есть)
   String? get paymentPlanName => payment?.paymentPlan?.name;
 
+  /// Это семейный абонемент?
+  bool get isFamilySubscription => isFamily || (members != null && members!.length > 1);
+
+  /// Получить всех участников семейного абонемента
+  List<Student> get memberStudents {
+    if (members == null || members!.isEmpty) {
+      return student != null ? [student!] : [];
+    }
+    return members!
+        .where((m) => m.student != null)
+        .map((m) => m.student!)
+        .toList();
+  }
+
+  /// Имена всех участников через запятую
+  String get displayMemberNames {
+    final students = memberStudents;
+    if (students.isEmpty) return student?.name ?? '';
+    return students.map((s) => s.name).join(', ');
+  }
+
+  /// Количество участников
+  int get memberCount => members?.length ?? (studentId != null ? 1 : 0);
+
   factory Subscription.fromJson(Map<String, dynamic> json) => Subscription(
         id: json['id'] as String,
         institutionId: json['institution_id'] as String,
-        studentId: json['student_id'] as String,
+        studentId: json['student_id'] as String?,
         paymentId: json['payment_id'] as String?,
         lessonsTotal: json['lessons_total'] as int,
         lessonsRemaining: json['lessons_remaining'] as int,
@@ -132,6 +195,7 @@ class Subscription {
             ? DateTime.parse(json['frozen_until'] as String)
             : null,
         frozenDaysTotal: json['frozen_days_total'] as int? ?? 0,
+        isFamily: json['is_family'] as bool? ?? false,
         createdAt: DateTime.parse(json['created_at'] as String),
         updatedAt: DateTime.parse(json['updated_at'] as String),
         student: json['students'] != null
@@ -139,6 +203,11 @@ class Subscription {
             : null,
         payment: json['payments'] != null
             ? Payment.fromJson(json['payments'] as Map<String, dynamic>)
+            : null,
+        members: json['subscription_members'] != null
+            ? (json['subscription_members'] as List)
+                .map((m) => SubscriptionMember.fromJson(m as Map<String, dynamic>))
+                .toList()
             : null,
       );
 
@@ -153,6 +222,7 @@ class Subscription {
         'is_frozen': isFrozen,
         'frozen_until': frozenUntil?.toIso8601String().split('T').first,
         'frozen_days_total': frozenDaysTotal,
+        'is_family': isFamily,
       };
 
   Subscription copyWith({
@@ -161,6 +231,8 @@ class Subscription {
     bool? isFrozen,
     DateTime? frozenUntil,
     int? frozenDaysTotal,
+    bool? isFamily,
+    List<SubscriptionMember>? members,
   }) =>
       Subscription(
         id: id,
@@ -174,10 +246,12 @@ class Subscription {
         isFrozen: isFrozen ?? this.isFrozen,
         frozenUntil: frozenUntil ?? this.frozenUntil,
         frozenDaysTotal: frozenDaysTotal ?? this.frozenDaysTotal,
+        isFamily: isFamily ?? this.isFamily,
         createdAt: createdAt,
         updatedAt: updatedAt,
         student: student,
         payment: payment,
+        members: members ?? this.members,
       );
 }
 

@@ -146,16 +146,18 @@ class SubscriptionRepository {
   }
 
   /// Списать занятие с подписки (выбирает подписку с ближайшим сроком)
+  /// Сначала ищет личную подписку, затем семейную через subscription_members
   /// Возвращает обновлённую подписку или null если нет активных подписок
   Future<Subscription?> deductLesson(String studentId) async {
     try {
       final today = DateTime.now().toIso8601String().split('T').first;
 
-      // Находим активную подписку с ближайшим сроком истечения
-      final data = await _client
+      // 1. Сначала ищем ЛИЧНУЮ подписку (is_family = false)
+      final personalData = await _client
           .from('subscriptions')
           .select('*')
           .eq('student_id', studentId)
+          .eq('is_family', false)
           .gt('lessons_remaining', 0)
           .gte('expires_at', today)
           .eq('is_frozen', false)
@@ -163,22 +165,54 @@ class SubscriptionRepository {
           .limit(1)
           .maybeSingle();
 
-      if (data == null) return null;
+      if (personalData != null) {
+        return _deductFromSubscription(Subscription.fromJson(personalData));
+      }
 
-      final subscription = Subscription.fromJson(data);
+      // 2. Если нет личной — ищем СЕМЕЙНУЮ через subscription_members
+      final familyMemberships = await _client
+          .from('subscription_members')
+          .select('subscription_id')
+          .eq('student_id', studentId);
 
-      // Списываем занятие
-      final updated = await _client
+      final membershipList = familyMemberships as List;
+      if (membershipList.isEmpty) return null;
+
+      final subscriptionIds = membershipList
+          .map((m) => m['subscription_id'] as String)
+          .toList();
+
+      // Находим активную семейную подписку
+      final familyData = await _client
           .from('subscriptions')
-          .update({'lessons_remaining': subscription.lessonsRemaining - 1})
-          .eq('id', subscription.id)
           .select('*')
-          .single();
+          .inFilter('id', subscriptionIds)
+          .eq('is_family', true)
+          .gt('lessons_remaining', 0)
+          .gte('expires_at', today)
+          .eq('is_frozen', false)
+          .order('expires_at', ascending: true)
+          .limit(1)
+          .maybeSingle();
 
-      return Subscription.fromJson(updated);
+      if (familyData == null) return null;
+
+      return _deductFromSubscription(Subscription.fromJson(familyData));
     } catch (e) {
       throw DatabaseException('Ошибка списания занятия: $e');
     }
+  }
+
+  /// Внутренний метод для списания занятия
+  Future<Subscription> _deductFromSubscription(Subscription subscription) async {
+    final updated = await _client
+        .from('subscriptions')
+        .update({'lessons_remaining': subscription.lessonsRemaining - 1})
+        .eq('id', subscription.id)
+        .select('*')
+        .single();
+
+    return Subscription.fromJson(updated);
   }
 
   /// Списать занятие и вернуть ID подписки для привязки к занятию
@@ -439,10 +473,214 @@ class SubscriptionRepository {
   /// Получить активный баланс студента (сумма активных подписок)
   Future<int> getActiveBalance(String studentId) async {
     try {
-      final subscriptions = await getActiveByStudent(studentId);
-      return subscriptions.fold<int>(0, (sum, sub) => sum + sub.lessonsRemaining);
+      final subscriptions = await getByStudentIncludingFamily(studentId);
+      final activeSubscriptions = subscriptions.where((sub) => sub.isActive);
+      return activeSubscriptions.fold<int>(0, (sum, sub) => sum + sub.lessonsRemaining);
     } catch (e) {
       return 0;
+    }
+  }
+
+  // ============ СЕМЕЙНЫЕ АБОНЕМЕНТЫ ============
+
+  /// Создать семейный абонемент
+  Future<Subscription> createFamily({
+    required String institutionId,
+    required List<String> studentIds,
+    String? paymentId,
+    required int lessonsTotal,
+    required DateTime expiresAt,
+    DateTime? startsAt,
+  }) async {
+    try {
+      if (studentIds.length < 2) {
+        throw DatabaseException('Семейный абонемент требует минимум 2 ученика');
+      }
+
+      // Создаём подписку с is_family = true
+      final data = await _client
+          .from('subscriptions')
+          .insert({
+            'institution_id': institutionId,
+            'student_id': studentIds.first, // Первый ученик как "основной"
+            'payment_id': paymentId,
+            'lessons_total': lessonsTotal,
+            'lessons_remaining': lessonsTotal,
+            'starts_at': (startsAt ?? DateTime.now()).toIso8601String().split('T').first,
+            'expires_at': expiresAt.toIso8601String().split('T').first,
+            'is_family': true,
+          })
+          .select('*')
+          .single();
+
+      final subscription = Subscription.fromJson(data);
+
+      // Добавляем всех участников в subscription_members
+      final memberInserts = studentIds.map((sid) => {
+        'subscription_id': subscription.id,
+        'student_id': sid,
+      }).toList();
+
+      await _client.from('subscription_members').insert(memberInserts);
+
+      // Привязываем долговые занятия всех участников
+      int totalLinked = 0;
+      for (final studentId in studentIds) {
+        if (totalLinked >= lessonsTotal) break;
+        final linked = await linkDebtLessons(
+          studentId: studentId,
+          subscriptionId: subscription.id,
+          maxLessons: lessonsTotal - totalLinked,
+        );
+        totalLinked += linked;
+      }
+
+      // Обновляем lessons_remaining если привязали занятия
+      if (totalLinked > 0) {
+        final updatedData = await _client
+            .from('subscriptions')
+            .update({'lessons_remaining': lessonsTotal - totalLinked})
+            .eq('id', subscription.id)
+            .select('*, subscription_members(*, students(*))')
+            .single();
+
+        return Subscription.fromJson(updatedData);
+      }
+
+      // Возвращаем подписку с участниками
+      return await getByIdWithMembers(subscription.id);
+    } catch (e) {
+      throw DatabaseException('Ошибка создания семейного абонемента: $e');
+    }
+  }
+
+  /// Получить подписку по ID с участниками
+  Future<Subscription> getByIdWithMembers(String id) async {
+    try {
+      final data = await _client
+          .from('subscriptions')
+          .select('*, students(*), payments(*, payment_plans(*)), subscription_members(*, students(*))')
+          .eq('id', id)
+          .single();
+
+      return Subscription.fromJson(data);
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки подписки: $e');
+    }
+  }
+
+  /// Получить подписки студента включая семейные
+  Future<List<Subscription>> getByStudentIncludingFamily(String studentId) async {
+    try {
+      // 1. Личные подписки
+      final personalData = await _client
+          .from('subscriptions')
+          .select('*, payments(*, payment_plans(*)), subscription_members(*, students(*))')
+          .eq('student_id', studentId)
+          .order('created_at', ascending: false);
+
+      final result = (personalData as List)
+          .map((item) => Subscription.fromJson(item))
+          .toList();
+
+      // 2. Семейные подписки через subscription_members
+      final familyMemberships = await _client
+          .from('subscription_members')
+          .select('subscription_id')
+          .eq('student_id', studentId);
+
+      final membershipList = familyMemberships as List;
+      if (membershipList.isNotEmpty) {
+        final familySubscriptionIds = membershipList
+            .map((m) => m['subscription_id'] as String)
+            .toSet(); // Set для исключения дубликатов
+
+        // Исключаем ID которые уже есть в личных
+        final personalIds = result.map((s) => s.id).toSet();
+        final uniqueFamilyIds = familySubscriptionIds.difference(personalIds);
+
+        if (uniqueFamilyIds.isNotEmpty) {
+          final familyData = await _client
+              .from('subscriptions')
+              .select('*, payments(*, payment_plans(*)), subscription_members(*, students(*))')
+              .inFilter('id', uniqueFamilyIds.toList())
+              .order('created_at', ascending: false);
+
+          result.addAll((familyData as List)
+              .map((item) => Subscription.fromJson(item)));
+        }
+      }
+
+      return result;
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки подписок: $e');
+    }
+  }
+
+  /// Получить активные подписки студента включая семейные
+  Future<List<Subscription>> getActiveByStudentIncludingFamily(String studentId) async {
+    try {
+      final allSubscriptions = await getByStudentIncludingFamily(studentId);
+      return allSubscriptions.where((sub) => sub.isActive).toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки активных подписок: $e');
+    }
+  }
+
+  /// Получить участников семейного абонемента
+  Future<List<SubscriptionMember>> getFamilyMembers(String subscriptionId) async {
+    try {
+      final data = await _client
+          .from('subscription_members')
+          .select('*, students(*)')
+          .eq('subscription_id', subscriptionId)
+          .order('created_at', ascending: true);
+
+      return (data as List)
+          .map((m) => SubscriptionMember.fromJson(m))
+          .toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки участников: $e');
+    }
+  }
+
+  /// Добавить участника в семейный абонемент
+  Future<void> addFamilyMember(String subscriptionId, String studentId) async {
+    try {
+      await _client.from('subscription_members').insert({
+        'subscription_id': subscriptionId,
+        'student_id': studentId,
+      });
+    } catch (e) {
+      throw DatabaseException('Ошибка добавления участника: $e');
+    }
+  }
+
+  /// Удалить участника из семейного абонемента
+  Future<void> removeFamilyMember(String subscriptionId, String studentId) async {
+    try {
+      // Проверяем что останется минимум 2 участника
+      final members = await getFamilyMembers(subscriptionId);
+      if (members.length <= 2) {
+        throw DatabaseException('В семейном абонементе должно быть минимум 2 участника');
+      }
+
+      await _client
+          .from('subscription_members')
+          .delete()
+          .eq('subscription_id', subscriptionId)
+          .eq('student_id', studentId);
+    } catch (e) {
+      throw DatabaseException('Ошибка удаления участника: $e');
+    }
+  }
+
+  /// Стрим подписок студента включая семейные (realtime)
+  Stream<List<Subscription>> watchByStudentIncludingFamily(String studentId) async* {
+    // Слушаем изменения в обеих таблицах
+    await for (final _ in _client.from('subscriptions').stream(primaryKey: ['id'])) {
+      final subscriptions = await getByStudentIncludingFamily(studentId);
+      yield subscriptions;
     }
   }
 }

@@ -48,6 +48,11 @@
   - Настройка рабочего времени заведения
   - FAB для быстрого создания занятий
   - Автоматическое расширение сетки для занятий вне рабочего времени
+- **`SESSION_2025_12_27_FAMILY_SUBSCRIPTIONS.md`** — семейные абонементы:
+  - Общий пул занятий для нескольких учеников
+  - Таблица `subscription_members` + VIEW `student_subscription_summary`
+  - UI создания семейного абонемента (чекбоксы)
+  - Отображение участников в карточках
 
 ## Валюта
 
@@ -404,6 +409,54 @@ ALTER PUBLICATION supabase_realtime ADD TABLE institutions;
   return (effectiveStart, effectiveEnd);
 }
 ```
+
+### 24. Семейные абонементы (Family Subscriptions)
+Несколько учеников (братья/сёстры) могут делить один абонемент.
+
+**Бизнес-логика:**
+- **Общий пул занятий:** 10 занятий на семью = 10 посещений любым участником
+- При завершении занятия ЛЮБОГО участника — списывается 1 занятие из общего пула
+- Приоритет списания: сначала личные подписки, потом семейные
+
+**Структура БД:**
+```sql
+-- Флаг семейного абонемента
+subscriptions.is_family BOOLEAN DEFAULT FALSE
+
+-- Таблица участников
+subscription_members (
+  subscription_id UUID REFERENCES subscriptions(id),
+  student_id UUID REFERENCES students(id),
+  UNIQUE(subscription_id, student_id)
+)
+
+-- VIEW для расчёта баланса (учитывает семейные)
+student_subscription_summary
+```
+
+**Создание семейного абонемента:**
+```dart
+// В форме оплаты — переключатель "Семейный абонемент"
+// Список учеников с чекбоксами (минимум 2)
+await paymentController.createFamilyPayment(
+  institutionId: id,
+  studentIds: [student1.id, student2.id, student3.id],
+  lessonsCount: 12,
+  ...
+);
+```
+
+**Отображение:**
+- В списке учеников — баланс из `student_subscription_summary` VIEW
+- В карточке ученика — бейдж "Семейный" + chips с именами участников
+- В списке оплат — имена всех участников + иконка семьи
+
+**Ключевые файлы:**
+- `lib/shared/models/subscription.dart` — модель + `SubscriptionMember`
+- `lib/features/subscriptions/repositories/subscription_repository.dart` — `createFamily`, `deductLesson`
+- `lib/features/students/repositories/student_repository.dart` — баланс из VIEW
+- `supabase/migrations/add_family_subscriptions.sql` — миграция
+
 
 ## CI/CD
 

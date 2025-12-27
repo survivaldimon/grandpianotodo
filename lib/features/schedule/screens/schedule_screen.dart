@@ -41,29 +41,8 @@ class ScheduleScreen extends ConsumerStatefulWidget {
   ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
 }
 
-class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
-    with WidgetsBindingObserver {
+class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   DateTime _selectedDate = DateTime.now();
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Обновляем данные когда приложение возвращается из фона
-    if (state == AppLifecycleState.resumed) {
-      ref.invalidate(lessonsByRoomProvider(RoomDateParams(widget.roomId, _selectedDate)));
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,12 +50,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
     final lessonsAsync = ref.watch(
       lessonsByRoomProvider(RoomDateParams(widget.roomId, _selectedDate)),
     );
-    // Используем StreamProvider для realtime обновления рабочего времени
-    final institutionAsync = ref.watch(currentInstitutionStreamProvider(widget.institutionId));
-
-    // Получаем рабочее время из заведения
-    final workStartHour = institutionAsync.valueOrNull?.workStartHour ?? 8;
-    final workEndHour = institutionAsync.valueOrNull?.workEndHour ?? 22;
 
     return Scaffold(
       appBar: AppBar(
@@ -117,8 +90,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
                 institutionId: widget.institutionId,
                 lessons: lessons,
                 onLessonTap: (lesson) => _showLessonDetail(context, lesson),
-                startHour: workStartHour,
-                endHour: workEndHour,
+                onAddLesson: (hour, minute) => _showAddLessonDialog(context, hour: hour, minute: minute),
               ),
             ),
           ),
@@ -131,7 +103,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
     );
   }
 
-  void _showAddLessonDialog(BuildContext context) {
+  void _showAddLessonDialog(BuildContext context, {int? hour, int minute = 0}) {
     // Инвалидируем кеш справочников для получения актуальных данных
     ref.invalidate(subjectsProvider(widget.institutionId));
     ref.invalidate(lessonTypesProvider(widget.institutionId));
@@ -143,6 +115,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
         institutionId: widget.institutionId,
         roomId: widget.roomId,
         date: _selectedDate,
+        initialHour: hour,
+        initialMinute: minute,
         onCreated: () {
           ref.invalidate(lessonsByRoomProvider(RoomDateParams(widget.roomId, _selectedDate)));
         },
@@ -252,8 +226,7 @@ class _TimeGrid extends StatelessWidget {
   final String institutionId;
   final List<Lesson> lessons;
   final void Function(Lesson) onLessonTap;
-  final int startHour;
-  final int endHour;
+  final void Function(int hour, int minute) onAddLesson;
 
   const _TimeGrid({
     required this.selectedDate,
@@ -261,11 +234,12 @@ class _TimeGrid extends StatelessWidget {
     required this.institutionId,
     required this.lessons,
     required this.onLessonTap,
-    required this.startHour,
-    required this.endHour,
+    required this.onAddLesson,
   });
 
-  static const hourHeight = 60.0;
+  static const startHour = 8;
+  static const endHour = 22;
+  static const hourHeight = 100.0; // 15 мин = 25px, время скрывается для коротких
 
   @override
   Widget build(BuildContext context) {
@@ -300,14 +274,7 @@ class _TimeGrid extends StatelessWidget {
                 Column(
                   children: [
                     for (int hour = startHour; hour <= endHour; hour++)
-                      Container(
-                        height: hourHeight,
-                        decoration: const BoxDecoration(
-                          border: Border(
-                            top: BorderSide(color: AppColors.border, width: 0.5),
-                          ),
-                        ),
-                      ),
+                      _buildCell(hour, lessons),
                   ],
                 ),
                 ...lessons.map((lesson) => _buildLessonBlock(context, lesson)),
@@ -319,14 +286,136 @@ class _TimeGrid extends StatelessWidget {
     );
   }
 
+  /// Находит наибольший свободный промежуток в ячейке часа
+  ({int start, int end})? _findLargestGapInHour(int hour, List<Lesson> lessons) {
+    const minGapMinutes = 15;
+    final hourStart = hour * 60;
+    final hourEnd = (hour + 1) * 60;
+
+    // Собираем занятые интервалы в этом часе
+    final occupiedIntervals = <({int start, int end})>[];
+
+    for (final lesson in lessons) {
+      final lessonStart = lesson.startTime.hour * 60 + lesson.startTime.minute;
+      final lessonEnd = lesson.endTime.hour * 60 + lesson.endTime.minute;
+
+      // Пересекается ли занятие с этим часом?
+      if (lessonEnd > hourStart && lessonStart < hourEnd) {
+        occupiedIntervals.add((
+          start: lessonStart.clamp(hourStart, hourEnd),
+          end: lessonEnd.clamp(hourStart, hourEnd),
+        ));
+      }
+    }
+
+    if (occupiedIntervals.isEmpty) {
+      // Весь час свободен
+      return (start: 0, end: 60);
+    }
+
+    // Сортируем по времени начала
+    occupiedIntervals.sort((a, b) => a.start.compareTo(b.start));
+
+    // Находим промежутки
+    final gaps = <({int start, int end})>[];
+
+    // До первого занятия
+    if (occupiedIntervals.first.start > hourStart) {
+      gaps.add((start: 0, end: occupiedIntervals.first.start - hourStart));
+    }
+
+    // Между занятиями
+    for (int i = 0; i < occupiedIntervals.length - 1; i++) {
+      final gapStart = occupiedIntervals[i].end;
+      final gapEnd = occupiedIntervals[i + 1].start;
+      if (gapEnd > gapStart) {
+        gaps.add((start: gapStart - hourStart, end: gapEnd - hourStart));
+      }
+    }
+
+    // После последнего занятия
+    if (occupiedIntervals.last.end < hourEnd) {
+      gaps.add((start: occupiedIntervals.last.end - hourStart, end: 60));
+    }
+
+    // Находим наибольший промежуток >= minGapMinutes
+    ({int start, int end})? largest;
+    int largestSize = 0;
+
+    for (final gap in gaps) {
+      final size = gap.end - gap.start;
+      if (size >= minGapMinutes && size > largestSize) {
+        largestSize = size;
+        largest = gap;
+      }
+    }
+
+    return largest;
+  }
+
+  Widget _buildCell(int hour, List<Lesson> lessons) {
+    final gap = _findLargestGapInHour(hour, lessons);
+
+    if (gap == null) {
+      // Нет свободного места >= 15 мин
+      return Container(
+        height: hourHeight,
+        decoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(color: AppColors.border, width: 0.5),
+          ),
+        ),
+      );
+    }
+
+    // Вычисляем позицию "+" в центре свободного промежутка
+    final gapCenterMinute = (gap.start + gap.end) / 2;
+    final buttonTopOffset = gapCenterMinute / 60 * hourHeight - 8;
+
+    return GestureDetector(
+      onTap: () => onAddLesson(hour, gap.start),
+      child: Container(
+        height: hourHeight,
+        decoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(color: AppColors.border, width: 0.5),
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: buttonTopOffset.clamp(0, hourHeight - 16),
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Icon(
+                  Icons.add,
+                  size: 16,
+                  color: AppColors.textTertiary.withValues(alpha: 0.4),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLessonBlock(BuildContext context, Lesson lesson) {
     final startMinutes = lesson.startTime.hour * 60 + lesson.startTime.minute;
     final endMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
     final startOffset = (startMinutes - startHour * 60) / 60 * hourHeight;
-    final duration = (endMinutes - startMinutes) / 60 * hourHeight;
+    final duration = durationMinutes / 60 * hourHeight;
 
     final color = _getLessonColor(lesson);
     final participant = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
+    // Показываем время только для занятий >= 30 минут
+    final showTime = durationMinutes >= 30;
+
+    String formatTime(TimeOfDay time) {
+      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    }
 
     return Positioned(
       top: startOffset,
@@ -336,29 +425,44 @@ class _TimeGrid extends StatelessWidget {
         onTap: () => onLessonTap(lesson),
         child: Container(
           height: duration,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(AppSizes.radiusS),
-            border: Border.all(color: color, width: 2),
+            border: Border.all(color: color, width: 1.5),
           ),
           clipBehavior: Clip.hardEdge,
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(
-                  participant,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      participant,
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
+                        fontSize: 11,
                       ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                  if (lesson.status == LessonStatus.completed)
+                    const Icon(Icons.check_circle, size: 12, color: AppColors.success),
+                  if (lesson.status == LessonStatus.cancelled)
+                    const Icon(Icons.cancel, size: 12, color: AppColors.error),
+                ],
               ),
-              if (lesson.status == LessonStatus.completed)
-                const Icon(Icons.check_circle, size: 14, color: AppColors.success),
-              if (lesson.status == LessonStatus.cancelled)
-                const Icon(Icons.cancel, size: 14, color: AppColors.error),
+              if (showTime)
+                Text(
+                  '${formatTime(lesson.startTime)}-${formatTime(lesson.endTime)}',
+                  style: TextStyle(
+                    color: color.withValues(alpha: 0.8),
+                    fontSize: 9,
+                  ),
+                ),
             ],
           ),
         ),
@@ -869,12 +973,16 @@ class _AddLessonSheet extends ConsumerStatefulWidget {
   final String roomId;
   final DateTime date;
   final VoidCallback onCreated;
+  final int? initialHour;
+  final int initialMinute;
 
   const _AddLessonSheet({
     required this.institutionId,
     required this.roomId,
     required this.date,
     required this.onCreated,
+    this.initialHour,
+    this.initialMinute = 0,
   });
 
   @override
@@ -882,8 +990,19 @@ class _AddLessonSheet extends ConsumerStatefulWidget {
 }
 
 class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
-  TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
-  TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
+  late TimeOfDay _startTime;
+  late TimeOfDay _endTime;
+
+  @override
+  void initState() {
+    super.initState();
+    final hour = widget.initialHour ?? 9;
+    final minute = widget.initialMinute;
+    _startTime = TimeOfDay(hour: hour, minute: minute);
+    // Время окончания = начало + 1 час (стандартная длительность)
+    final endMinutes = hour * 60 + minute + 60;
+    _endTime = TimeOfDay(hour: endMinutes ~/ 60, minute: endMinutes % 60);
+  }
   Student? _selectedStudent;
   Subject? _selectedSubject;
   LessonType? _selectedLessonType;
@@ -1175,6 +1294,18 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Время окончания должно быть позже времени начала'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Проверка минимальной длительности (15 минут)
+    final durationMinutes = endMinutes - startMinutes;
+    if (durationMinutes < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Минимальная длительность занятия — 15 минут'),
           backgroundColor: Colors.orange,
         ),
       );
