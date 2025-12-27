@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 
 /// Провайдер ID текущего заведения
@@ -18,6 +21,81 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
+  Timer? _checkTimer;
+  String? _lastInstitutionId;
+  bool _isShowingDeletedDialog = false;
+
+  @override
+  void dispose() {
+    _checkTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startMembershipCheck(String institutionId) {
+    // Отменяем предыдущий таймер если ID изменился
+    if (_lastInstitutionId != institutionId) {
+      _checkTimer?.cancel();
+      _lastInstitutionId = institutionId;
+
+      // Проверяем каждые 10 секунд
+      _checkTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+        _checkMembership(institutionId);
+      });
+    }
+  }
+
+  Future<void> _checkMembership(String institutionId) async {
+    if (_isShowingDeletedDialog) return;
+
+    // Инвалидируем и проверяем членство
+    ref.invalidate(myMembershipProvider(institutionId));
+
+    // Даём время на загрузку
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    final membership = ref.read(myMembershipProvider(institutionId));
+
+    membership.whenData((member) {
+      if (member == null && mounted && !_isShowingDeletedDialog) {
+        _showInstitutionDeletedDialog();
+      }
+    });
+  }
+
+  void _showInstitutionDeletedDialog() {
+    _isShowingDeletedDialog = true;
+    _checkTimer?.cancel();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon: const Icon(
+          Icons.warning_amber_rounded,
+          size: 48,
+          color: AppColors.warning,
+        ),
+        title: const Text('Заведение удалено'),
+        content: const Text(
+          'Это заведение было удалено владельцем. Вы будете перенаправлены на главный экран.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go('/institutions');
+            },
+            child: const Text('ОК'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      _isShowingDeletedDialog = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
@@ -46,17 +124,9 @@ class _MainShellState extends ConsumerState<MainShell> {
       }
     }
 
-    // Слушаем членство пользователя — если заведение удалено, редиректим
+    // Запускаем периодическую проверку членства
     if (institutionId != null) {
-      ref.listen(myMembershipProvider(institutionId), (prev, next) {
-        // Если членство было и стало null — заведение удалено или пользователь исключён
-        if (prev?.valueOrNull != null && next.valueOrNull == null) {
-          // Редирект на список заведений
-          if (mounted) {
-            context.go('/institutions');
-          }
-        }
-      });
+      _startMembershipCheck(institutionId);
     }
 
     return Scaffold(
