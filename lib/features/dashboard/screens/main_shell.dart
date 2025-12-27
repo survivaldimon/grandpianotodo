@@ -2,18 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/features/institution/providers/institution_provider.dart';
 
 /// Провайдер ID текущего заведения
 final currentInstitutionIdProvider = StateProvider<String?>((ref) => null);
 
 /// Главная оболочка приложения с нижней навигацией
-class MainShell extends ConsumerWidget {
+class MainShell extends ConsumerStatefulWidget {
   final Widget child;
 
   const MainShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends ConsumerState<MainShell> {
+  @override
+  Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
 
     // Определяем текущий индекс на основе маршрута
@@ -40,8 +46,21 @@ class MainShell extends ConsumerWidget {
       }
     }
 
+    // Слушаем членство пользователя — если заведение удалено, редиректим
+    if (institutionId != null) {
+      ref.listen(myMembershipProvider(institutionId), (prev, next) {
+        // Если членство было и стало null — заведение удалено или пользователь исключён
+        if (prev?.valueOrNull != null && next.valueOrNull == null) {
+          // Редирект на список заведений
+          if (mounted) {
+            context.go('/institutions');
+          }
+        }
+      });
+    }
+
     return Scaffold(
-      body: child,
+      body: widget.child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: (index) {
