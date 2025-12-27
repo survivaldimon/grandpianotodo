@@ -120,14 +120,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               const Divider(),
               const _SectionHeader(title: 'УПРАВЛЕНИЕ'),
-              ListTile(
-                leading: const Icon(Icons.door_front_door),
-                title: const Text(AppStrings.rooms),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  context.push('/institutions/$institutionId/rooms');
-                },
-              ),
+              // Кабинеты — только если есть право manageRooms
+              if (isOwner || (permissions?.manageRooms ?? false))
+                ListTile(
+                  leading: const Icon(Icons.door_front_door),
+                  title: const Text(AppStrings.rooms),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    context.push('/institutions/$institutionId/rooms');
+                  },
+                ),
               // Статистика — только если есть право viewStatistics
               if (isOwner || (permissions?.viewStatistics ?? false))
                 ListTile(
@@ -146,30 +148,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   context.push('/institutions/$institutionId/members');
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.music_note),
-                title: const Text(AppStrings.subjects),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  context.push('/institutions/$institutionId/subjects');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.event_note),
-                title: const Text(AppStrings.lessonTypes),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  context.push('/institutions/$institutionId/lesson-types');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.credit_card),
-                title: const Text(AppStrings.paymentPlans),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  context.push('/institutions/$institutionId/payment-plans');
-                },
-              ),
+              // Предметы — только если есть право manageSubjects
+              if (isOwner || (permissions?.manageSubjects ?? false))
+                ListTile(
+                  leading: const Icon(Icons.music_note),
+                  title: const Text(AppStrings.subjects),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    context.push('/institutions/$institutionId/subjects');
+                  },
+                ),
+              // Типы занятий — только если есть право manageLessonTypes
+              if (isOwner || (permissions?.manageLessonTypes ?? false))
+                ListTile(
+                  leading: const Icon(Icons.event_note),
+                  title: const Text(AppStrings.lessonTypes),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    context.push('/institutions/$institutionId/lesson-types');
+                  },
+                ),
+              // Тарифы оплаты — только если есть право managePaymentPlans
+              if (isOwner || (permissions?.managePaymentPlans ?? false))
+                ListTile(
+                  leading: const Icon(Icons.credit_card),
+                  title: const Text(AppStrings.paymentPlans),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    context.push('/institutions/$institutionId/payment-plans');
+                  },
+                ),
               const Divider(),
               const _SectionHeader(title: 'АККАУНТ'),
               ListTile(
