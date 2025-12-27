@@ -240,3 +240,25 @@ final isMyStudentProvider =
 
   return myStudentIds.contains(params.studentId);
 });
+
+/// Провайдер учеников для добавления оплаты (фильтрует по правам)
+/// Возвращает только своих учеников, если нет права addPaymentsForAllStudents
+final studentsForPaymentProvider =
+    FutureProvider.family<List<Student>, String>((ref, institutionId) async {
+  final repo = ref.watch(studentRepositoryProvider);
+  final allStudents = await repo.getByInstitution(institutionId);
+  final activeStudents = allStudents.where((s) => s.archivedAt == null).toList();
+
+  final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+  if (currentUserId == null) return [];
+
+  // Получаем права текущего пользователя
+  final bindingsRepo = ref.read(studentBindingsRepositoryProvider);
+  final myStudentIds = await bindingsRepo.getTeacherStudentIds(
+    currentUserId,
+    institutionId,
+  );
+
+  // Фильтруем только своих учеников
+  return activeStudents.where((s) => myStudentIds.contains(s.id)).toList();
+});

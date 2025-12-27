@@ -5,6 +5,7 @@ import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/utils/validators.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран присоединения к заведению по коду
 class JoinInstitutionScreen extends ConsumerStatefulWidget {
@@ -60,7 +61,7 @@ class _JoinInstitutionScreenState extends ConsumerState<JoinInstitutionScreen> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );

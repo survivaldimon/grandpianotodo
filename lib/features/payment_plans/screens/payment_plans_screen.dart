@@ -22,7 +22,7 @@ class PaymentPlansScreen extends ConsumerWidget {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );
@@ -41,8 +41,8 @@ class PaymentPlansScreen extends ConsumerWidget {
       ),
       body: plansAsync.when(
         loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView(
-          message: error.toString(),
+        error: (error, _) => ErrorView.fromException(
+          error,
           onRetry: () => ref.invalidate(paymentPlansProvider(institutionId)),
         ),
         data: (plans) {

@@ -6,6 +6,7 @@ import 'package:kabinet/features/groups/providers/group_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/student_group.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран деталей группы
 class GroupDetailScreen extends ConsumerWidget {
@@ -29,20 +30,9 @@ class GroupDetailScreen extends ConsumerWidget {
       ),
       error: (e, _) => Scaffold(
         appBar: AppBar(title: const Text('Группа')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('Ошибка: $e'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(groupProvider(groupId)),
-                child: const Text('Повторить'),
-              ),
-            ],
-          ),
+        body: ErrorView.fromException(
+          e,
+          onRetry: () => ref.invalidate(groupProvider(groupId)),
         ),
       ),
       data: (group) => _GroupDetailContent(

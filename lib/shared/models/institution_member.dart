@@ -17,6 +17,8 @@ class MemberPermissions {
   final bool deleteOwnLessons;
   final bool deleteAllLessons;
   final bool viewAllSchedule;
+  final bool addPaymentsForOwnStudents;
+  final bool addPaymentsForAllStudents;
   final bool managePayments;
   final bool viewPayments;
   final bool viewStatistics;
@@ -38,6 +40,8 @@ class MemberPermissions {
     this.deleteOwnLessons = true,
     this.deleteAllLessons = false,
     this.viewAllSchedule = true,
+    this.addPaymentsForOwnStudents = true,
+    this.addPaymentsForAllStudents = false,
     this.managePayments = false,
     this.viewPayments = true,
     this.viewStatistics = false,
@@ -61,6 +65,8 @@ class MemberPermissions {
         deleteOwnLessons: true,
         deleteAllLessons: true,
         viewAllSchedule: true,
+        addPaymentsForOwnStudents: true,
+        addPaymentsForAllStudents: true,
         managePayments: true,
         viewPayments: true,
         viewStatistics: true,
@@ -88,6 +94,9 @@ class MemberPermissions {
         deleteOwnLessons: json['delete_own_lessons'] as bool? ?? json['delete_lessons'] as bool? ?? false,
         deleteAllLessons: json['delete_all_lessons'] as bool? ?? false,
         viewAllSchedule: json['view_all_schedule'] as bool? ?? true,
+        // Обратная совместимость: старое manage_payments -> addPaymentsForAllStudents
+        addPaymentsForOwnStudents: json['add_payments_for_own_students'] as bool? ?? true,
+        addPaymentsForAllStudents: json['add_payments_for_all_students'] as bool? ?? json['manage_payments'] as bool? ?? false,
         managePayments: json['manage_payments'] as bool? ?? false,
         viewPayments: json['view_payments'] as bool? ?? false,
         viewStatistics: json['view_statistics'] as bool? ?? false,
@@ -114,6 +123,8 @@ class MemberPermissions {
         // Для обратной совместимости с RLS политикой в Supabase
         'delete_lessons': deleteOwnLessons || deleteAllLessons,
         'view_all_schedule': viewAllSchedule,
+        'add_payments_for_own_students': addPaymentsForOwnStudents,
+        'add_payments_for_all_students': addPaymentsForAllStudents,
         'manage_payments': managePayments,
         'view_payments': viewPayments,
         'view_statistics': viewStatistics,
@@ -136,6 +147,8 @@ class MemberPermissions {
     bool? deleteOwnLessons,
     bool? deleteAllLessons,
     bool? viewAllSchedule,
+    bool? addPaymentsForOwnStudents,
+    bool? addPaymentsForAllStudents,
     bool? managePayments,
     bool? viewPayments,
     bool? viewStatistics,
@@ -157,6 +170,8 @@ class MemberPermissions {
         deleteOwnLessons: deleteOwnLessons ?? this.deleteOwnLessons,
         deleteAllLessons: deleteAllLessons ?? this.deleteAllLessons,
         viewAllSchedule: viewAllSchedule ?? this.viewAllSchedule,
+        addPaymentsForOwnStudents: addPaymentsForOwnStudents ?? this.addPaymentsForOwnStudents,
+        addPaymentsForAllStudents: addPaymentsForAllStudents ?? this.addPaymentsForAllStudents,
         managePayments: managePayments ?? this.managePayments,
         viewPayments: viewPayments ?? this.viewPayments,
         viewStatistics: viewStatistics ?? this.viewStatistics,

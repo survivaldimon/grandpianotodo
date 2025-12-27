@@ -22,6 +22,7 @@ import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Класс для хранения состояния фильтров расписания
 class ScheduleFilters {
@@ -219,10 +220,10 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   ) {
     return roomsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Ошибка: $e')),
+      error: (e, _) => ErrorView.fromException(e),
       data: (rooms) => lessonsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Ошибка: $e')),
+        error: (e, _) => ErrorView.fromException(e),
         data: (lessons) {
           final filteredLessons = _filters.isEmpty
               ? lessons
@@ -266,10 +267,10 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
 
     return roomsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Ошибка: $e')),
+      error: (e, _) => ErrorView.fromException(e),
       data: (rooms) => weekLessonsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Ошибка: $e')),
+        error: (e, _) => ErrorView.fromException(e),
         data: (lessonsByDay) {
           // Применяем фильтры к занятиям каждого дня
           final filteredLessonsByDay = <DateTime, List<Lesson>>{};
@@ -337,6 +338,10 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   }
 
   void _showAddLessonSheet(Room room, int hour) {
+    // Инвалидируем кеш справочников для получения актуальных данных
+    ref.invalidate(subjectsProvider(widget.institutionId));
+    ref.invalidate(lessonTypesProvider(widget.institutionId));
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1585,7 +1590,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );
@@ -2086,7 +2091,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );
@@ -2218,7 +2223,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
             // Ученик
             studentsAsync.when(
               loading: () => const CircularProgressIndicator(),
-              error: (e, _) => Text('Ошибка: $e'),
+              error: (e, _) => ErrorView.inline(e),
               data: (students) {
                 _selectedStudent ??= students.firstWhere(
                   (s) => s.id == widget.lesson.studentId,
@@ -2614,7 +2619,7 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );
@@ -2735,7 +2740,7 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
             // Ученик
             studentsAsync.when(
               loading: () => const CircularProgressIndicator(),
-              error: (e, _) => Text('Ошибка: $e'),
+              error: (e, _) => ErrorView.inline(e),
               data: (students) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3580,7 +3585,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                     icon: Icons.person,
                     child: membersAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Text('Ошибка: $e'),
+                      error: (e, _) => ErrorView.inline(e),
                       data: (members) => _buildCheckboxList<InstitutionMember>(
                         items: members.where((m) => !m.isArchived).toList(),
                         selectedIds: _selectedTeachers,
@@ -3602,7 +3607,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                     icon: Icons.category,
                     child: lessonTypesAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Text('Ошибка: $e'),
+                      error: (e, _) => ErrorView.inline(e),
                       data: (types) => _buildCheckboxList<LessonType>(
                         items: types,
                         selectedIds: _selectedLessonTypes,
@@ -3620,7 +3625,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                     icon: Icons.music_note,
                     child: subjectsAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Text('Ошибка: $e'),
+                      error: (e, _) => ErrorView.inline(e),
                       data: (subjects) => _buildCheckboxList<Subject>(
                         items: subjects,
                         selectedIds: _selectedSubjects,
@@ -3671,7 +3676,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
   Widget _buildStudentsSection(AsyncValue<List<Student>> studentsAsync) {
     return studentsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('Ошибка: $e'),
+      error: (e, _) => ErrorView.inline(e),
       data: (students) {
         // Фильтруем только активных и сортируем по алфавиту
         final activeStudents = students

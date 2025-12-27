@@ -19,7 +19,7 @@ class ProfileScreen extends ConsumerWidget {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );
@@ -32,8 +32,8 @@ class ProfileScreen extends ConsumerWidget {
       ),
       body: profileAsync.when(
         loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView(
-          message: error.toString(),
+        error: (error, _) => ErrorView.fromException(
+          error,
           onRetry: () => ref.invalidate(currentProfileProvider),
         ),
         data: (profile) {

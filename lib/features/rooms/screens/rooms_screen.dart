@@ -55,8 +55,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
       ),
       body: roomsAsync.when(
         loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView(
-          message: error.toString(),
+        error: (error, _) => ErrorView.fromException(
+          error,
           onRetry: () => ref.invalidate(roomsProvider(widget.institutionId)),
         ),
         data: (rooms) {

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/features/statistics/repositories/statistics_repository.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран статистики
 class StatisticsScreen extends ConsumerStatefulWidget {
@@ -309,7 +310,7 @@ class _GeneralTab extends ConsumerWidget {
 
     return statsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Ошибка: $e')),
+      error: (e, _) => ErrorView.fromException(e),
       data: (stats) => ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -478,7 +479,7 @@ class _SubjectsTab extends ConsumerWidget {
 
     return statsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Ошибка: $e')),
+      error: (e, _) => ErrorView.fromException(e),
       data: (stats) {
         if (stats.isEmpty) {
           return const Center(child: Text('Нет данных за период'));
@@ -617,7 +618,7 @@ class _TeachersTab extends ConsumerWidget {
 
     return statsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Ошибка: $e')),
+      error: (e, _) => ErrorView.fromException(e),
       data: (stats) {
         if (stats.isEmpty) {
           return const Center(child: Text('Нет данных за период'));
@@ -773,7 +774,7 @@ class _StudentsTab extends ConsumerWidget {
           ),
           error: (e, _) => Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('Ошибка: $e'),
+            child: ErrorView.inline(e),
           ),
           data: (students) {
             if (students.isEmpty) {
@@ -826,7 +827,7 @@ class _StudentsTab extends ConsumerWidget {
           ),
           error: (e, _) => Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('Ошибка: $e'),
+            child: ErrorView.inline(e),
           ),
           data: (debtors) {
             if (debtors.isEmpty) {
@@ -896,7 +897,7 @@ class _PaymentPlansTab extends ConsumerWidget {
 
     return statsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Ошибка: $e')),
+      error: (e, _) => ErrorView.fromException(e),
       data: (stats) {
         if (stats.isEmpty) {
           return const Center(child: Text('Нет данных за период'));

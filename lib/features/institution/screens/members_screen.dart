@@ -7,6 +7,7 @@ import 'package:kabinet/features/institution/providers/institution_provider.dart
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран управления участниками заведения
 class MembersScreen extends ConsumerWidget {
@@ -26,20 +27,9 @@ class MembersScreen extends ConsumerWidget {
       ),
       body: membersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('Ошибка: $e'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(membersProvider(institutionId)),
-                child: const Text('Повторить'),
-              ),
-            ],
-          ),
+        error: (e, _) => ErrorView.fromException(
+          e,
+          onRetry: () => ref.invalidate(membersProvider(institutionId)),
         ),
         data: (members) {
           if (members.isEmpty) {

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
+import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/shared/models/payment.dart';
@@ -44,20 +46,43 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     final totalAsync = ref.watch(periodTotalProvider(_periodParams));
     final monthName = DateFormat('LLLL yyyy', 'ru').format(_selectedMonth);
 
+    // Получаем права текущего пользователя
+    final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
+    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+
+    // Проверяем, является ли пользователь владельцем
+    final isOwner = institutionAsync.maybeWhen(
+      data: (inst) => inst.ownerId == currentUserId,
+      orElse: () => false,
+    );
+
+    // Право на добавление оплат (для своих или для всех)
+    final canAddPayments = isOwner ||
+        (permissions?.addPaymentsForOwnStudents ?? false) ||
+        (permissions?.addPaymentsForAllStudents ?? false);
+
+    // Право на добавление оплат для всех учеников
+    final canAddForAllStudents = isOwner ||
+        (permissions?.addPaymentsForAllStudents ?? false);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.payments),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddPaymentDialog(context),
-          ),
+          if (canAddPayments)
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () => _showAddPaymentDialog(context, canAddForAllStudents),
+            ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddPaymentDialog(context),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: canAddPayments
+          ? FloatingActionButton(
+              onPressed: () => _showAddPaymentDialog(context, canAddForAllStudents),
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: Column(
         children: [
           // Period selector
@@ -110,8 +135,8 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
           Expanded(
             child: paymentsAsync.when(
               loading: () => const LoadingIndicator(),
-              error: (error, _) => ErrorView(
-                message: error.toString(),
+              error: (error, _) => ErrorView.fromException(
+                error,
                 onRetry: () => ref.invalidate(paymentsProvider(_periodParams)),
               ),
               data: (payments) {
@@ -195,13 +220,14 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     return '${formatter.format(amount.toInt())} ₸';
   }
 
-  void _showAddPaymentDialog(BuildContext context) {
+  void _showAddPaymentDialog(BuildContext context, bool canAddForAllStudents) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (dialogContext) => _AddPaymentSheet(
         institutionId: widget.institutionId,
+        canAddForAllStudents: canAddForAllStudents,
         onSuccess: () {
           ref.invalidate(paymentsProvider(_periodParams));
           ref.invalidate(periodTotalProvider(_periodParams));
@@ -215,10 +241,12 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 /// Форма добавления оплаты
 class _AddPaymentSheet extends ConsumerStatefulWidget {
   final String institutionId;
+  final bool canAddForAllStudents;
   final VoidCallback onSuccess;
 
   const _AddPaymentSheet({
     required this.institutionId,
+    required this.canAddForAllStudents,
     required this.onSuccess,
   });
 
@@ -347,7 +375,10 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+    // Используем разные провайдеры в зависимости от прав
+    final studentsAsync = widget.canAddForAllStudents
+        ? ref.watch(studentsProvider(widget.institutionId))
+        : ref.watch(studentsForPaymentProvider(widget.institutionId));
     final plansAsync = ref.watch(paymentPlansProvider(widget.institutionId));
     final controllerState = ref.watch(paymentControllerProvider);
 
@@ -426,7 +457,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 // Ученик
                 studentsAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => ErrorView.inline(e),
                   data: (students) {
                     if (students.isEmpty) {
                       return Container(
@@ -508,7 +539,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 // Тариф
                 plansAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => ErrorView.inline(e),
                   data: (plans) {
                     // Находим выбранный план по ID
                     final currentPlan = _selectedPlan != null

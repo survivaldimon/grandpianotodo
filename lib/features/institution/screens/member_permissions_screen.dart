@@ -272,8 +272,20 @@ class _MemberPermissionsScreenState
                       (v) => setState(() => _permissions = _permissions.copyWith(viewPayments: v)),
                     ),
                     _buildPermissionTile(
+                      'Оплаты для своих учеников',
+                      'Добавление оплат своим ученикам',
+                      _permissions.addPaymentsForOwnStudents,
+                      (v) => setState(() => _permissions = _permissions.copyWith(addPaymentsForOwnStudents: v)),
+                    ),
+                    _buildPermissionTile(
+                      'Оплаты для всех учеников',
+                      'Добавление оплат любым ученикам',
+                      _permissions.addPaymentsForAllStudents,
+                      (v) => setState(() => _permissions = _permissions.copyWith(addPaymentsForAllStudents: v)),
+                    ),
+                    _buildPermissionTile(
                       'Управление оплатами',
-                      'Добавление, корректировка оплат',
+                      'Редактирование и удаление оплат',
                       _permissions.managePayments,
                       (v) => setState(() => _permissions = _permissions.copyWith(managePayments: v)),
                     ),

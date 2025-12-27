@@ -13,6 +13,7 @@ import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/subscription.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Главный экран (Dashboard)
 class DashboardScreen extends ConsumerWidget {
@@ -599,7 +600,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Ошибка: $e')),
+              error: (e, _) => ErrorView.fromException(e),
             ),
           ),
 

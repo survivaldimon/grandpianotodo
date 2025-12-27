@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/groups/providers/group_provider.dart';
 import 'package:kabinet/shared/models/student_group.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран списка групп
 class GroupsScreen extends ConsumerWidget {
@@ -25,20 +26,9 @@ class GroupsScreen extends ConsumerWidget {
       ),
       body: groupsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('Ошибка: $e'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(groupsProvider(institutionId)),
-                child: const Text('Повторить'),
-              ),
-            ],
-          ),
+        error: (e, _) => ErrorView.fromException(
+          e,
+          onRetry: () => ref.invalidate(groupsProvider(institutionId)),
         ),
         data: (groups) {
           if (groups.isEmpty) {

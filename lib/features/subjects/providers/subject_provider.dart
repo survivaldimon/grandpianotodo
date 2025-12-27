@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kabinet/features/institution/providers/subject_provider.dart';
 import 'package:kabinet/features/subjects/repositories/subject_repository.dart';
 import 'package:kabinet/shared/models/subject.dart';
 
@@ -42,6 +43,7 @@ class SubjectController extends StateNotifier<AsyncValue<void>> {
         color: color,
       );
       _ref.invalidate(subjectsListProvider(institutionId));
+      _ref.invalidate(subjectsProvider(institutionId)); // Для экрана расписания
       state = const AsyncValue.data(null);
       return subject;
     } catch (e, st) {
@@ -65,6 +67,7 @@ class SubjectController extends StateNotifier<AsyncValue<void>> {
         color: color,
       );
       _ref.invalidate(subjectsListProvider(institutionId));
+      _ref.invalidate(subjectsProvider(institutionId)); // Для экрана расписания
       _ref.invalidate(subjectProvider(id));
       state = const AsyncValue.data(null);
       return true;
@@ -80,6 +83,7 @@ class SubjectController extends StateNotifier<AsyncValue<void>> {
     try {
       await _repo.archive(id);
       _ref.invalidate(subjectsListProvider(institutionId));
+      _ref.invalidate(subjectsProvider(institutionId)); // Для экрана расписания
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -94,6 +98,7 @@ class SubjectController extends StateNotifier<AsyncValue<void>> {
     try {
       await _repo.delete(id);
       _ref.invalidate(subjectsListProvider(institutionId));
+      _ref.invalidate(subjectsProvider(institutionId)); // Для экрана расписания
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {

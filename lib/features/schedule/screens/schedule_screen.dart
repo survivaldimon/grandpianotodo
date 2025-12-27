@@ -23,6 +23,7 @@ import 'package:kabinet/shared/models/lesson_type.dart';
 import 'package:kabinet/shared/models/subscription.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
+import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран расписания кабинета
 class ScheduleScreen extends ConsumerStatefulWidget {
@@ -81,7 +82,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           Expanded(
             child: lessonsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Ошибка: $e')),
+              error: (e, _) => ErrorView.fromException(e),
               data: (lessons) => _TimeGrid(
                 selectedDate: _selectedDate,
                 roomId: widget.roomId,
@@ -101,6 +102,10 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 
   void _showAddLessonDialog(BuildContext context) {
+    // Инвалидируем кеш справочников для получения актуальных данных
+    ref.invalidate(subjectsProvider(widget.institutionId));
+    ref.invalidate(lessonTypesProvider(widget.institutionId));
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -383,7 +388,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );
@@ -857,7 +862,7 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString()),
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
             backgroundColor: Colors.red,
           ),
         );
@@ -945,7 +950,7 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
             // Ученик
             studentsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Text('Ошибка загрузки учеников: $e'),
+              error: (e, _) => ErrorView.inline(e),
               data: (students) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
