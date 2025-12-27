@@ -58,15 +58,38 @@ final studentFilterProvider = StateProvider<StudentFilter>((ref) {
   return StudentFilter.all;
 });
 
+/// Параметры фильтрации учеников
+class StudentFilterParams {
+  final String institutionId;
+  final bool onlyMyStudents;
+
+  const StudentFilterParams({
+    required this.institutionId,
+    this.onlyMyStudents = false,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StudentFilterParams &&
+          institutionId == other.institutionId &&
+          onlyMyStudents == other.onlyMyStudents;
+
+  @override
+  int get hashCode => institutionId.hashCode ^ onlyMyStudents.hashCode;
+}
+
 /// Провайдер отфильтрованных учеников (realtime)
+/// Если onlyMyStudents = true, показывает только учеников привязанных к текущему пользователю
 final filteredStudentsProvider =
-    StreamProvider.family<List<Student>, String>((ref, institutionId) async* {
+    StreamProvider.family<List<Student>, StudentFilterParams>((ref, params) async* {
   final repo = ref.watch(studentRepositoryProvider);
   final filter = ref.watch(studentFilterProvider);
+  final institutionId = params.institutionId;
 
-  // Для фильтра "Мои ученики" получаем ID текущего пользователя
+  // Получаем ID учеников текущего пользователя если нужна фильтрация
   Set<String>? myStudentIds;
-  if (filter == StudentFilter.myStudents) {
+  if (params.onlyMyStudents || filter == StudentFilter.myStudents) {
     final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
     if (currentUserId != null) {
       final bindingsRepo = ref.read(studentBindingsRepositoryProvider);
@@ -79,23 +102,32 @@ final filteredStudentsProvider =
   }
 
   await for (final students in repo.watchByInstitution(institutionId)) {
+    List<Student> filtered;
+
     switch (filter) {
       case StudentFilter.all:
-        yield students.where((s) => s.archivedAt == null).toList();
+        filtered = students.where((s) => s.archivedAt == null).toList();
       case StudentFilter.withDebt:
-        yield students
+        filtered = students
             .where((s) => s.archivedAt == null && s.balance < 0)
             .toList();
       case StudentFilter.archived:
-        yield students.where((s) => s.archivedAt != null).toList();
+        filtered = students.where((s) => s.archivedAt != null).toList();
       case StudentFilter.myStudents:
-        yield students
+        filtered = students
             .where((s) =>
                 s.archivedAt == null &&
                 myStudentIds != null &&
                 myStudentIds.contains(s.id))
             .toList();
     }
+
+    // Если onlyMyStudents = true, дополнительно фильтруем по привязке
+    if (params.onlyMyStudents && myStudentIds != null) {
+      filtered = filtered.where((s) => myStudentIds!.contains(s.id)).toList();
+    }
+
+    yield filtered;
   }
 });
 

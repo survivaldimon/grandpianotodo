@@ -74,6 +74,19 @@ class RoomController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<bool> delete(String id, String institutionId) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.delete(id);
+      _ref.invalidate(roomsProvider(institutionId));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
   Future<bool> archive(String id, String institutionId) async {
     state = const AsyncValue.loading();
     try {

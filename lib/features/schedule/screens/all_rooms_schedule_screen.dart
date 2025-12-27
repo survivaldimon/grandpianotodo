@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
@@ -124,6 +125,16 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       lessonsByInstitutionStreamProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
     );
 
+    // Получаем права пользователя
+    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+    final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
+    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+    final isOwner = institutionAsync.maybeWhen(
+      data: (inst) => inst.ownerId == currentUserId,
+      orElse: () => false,
+    );
+    final canManageRooms = isOwner || (permissions?.manageRooms ?? false);
+
     // Получаем название выбранного кабинета для заголовка
     String title = 'Расписание';
     if (_selectedRoomId != null) {
@@ -206,8 +217,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           const Divider(height: 1),
           Expanded(
             child: _viewMode == ScheduleViewMode.day
-                ? _buildDayView(roomsAsync, lessonsAsync)
-                : _buildWeekView(roomsAsync),
+                ? _buildDayView(roomsAsync, lessonsAsync, canManageRooms)
+                : _buildWeekView(roomsAsync, canManageRooms),
           ),
         ],
       ),
@@ -217,6 +228,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   Widget _buildDayView(
     AsyncValue<List<Room>> roomsAsync,
     AsyncValue<List<Lesson>> lessonsAsync,
+    bool canManageRooms,
   ) {
     return roomsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -239,6 +251,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             institutionId: widget.institutionId,
             selectedRoomId: _selectedRoomId,
             restoreScrollOffset: _savedScrollOffset,
+            canManageRooms: canManageRooms,
             onLessonTap: _showLessonDetail,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
@@ -260,7 +273,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     );
   }
 
-  Widget _buildWeekView(AsyncValue<List<Room>> roomsAsync) {
+  Widget _buildWeekView(AsyncValue<List<Room>> roomsAsync, bool canManageRooms) {
     final weekStart = InstitutionWeekParams.getWeekStart(_selectedDate);
     final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
     final weekLessonsAsync = ref.watch(lessonsByInstitutionWeekProvider(weekParams));
@@ -290,6 +303,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             institutionId: widget.institutionId,
             selectedRoomId: _selectedRoomId,
             restoreScrollOffset: _savedScrollOffset,
+            canManageRooms: canManageRooms,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
                 // Всегда сохраняем текущую позицию скролла
@@ -607,6 +621,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final String institutionId;
   final String? selectedRoomId;
   final double? restoreScrollOffset; // Позиция скролла для восстановления
+  final bool canManageRooms; // Может ли пользователь управлять кабинетами
   final void Function(Lesson) onLessonTap;
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, int hour) onAddLesson;
@@ -622,6 +637,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
     required this.onAddLesson,
     this.selectedRoomId,
     this.restoreScrollOffset,
+    this.canManageRooms = false,
   });
 
   static const startHour = 8;
@@ -732,21 +748,57 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     final rooms = widget.rooms;
     final lessons = widget.lessons;
     if (rooms.isEmpty) {
-      return const Center(
-        child: Text('Нет кабинетов', style: TextStyle(color: AppColors.textSecondary)),
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.meeting_room_outlined,
+              size: 48,
+              color: AppColors.textTertiary,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Нет кабинетов',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            if (widget.canManageRooms) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.push('/institutions/${widget.institutionId}/rooms'),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Добавить кабинет'),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       );
     }
 
     final totalHeight = (_AllRoomsTimeGrid.endHour - _AllRoomsTimeGrid.startHour + 1) * _AllRoomsTimeGrid.hourHeight;
 
     // Если выбран один кабинет - используем всю доступную ширину
-    final isSingleRoom = widget.selectedRoomId != null && rooms.length == 1;
-
     return LayoutBuilder(builder: (context, constraints) {
       // Доступная ширина для колонки кабинета (минус ширина временной шкалы)
       final availableWidth = constraints.maxWidth - AppSizes.timeGridWidth;
-      final roomColumnWidth = isSingleRoom
-          ? availableWidth
+
+      // Проверяем, помещаются ли все кабинеты на экран с фиксированной шириной
+      final fitsOnScreen = rooms.length * _AllRoomsTimeGrid.roomColumnWidth <= availableWidth;
+
+      // Расширяем колонки на весь экран если:
+      // 1. Выбран один кабинет (через фильтр)
+      // 2. ИЛИ все кабинеты помещаются на экран
+      final isSingleRoom = widget.selectedRoomId != null && rooms.length == 1;
+      final shouldExpandColumns = isSingleRoom || fitsOnScreen;
+
+      final roomColumnWidth = shouldExpandColumns
+          ? availableWidth / rooms.length
           : _AllRoomsTimeGrid.roomColumnWidth;
 
     return Column(
@@ -764,42 +816,47 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
               SizedBox(width: AppSizes.timeGridWidth),
               // Заголовки кабинетов (кликабельные для фильтрации)
               Expanded(
-                child: isSingleRoom
+                child: shouldExpandColumns
                     ? Row(
                         children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                widget.onRoomTap(widget.rooms[0].id, _lastScrollOffset);
-                              },
-                              child: Container(
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: widget.selectedRoomId == widget.rooms[0].id
-                                      ? AppColors.primary.withValues(alpha: 0.15)
-                                      : null,
-                                  border: BorderDirectional(
-                                    bottom: widget.selectedRoomId == widget.rooms[0].id
-                                        ? BorderSide(color: AppColors.primary, width: 2)
-                                        : BorderSide.none,
-                                  ),
-                                ),
-                                child: Text(
-                                  widget.rooms[0].number != null
-                                      ? '№${widget.rooms[0].number}'
-                                      : widget.rooms[0].name,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                    color: widget.selectedRoomId == widget.rooms[0].id
-                                        ? AppColors.primary
+                          for (int index = 0; index < rooms.length; index++)
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  widget.onRoomTap(rooms[index].id, _lastScrollOffset);
+                                },
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: widget.selectedRoomId == rooms[index].id
+                                        ? AppColors.primary.withValues(alpha: 0.15)
                                         : null,
+                                    border: Border(
+                                      left: BorderSide(
+                                        color: index == 0 ? Colors.transparent : AppColors.border,
+                                        width: 0.5,
+                                      ),
+                                      bottom: widget.selectedRoomId == rooms[index].id
+                                          ? BorderSide(color: AppColors.primary, width: 2)
+                                          : BorderSide.none,
+                                    ),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
+                                  child: Text(
+                                    rooms[index].number != null
+                                        ? '№${rooms[index].number}'
+                                        : rooms[index].name,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: widget.selectedRoomId == rooms[index].id
+                                          ? AppColors.primary
+                                          : null,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                         ],
                       )
                     : SingleChildScrollView(
@@ -892,23 +949,31 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                   ),
                   // Колонки кабинетов
                   Expanded(
-                    child: isSingleRoom
+                    child: shouldExpandColumns
                         ? Stack(
                             children: [
                               // Сетка с кликабельными ячейками
                               Row(
                                 children: [
-                                  Expanded(
-                                    child: Container(
-                                      decoration: const BoxDecoration(),
-                                      child: Column(
-                                        children: [
-                                          for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
-                                            _buildCell(rooms[0], hour, lessons),
-                                        ],
+                                  for (int i = 0; i < rooms.length; i++)
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border(
+                                            left: BorderSide(
+                                              color: i == 0 ? Colors.transparent : AppColors.border,
+                                              width: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
+                                              _buildCell(rooms[i], hour, lessons),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
                                 ],
                               ),
                               // Занятия
@@ -1092,6 +1157,7 @@ class _WeekTimeGrid extends StatefulWidget {
   final String institutionId;
   final String? selectedRoomId;
   final double? restoreScrollOffset; // Позиция скролла для восстановления
+  final bool canManageRooms; // Может ли пользователь управлять кабинетами
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, DateTime date) onCellTap;
 
@@ -1105,6 +1171,7 @@ class _WeekTimeGrid extends StatefulWidget {
     required this.onCellTap,
     this.selectedRoomId,
     this.restoreScrollOffset,
+    this.canManageRooms = false,
   });
 
   static const minRoomColumnWidth = 100.0;
@@ -1252,38 +1319,86 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   Widget build(BuildContext context) {
     final rooms = widget.rooms;
     if (rooms.isEmpty) {
-      return const Center(
-        child: Text('Нет кабинетов', style: TextStyle(color: AppColors.textSecondary)),
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.meeting_room_outlined,
+              size: 48,
+              color: AppColors.textTertiary,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Нет кабинетов',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            if (widget.canManageRooms) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.push('/institutions/${widget.institutionId}/rooms'),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Добавить кабинет'),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       );
-    }
-
-    // Вычисляем высоту каждой строки на основе максимального количества занятий
-    final rowHeights = <int, double>{};
-    for (var dayIndex = 0; dayIndex < 7; dayIndex++) {
-      final date = widget.weekStart.add(Duration(days: dayIndex));
-      final normalizedDate = DateTime(date.year, date.month, date.day);
-      final dayLessons = widget.lessonsByDay[normalizedDate] ?? [];
-
-      int maxLessons = 0;
-      for (final room in rooms) {
-        final count = dayLessons.where((l) => l.roomId == room.id).length;
-        if (count > maxLessons) maxLessons = count;
-      }
-
-      rowHeights[dayIndex] = maxLessons > 0
-          ? (maxLessons * _WeekTimeGrid.lessonItemHeight + 8).clamp(_WeekTimeGrid.minRowHeight, double.infinity)
-          : _WeekTimeGrid.minRowHeight;
     }
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Если выбран один кабинет - расширяем на весь экран
+        // Вычисляем высоту каждой строки на основе максимального количества занятий
+        final baseRowHeights = <int, double>{};
+        for (var dayIndex = 0; dayIndex < 7; dayIndex++) {
+          final date = widget.weekStart.add(Duration(days: dayIndex));
+          final normalizedDate = DateTime(date.year, date.month, date.day);
+          final dayLessons = widget.lessonsByDay[normalizedDate] ?? [];
+
+          int maxLessons = 0;
+          for (final room in rooms) {
+            final count = dayLessons.where((l) => l.roomId == room.id).length;
+            if (count > maxLessons) maxLessons = count;
+          }
+
+          baseRowHeights[dayIndex] = maxLessons > 0
+              ? (maxLessons * _WeekTimeGrid.lessonItemHeight + 8).clamp(_WeekTimeGrid.minRowHeight, double.infinity)
+              : _WeekTimeGrid.minRowHeight;
+        }
+
+        // Вычисляем доступную высоту для строк дней (минус заголовок 40px)
+        const headerHeight = 40.0;
+        final availableHeight = constraints.maxHeight - headerHeight;
+        final totalMinHeight = baseRowHeights.values.fold(0.0, (sum, h) => sum + h);
+
+        // Если контента мало - растягиваем строки на всю доступную высоту
+        final rowHeights = <int, double>{};
+        if (totalMinHeight < availableHeight) {
+          // Масштабируем пропорционально базовой высоте каждого дня
+          final scale = availableHeight / totalMinHeight;
+          for (var i = 0; i < 7; i++) {
+            rowHeights[i] = baseRowHeights[i]! * scale;
+          }
+        } else {
+          rowHeights.addAll(baseRowHeights);
+        }
+
+        // Проверяем, помещаются ли все кабинеты на экран
         final availableWidth = constraints.maxWidth - _WeekTimeGrid.dayLabelWidth;
-        final roomColumnWidth = rooms.length == 1
-            ? availableWidth
+        final fitsOnScreen = rooms.length * _WeekTimeGrid.minRoomColumnWidth <= availableWidth;
+
+        // Расширяем колонки если все помещаются
+        final roomColumnWidth = fitsOnScreen
+            ? availableWidth / rooms.length
             : _WeekTimeGrid.minRoomColumnWidth;
         final totalWidth = rooms.length * roomColumnWidth;
-        final needsHorizontalScroll = totalWidth > availableWidth;
+        final needsHorizontalScroll = !fitsOnScreen;
 
         return Column(
           children: [
@@ -1313,8 +1428,8 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                   ),
                   // Заголовки кабинетов
                   Expanded(
-                    child: rooms.length == 1
-                        ? _buildRoomHeaders(widget.rooms, roomColumnWidth)
+                    child: fitsOnScreen
+                        ? _buildRoomHeaders(widget.rooms, roomColumnWidth, expandColumns: true)
                         : SingleChildScrollView(
                             controller: _headerScrollController,
                             scrollDirection: Axis.horizontal,
@@ -1330,77 +1445,14 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             ),
             // Сетка дней и занятий
             Expanded(
-              child: SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                child: Column(
-                  children: List.generate(7, (dayIndex) {
-                    final date = widget.weekStart.add(Duration(days: dayIndex));
-                    final normalizedDate = DateTime(date.year, date.month, date.day);
-                    final dayLessons = widget.lessonsByDay[normalizedDate] ?? [];
-                    final isToday = AppDateUtils.isToday(date);
-                    final rowHeight = rowHeights[dayIndex] ?? _WeekTimeGrid.minRowHeight;
-
-                    return Container(
-                      height: rowHeight,
-                      decoration: BoxDecoration(
-                        color: isToday ? AppColors.primary.withValues(alpha: 0.05) : null,
-                        border: const Border(
-                          bottom: BorderSide(color: AppColors.border, width: 0.5),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          // День недели слева
-                          Container(
-                            width: _WeekTimeGrid.dayLabelWidth,
-                            height: rowHeight,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: isToday ? AppColors.primary.withValues(alpha: 0.1) : null,
-                              border: const Border(
-                                right: BorderSide(color: AppColors.border),
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  _weekDays[dayIndex],
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: isToday ? AppColors.primary : AppColors.textPrimary,
-                                  ),
-                                ),
-                                Text(
-                                  '${date.day}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isToday ? AppColors.primary : AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Ячейки с занятиями
-                          Expanded(
-                            child: rooms.length == 1
-                                ? _buildDayCells(widget.rooms, dayLessons, date, roomColumnWidth)
-                                : SingleChildScrollView(
-                                    controller: _dayControllers[dayIndex],
-                                    scrollDirection: Axis.horizontal,
-                                    physics: const ClampingScrollPhysics(),
-                                    child: SizedBox(
-                                      width: totalWidth,
-                                      child: _buildDayCells(widget.rooms, dayLessons, date, roomColumnWidth),
-                                    ),
-                                  ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ),
+              child: _buildDaysGrid(
+                rooms: rooms,
+                rowHeights: rowHeights,
+                totalMinHeight: totalMinHeight,
+                availableHeight: availableHeight,
+                fitsOnScreen: fitsOnScreen,
+                roomColumnWidth: roomColumnWidth,
+                totalWidth: totalWidth,
               ),
             ),
           ],
@@ -1409,8 +1461,169 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     );
   }
 
-  Widget _buildRoomHeaders(List<Room> rooms, double roomColumnWidth) {
-    final isSingleRoom = rooms.length == 1;
+  Widget _buildDaysGrid({
+    required List<Room> rooms,
+    required Map<int, double> rowHeights,
+    required double totalMinHeight,
+    required double availableHeight,
+    required bool fitsOnScreen,
+    required double roomColumnWidth,
+    required double totalWidth,
+  }) {
+    final needsVerticalScroll = totalMinHeight > availableHeight;
+
+    Widget buildDayRow(int dayIndex) {
+      final date = widget.weekStart.add(Duration(days: dayIndex));
+      final normalizedDate = DateTime(date.year, date.month, date.day);
+      final dayLessons = widget.lessonsByDay[normalizedDate] ?? [];
+      final isToday = AppDateUtils.isToday(date);
+      final rowHeight = rowHeights[dayIndex] ?? _WeekTimeGrid.minRowHeight;
+
+      return Container(
+        height: needsVerticalScroll ? rowHeight : null,
+        decoration: BoxDecoration(
+          color: isToday ? AppColors.primary.withValues(alpha: 0.05) : null,
+          border: const Border(
+            bottom: BorderSide(color: AppColors.border, width: 0.5),
+          ),
+        ),
+        child: Row(
+          children: [
+            // День недели слева
+            Container(
+              width: _WeekTimeGrid.dayLabelWidth,
+              height: needsVerticalScroll ? rowHeight : null,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isToday ? AppColors.primary.withValues(alpha: 0.1) : null,
+                border: const Border(
+                  right: BorderSide(color: AppColors.border),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _weekDays[dayIndex],
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: isToday ? AppColors.primary : AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    '${date.day}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isToday ? AppColors.primary : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Ячейки с занятиями
+            Expanded(
+              child: fitsOnScreen
+                  ? _buildDayCells(rooms, dayLessons, date, roomColumnWidth, expandColumns: true)
+                  : SingleChildScrollView(
+                      controller: _dayControllers[dayIndex],
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      child: SizedBox(
+                        width: totalWidth,
+                        child: _buildDayCells(rooms, dayLessons, date, roomColumnWidth),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Если контент не помещается - скроллируемый Column с минимальными высотами
+    if (needsVerticalScroll) {
+      return SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: Column(
+          children: List.generate(7, buildDayRow),
+        ),
+      );
+    }
+
+    // Если помещается - используем рассчитанные высоты (уже с доп. пространством)
+    return Column(
+      children: List.generate(7, (dayIndex) {
+        final date = widget.weekStart.add(Duration(days: dayIndex));
+        final normalizedDate = DateTime(date.year, date.month, date.day);
+        final dayLessons = widget.lessonsByDay[normalizedDate] ?? [];
+        final isToday = AppDateUtils.isToday(date);
+        final rowHeight = rowHeights[dayIndex]!;
+
+        return SizedBox(
+          height: rowHeight,
+          child: Container(
+            decoration: BoxDecoration(
+              color: isToday ? AppColors.primary.withValues(alpha: 0.05) : null,
+              border: const Border(
+                bottom: BorderSide(color: AppColors.border, width: 0.5),
+              ),
+            ),
+            child: Row(
+              children: [
+                // День недели слева
+                Container(
+                  width: _WeekTimeGrid.dayLabelWidth,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isToday ? AppColors.primary.withValues(alpha: 0.1) : null,
+                    border: const Border(
+                      right: BorderSide(color: AppColors.border),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _weekDays[dayIndex],
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: isToday ? AppColors.primary : AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        '${date.day}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isToday ? AppColors.primary : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Ячейки с занятиями
+                Expanded(
+                  child: fitsOnScreen
+                      ? _buildDayCells(rooms, dayLessons, date, roomColumnWidth, expandColumns: true)
+                      : SingleChildScrollView(
+                          controller: _dayControllers[dayIndex],
+                          scrollDirection: Axis.horizontal,
+                          physics: const ClampingScrollPhysics(),
+                          child: SizedBox(
+                            width: totalWidth,
+                            child: _buildDayCells(rooms, dayLessons, date, roomColumnWidth),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildRoomHeaders(List<Room> rooms, double roomColumnWidth, {bool expandColumns = false}) {
     return Row(
       children: rooms.map((room) {
         final isSelected = widget.selectedRoomId == room.id;
@@ -1423,7 +1636,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             widget.onRoomTap(room.id, _lastScrollOffset);
           },
           child: Container(
-            width: isSingleRoom ? double.infinity : roomColumnWidth,
+            width: expandColumns ? null : roomColumnWidth,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: isSelected ? AppColors.primary.withValues(alpha: 0.15) : null,
@@ -1442,13 +1655,12 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             ),
           ),
         );
-        return isSingleRoom ? Expanded(child: content) : content;
+        return expandColumns ? Expanded(child: content) : content;
       }).toList(),
     );
   }
 
-  Widget _buildDayCells(List<Room> rooms, List<Lesson> dayLessons, DateTime date, double roomColumnWidth) {
-    final isSingleRoom = rooms.length == 1;
+  Widget _buildDayCells(List<Room> rooms, List<Lesson> dayLessons, DateTime date, double roomColumnWidth, {bool expandColumns = false}) {
     return Row(
       children: rooms.map((room) {
         final roomLessons = dayLessons
@@ -1463,7 +1675,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
         final content = GestureDetector(
           onTap: () => widget.onCellTap(room, date),
           child: Container(
-            width: isSingleRoom ? double.infinity : roomColumnWidth,
+            width: expandColumns ? null : roomColumnWidth,
             decoration: const BoxDecoration(
               border: Border(
                 left: BorderSide(color: AppColors.border, width: 0.5),
@@ -1475,7 +1687,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                 : _buildLessonsList(roomLessons),
           ),
         );
-        return isSingleRoom ? Expanded(child: content) : content;
+        return expandColumns ? Expanded(child: content) : content;
       }).toList(),
     );
   }
@@ -1764,7 +1976,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
 
     if (completed == true) {
       // Ставим "Проведено" — снимаем "Отменено"
-      success = await controller.complete(lesson.id, lesson.roomId, lesson.date);
+      success = await controller.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
       if (success && mounted) {
         setState(() {
           _currentStatus = LessonStatus.completed;
@@ -1773,7 +1985,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       }
     } else if (completed == false && _isCompleted) {
       // Снимаем "Проведено" — возвращаем в "Запланировано"
-      success = await controller.uncomplete(lesson.id, lesson.roomId, lesson.date);
+      success = await controller.uncomplete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
       if (success && mounted) {
         setState(() {
           _currentStatus = LessonStatus.scheduled;
@@ -1782,7 +1994,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       }
     } else if (cancelled == true) {
       // Ставим "Отменено" — снимаем "Проведено"
-      success = await controller.cancel(lesson.id, lesson.roomId, lesson.date);
+      success = await controller.cancel(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
       if (success && mounted) {
         setState(() {
           _currentStatus = LessonStatus.cancelled;
@@ -1791,7 +2003,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       }
     } else if (cancelled == false && _isCancelled) {
       // Снимаем "Отменено" — возвращаем в "Запланировано"
-      success = await controller.uncomplete(lesson.id, lesson.roomId, lesson.date);
+      success = await controller.uncomplete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
       if (success && mounted) {
         setState(() {
           _currentStatus = LessonStatus.scheduled;
@@ -1814,7 +2026,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     // Если занятие ещё не проведено — сначала помечаем как проведённое
     if (_currentStatus != LessonStatus.completed) {
       final lessonController = ref.read(lessonControllerProvider.notifier);
-      await lessonController.complete(lesson.id, lesson.roomId, lesson.date);
+      await lessonController.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
     }
 
     // Создаём оплату с lessonId в comment
@@ -1923,10 +2135,11 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
           lesson.repeatGroupId!,
           lesson.date,
           lesson.roomId,
+          widget.institutionId,
         );
         message = 'Удалено $followingCount занятий';
       } else {
-        success = await controller.delete(lesson.id, lesson.roomId, lesson.date);
+        success = await controller.delete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
         message = 'Занятие удалено';
       }
 
@@ -1967,6 +2180,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
           lesson.id,
           lesson.roomId,
           lesson.date,
+          widget.institutionId,
         );
 
         if (success && mounted) {
@@ -2415,6 +2629,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
           lesson.repeatGroupId!,
           lesson.date,
           lesson.roomId,
+          widget.institutionId,
           startTime: _startTime,
           endTime: _endTime,
         );
@@ -2424,6 +2639,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
           lesson.id,
           roomId: lesson.roomId,
           date: lesson.date,
+          institutionId: widget.institutionId,
           newRoomId: _selectedRoom?.id,
           newDate: _date,
           startTime: _startTime,
@@ -2445,6 +2661,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
         lesson.id,
         roomId: lesson.roomId,
         date: lesson.date,
+        institutionId: widget.institutionId,
         newRoomId: _selectedRoom?.id,
         newDate: _date,
         startTime: _startTime,

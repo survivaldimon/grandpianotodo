@@ -262,7 +262,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         comment: comment,
       );
 
-      _invalidateForRoom(roomId, date);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
       state = const AsyncValue.data(null);
       return lesson;
     } catch (e, st) {
@@ -275,6 +275,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     String id, {
     required String roomId,
     required DateTime date,
+    required String institutionId,
     String? newRoomId,
     DateTime? newDate,
     TimeOfDay? startTime,
@@ -312,9 +313,9 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         await _repo.updateStatus(id, status);
       }
 
-      _invalidateForRoom(roomId, date);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
       if (newRoomId != null || newDate != null) {
-        _invalidateForRoom(newRoomId ?? roomId, newDate ?? date);
+        _invalidateForRoom(newRoomId ?? roomId, newDate ?? date, institutionId: institutionId);
       }
       _ref.invalidate(lessonProvider(id));
 
@@ -326,7 +327,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<bool> complete(String id, String roomId, DateTime date) async {
+  Future<bool> complete(String id, String roomId, DateTime date, String institutionId) async {
     state = const AsyncValue.loading();
     try {
       // Получаем занятие, чтобы узнать studentId
@@ -350,7 +351,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         }
       }
 
-      _invalidateForRoom(roomId, date);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
       _ref.invalidate(lessonProvider(id));
       state = const AsyncValue.data(null);
       return true;
@@ -360,7 +361,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<bool> uncomplete(String id, String roomId, DateTime date) async {
+  Future<bool> uncomplete(String id, String roomId, DateTime date, String institutionId) async {
     state = const AsyncValue.loading();
     try {
       // Получаем занятие, чтобы узнать studentId и subscriptionId
@@ -387,7 +388,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         }
       }
 
-      _invalidateForRoom(roomId, date);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
       _ref.invalidate(lessonProvider(id));
       state = const AsyncValue.data(null);
       return true;
@@ -397,13 +398,13 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<bool> cancel(String id, String roomId, DateTime date) async {
+  Future<bool> cancel(String id, String roomId, DateTime date, String institutionId) async {
     state = const AsyncValue.loading();
     try {
       await _repo.cancel(id);
       // При отмене занятие НЕ списывается с абонемента
       // (занятие не было проведено)
-      _invalidateForRoom(roomId, date);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
       _ref.invalidate(lessonProvider(id));
       state = const AsyncValue.data(null);
       return true;
@@ -413,11 +414,11 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<bool> archive(String id, String roomId, DateTime date) async {
+  Future<bool> archive(String id, String roomId, DateTime date, String institutionId) async {
     state = const AsyncValue.loading();
     try {
       await _repo.archive(id);
-      _invalidateForRoom(roomId, date);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -426,11 +427,11 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<bool> delete(String id, String roomId, DateTime date) async {
+  Future<bool> delete(String id, String roomId, DateTime date, String institutionId) async {
     state = const AsyncValue.loading();
     try {
       await _repo.delete(id);
-      _invalidateForRoom(roomId, date);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -471,7 +472,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
 
       // Инвалидируем кэш для всех дат
       for (final date in dates) {
-        _invalidateForRoom(roomId, date);
+        _invalidateForRoom(roomId, date, institutionId: institutionId);
       }
 
       state = const AsyncValue.data(null);
@@ -498,11 +499,11 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Удалить это и все последующие занятия серии
-  Future<bool> deleteFollowing(String repeatGroupId, DateTime fromDate, String roomId) async {
+  Future<bool> deleteFollowing(String repeatGroupId, DateTime fromDate, String roomId, String institutionId) async {
     state = const AsyncValue.loading();
     try {
       await _repo.deleteFollowingLessons(repeatGroupId, fromDate);
-      _invalidateForRoom(roomId, fromDate);
+      _invalidateForRoom(roomId, fromDate, institutionId: institutionId);
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -515,7 +516,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   Future<bool> updateFollowing(
     String repeatGroupId,
     DateTime fromDate,
-    String roomId, {
+    String roomId,
+    String institutionId, {
     TimeOfDay? startTime,
     TimeOfDay? endTime,
   }) async {
@@ -527,7 +529,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         startTime: startTime,
         endTime: endTime,
       );
-      _invalidateForRoom(roomId, fromDate);
+      _invalidateForRoom(roomId, fromDate, institutionId: institutionId);
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -542,8 +544,18 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     return lessons.length;
   }
 
-  void _invalidateForRoom(String roomId, DateTime date) {
+  void _invalidateForRoom(String roomId, DateTime date, {String? institutionId}) {
     _ref.invalidate(lessonsByRoomProvider(RoomDateParams(roomId, date)));
+
+    // Инвалидируем недельный провайдер для realtime обновления
+    if (institutionId != null) {
+      // Вычисляем начало недели для даты
+      final weekStart = date.subtract(Duration(days: date.weekday - 1));
+      final normalizedWeekStart = DateTime(weekStart.year, weekStart.month, weekStart.day);
+      _ref.invalidate(lessonsByInstitutionWeekProvider(
+        InstitutionWeekParams(institutionId, normalizedWeekStart),
+      ));
+    }
   }
 }
 

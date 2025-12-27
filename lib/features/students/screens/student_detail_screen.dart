@@ -57,8 +57,6 @@ class StudentDetailScreen extends ConsumerWidget {
           IsMyStudentParams(studentId, institutionId),
         ));
 
-        final canArchive = permissions?.archiveData ?? false;
-
         // Проверяем права на редактирование ученика
         final isOwner = institutionAsync.maybeWhen(
           data: (inst) => inst.ownerId == ref.watch(currentUserIdProvider),
@@ -73,6 +71,11 @@ class StudentDetailScreen extends ConsumerWidget {
         final canEditStudent = hasFullAccess ||
             (permissions?.manageAllStudents ?? false) ||
             (isMyStudent && (permissions?.manageOwnStudents ?? false));
+
+        // Право архивировать: владелец, или есть права archiveData, или свой ученик
+        final canArchive = isOwner ||
+            (permissions?.archiveData ?? false) ||
+            isMyStudent;
 
         return Scaffold(
           appBar: AppBar(

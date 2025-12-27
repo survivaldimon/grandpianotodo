@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
@@ -26,12 +27,14 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   @override
   Widget build(BuildContext context) {
     final roomsAsync = ref.watch(roomsProvider(widget.institutionId));
+    final rooms = roomsAsync.valueOrNull ?? [];
+    final hasRooms = rooms.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.rooms),
         actions: [
-          if (!_isEditMode)
+          if (!_isEditMode && hasRooms)
             IconButton(
               icon: const Icon(Icons.reorder),
               tooltip: 'Изменить порядок',
@@ -46,13 +49,14 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
               },
               child: const Text('Готово'),
             ),
-          if (!_isEditMode)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => _showAddRoomDialog(context, ref),
-            ),
         ],
       ),
+      floatingActionButton: !_isEditMode && hasRooms
+          ? FloatingActionButton(
+              onPressed: () => _showAddRoomDialog(context, ref),
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: roomsAsync.when(
         loading: () => const LoadingIndicator(),
         error: (error, _) => ErrorView.fromException(
@@ -77,39 +81,9 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
               ref.invalidate(roomsProvider(widget.institutionId));
               await ref.read(roomsProvider(widget.institutionId).future);
             },
-            child: Column(
-              children: [
-                // Кнопка "Все кабинеты"
-                if (!_isEditMode)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: Card(
-                      color: AppColors.primary,
-                      child: ListTile(
-                        leading: const Icon(Icons.grid_view, color: Colors.white),
-                        title: const Text(
-                          'Все кабинеты',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: const Text(
-                          'Расписание всех кабинетов',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        trailing: const Icon(Icons.chevron_right, color: Colors.white),
-                        onTap: () {
-                          context.go('/institutions/${widget.institutionId}/rooms/all');
-                        },
-                      ),
-                    ),
-                  ),
-                // Список кабинетов
-                Expanded(
-                  child: _isEditMode
-                      ? _buildReorderableList(rooms)
-                      : _buildNormalList(rooms),
-                ),
-              ],
-            ),
+            child: _isEditMode
+                ? _buildReorderableList(rooms)
+                : _buildNormalList(rooms),
           );
         },
       ),
@@ -190,63 +164,212 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   }
 
   void _showAddRoomDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final numberController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Новый кабинет'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: numberController,
-                decoration: const InputDecoration(
-                  labelText: 'Номер кабинета',
-                  hintText: 'Например: 101',
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dialogContext) => _AddRoomSheet(
+        institutionId: widget.institutionId,
+      ),
+    );
+  }
+}
+
+/// Форма создания нового кабинета
+class _AddRoomSheet extends ConsumerStatefulWidget {
+  final String institutionId;
+
+  const _AddRoomSheet({required this.institutionId});
+
+  @override
+  ConsumerState<_AddRoomSheet> createState() => _AddRoomSheetState();
+}
+
+class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _numberController = TextEditingController();
+  final _nameController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _numberController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createRoom() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final controller = ref.read(roomControllerProvider.notifier);
+      final room = await controller.create(
+        institutionId: widget.institutionId,
+        name: _nameController.text.isEmpty
+            ? 'Кабинет ${_numberController.text}'
+            : _nameController.text.trim(),
+        number: _numberController.text.trim(),
+      );
+
+      if (room != null && mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Кабинет "${room.number != null ? "№${room.number}" : room.name}" создан'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Индикатор
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? 'Введите номер' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Название',
-                  hintText: 'Например: Фортепианный',
+                const SizedBox(height: 20),
+
+                // Заголовок
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.meeting_room,
+                        color: AppColors.primary,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Новый кабинет',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Заполните данные кабинета',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 28),
+
+                // Номер кабинета
+                TextFormField(
+                  controller: _numberController,
+                  decoration: InputDecoration(
+                    labelText: 'Номер кабинета *',
+                    hintText: 'Например: 101',
+                    prefixIcon: const Icon(Icons.tag),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  validator: (v) => v == null || v.isEmpty ? 'Введите номер кабинета' : null,
+                ),
+                const SizedBox(height: 16),
+
+                // Название
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Название (опционально)',
+                    hintText: 'Например: Фортепианный',
+                    prefixIcon: const Icon(Icons.label_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  textCapitalization: TextCapitalization.sentences,
+                ),
+                const SizedBox(height: 28),
+
+                // Кнопка создания
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _createRoom,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Создать кабинет',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                final controller = ref.read(roomControllerProvider.notifier);
-                final room = await controller.create(
-                  institutionId: widget.institutionId,
-                  name: nameController.text.isEmpty
-                      ? 'Кабинет ${numberController.text}'
-                      : nameController.text,
-                  number: numberController.text,
-                );
-                if (room != null && context.mounted) {
-                  Navigator.pop(context);
-                }
-              }
-            },
-            child: const Text('Создать'),
-          ),
-        ],
       ),
     );
   }
@@ -314,11 +437,11 @@ class _RoomCard extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.archive, color: Colors.orange),
-              title: const Text('Архивировать', style: TextStyle(color: Colors.orange)),
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Удалить', style: TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
-                _showArchiveConfirmation(context, ref);
+                _showDeleteConfirmation(context, ref);
               },
             ),
           ],
@@ -328,80 +451,27 @@ class _RoomCard extends ConsumerWidget {
   }
 
   void _showEditDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController(text: room.name);
-    final numberController = TextEditingController(text: room.number ?? '');
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Редактировать кабинет'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: numberController,
-                decoration: const InputDecoration(
-                  labelText: 'Номер кабинета',
-                  hintText: 'Например: 101',
-                ),
-                validator: (v) => v == null || v.isEmpty ? 'Введите номер' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Название',
-                  hintText: 'Например: Фортепианный',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                final controller = ref.read(roomControllerProvider.notifier);
-                final success = await controller.update(
-                  room.id,
-                  institutionId: institutionId,
-                  name: nameController.text.isEmpty
-                      ? 'Кабинет ${numberController.text}'
-                      : nameController.text,
-                  number: numberController.text,
-                );
-                if (success && dialogContext.mounted) {
-                  Navigator.pop(dialogContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Кабинет обновлён')),
-                  );
-                }
-              }
-            },
-            child: const Text('Сохранить'),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dialogContext) => _EditRoomSheet(
+        room: room,
+        institutionId: institutionId,
       ),
     );
   }
 
-  void _showArchiveConfirmation(BuildContext context, WidgetRef ref) {
+  void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Архивировать кабинет?'),
+        title: const Text('Удалить кабинет?'),
         content: Text(
           'Кабинет "${room.number != null ? "№${room.number} ${room.name}" : room.name}" '
-          'будет перемещён в архив. Занятия в этом кабинете останутся в истории.',
+          'будет удалён. Это действие нельзя отменить.',
         ),
         actions: [
           TextButton(
@@ -412,20 +482,232 @@ class _RoomCard extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(dialogContext);
               final controller = ref.read(roomControllerProvider.notifier);
-              final success = await controller.archive(room.id, institutionId);
+              final success = await controller.delete(room.id, institutionId);
               if (success) {
                 scaffoldMessenger.showSnackBar(
                   const SnackBar(
-                    content: Text('Кабинет архивирован'),
-                    backgroundColor: Colors.orange,
+                    content: Text('Кабинет удалён'),
+                    backgroundColor: AppColors.error,
                   ),
                 );
               }
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.orange),
-            child: const Text('Архивировать'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Удалить'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Форма редактирования кабинета
+class _EditRoomSheet extends ConsumerStatefulWidget {
+  final Room room;
+  final String institutionId;
+
+  const _EditRoomSheet({
+    required this.room,
+    required this.institutionId,
+  });
+
+  @override
+  ConsumerState<_EditRoomSheet> createState() => _EditRoomSheetState();
+}
+
+class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _numberController;
+  late final TextEditingController _nameController;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _numberController = TextEditingController(text: widget.room.number ?? '');
+    _nameController = TextEditingController(text: widget.room.name);
+  }
+
+  @override
+  void dispose() {
+    _numberController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _updateRoom() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final controller = ref.read(roomControllerProvider.notifier);
+      final success = await controller.update(
+        widget.room.id,
+        institutionId: widget.institutionId,
+        name: _nameController.text.isEmpty
+            ? 'Кабинет ${_numberController.text}'
+            : _nameController.text.trim(),
+        number: _numberController.text.trim(),
+      );
+
+      if (success && mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Кабинет обновлён'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Индикатор
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Заголовок
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.edit,
+                        color: AppColors.primary,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Редактировать кабинет',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Измените данные кабинета',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+
+                // Номер кабинета
+                TextFormField(
+                  controller: _numberController,
+                  decoration: InputDecoration(
+                    labelText: 'Номер кабинета *',
+                    hintText: 'Например: 101',
+                    prefixIcon: const Icon(Icons.tag),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  validator: (v) => v == null || v.isEmpty ? 'Введите номер кабинета' : null,
+                ),
+                const SizedBox(height: 16),
+
+                // Название
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Название (опционально)',
+                    hintText: 'Например: Фортепианный',
+                    prefixIcon: const Icon(Icons.label_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  textCapitalization: TextCapitalization.sentences,
+                ),
+                const SizedBox(height: 28),
+
+                // Кнопка сохранения
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _updateRoom,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Сохранить',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

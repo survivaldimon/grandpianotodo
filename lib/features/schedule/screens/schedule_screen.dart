@@ -12,6 +12,7 @@ import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/institution/providers/subject_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
+import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
@@ -593,6 +594,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       widget.lesson.id,
       widget.lesson.roomId,
       widget.lesson.date,
+      widget.institutionId,
     );
 
     if (success && mounted) {
@@ -619,6 +621,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       widget.lesson.id,
       widget.lesson.roomId,
       widget.lesson.date,
+      widget.institutionId,
     );
 
     if (success && mounted) {
@@ -649,6 +652,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         lesson.id,
         lesson.roomId,
         lesson.date,
+        widget.institutionId,
       );
     }
 
@@ -685,6 +689,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       widget.lesson.id,
       widget.lesson.roomId,
       widget.lesson.date,
+      widget.institutionId,
     );
 
     if (success && mounted) {
@@ -732,6 +737,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         widget.lesson.id,
         widget.lesson.roomId,
         widget.lesson.date,
+        widget.institutionId,
       );
 
       if (success && mounted) {
@@ -1081,8 +1087,13 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                       child: Text(m.profile?.fullName ?? m.roleName),
                     )),
                   ],
-                  onChanged: (member) {
+                  onChanged: (member) async {
                     setState(() => _selectedTeacher = member);
+
+                    // Автовыбор направления если у преподавателя только одно
+                    if (member != null) {
+                      await _autoSelectSubjectForTeacher(member.userId);
+                    }
                   },
                 );
               },
@@ -1318,6 +1329,33 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
     } catch (e) {
       // Ошибка автозаполнения не критична - просто игнорируем
       debugPrint('Ошибка автозаполнения: $e');
+    }
+  }
+
+  /// Автовыбор направления если у преподавателя только одно
+  Future<void> _autoSelectSubjectForTeacher(String userId) async {
+    try {
+      final teacherSubjects = await ref.read(
+        teacherSubjectsProvider(
+          TeacherSubjectsParams(
+            userId: userId,
+            institutionId: widget.institutionId,
+          ),
+        ).future,
+      );
+
+      if (teacherSubjects.length == 1 && mounted) {
+        final subjectsAsync = ref.read(subjectsProvider(widget.institutionId));
+        final subjects = subjectsAsync.valueOrNull ?? [];
+        final matchingSubject = subjects.firstWhere(
+          (s) => s.id == teacherSubjects.first.subjectId,
+          orElse: () => teacherSubjects.first.subject!,
+        );
+
+        setState(() => _selectedSubject = matchingSubject);
+      }
+    } catch (e) {
+      debugPrint('Ошибка автовыбора направления: $e');
     }
   }
 

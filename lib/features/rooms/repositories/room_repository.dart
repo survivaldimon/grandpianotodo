@@ -90,6 +90,15 @@ class RoomRepository {
     }
   }
 
+  /// Удалить кабинет
+  Future<void> delete(String id) async {
+    try {
+      await _client.from('rooms').delete().eq('id', id);
+    } catch (e) {
+      throw DatabaseException('Ошибка удаления кабинета: $e');
+    }
+  }
+
   /// Архивировать кабинет
   Future<void> archive(String id) async {
     try {

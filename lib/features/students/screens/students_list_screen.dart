@@ -9,6 +9,7 @@ import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/empty_state.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
+import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
@@ -25,10 +26,7 @@ class StudentsListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final filter = ref.watch(studentFilterProvider);
-    final studentsAsync = ref.watch(filteredStudentsProvider(institutionId));
-
-    // Проверяем права на добавление учеников
+    // Проверяем права
     final permissions = ref.watch(myPermissionsProvider(institutionId));
     final institutionAsync = ref.watch(currentInstitutionProvider(institutionId));
     final isOwner = institutionAsync.maybeWhen(
@@ -37,9 +35,15 @@ class StudentsListScreen extends ConsumerWidget {
     );
     final isAdmin = ref.watch(isAdminProvider(institutionId));
     final hasFullAccess = isOwner || isAdmin;
+    final canManageAllStudents = hasFullAccess || (permissions?.manageAllStudents ?? false);
     final canAddStudent = hasFullAccess ||
         (permissions?.manageOwnStudents ?? false) ||
         (permissions?.manageAllStudents ?? false);
+
+    final filter = ref.watch(studentFilterProvider);
+    final studentsAsync = ref.watch(filteredStudentsProvider(
+      StudentFilterParams(institutionId: institutionId, onlyMyStudents: !canManageAllStudents),
+    ));
 
     return Scaffold(
       appBar: AppBar(
@@ -56,13 +60,14 @@ class StudentsListScreen extends ConsumerWidget {
               // TODO: Search
             },
           ),
-          if (canAddStudent)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => _showAddStudentDialog(context, ref),
-            ),
         ],
       ),
+      floatingActionButton: canAddStudent
+          ? FloatingActionButton(
+              onPressed: () => _showAddStudentDialog(context, ref),
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: Column(
         children: [
           // Filter chips
@@ -76,12 +81,15 @@ class StudentsListScreen extends ConsumerWidget {
                   selected: filter == StudentFilter.all,
                   onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.all,
                 ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('Мои'),
-                  selected: filter == StudentFilter.myStudents,
-                  onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.myStudents,
-                ),
+                // Кнопка "Мои" только для тех, кто видит всех учеников
+                if (canManageAllStudents) ...[
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: const Text('Мои'),
+                    selected: filter == StudentFilter.myStudents,
+                    onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.myStudents,
+                  ),
+                ],
                 const SizedBox(width: 8),
                 FilterChip(
                   label: const Text('С долгом'),
@@ -103,7 +111,9 @@ class StudentsListScreen extends ConsumerWidget {
               loading: () => const LoadingIndicator(),
               error: (error, _) => ErrorView.fromException(
                 error,
-                onRetry: () => ref.invalidate(filteredStudentsProvider(institutionId)),
+                onRetry: () => ref.invalidate(filteredStudentsProvider(
+                  StudentFilterParams(institutionId: institutionId, onlyMyStudents: !canManageAllStudents),
+                )),
               ),
               data: (students) {
                 if (students.isEmpty) {
@@ -111,7 +121,9 @@ class StudentsListScreen extends ConsumerWidget {
                 }
                 return RefreshIndicator(
                   onRefresh: () async {
-                    ref.invalidate(filteredStudentsProvider(institutionId));
+                    ref.invalidate(filteredStudentsProvider(
+                      StudentFilterParams(institutionId: institutionId, onlyMyStudents: !canManageAllStudents),
+                    ));
                   },
                   child: ListView.builder(
                     padding: AppSizes.paddingHorizontalM,
@@ -170,12 +182,25 @@ class StudentsListScreen extends ConsumerWidget {
   }
 
   void _showAddStudentDialog(BuildContext context, WidgetRef ref) {
+    final permissions = ref.read(myPermissionsProvider(institutionId));
+    final institutionAsync = ref.read(currentInstitutionProvider(institutionId));
+    final currentUserId = ref.read(currentUserIdProvider);
+    final isOwner = institutionAsync.maybeWhen(
+      data: (inst) => inst.ownerId == currentUserId,
+      orElse: () => false,
+    );
+    final isAdmin = ref.read(isAdminProvider(institutionId));
+    final hasFullAccess = isOwner || isAdmin;
+    final canManageAllStudents = hasFullAccess || (permissions?.manageAllStudents ?? false);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (dialogContext) => _AddStudentSheet(
         institutionId: institutionId,
+        canManageAllStudents: canManageAllStudents,
+        currentUserId: currentUserId,
       ),
     );
   }
@@ -184,8 +209,14 @@ class StudentsListScreen extends ConsumerWidget {
 /// Форма создания нового ученика
 class _AddStudentSheet extends ConsumerStatefulWidget {
   final String institutionId;
+  final bool canManageAllStudents;
+  final String? currentUserId;
 
-  const _AddStudentSheet({required this.institutionId});
+  const _AddStudentSheet({
+    required this.institutionId,
+    required this.canManageAllStudents,
+    this.currentUserId,
+  });
 
   @override
   ConsumerState<_AddStudentSheet> createState() => _AddStudentSheetState();
@@ -200,6 +231,8 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
   InstitutionMember? _selectedTeacher;
   Subject? _selectedSubject;
   bool _isLoading = false;
+  bool _teacherInitialized = false;
+  bool _subjectInitialized = false;
 
   @override
   void dispose() {
@@ -381,6 +414,43 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     // Показываем всех активных участников
                     final activeMembers = members.where((m) => !m.isArchived).toList();
 
+                    // Если нет прав на управление всеми учениками - автоматически привязываем к текущему пользователю
+                    if (!widget.canManageAllStudents && !_teacherInitialized) {
+                      final currentMember = activeMembers.where((m) => m.userId == widget.currentUserId).firstOrNull;
+                      if (currentMember != null) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            setState(() {
+                              _selectedTeacher = currentMember;
+                              _teacherInitialized = true;
+                            });
+                            // Автовыбор направления если у преподавателя только одно
+                            _autoSelectSubjectForTeacher(currentMember.userId);
+                          }
+                        });
+                      }
+                    }
+
+                    // Если нет прав - показываем только информацию без возможности изменить
+                    if (!widget.canManageAllStudents) {
+                      final teacherName = _selectedTeacher?.profile?.fullName ?? 'Вы';
+                      return InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Преподаватель',
+                          prefixIcon: const Icon(Icons.school_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                        ),
+                        child: Text(
+                          teacherName,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                        ),
+                      );
+                    }
+
                     if (activeMembers.isEmpty) {
                       return InputDecorator(
                         decoration: InputDecoration(
@@ -418,7 +488,13 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       )).toList(),
-                      onChanged: (value) => setState(() => _selectedTeacher = value),
+                      onChanged: (value) {
+                        setState(() => _selectedTeacher = value);
+                        // Автовыбор направления если у преподавателя только одно
+                        if (value != null) {
+                          _autoSelectSubjectForTeacher(value.userId);
+                        }
+                      },
                     );
                   },
                 ),
@@ -538,6 +614,39 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
         ),
       ),
     );
+  }
+
+  /// Автовыбор направления если у преподавателя только одно
+  Future<void> _autoSelectSubjectForTeacher(String userId) async {
+    if (_subjectInitialized) return;
+
+    try {
+      final teacherSubjects = await ref.read(
+        teacherSubjectsProvider(
+          TeacherSubjectsParams(
+            userId: userId,
+            institutionId: widget.institutionId,
+          ),
+        ).future,
+      );
+
+      if (teacherSubjects.length == 1 && mounted) {
+        final subjectsAsync = ref.read(subjectsListProvider(widget.institutionId));
+        final subjects = subjectsAsync.valueOrNull ?? [];
+        final activeSubjects = subjects.where((s) => s.archivedAt == null).toList();
+        final matchingSubject = activeSubjects.firstWhere(
+          (s) => s.id == teacherSubjects.first.subjectId,
+          orElse: () => teacherSubjects.first.subject!,
+        );
+
+        setState(() {
+          _selectedSubject = matchingSubject;
+          _subjectInitialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Ошибка автовыбора направления: $e');
+    }
   }
 
   Widget _buildDropdownSkeleton(String label) {

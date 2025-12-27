@@ -471,7 +471,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
 
       if (mark.isCompleted) {
         futures.add(
-          lessonController.complete(lesson.id, lesson.roomId, lesson.date).then((_) async {
+          lessonController.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId).then((_) async {
             // Если оплачено - создать оплату
             if (mark.isPaid && lesson.studentId != null && lesson.lessonType?.defaultPrice != null) {
               final lessonTypeName = lesson.lessonType?.name ?? 'Оплата занятия';
@@ -487,7 +487,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
         );
       } else if (mark.isCancelled) {
         futures.add(
-          lessonController.cancel(lesson.id, lesson.roomId, lesson.date),
+          lessonController.cancel(lesson.id, lesson.roomId, lesson.date, widget.institutionId),
         );
       }
     }
