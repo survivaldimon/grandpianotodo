@@ -16,3 +16,6 @@ ADD CONSTRAINT check_work_hours_order CHECK (work_end_hour > work_start_hour);
 -- Комментарии к колонкам
 COMMENT ON COLUMN institutions.work_start_hour IS 'Начало рабочего времени (час, 0-23). По умолчанию 8.';
 COMMENT ON COLUMN institutions.work_end_hour IS 'Конец рабочего времени (час, 1-24). По умолчанию 22.';
+
+-- Добавляем таблицу institutions в Realtime для синхронизации рабочего времени между участниками
+ALTER PUBLICATION supabase_realtime ADD TABLE institutions;

@@ -20,11 +20,19 @@ final archivedInstitutionsProvider = FutureProvider<List<Institution>>((ref) asy
   return repo.getArchivedInstitutions();
 });
 
-/// Провайдер текущего заведения
+/// Провайдер текущего заведения (для единоразовой загрузки)
 final currentInstitutionProvider =
     FutureProvider.family<Institution, String>((ref, id) async {
   final repo = ref.watch(institutionRepositoryProvider);
   return repo.getById(id);
+});
+
+/// Провайдер текущего заведения (realtime)
+/// Используется для отслеживания изменений настроек заведения (рабочее время и т.д.)
+final currentInstitutionStreamProvider =
+    StreamProvider.family<Institution, String>((ref, id) {
+  final repo = ref.watch(institutionRepositoryProvider);
+  return repo.watchById(id);
 });
 
 /// Провайдер участников заведения

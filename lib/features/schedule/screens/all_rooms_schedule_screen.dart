@@ -148,8 +148,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       lessonsByInstitutionStreamProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
     );
 
-    // Получаем права пользователя
-    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+    // Получаем права пользователя (используем StreamProvider для realtime обновления)
+    final institutionAsync = ref.watch(currentInstitutionStreamProvider(widget.institutionId));
     final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
     final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
     final isOwner = institutionAsync.maybeWhen(

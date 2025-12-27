@@ -71,7 +71,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
     final lessonsAsync = ref.watch(
       lessonsByRoomProvider(RoomDateParams(widget.roomId, _selectedDate)),
     );
-    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+    // Используем StreamProvider для realtime обновления рабочего времени
+    final institutionAsync = ref.watch(currentInstitutionStreamProvider(widget.institutionId));
 
     // Получаем рабочее время из заведения
     final workStartHour = institutionAsync.valueOrNull?.workStartHour ?? 8;

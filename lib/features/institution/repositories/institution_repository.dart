@@ -45,6 +45,21 @@ class InstitutionRepository {
     }
   }
 
+  /// Стрим заведения по ID (realtime)
+  Stream<Institution> watchById(String id) async* {
+    // Сначала выдаём текущее значение
+    yield await getById(id);
+
+    // Слушаем изменения
+    await for (final _ in _client
+        .from('institutions')
+        .stream(primaryKey: ['id'])
+        .eq('id', id)) {
+      // При любом изменении загружаем актуальные данные
+      yield await getById(id);
+    }
+  }
+
   /// Создать заведение
   Future<Institution> create(String name) async {
     if (_userId == null) throw AuthAppException('Пользователь не авторизован');
