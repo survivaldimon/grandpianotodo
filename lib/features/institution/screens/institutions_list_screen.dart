@@ -24,6 +24,15 @@ class _InstitutionsListScreenState extends ConsumerState<InstitutionsListScreen>
   bool _hasAutoNavigated = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Принудительно обновляем список заведений при открытии экрана
+    Future.microtask(() {
+      ref.invalidate(myInstitutionsProvider);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final institutionsAsync = ref.watch(myInstitutionsProvider);
 
