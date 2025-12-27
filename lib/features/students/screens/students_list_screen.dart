@@ -276,6 +276,14 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
               institutionId: widget.institutionId,
             );
           }
+
+          // Принудительно обновляем список учеников для обновления myStudentIds
+          ref.invalidate(filteredStudentsProvider(
+            StudentFilterParams(institutionId: widget.institutionId, onlyMyStudents: true),
+          ));
+          ref.invalidate(filteredStudentsProvider(
+            StudentFilterParams(institutionId: widget.institutionId, onlyMyStudents: false),
+          ));
         }
 
         if (mounted) {
