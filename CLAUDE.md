@@ -38,11 +38,16 @@
 - `SESSION_2025_12_25_SUBSCRIPTIONS_REALTIME.md` — детальный отчет об исправлении Realtime подписок
 - `SESSION_2025_12_25_PERMISSIONS.md` — система прав участников, разделение прав на удаление занятий
 - `SESSION_2025_12_26_UI_IMPROVEMENTS.md` — UI улучшения, экран профиля, исправление архивации учеников
-- **`SESSION_2025_12_27_PERMISSIONS.md`** — расширение системы прав:
+- `SESSION_2025_12_27_PERMISSIONS.md` — расширение системы прав:
   - Разделение прав на управление учениками (свои/все)
   - Скрытие кода приглашения (только владельцу)
   - Режим "только просмотр" для карточек учеников
   - Исправление ошибки при отметке занятия
+- **`SESSION_2025_12_27_SCHEDULE_FAB.md`** — улучшения расписания:
+  - Валидация пароля при регистрации
+  - Настройка рабочего времени заведения
+  - FAB для быстрого создания занятий
+  - Автоматическое расширение сетки для занятий вне рабочего времени
 
 ## Валюта
 
@@ -304,6 +309,101 @@ final canEditStudent = isOwner ||
 - Архивированный ученик показывает баннер с датой архивации
 - `watchByInstitution` загружает ВСЕХ учеников (includeArchived: true)
 - Фильтрация происходит в провайдере `filteredStudentsProvider`
+
+### 20. Валидация пароля при регистрации
+При регистрации пароль должен соответствовать требованиям:
+- Минимум **8 символов**
+- Минимум **1 заглавная буква** (A-Z или А-Я)
+- Минимум **1 специальный символ** (!@#$%^&*()_+-=[]{}etc)
+
+**Файлы:**
+- `lib/core/utils/validators.dart` — функция `Validators.password()`
+- `lib/core/constants/app_strings.dart` — сообщения об ошибках
+- `lib/features/auth/screens/register_screen.dart` — подсказка под полем
+
+### 21. Рабочее время заведения
+Настройка рабочего времени определяет диапазон часов в сетке расписания.
+
+**Поля в таблице `institutions`:**
+```sql
+work_start_hour INTEGER DEFAULT 8   -- Начало (0-23)
+work_end_hour INTEGER DEFAULT 22    -- Конец (1-24)
+```
+
+**Настройка:**
+- Находится в Настройки → раздел "Заведение"
+- Доступна только владельцу и администраторам
+- Значение по умолчанию: 8:00 — 22:00
+- Только целые часы (без минут)
+
+**Realtime синхронизация:**
+- `currentInstitutionStreamProvider` — StreamProvider для отслеживания изменений
+- При изменении рабочего времени все участники видят обновление сразу
+- Таблица `institutions` добавлена в Supabase Realtime publication
+
+**Миграция:**
+```sql
+ALTER TABLE institutions
+ADD COLUMN IF NOT EXISTS work_start_hour INTEGER DEFAULT 8,
+ADD COLUMN IF NOT EXISTS work_end_hour INTEGER DEFAULT 22;
+
+ALTER PUBLICATION supabase_realtime ADD TABLE institutions;
+```
+
+### 22. FAB для быстрого создания занятий
+В расписании (дневной и недельный режим) есть FloatingActionButton для быстрого создания занятий.
+
+**Возможности:**
+- Выбор кабинета из списка
+- Выбор даты (по умолчанию — текущая выбранная)
+- Выбор времени начала и окончания
+- Выбор ученика (или создание нового)
+- Выбор преподавателя (если несколько)
+- Выбор предмета и типа занятия
+
+**Доступность:**
+- Владелец заведения
+- Участники с правом `createLessons`
+
+**Виджет:** `_QuickAddLessonSheet` в `all_rooms_schedule_screen.dart`
+
+### 23. Расширение сетки расписания
+Сетка расписания автоматически расширяется для отображения занятий вне рабочего времени.
+
+**Логика:**
+- Базовый диапазон — рабочее время заведения (например, 8:00-22:00)
+- Если есть занятие в 7:00 — сетка расширится до 7:00
+- Если есть занятие до 23:00 — сетка расширится до 23:00
+
+**Особенности:**
+- В дневном режиме — расширение работает для конкретного дня
+- В недельном режиме — расширение применяется ко всей неделе
+- Пустые часы вне рабочего времени НЕ показываются
+
+**Метод:**
+```dart
+(int, int) _calculateEffectiveHours({
+  required List<Lesson> lessons,
+  required int workStartHour,
+  required int workEndHour,
+}) {
+  int effectiveStart = workStartHour;
+  int effectiveEnd = workEndHour;
+
+  for (final lesson in lessons) {
+    if (lesson.startTime.hour < effectiveStart) {
+      effectiveStart = lesson.startTime.hour;
+    }
+    final lessonEndHour = lesson.endTime.minute > 0
+        ? lesson.endTime.hour + 1
+        : lesson.endTime.hour;
+    if (lessonEndHour > effectiveEnd) {
+      effectiveEnd = lessonEndHour;
+    }
+  }
+  return (effectiveStart, effectiveEnd);
+}
+```
 
 ## CI/CD
 

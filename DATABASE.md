@@ -133,9 +133,15 @@ CREATE TABLE institutions (
   name TEXT NOT NULL,
   owner_id UUID NOT NULL REFERENCES auth.users(id),
   invite_code TEXT UNIQUE NOT NULL DEFAULT generate_invite_code(),
+  work_start_hour INTEGER DEFAULT 8,    -- Начало рабочего времени (0-23)
+  work_end_hour INTEGER DEFAULT 22,     -- Конец рабочего времени (1-24)
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  archived_at TIMESTAMPTZ
+  archived_at TIMESTAMPTZ,
+
+  CONSTRAINT check_work_start_hour CHECK (work_start_hour >= 0 AND work_start_hour <= 23),
+  CONSTRAINT check_work_end_hour CHECK (work_end_hour >= 1 AND work_end_hour <= 24),
+  CONSTRAINT check_work_hours_order CHECK (work_end_hour > work_start_hour)
 );
 
 -- Функция генерации invite code
@@ -691,6 +697,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students;
 ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
 ALTER PUBLICATION supabase_realtime ADD TABLE payments;
 ALTER PUBLICATION supabase_realtime ADD TABLE subscriptions;
+ALTER PUBLICATION supabase_realtime ADD TABLE institutions;          -- Для синхронизации рабочего времени
+ALTER PUBLICATION supabase_realtime ADD TABLE institution_members;   -- Для синхронизации прав участников
 ```
 
 ## Индексы для производительности
