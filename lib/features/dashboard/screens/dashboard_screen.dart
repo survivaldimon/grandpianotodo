@@ -16,21 +16,58 @@ import 'package:kabinet/shared/models/subscription.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Главный экран (Dashboard)
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   final String institutionId;
 
   const DashboardScreen({super.key, required this.institutionId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Обновляем данные когда приложение возвращается из фона
+    if (state == AppLifecycleState.resumed) {
+      _refreshData();
+    }
+  }
+
+  void _refreshData() {
+    ref.invalidate(currentInstitutionProvider(widget.institutionId));
+    ref.invalidate(institutionTodayLessonsProvider(widget.institutionId));
+    ref.invalidate(studentsWithDebtProvider(widget.institutionId));
+    ref.invalidate(todayPaymentsTotalProvider(widget.institutionId));
+    ref.invalidate(unmarkedLessonsStreamProvider(widget.institutionId));
+    ref.invalidate(expiringSubscriptionsProvider(
+      ExpiringSubscriptionsParams(widget.institutionId, days: 7),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final today = DateTime.now();
-    final institutionAsync = ref.watch(currentInstitutionProvider(institutionId));
-    final lessonsAsync = ref.watch(institutionTodayLessonsProvider(institutionId));
-    final debtorsAsync = ref.watch(studentsWithDebtProvider(institutionId));
-    final todayPaymentsAsync = ref.watch(todayPaymentsTotalProvider(institutionId));
-    final unmarkedLessonsAsync = ref.watch(unmarkedLessonsStreamProvider(institutionId));
+    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+    final lessonsAsync = ref.watch(institutionTodayLessonsProvider(widget.institutionId));
+    final debtorsAsync = ref.watch(studentsWithDebtProvider(widget.institutionId));
+    final todayPaymentsAsync = ref.watch(todayPaymentsTotalProvider(widget.institutionId));
+    final unmarkedLessonsAsync = ref.watch(unmarkedLessonsStreamProvider(widget.institutionId));
     final expiringSubscriptionsAsync = ref.watch(
-      expiringSubscriptionsProvider(ExpiringSubscriptionsParams(institutionId, days: 7)),
+      expiringSubscriptionsProvider(ExpiringSubscriptionsParams(widget.institutionId, days: 7)),
     );
 
     return Scaffold(
@@ -50,19 +87,14 @@ class DashboardScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.person_outline),
             onPressed: () {
-              context.go('/institutions/$institutionId/settings');
+              context.go('/institutions/${widget.institutionId}/settings');
             },
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(currentInstitutionProvider(institutionId));
-          ref.invalidate(institutionTodayLessonsProvider(institutionId));
-          ref.invalidate(studentsWithDebtProvider(institutionId));
-          ref.invalidate(todayPaymentsTotalProvider(institutionId));
-          ref.invalidate(unmarkedLessonsProvider(institutionId));
-          ref.invalidate(expiringSubscriptionsProvider(ExpiringSubscriptionsParams(institutionId, days: 7)));
+          _refreshData();
         },
         child: ListView(
           padding: AppSizes.paddingAllM,
@@ -80,7 +112,7 @@ class DashboardScreen extends ConsumerWidget {
                 title: 'Занятия сегодня',
                 trailing: lessons.length.toString(),
                 icon: Icons.event_note,
-                onTap: () => context.go('/institutions/$institutionId/schedule'),
+                onTap: () => context.go('/institutions/${widget.institutionId}/schedule'),
               ),
               loading: () => _DashboardCard(
                 title: 'Занятия сегодня',
@@ -92,7 +124,7 @@ class DashboardScreen extends ConsumerWidget {
                 title: 'Занятия сегодня',
                 trailing: '—',
                 icon: Icons.event_note,
-                onTap: () => context.go('/institutions/$institutionId/schedule'),
+                onTap: () => context.go('/institutions/${widget.institutionId}/schedule'),
               ),
             ),
             const SizedBox(height: 12),
@@ -152,7 +184,7 @@ class DashboardScreen extends ConsumerWidget {
                   subtitle: _formatNextLesson(nextLesson),
                   icon: Icons.schedule,
                   onTap: () {
-                    context.go('/institutions/$institutionId/schedule');
+                    context.go('/institutions/${widget.institutionId}/schedule');
                   },
                 );
               },
@@ -185,7 +217,7 @@ class DashboardScreen extends ConsumerWidget {
                   iconColor: debtors.isEmpty ? AppColors.success : AppColors.warning,
                   onTap: () {
                     ref.read(studentFilterProvider.notifier).state = StudentFilter.withDebt;
-                    context.go('/institutions/$institutionId/students');
+                    context.go('/institutions/${widget.institutionId}/students');
                   },
                 );
               },
@@ -203,7 +235,7 @@ class DashboardScreen extends ConsumerWidget {
                 iconColor: AppColors.warning,
                 onTap: () {
                   ref.read(studentFilterProvider.notifier).state = StudentFilter.withDebt;
-                  context.go('/institutions/$institutionId/students');
+                  context.go('/institutions/${widget.institutionId}/students');
                 },
               ),
             ),
@@ -216,7 +248,7 @@ class DashboardScreen extends ConsumerWidget {
                 trailing: _formatCurrency(total),
                 icon: Icons.payments,
                 iconColor: AppColors.success,
-                onTap: () => context.go('/institutions/$institutionId/payments'),
+                onTap: () => context.go('/institutions/${widget.institutionId}/payments'),
               ),
               loading: () => _DashboardCard(
                 title: 'Сегодня оплачено',
@@ -230,7 +262,7 @@ class DashboardScreen extends ConsumerWidget {
                 trailing: '—',
                 icon: Icons.payments,
                 iconColor: AppColors.success,
-                onTap: () => context.go('/institutions/$institutionId/payments'),
+                onTap: () => context.go('/institutions/${widget.institutionId}/payments'),
               ),
             ),
             const SizedBox(height: 12),
@@ -341,7 +373,7 @@ class DashboardScreen extends ConsumerWidget {
                         : null,
                     onTap: () {
                       Navigator.pop(context);
-                      context.go('/institutions/$institutionId/students/${sub.studentId}');
+                      context.go('/institutions/${widget.institutionId}/students/${sub.studentId}');
                     },
                   );
                 },
@@ -389,7 +421,7 @@ class DashboardScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _UnmarkedLessonsSheet(institutionId: institutionId),
+      builder: (context) => _UnmarkedLessonsSheet(institutionId: widget.institutionId),
     );
   }
 }

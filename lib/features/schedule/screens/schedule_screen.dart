@@ -41,8 +41,29 @@ class ScheduleScreen extends ConsumerStatefulWidget {
   ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
 }
 
-class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
+class _ScheduleScreenState extends ConsumerState<ScheduleScreen>
+    with WidgetsBindingObserver {
   DateTime _selectedDate = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Обновляем данные когда приложение возвращается из фона
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(lessonsByRoomProvider(RoomDateParams(widget.roomId, _selectedDate)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

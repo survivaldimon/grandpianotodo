@@ -111,12 +111,35 @@ class AllRoomsScheduleScreen extends ConsumerStatefulWidget {
   ConsumerState<AllRoomsScheduleScreen> createState() => _AllRoomsScheduleScreenState();
 }
 
-class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen> {
+class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
+    with WidgetsBindingObserver {
   DateTime _selectedDate = DateTime.now();
   String? _selectedRoomId; // null = все кабинеты
   double? _savedScrollOffset; // Сохранённая позиция скролла для восстановления
   ScheduleFilters _filters = const ScheduleFilters();
   ScheduleViewMode _viewMode = ScheduleViewMode.day;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Обновляем данные когда приложение возвращается из фона
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(lessonsByInstitutionStreamProvider(
+        InstitutionDateParams(widget.institutionId, _selectedDate),
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
