@@ -311,7 +311,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
                 }
               });
             },
-            onAddLesson: (room, hour) => _showAddLessonSheet(room, hour),
+            onAddLesson: (room, hour, minute) => _showAddLessonSheet(room, hour, minute),
           );
         },
       ),
@@ -444,7 +444,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     );
   }
 
-  void _showAddLessonSheet(Room room, int hour) {
+  void _showAddLessonSheet(Room room, int hour, int minute) {
     // Инвалидируем кеш справочников для получения актуальных данных
     ref.invalidate(subjectsProvider(widget.institutionId));
     ref.invalidate(lessonTypesProvider(widget.institutionId));
@@ -456,6 +456,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         room: room,
         date: _selectedDate,
         startHour: hour,
+        startMinute: minute,
         institutionId: widget.institutionId,
         onCreated: () {
           // Инвалидируем оба провайдера для гарантированного обновления
@@ -764,7 +765,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final int endHour;
   final void Function(Lesson) onLessonTap;
   final void Function(String roomId, double currentOffset) onRoomTap;
-  final void Function(Room room, int hour) onAddLesson;
+  final void Function(Room room, int hour, int minute) onAddLesson;
 
   const _AllRoomsTimeGrid({
     required this.rooms,
@@ -782,7 +783,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
     this.canManageRooms = false,
   });
 
-  static const hourHeight = 60.0;
+  static const hourHeight = 100.0; // 15 мин = 25px, время скрывается для коротких
   static const roomColumnWidth = 120.0; // Базовая ширина для многих кабинетов
 
   @override
@@ -1168,24 +1169,97 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     }); // LayoutBuilder
   }
 
-  /// Проверяет, занята ли ячейка (есть ли урок в этот час)
-  bool _isCellOccupied(Room room, int hour, List<Lesson> lessons) {
+  /// Находит наибольший свободный промежуток в ячейке часа
+  /// Возвращает (startMinuteInHour, endMinuteInHour) или null если нет свободного места >= 15 мин
+  ({int start, int end})? _findLargestGapInHour(Room room, int hour, List<Lesson> lessons) {
+    const minGapMinutes = 15;
+    final hourStart = hour * 60;
+    final hourEnd = (hour + 1) * 60;
+
+    // Собираем занятые интервалы в этом часе
+    final occupiedIntervals = <({int start, int end})>[];
+
     for (final lesson in lessons) {
       if (lesson.roomId != room.id) continue;
-      final lessonStartHour = lesson.startTime.hour;
-      final lessonEndHour = lesson.endTime.hour + (lesson.endTime.minute > 0 ? 1 : 0);
-      if (hour >= lessonStartHour && hour < lessonEndHour) {
-        return true;
+
+      final lessonStart = lesson.startTime.hour * 60 + lesson.startTime.minute;
+      final lessonEnd = lesson.endTime.hour * 60 + lesson.endTime.minute;
+
+      // Пересекается ли занятие с этим часом?
+      if (lessonEnd > hourStart && lessonStart < hourEnd) {
+        occupiedIntervals.add((
+          start: lessonStart.clamp(hourStart, hourEnd),
+          end: lessonEnd.clamp(hourStart, hourEnd),
+        ));
       }
     }
-    return false;
+
+    if (occupiedIntervals.isEmpty) {
+      // Весь час свободен
+      return (start: 0, end: 60);
+    }
+
+    // Сортируем по времени начала
+    occupiedIntervals.sort((a, b) => a.start.compareTo(b.start));
+
+    // Находим промежутки
+    final gaps = <({int start, int end})>[];
+
+    // До первого занятия
+    if (occupiedIntervals.first.start > hourStart) {
+      gaps.add((start: 0, end: occupiedIntervals.first.start - hourStart));
+    }
+
+    // Между занятиями
+    for (int i = 0; i < occupiedIntervals.length - 1; i++) {
+      final gapStart = occupiedIntervals[i].end;
+      final gapEnd = occupiedIntervals[i + 1].start;
+      if (gapEnd > gapStart) {
+        gaps.add((start: gapStart - hourStart, end: gapEnd - hourStart));
+      }
+    }
+
+    // После последнего занятия
+    if (occupiedIntervals.last.end < hourEnd) {
+      gaps.add((start: occupiedIntervals.last.end - hourStart, end: 60));
+    }
+
+    // Находим наибольший промежуток >= minGapMinutes
+    ({int start, int end})? largest;
+    int largestSize = 0;
+
+    for (final gap in gaps) {
+      final size = gap.end - gap.start;
+      if (size >= minGapMinutes && size > largestSize) {
+        largestSize = size;
+        largest = gap;
+      }
+    }
+
+    return largest;
   }
 
   Widget _buildCell(Room room, int hour, List<Lesson> lessons) {
-    final isOccupied = _isCellOccupied(room, hour, lessons);
+    final gap = _findLargestGapInHour(room, hour, lessons);
+
+    if (gap == null) {
+      // Нет свободного места >= 15 мин
+      return Container(
+        height: _AllRoomsTimeGrid.hourHeight,
+        decoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(color: AppColors.border, width: 0.5),
+          ),
+        ),
+      );
+    }
+
+    // Вычисляем позицию "+" в центре свободного промежутка
+    final gapCenterMinute = (gap.start + gap.end) / 2;
+    final buttonTopOffset = gapCenterMinute / 60 * _AllRoomsTimeGrid.hourHeight - 8;
 
     return GestureDetector(
-      onTap: isOccupied ? null : () => widget.onAddLesson(room, hour),
+      onTap: () => widget.onAddLesson(room, hour, gap.start),
       child: Container(
         height: _AllRoomsTimeGrid.hourHeight,
         decoration: const BoxDecoration(
@@ -1193,15 +1267,22 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
             top: BorderSide(color: AppColors.border, width: 0.5),
           ),
         ),
-        child: isOccupied
-            ? null
-            : Center(
+        child: Stack(
+          children: [
+            Positioned(
+              top: buttonTopOffset.clamp(0, _AllRoomsTimeGrid.hourHeight - 16),
+              left: 0,
+              right: 0,
+              child: Center(
                 child: Icon(
                   Icons.add,
                   size: 16,
                   color: AppColors.textTertiary.withValues(alpha: 0.4),
                 ),
               ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1212,11 +1293,22 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
 
     final startMinutes = lesson.startTime.hour * 60 + lesson.startTime.minute;
     final endMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
     final startOffset = (startMinutes - widget.startHour * 60) / 60 * _AllRoomsTimeGrid.hourHeight;
-    final duration = (endMinutes - startMinutes) / 60 * _AllRoomsTimeGrid.hourHeight;
+    final duration = durationMinutes / 60 * _AllRoomsTimeGrid.hourHeight;
+
+    // Показываем время только для занятий >= 30 минут
+    final showTime = durationMinutes >= 30;
 
     final color = _getLessonColor(lesson);
     final participant = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
+
+    // Для коротких занятий уменьшаем padding
+    final isShort = durationMinutes < 30;
+    final verticalPadding = isShort ? 2.0 : 4.0;
+    final horizontalPadding = isShort ? 3.0 : 4.0;
+    final fontSize = isShort ? 9.0 : 10.0;
+    final iconSize = isShort ? 10.0 : 12.0;
 
     return Positioned(
       top: startOffset,
@@ -1226,7 +1318,11 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
         onTap: () => widget.onLessonTap(lesson),
         child: Container(
           height: duration,
-          padding: const EdgeInsets.all(4),
+          clipBehavior: Clip.hardEdge,
+          padding: EdgeInsets.symmetric(
+            vertical: verticalPadding,
+            horizontal: horizontalPadding,
+          ),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(AppSizes.radiusS),
@@ -1234,28 +1330,32 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      participant,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
+              Flexible(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        participant,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: fontSize,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  if (lesson.isRepeating)
-                    const Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
-                  if (lesson.status == LessonStatus.completed)
-                    const Icon(Icons.check_circle, size: 12, color: AppColors.success),
-                  if (lesson.status == LessonStatus.cancelled)
-                    const Icon(Icons.cancel, size: 12, color: AppColors.error),
-                ],
+                    if (lesson.isRepeating)
+                      Icon(Icons.repeat, size: iconSize, color: AppColors.textSecondary),
+                    if (lesson.status == LessonStatus.completed)
+                      Icon(Icons.check_circle, size: iconSize, color: AppColors.success),
+                    if (lesson.status == LessonStatus.cancelled)
+                      Icon(Icons.cancel, size: iconSize, color: AppColors.error),
+                  ],
+                ),
               ),
-              if (duration > 30)
+              if (showTime)
                 Text(
                   '${_formatTime(lesson.startTime)}-${_formatTime(lesson.endTime)}',
                   style: const TextStyle(
@@ -2722,6 +2822,20 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
   }
 
   Future<void> _saveChanges() async {
+    // Проверка минимальной длительности (15 минут)
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
+    if (durationMinutes < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Минимальная длительность занятия — 15 минут'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final controller = ref.read(lessonControllerProvider.notifier);
     final lesson = widget.lesson;
 
@@ -2847,6 +2961,7 @@ class _AddLessonSheet extends ConsumerStatefulWidget {
   final Room room;
   final DateTime date;
   final int startHour;
+  final int startMinute;
   final String institutionId;
   final VoidCallback onCreated;
 
@@ -2854,6 +2969,7 @@ class _AddLessonSheet extends ConsumerStatefulWidget {
     required this.room,
     required this.date,
     required this.startHour,
+    this.startMinute = 0,
     required this.institutionId,
     required this.onCreated,
   });
@@ -2882,8 +2998,10 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
   @override
   void initState() {
     super.initState();
-    _startTime = TimeOfDay(hour: widget.startHour, minute: 0);
-    _endTime = TimeOfDay(hour: widget.startHour + 1, minute: 0);
+    _startTime = TimeOfDay(hour: widget.startHour, minute: widget.startMinute);
+    // Конец через час от начала
+    final endMinutes = widget.startHour * 60 + widget.startMinute + 60;
+    _endTime = TimeOfDay(hour: endMinutes ~/ 60, minute: endMinutes % 60);
   }
 
   /// Генерирует список дат на основе типа повтора
@@ -3466,6 +3584,20 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
 
   Future<void> _createLesson() async {
     if (_selectedStudent == null) return;
+
+    // Проверка минимальной длительности (15 минут)
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
+    if (durationMinutes < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Минимальная длительность занятия — 15 минут'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     final currentUserId = ref.read(currentUserIdProvider);
     if (currentUserId == null) return;
@@ -4843,6 +4975,20 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
   Future<void> _createLesson() async {
     if (_selectedStudent == null || _selectedRoom == null) return;
+
+    // Проверка минимальной длительности (15 минут)
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
+    if (durationMinutes < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Минимальная длительность занятия — 15 минут'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     final currentUserId = ref.read(currentUserIdProvider);
     if (currentUserId == null) return;
