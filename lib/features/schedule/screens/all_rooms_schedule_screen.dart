@@ -111,12 +111,35 @@ class AllRoomsScheduleScreen extends ConsumerStatefulWidget {
   ConsumerState<AllRoomsScheduleScreen> createState() => _AllRoomsScheduleScreenState();
 }
 
-class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen> {
+class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
+    with WidgetsBindingObserver {
   DateTime _selectedDate = DateTime.now();
   String? _selectedRoomId; // null = все кабинеты
   double? _savedScrollOffset; // Сохранённая позиция скролла для восстановления
   ScheduleFilters _filters = const ScheduleFilters();
   ScheduleViewMode _viewMode = ScheduleViewMode.day;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Обновляем данные когда приложение возвращается из фона
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(lessonsByInstitutionStreamProvider(
+        InstitutionDateParams(widget.institutionId, _selectedDate),
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -125,8 +148,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       lessonsByInstitutionStreamProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
     );
 
-    // Получаем права пользователя
-    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+    // Получаем права пользователя (используем StreamProvider для realtime обновления)
+    final institutionAsync = ref.watch(currentInstitutionStreamProvider(widget.institutionId));
     final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
     final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
     final isOwner = institutionAsync.maybeWhen(
@@ -134,6 +157,10 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       orElse: () => false,
     );
     final canManageRooms = isOwner || (permissions?.manageRooms ?? false);
+
+    // Получаем рабочее время из заведения
+    final workStartHour = institutionAsync.valueOrNull?.workStartHour ?? 8;
+    final workEndHour = institutionAsync.valueOrNull?.workEndHour ?? 22;
 
     // Получаем название выбранного кабинета для заголовка
     String title = 'Расписание';
@@ -217,11 +244,18 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           const Divider(height: 1),
           Expanded(
             child: _viewMode == ScheduleViewMode.day
-                ? _buildDayView(roomsAsync, lessonsAsync, canManageRooms)
-                : _buildWeekView(roomsAsync, canManageRooms),
+                ? _buildDayView(roomsAsync, lessonsAsync, canManageRooms, workStartHour, workEndHour)
+                : _buildWeekView(roomsAsync, canManageRooms, workStartHour, workEndHour),
           ),
         ],
       ),
+      floatingActionButton: (isOwner || (permissions?.createLessons ?? false))
+          ? FloatingActionButton(
+              onPressed: () => _showQuickAddLessonSheet(roomsAsync.valueOrNull ?? []),
+              tooltip: 'Добавить занятие',
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 
@@ -229,6 +263,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     AsyncValue<List<Room>> roomsAsync,
     AsyncValue<List<Lesson>> lessonsAsync,
     bool canManageRooms,
+    int workStartHour,
+    int workEndHour,
   ) {
     return roomsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -241,6 +277,13 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
               ? lessons
               : lessons.where((l) => _filters.matchesLesson(l)).toList();
 
+          // Вычисляем эффективные часы с учётом занятий вне рабочего времени
+          final effectiveHours = _calculateEffectiveHours(
+            lessons: lessons,
+            workStartHour: workStartHour,
+            workEndHour: workEndHour,
+          );
+
           return _AllRoomsTimeGrid(
             rooms: _selectedRoomId != null
                 ? rooms.where((r) => r.id == _selectedRoomId).toList()
@@ -252,6 +295,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             selectedRoomId: _selectedRoomId,
             restoreScrollOffset: _savedScrollOffset,
             canManageRooms: canManageRooms,
+            startHour: effectiveHours.$1,
+            endHour: effectiveHours.$2,
             onLessonTap: _showLessonDetail,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
@@ -266,14 +311,52 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
                 }
               });
             },
-            onAddLesson: (room, hour, minute) => _showAddLessonSheet(room, hour, minute),
+            onAddLesson: (room, hour) => _showAddLessonSheet(room, hour),
           );
         },
       ),
     );
   }
 
-  Widget _buildWeekView(AsyncValue<List<Room>> roomsAsync, bool canManageRooms) {
+  /// Вычисляет эффективные часы отображения сетки
+  /// Расширяет диапазон, если есть занятия вне рабочего времени
+  (int, int) _calculateEffectiveHours({
+    required List<Lesson> lessons,
+    required int workStartHour,
+    required int workEndHour,
+  }) {
+    int effectiveStart = workStartHour;
+    int effectiveEnd = workEndHour;
+
+    for (final lesson in lessons) {
+      // Час начала занятия
+      final lessonStartHour = lesson.startTime.hour;
+      // Час окончания занятия (если минуты > 0, нужен следующий час)
+      final lessonEndHour = lesson.endTime.minute > 0
+          ? lesson.endTime.hour + 1
+          : lesson.endTime.hour;
+
+      if (lessonStartHour < effectiveStart) {
+        effectiveStart = lessonStartHour;
+      }
+      if (lessonEndHour > effectiveEnd) {
+        effectiveEnd = lessonEndHour;
+      }
+    }
+
+    // Ограничиваем разумными пределами (0-24)
+    effectiveStart = effectiveStart.clamp(0, 23);
+    effectiveEnd = effectiveEnd.clamp(1, 24);
+
+    return (effectiveStart, effectiveEnd);
+  }
+
+  Widget _buildWeekView(
+    AsyncValue<List<Room>> roomsAsync,
+    bool canManageRooms,
+    int workStartHour,
+    int workEndHour,
+  ) {
     final weekStart = InstitutionWeekParams.getWeekStart(_selectedDate);
     final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
     final weekLessonsAsync = ref.watch(lessonsByInstitutionWeekProvider(weekParams));
@@ -293,6 +376,14 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
                 : entry.value.where((l) => _filters.matchesLesson(l)).toList();
           }
 
+          // Вычисляем эффективные часы для всей недели
+          final allLessons = lessonsByDay.values.expand((list) => list).toList();
+          final effectiveHours = _calculateEffectiveHours(
+            lessons: allLessons,
+            workStartHour: workStartHour,
+            workEndHour: workEndHour,
+          );
+
           return _WeekTimeGrid(
             rooms: _selectedRoomId != null
                 ? rooms.where((r) => r.id == _selectedRoomId).toList()
@@ -304,6 +395,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             selectedRoomId: _selectedRoomId,
             restoreScrollOffset: _savedScrollOffset,
             canManageRooms: canManageRooms,
+            startHour: effectiveHours.$1,
+            endHour: effectiveHours.$2,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
                 // Всегда сохраняем текущую позицию скролла
@@ -351,7 +444,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     );
   }
 
-  void _showAddLessonSheet(Room room, int hour, int minute) {
+  void _showAddLessonSheet(Room room, int hour) {
     // Инвалидируем кеш справочников для получения актуальных данных
     ref.invalidate(subjectsProvider(widget.institutionId));
     ref.invalidate(lessonTypesProvider(widget.institutionId));
@@ -363,7 +456,6 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         room: room,
         date: _selectedDate,
         startHour: hour,
-        startMinute: minute,
         institutionId: widget.institutionId,
         onCreated: () {
           // Инвалидируем оба провайдера для гарантированного обновления
@@ -373,6 +465,51 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           ref.invalidate(lessonsByInstitutionStreamProvider(
             InstitutionDateParams(widget.institutionId, _selectedDate),
           ));
+        },
+      ),
+    );
+  }
+
+  /// Показывает форму быстрого добавления занятия (из FAB)
+  void _showQuickAddLessonSheet(List<Room> rooms) {
+    if (rooms.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Сначала добавьте кабинет'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Инвалидируем кеш справочников для получения актуальных данных
+    ref.invalidate(subjectsProvider(widget.institutionId));
+    ref.invalidate(lessonTypesProvider(widget.institutionId));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _QuickAddLessonSheet(
+        rooms: rooms,
+        initialDate: _selectedDate,
+        institutionId: widget.institutionId,
+        onCreated: (DateTime createdDate) {
+          // Инвалидируем провайдеры для выбранной даты
+          ref.invalidate(lessonsByInstitutionProvider(
+            InstitutionDateParams(widget.institutionId, createdDate),
+          ));
+          ref.invalidate(lessonsByInstitutionStreamProvider(
+            InstitutionDateParams(widget.institutionId, createdDate),
+          ));
+          // Также инвалидируем для текущей выбранной даты
+          if (createdDate != _selectedDate) {
+            ref.invalidate(lessonsByInstitutionProvider(
+              InstitutionDateParams(widget.institutionId, _selectedDate),
+            ));
+            ref.invalidate(lessonsByInstitutionStreamProvider(
+              InstitutionDateParams(widget.institutionId, _selectedDate),
+            ));
+          }
         },
       ),
     );
@@ -623,9 +760,11 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final String? selectedRoomId;
   final double? restoreScrollOffset; // Позиция скролла для восстановления
   final bool canManageRooms; // Может ли пользователь управлять кабинетами
+  final int startHour;
+  final int endHour;
   final void Function(Lesson) onLessonTap;
   final void Function(String roomId, double currentOffset) onRoomTap;
-  final void Function(Room room, int hour, int minute) onAddLesson;
+  final void Function(Room room, int hour) onAddLesson;
 
   const _AllRoomsTimeGrid({
     required this.rooms,
@@ -636,14 +775,14 @@ class _AllRoomsTimeGrid extends StatefulWidget {
     required this.onLessonTap,
     required this.onRoomTap,
     required this.onAddLesson,
+    required this.startHour,
+    required this.endHour,
     this.selectedRoomId,
     this.restoreScrollOffset,
     this.canManageRooms = false,
   });
 
-  static const startHour = 8;
-  static const endHour = 22;
-  static const hourHeight = 100.0; // 15 мин = 25px, время скрывается для коротких
+  static const hourHeight = 60.0;
   static const roomColumnWidth = 120.0; // Базовая ширина для многих кабинетов
 
   @override
@@ -782,7 +921,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
       );
     }
 
-    final totalHeight = (_AllRoomsTimeGrid.endHour - _AllRoomsTimeGrid.startHour + 1) * _AllRoomsTimeGrid.hourHeight;
+    final totalHeight = (widget.endHour - widget.startHour + 1) * _AllRoomsTimeGrid.hourHeight;
 
     // Если выбран один кабинет - используем всю доступную ширину
     return LayoutBuilder(builder: (context, constraints) {
@@ -932,7 +1071,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                     width: AppSizes.timeGridWidth,
                     child: Column(
                       children: [
-                        for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
+                        for (int hour = widget.startHour; hour <= widget.endHour; hour++)
                           SizedBox(
                             height: _AllRoomsTimeGrid.hourHeight,
                             child: Align(
@@ -969,7 +1108,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                         ),
                                         child: Column(
                                           children: [
-                                            for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
+                                            for (int hour = widget.startHour; hour <= widget.endHour; hour++)
                                               _buildCell(rooms[i], hour, lessons),
                                           ],
                                         ),
@@ -1005,7 +1144,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                           ),
                                           child: Column(
                                             children: [
-                                              for (int hour = _AllRoomsTimeGrid.startHour; hour <= _AllRoomsTimeGrid.endHour; hour++)
+                                              for (int hour = widget.startHour; hour <= widget.endHour; hour++)
                                                 _buildCell(rooms[i], hour, lessons),
                                             ],
                                           ),
@@ -1029,97 +1168,24 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     }); // LayoutBuilder
   }
 
-  /// Находит наибольший свободный промежуток в ячейке часа
-  /// Возвращает (startMinuteInHour, endMinuteInHour) или null если нет свободного места >= 15 мин
-  ({int start, int end})? _findLargestGapInHour(Room room, int hour, List<Lesson> lessons) {
-    const minGapMinutes = 15;
-    final hourStart = hour * 60;
-    final hourEnd = (hour + 1) * 60;
-
-    // Собираем занятые интервалы в этом часе
-    final occupiedIntervals = <({int start, int end})>[];
-
+  /// Проверяет, занята ли ячейка (есть ли урок в этот час)
+  bool _isCellOccupied(Room room, int hour, List<Lesson> lessons) {
     for (final lesson in lessons) {
       if (lesson.roomId != room.id) continue;
-
-      final lessonStart = lesson.startTime.hour * 60 + lesson.startTime.minute;
-      final lessonEnd = lesson.endTime.hour * 60 + lesson.endTime.minute;
-
-      // Пересекается ли занятие с этим часом?
-      if (lessonEnd > hourStart && lessonStart < hourEnd) {
-        occupiedIntervals.add((
-          start: lessonStart.clamp(hourStart, hourEnd),
-          end: lessonEnd.clamp(hourStart, hourEnd),
-        ));
+      final lessonStartHour = lesson.startTime.hour;
+      final lessonEndHour = lesson.endTime.hour + (lesson.endTime.minute > 0 ? 1 : 0);
+      if (hour >= lessonStartHour && hour < lessonEndHour) {
+        return true;
       }
     }
-
-    if (occupiedIntervals.isEmpty) {
-      // Весь час свободен
-      return (start: 0, end: 60);
-    }
-
-    // Сортируем по времени начала
-    occupiedIntervals.sort((a, b) => a.start.compareTo(b.start));
-
-    // Находим промежутки
-    final gaps = <({int start, int end})>[];
-
-    // До первого занятия
-    if (occupiedIntervals.first.start > hourStart) {
-      gaps.add((start: 0, end: occupiedIntervals.first.start - hourStart));
-    }
-
-    // Между занятиями
-    for (int i = 0; i < occupiedIntervals.length - 1; i++) {
-      final gapStart = occupiedIntervals[i].end;
-      final gapEnd = occupiedIntervals[i + 1].start;
-      if (gapEnd > gapStart) {
-        gaps.add((start: gapStart - hourStart, end: gapEnd - hourStart));
-      }
-    }
-
-    // После последнего занятия
-    if (occupiedIntervals.last.end < hourEnd) {
-      gaps.add((start: occupiedIntervals.last.end - hourStart, end: 60));
-    }
-
-    // Находим наибольший промежуток >= minGapMinutes
-    ({int start, int end})? largest;
-    int largestSize = 0;
-
-    for (final gap in gaps) {
-      final size = gap.end - gap.start;
-      if (size >= minGapMinutes && size > largestSize) {
-        largestSize = size;
-        largest = gap;
-      }
-    }
-
-    return largest;
+    return false;
   }
 
   Widget _buildCell(Room room, int hour, List<Lesson> lessons) {
-    final gap = _findLargestGapInHour(room, hour, lessons);
-
-    if (gap == null) {
-      // Нет свободного места >= 15 мин
-      return Container(
-        height: _AllRoomsTimeGrid.hourHeight,
-        decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: AppColors.border, width: 0.5),
-          ),
-        ),
-      );
-    }
-
-    // Вычисляем позицию "+" в центре свободного промежутка
-    final gapCenterMinute = (gap.start + gap.end) / 2;
-    final buttonTopOffset = gapCenterMinute / 60 * _AllRoomsTimeGrid.hourHeight - 8; // 8 = половина размера иконки
+    final isOccupied = _isCellOccupied(room, hour, lessons);
 
     return GestureDetector(
-      onTap: () => widget.onAddLesson(room, hour, gap.start),
+      onTap: isOccupied ? null : () => widget.onAddLesson(room, hour),
       child: Container(
         height: _AllRoomsTimeGrid.hourHeight,
         decoration: const BoxDecoration(
@@ -1127,22 +1193,15 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
             top: BorderSide(color: AppColors.border, width: 0.5),
           ),
         ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: buttonTopOffset.clamp(0, _AllRoomsTimeGrid.hourHeight - 16),
-              left: 0,
-              right: 0,
-              child: Center(
+        child: isOccupied
+            ? null
+            : Center(
                 child: Icon(
                   Icons.add,
                   size: 16,
                   color: AppColors.textTertiary.withValues(alpha: 0.4),
                 ),
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1153,14 +1212,11 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
 
     final startMinutes = lesson.startTime.hour * 60 + lesson.startTime.minute;
     final endMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
-    final durationMinutes = endMinutes - startMinutes;
-    final startOffset = (startMinutes - _AllRoomsTimeGrid.startHour * 60) / 60 * _AllRoomsTimeGrid.hourHeight;
-    final duration = durationMinutes / 60 * _AllRoomsTimeGrid.hourHeight;
+    final startOffset = (startMinutes - widget.startHour * 60) / 60 * _AllRoomsTimeGrid.hourHeight;
+    final duration = (endMinutes - startMinutes) / 60 * _AllRoomsTimeGrid.hourHeight;
 
     final color = _getLessonColor(lesson);
     final participant = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
-    // Показываем время только для занятий >= 30 минут
-    final showTime = durationMinutes >= 30;
 
     return Positioned(
       top: startOffset,
@@ -1170,15 +1226,14 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
         onTap: () => widget.onLessonTap(lesson),
         child: Container(
           height: duration,
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(AppSizes.radiusS),
-            border: Border.all(color: color, width: 1.5),
+            border: Border.all(color: color, width: 2),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
@@ -1193,14 +1248,14 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                     ),
                   ),
                   if (lesson.isRepeating)
-                    const Icon(Icons.repeat, size: 10, color: AppColors.textSecondary),
+                    const Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
                   if (lesson.status == LessonStatus.completed)
-                    const Icon(Icons.check_circle, size: 10, color: AppColors.success),
+                    const Icon(Icons.check_circle, size: 12, color: AppColors.success),
                   if (lesson.status == LessonStatus.cancelled)
-                    const Icon(Icons.cancel, size: 10, color: AppColors.error),
+                    const Icon(Icons.cancel, size: 12, color: AppColors.error),
                 ],
               ),
-              if (showTime)
+              if (duration > 30)
                 Text(
                   '${_formatTime(lesson.startTime)}-${_formatTime(lesson.endTime)}',
                   style: const TextStyle(
@@ -1243,6 +1298,8 @@ class _WeekTimeGrid extends StatefulWidget {
   final String? selectedRoomId;
   final double? restoreScrollOffset; // Позиция скролла для восстановления
   final bool canManageRooms; // Может ли пользователь управлять кабинетами
+  final int startHour;
+  final int endHour;
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, DateTime date) onCellTap;
 
@@ -1254,6 +1311,8 @@ class _WeekTimeGrid extends StatefulWidget {
     required this.institutionId,
     required this.onRoomTap,
     required this.onCellTap,
+    required this.startHour,
+    required this.endHour,
     this.selectedRoomId,
     this.restoreScrollOffset,
     this.canManageRooms = false,
@@ -2663,20 +2722,6 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
   }
 
   Future<void> _saveChanges() async {
-    // Проверка минимальной длительности (15 минут)
-    final startMinutes = _startTime.hour * 60 + _startTime.minute;
-    final endMinutes = _endTime.hour * 60 + _endTime.minute;
-    final durationMinutes = endMinutes - startMinutes;
-    if (durationMinutes < 15) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Минимальная длительность занятия — 15 минут'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
     final controller = ref.read(lessonControllerProvider.notifier);
     final lesson = widget.lesson;
 
@@ -2802,7 +2847,6 @@ class _AddLessonSheet extends ConsumerStatefulWidget {
   final Room room;
   final DateTime date;
   final int startHour;
-  final int startMinute;
   final String institutionId;
   final VoidCallback onCreated;
 
@@ -2810,7 +2854,6 @@ class _AddLessonSheet extends ConsumerStatefulWidget {
     required this.room,
     required this.date,
     required this.startHour,
-    this.startMinute = 0,
     required this.institutionId,
     required this.onCreated,
   });
@@ -2839,10 +2882,8 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
   @override
   void initState() {
     super.initState();
-    _startTime = TimeOfDay(hour: widget.startHour, minute: widget.startMinute);
-    // Время окончания = начало + 1 час (стандартная длительность)
-    final endMinutes = widget.startHour * 60 + widget.startMinute + 60;
-    _endTime = TimeOfDay(hour: endMinutes ~/ 60, minute: endMinutes % 60);
+    _startTime = TimeOfDay(hour: widget.startHour, minute: 0);
+    _endTime = TimeOfDay(hour: widget.startHour + 1, minute: 0);
   }
 
   /// Генерирует список дат на основе типа повтора
@@ -3064,6 +3105,12 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
               loading: () => const CircularProgressIndicator(),
               error: (e, _) => ErrorView.inline(e),
               data: (students) {
+                // Находим выбранного студента по ID в текущем списке
+                // (объекты могут быть разными после перезагрузки)
+                final currentStudent = _selectedStudent != null
+                    ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                    : null;
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -3078,7 +3125,7 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                           labelText: 'Ученик *',
                           prefixIcon: Icon(Icons.person),
                         ),
-                        value: _selectedStudent,
+                        value: currentStudent,
                         items: students.map((s) => DropdownMenuItem<Student?>(
                           value: s,
                           child: Text(s.name),
@@ -3419,20 +3466,6 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
 
   Future<void> _createLesson() async {
     if (_selectedStudent == null) return;
-
-    // Проверка минимальной длительности (15 минут)
-    final startMinutes = _startTime.hour * 60 + _startTime.minute;
-    final endMinutes = _endTime.hour * 60 + _endTime.minute;
-    final durationMinutes = endMinutes - startMinutes;
-    if (durationMinutes < 15) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Минимальная длительность занятия — 15 минут'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
 
     final currentUserId = ref.read(currentUserIdProvider);
     if (currentUserId == null) return;
@@ -4450,6 +4483,463 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
       spacing: 4,
       runSpacing: 4,
       children: days,
+    );
+  }
+}
+
+/// Форма быстрого добавления занятия (из FAB)
+/// Позволяет выбрать кабинет, дату и время
+class _QuickAddLessonSheet extends ConsumerStatefulWidget {
+  final List<Room> rooms;
+  final DateTime initialDate;
+  final String institutionId;
+  final void Function(DateTime createdDate) onCreated;
+
+  const _QuickAddLessonSheet({
+    required this.rooms,
+    required this.initialDate,
+    required this.institutionId,
+    required this.onCreated,
+  });
+
+  @override
+  ConsumerState<_QuickAddLessonSheet> createState() => _QuickAddLessonSheetState();
+}
+
+class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
+  late DateTime _selectedDate;
+  late Room? _selectedRoom;
+  late TimeOfDay _startTime;
+  late TimeOfDay _endTime;
+  Student? _selectedStudent;
+  Subject? _selectedSubject;
+  LessonType? _selectedLessonType;
+  InstitutionMember? _selectedTeacher;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+    _selectedRoom = widget.rooms.isNotEmpty ? widget.rooms.first : null;
+    final now = TimeOfDay.now();
+    // Округляем до ближайшего часа
+    _startTime = TimeOfDay(hour: now.hour, minute: 0);
+    _endTime = TimeOfDay(hour: now.hour + 1, minute: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+    final subjectsAsync = ref.watch(subjectsProvider(widget.institutionId));
+    final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
+    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final controllerState = ref.watch(lessonControllerProvider);
+
+    ref.listen(lessonControllerProvider, (prev, next) {
+      if (next.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Новое занятие',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Кабинет
+            DropdownButtonFormField<Room>(
+              decoration: const InputDecoration(
+                labelText: 'Кабинет *',
+                prefixIcon: Icon(Icons.door_front_door),
+              ),
+              value: _selectedRoom,
+              items: widget.rooms.map((r) => DropdownMenuItem<Room>(
+                value: r,
+                child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
+              )).toList(),
+              onChanged: (room) {
+                setState(() => _selectedRoom = room);
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Дата
+            InkWell(
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate,
+                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (date != null) {
+                  setState(() => _selectedDate = date);
+                }
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Дата *',
+                  prefixIcon: Icon(Icons.calendar_today),
+                ),
+                child: Text(AppDateUtils.formatDayMonth(_selectedDate)),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Время
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: _startTime,
+                      );
+                      if (time != null) {
+                        setState(() {
+                          _startTime = time;
+                          final endMinutes = time.hour * 60 + time.minute + 60;
+                          _endTime = TimeOfDay(
+                            hour: endMinutes ~/ 60,
+                            minute: endMinutes % 60,
+                          );
+                        });
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Начало',
+                        prefixIcon: Icon(Icons.access_time),
+                      ),
+                      child: Text(_formatTime(_startTime)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: _endTime,
+                      );
+                      if (time != null) {
+                        setState(() => _endTime = time);
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Конец',
+                        prefixIcon: Icon(Icons.access_time),
+                      ),
+                      child: Text(_formatTime(_endTime)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Ученик
+            studentsAsync.when(
+              loading: () => const CircularProgressIndicator(),
+              error: (e, _) => ErrorView.inline(e),
+              data: (students) {
+                // Находим выбранного студента по ID в текущем списке
+                // (объекты могут быть разными после перезагрузки)
+                final currentStudent = _selectedStudent != null
+                    ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                    : null;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (students.isEmpty)
+                      const Text(
+                        'Нет учеников. Добавьте ученика ниже.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      )
+                    else
+                      DropdownButtonFormField<Student?>(
+                        decoration: const InputDecoration(
+                          labelText: 'Ученик *',
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        value: currentStudent,
+                        items: students.map((s) => DropdownMenuItem<Student?>(
+                          value: s,
+                          child: Text(s.name),
+                        )).toList(),
+                        onChanged: (student) {
+                          setState(() => _selectedStudent = student);
+                        },
+                      ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => _showAddStudentDialog(),
+                      icon: const Icon(Icons.person_add, size: 18),
+                      label: const Text('Добавить нового ученика'),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Преподаватель
+            membersAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => const SizedBox.shrink(),
+              data: (members) {
+                final activeMembers = members.where((m) => !m.isArchived).toList();
+                if (activeMembers.length <= 1) return const SizedBox.shrink();
+
+                // Установить текущего пользователя по умолчанию
+                final currentUserId = ref.read(currentUserIdProvider);
+                _selectedTeacher ??= activeMembers.where((m) => m.userId == currentUserId).firstOrNull;
+
+                return DropdownButtonFormField<InstitutionMember?>(
+                  decoration: const InputDecoration(
+                    labelText: 'Преподаватель',
+                    prefixIcon: Icon(Icons.school),
+                  ),
+                  value: _selectedTeacher,
+                  items: activeMembers.map((m) => DropdownMenuItem<InstitutionMember?>(
+                    value: m,
+                    child: Text(m.profile?.fullName ?? 'Без имени'),
+                  )).toList(),
+                  onChanged: (member) async {
+                    setState(() => _selectedTeacher = member);
+
+                    // Автозаполнение предмета если у преподавателя один привязанный
+                    if (member != null) {
+                      _autoFillSubjectFromTeacher(member.userId);
+                    }
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Предмет
+            subjectsAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => const SizedBox.shrink(),
+              data: (subjects) {
+                if (subjects.isEmpty) return const SizedBox.shrink();
+                return DropdownButtonFormField<Subject?>(
+                  decoration: const InputDecoration(
+                    labelText: 'Предмет',
+                    prefixIcon: Icon(Icons.music_note),
+                  ),
+                  value: _selectedSubject,
+                  items: [
+                    const DropdownMenuItem<Subject?>(
+                      value: null,
+                      child: Text('Не выбран'),
+                    ),
+                    ...subjects.map((s) => DropdownMenuItem<Subject?>(
+                      value: s,
+                      child: Text(s.name),
+                    )),
+                  ],
+                  onChanged: (subject) {
+                    setState(() => _selectedSubject = subject);
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Тип занятия
+            lessonTypesAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => const SizedBox.shrink(),
+              data: (lessonTypes) {
+                if (lessonTypes.isEmpty) return const SizedBox.shrink();
+                return DropdownButtonFormField<LessonType?>(
+                  decoration: const InputDecoration(
+                    labelText: 'Тип занятия',
+                    prefixIcon: Icon(Icons.category),
+                  ),
+                  value: _selectedLessonType,
+                  items: [
+                    const DropdownMenuItem<LessonType?>(
+                      value: null,
+                      child: Text('Не выбран'),
+                    ),
+                    ...lessonTypes.map((lt) => DropdownMenuItem<LessonType?>(
+                      value: lt,
+                      child: Text('${lt.name} (${lt.defaultDurationMinutes} мин)'),
+                    )),
+                  ],
+                  onChanged: (lessonType) {
+                    setState(() {
+                      _selectedLessonType = lessonType;
+                      if (lessonType != null) {
+                        final startMinutes = _startTime.hour * 60 + _startTime.minute;
+                        final endMinutes = startMinutes + lessonType.defaultDurationMinutes;
+                        _endTime = TimeOfDay(
+                          hour: endMinutes ~/ 60,
+                          minute: endMinutes % 60,
+                        );
+                      }
+                    });
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // Кнопка создания
+            ElevatedButton.icon(
+              onPressed: controllerState.isLoading || _selectedStudent == null || _selectedRoom == null
+                  ? null
+                  : _createLesson,
+              icon: const Icon(Icons.add),
+              label: const Text('Создать занятие'),
+            ),
+
+            if (controllerState.isLoading)
+              const Padding(
+                padding: EdgeInsets.only(top: 16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createLesson() async {
+    if (_selectedStudent == null || _selectedRoom == null) return;
+
+    final currentUserId = ref.read(currentUserIdProvider);
+    if (currentUserId == null) return;
+
+    // Используем выбранного преподавателя или текущего пользователя
+    final teacherId = _selectedTeacher?.userId ?? currentUserId;
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+
+    final lesson = await controller.create(
+      institutionId: widget.institutionId,
+      roomId: _selectedRoom!.id,
+      teacherId: teacherId,
+      date: _selectedDate,
+      startTime: _startTime,
+      endTime: _endTime,
+      studentId: _selectedStudent!.id,
+      subjectId: _selectedSubject?.id,
+      lessonTypeId: _selectedLessonType?.id,
+    );
+
+    if (lesson != null && mounted) {
+      // Автоматически создаём привязки ученик-преподаватель и ученик-предмет
+      _createBindings(teacherId);
+
+      widget.onCreated(_selectedDate);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Занятие создано'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  /// Создаёт привязки ученик-преподаватель и ученик-предмет (upsert - не падает если уже есть)
+  void _createBindings(String teacherId) {
+    if (_selectedStudent == null) return;
+
+    // Запускаем в фоне, не блокируем UI
+    ref.read(studentBindingsControllerProvider.notifier).createBindingsFromLesson(
+      studentId: _selectedStudent!.id,
+      teacherId: teacherId,
+      subjectId: _selectedSubject?.id,
+      institutionId: widget.institutionId,
+    );
+  }
+
+  /// Автозаполнение предмета из привязок преподавателя (если у него один предмет)
+  Future<void> _autoFillSubjectFromTeacher(String userId) async {
+    try {
+      final teacherSubjects = await ref.read(
+        teacherSubjectsProvider(TeacherSubjectsParams(
+          userId: userId,
+          institutionId: widget.institutionId,
+        )).future,
+      );
+
+      // Если у преподавателя ровно один привязанный предмет — автозаполняем
+      if (teacherSubjects.length == 1 && mounted) {
+        final teacherSubject = teacherSubjects.first;
+        if (teacherSubject.subjectId.isNotEmpty) {
+          // Ищем предмет в общем списке по ID (важно для совпадения ссылок в dropdown)
+          final allSubjects = await ref.read(subjectsProvider(widget.institutionId).future);
+          final matchingSubject = allSubjects.where((s) => s.id == teacherSubject.subjectId).firstOrNull;
+          if (matchingSubject != null && mounted) {
+            setState(() => _selectedSubject = matchingSubject);
+          }
+        }
+      }
+    } catch (e) {
+      // Игнорируем ошибки — это не критично
+    }
+  }
+
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showAddStudentDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dialogContext) => _QuickAddStudentSheet(
+        institutionId: widget.institutionId,
+        onStudentCreated: (student) {
+          ref.invalidate(studentsProvider(widget.institutionId));
+          ref.read(studentsProvider(widget.institutionId).future).then((students) {
+            final newStudent = students.where((s) => s.id == student.id).firstOrNull;
+            if (mounted) {
+              setState(() => _selectedStudent = newStudent);
+            }
+          });
+        },
+      ),
     );
   }
 }
