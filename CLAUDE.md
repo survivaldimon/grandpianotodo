@@ -70,6 +70,10 @@
   - Таблица `subscription_members` + VIEW `student_subscription_summary`
   - UI создания семейного абонемента (чекбоксы)
   - Отображение участников в карточках
+- **`SESSION_2025_12_28_TAB_ANIMATIONS.md`** — анимация вкладок и исправления:
+  - Slide-анимация переключения вкладок в стиле iOS
+  - Автопривязка ученика к преподавателю при создании
+  - Исправление видимости оплат для участников
 
 ## Валюта
 
@@ -234,10 +238,26 @@ final canEditStudent = isOwner ||
 - `myPermissionsProvider` — извлекает права из membership
 - При открытии деталей занятия вызывается `ref.invalidate(myMembershipProvider)` для гарантированного обновления
 
+**Структура прав просмотра оплат:**
+```dart
+viewOwnStudentsPayments: bool  // Просмотр оплат своих учеников (по умолчанию true)
+viewAllPayments: bool          // Просмотр всех оплат заведения (по умолчанию false)
+```
+
+**Проверка прав на просмотр оплат:**
+```dart
+final canViewAllPayments = hasFullAccess ||
+    (permissions?.viewAllPayments ?? false);
+final canViewOwnStudentsPayments = permissions?.viewOwnStudentsPayments ?? true;
+
+// Фильтрация в UI: если !canViewAllPayments — показывать только оплаты своих учеников
+```
+
 **Обратная совместимость с RLS:**
 В `toJson()` добавляются поля для совместимости с RLS политикой в Supabase:
 - `delete_lessons: deleteOwnLessons || deleteAllLessons`
 - `manage_students: manageOwnStudents || manageAllStudents`
+- `view_payments: viewOwnStudentsPayments || viewAllPayments`
 
 **Базовые права для новых участников (по умолчанию):**
 - `createLessons: true`
@@ -246,7 +266,7 @@ final canEditStudent = isOwner ||
 - `manageOwnStudents: true`
 - `manageGroups: true`
 - `deleteOwnLessons: true`
-- `viewPayments: true`
+- `viewOwnStudentsPayments: true`
 - `addPaymentsForOwnStudents: true`
 
 **Роль администратора (isAdmin):**
@@ -473,6 +493,94 @@ await paymentController.createFamilyPayment(
 - `lib/features/subscriptions/repositories/subscription_repository.dart` — `createFamily`, `deductLesson`
 - `lib/features/students/repositories/student_repository.dart` — баланс из VIEW
 - `supabase/migrations/add_family_subscriptions.sql` — миграция
+
+### 25. Анимация переключения вкладок
+При переключении вкладок нижней навигации используется slide-анимация в стиле iOS.
+
+**Логика:**
+- Переход на вкладку с **бо́льшим индексом** (влево→вправо): страница въезжает **справа**
+- Переход на вкладку с **меньшим индексом** (вправо→влево): страница въезжает **слева**
+
+**Индексы вкладок:**
+| Индекс | Вкладка |
+|--------|---------|
+| 0 | Главная (Dashboard) |
+| 1 | Расписание (Schedule) |
+| 2 | Ученики (Students) |
+| 3 | Оплаты (Payments) |
+| 4 | Настройки (Settings) |
+
+**Реализация в MainShell:**
+```dart
+class _MainShellState extends ConsumerState<MainShell>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  Animation<Offset> _slideAnimation = const AlwaysStoppedAnimation(Offset.zero);
+  int _lastKnownIndex = -1;
+  String? _lastLocation;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkRouteChange();  // Отслеживаем смену маршрута
+  }
+
+  void _animateToTab(int newIndex) {
+    if (_lastKnownIndex == -1 || newIndex == _lastKnownIndex) return;
+
+    final goingToHigherIndex = newIndex > _lastKnownIndex;
+    _lastKnownIndex = newIndex;
+
+    setState(() {
+      _slideAnimation = Tween<Offset>(
+        begin: Offset(goingToHigherIndex ? 1.0 : -1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCubic,
+      ));
+    });
+
+    _animationController.forward(from: 0.0);
+  }
+}
+```
+
+**Важные особенности:**
+- Используется `didChangeDependencies` для отслеживания смены GoRouterState
+- `addPostFrameCallback` гарантирует запуск анимации после завершения фрейма
+- `_lastLocation` предотвращает повторные анимации при rebuild
+- `SlideTransition` оборачивает `widget.child` в body Scaffold
+
+**Файл:** `lib/features/dashboard/screens/main_shell.dart`
+
+### 26. Автопривязка ученика к преподавателю
+При создании ученика он автоматически привязывается к текущему пользователю (преподавателю).
+
+**Проблема:** Участник создавал ученика, но не видел его в "своих учениках" и не мог добавить оплату.
+
+**Решение в `StudentController.create()`:**
+```dart
+Future<Student?> create({...}) async {
+  final student = await _repo.create(...);
+
+  // Автоматически привязываем созданного ученика к текущему пользователю
+  final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+  if (currentUserId != null) {
+    final bindingsController = _ref.read(studentBindingsControllerProvider.notifier);
+    await bindingsController.addTeacher(
+      studentId: student.id,
+      userId: currentUserId,
+      institutionId: institutionId,
+    );
+    _ref.invalidate(myStudentIdsProvider(institutionId));
+  }
+
+  return student;
+}
+```
+
+**Файл:** `lib/features/students/providers/student_provider.dart`
 
 
 ## CI/CD

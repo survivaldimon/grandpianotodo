@@ -42,8 +42,8 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final paymentsAsync = ref.watch(paymentsProvider(_periodParams));
-    final totalAsync = ref.watch(periodTotalProvider(_periodParams));
+    // Используем StreamProvider для realtime обновлений
+    final paymentsAsync = ref.watch(paymentsStreamByPeriodProvider(_periodParams));
     final monthName = DateFormat('LLLL yyyy', 'ru').format(_selectedMonth);
 
     // Получаем права текущего пользователя
@@ -67,6 +67,15 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     // Право на добавление оплат для всех учеников
     final canAddForAllStudents = hasFullAccess ||
         (permissions?.addPaymentsForAllStudents ?? false);
+
+    // Права на просмотр оплат
+    final canViewAllPayments = hasFullAccess ||
+        (permissions?.viewAllPayments ?? false);
+    final canViewOwnStudentsPayments = permissions?.viewOwnStudentsPayments ?? true;
+    final canViewAnyPayments = canViewAllPayments || canViewOwnStudentsPayments;
+
+    // ID своих учеников для фильтрации
+    final myStudentIdsAsync = ref.watch(myStudentIdsProvider(widget.institutionId));
 
     return Scaffold(
       appBar: AppBar(
@@ -102,70 +111,137 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               ],
             ),
           ),
-          // Total
-          Container(
-            margin: AppSizes.paddingHorizontalM,
-            padding: AppSizes.paddingAllM,
-            decoration: BoxDecoration(
-              color: AppColors.success.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(AppSizes.radiusM),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Итого:'),
-                totalAsync.when(
-                  data: (total) => Text(
-                    _formatCurrency(total),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.success,
-                        ),
+          // Total — считаем из realtime данных
+          if (canViewAnyPayments)
+            Container(
+              margin: AppSizes.paddingHorizontalM,
+              padding: AppSizes.paddingAllM,
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppSizes.radiusM),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(canViewAllPayments ? 'Итого:' : 'Итого (ваши ученики):'),
+                  paymentsAsync.when(
+                    data: (payments) {
+                      double total;
+                      if (canViewAllPayments) {
+                        // Сумма всех оплат
+                        total = payments.fold<double>(0, (sum, p) => sum + p.amount);
+                      } else {
+                        // Сумма только оплат своих учеников
+                        final myStudentIds = myStudentIdsAsync.valueOrNull ?? {};
+                        total = payments
+                            .where((p) {
+                              if (myStudentIds.contains(p.studentId)) {
+                                return true;
+                              }
+                              if (p.subscription?.members != null) {
+                                return p.subscription!.members!.any(
+                                  (m) => myStudentIds.contains(m.studentId),
+                                );
+                              }
+                              return false;
+                            })
+                            .fold<double>(0, (sum, p) => sum + p.amount);
+                      }
+                      return Text(
+                        _formatCurrency(total),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.success,
+                            ),
+                      );
+                    },
+                    loading: () => const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    error: (_, __) => const Text('—'),
                   ),
-                  loading: () => const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  error: (_, __) => const Text('—'),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 16),
           // Payments list
           Expanded(
-            child: paymentsAsync.when(
-              loading: () => const LoadingIndicator(),
-              error: (error, _) => ErrorView.fromException(
-                error,
-                onRetry: () => ref.invalidate(paymentsProvider(_periodParams)),
-              ),
-              data: (payments) {
-                if (payments.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Нет оплат за этот период',
-                      style: TextStyle(color: AppColors.textSecondary),
+            child: !canViewAnyPayments
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_outline, size: 48, color: AppColors.textSecondary),
+                        SizedBox(height: 16),
+                        Text(
+                          'Нет доступа к просмотру оплат',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      ],
                     ),
-                  );
-                }
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    ref.invalidate(paymentsProvider(_periodParams));
-                    ref.invalidate(periodTotalProvider(_periodParams));
-                  },
-                  child: _buildPaymentsList(payments),
-                );
-              },
-            ),
+                  )
+                : paymentsAsync.when(
+                    loading: () => const LoadingIndicator(),
+                    error: (error, _) => ErrorView.fromException(
+                      error,
+                      onRetry: () => ref.invalidate(paymentsProvider(_periodParams)),
+                    ),
+                    data: (payments) {
+                      // Если нужна фильтрация по своим ученикам, ждём загрузки myStudentIds
+                      if (!canViewAllPayments && myStudentIdsAsync.isLoading) {
+                        return const LoadingIndicator();
+                      }
+
+                      // Фильтруем оплаты по правам
+                      List<Payment> filteredPayments = payments;
+                      final myStudentIds = myStudentIdsAsync.valueOrNull ?? {};
+
+                      if (!canViewAllPayments) {
+                        // Показываем только оплаты своих учеников
+                        filteredPayments = payments.where((p) {
+                          // Проверяем основного ученика
+                          if (myStudentIds.contains(p.studentId)) {
+                            return true;
+                          }
+                          // Для семейных абонементов проверяем всех участников
+                          if (p.subscription?.members != null) {
+                            return p.subscription!.members!.any(
+                              (m) => myStudentIds.contains(m.studentId),
+                            );
+                          }
+                          return false;
+                        }).toList();
+                      }
+
+                      if (filteredPayments.isEmpty) {
+                        return Center(
+                          child: Text(
+                            canViewAllPayments
+                                ? 'Нет оплат за этот период'
+                                : 'Нет оплат ваших учеников за этот период',
+                            style: const TextStyle(color: AppColors.textSecondary),
+                          ),
+                        );
+                      }
+                      return RefreshIndicator(
+                        onRefresh: () async {
+                          // Инвалидируем stream провайдер для принудительного обновления
+                          ref.invalidate(paymentsStreamByPeriodProvider(_periodParams));
+                          ref.invalidate(myStudentIdsProvider(widget.institutionId));
+                        },
+                        child: _buildPaymentsList(filteredPayments, myStudentIds),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPaymentsList(List<Payment> payments) {
+  Widget _buildPaymentsList(List<Payment> payments, Set<String> myStudentIds) {
     // Group payments by date
     final groupedPayments = groupBy<Payment, String>(
       payments,
@@ -189,9 +265,10 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
             ...dayPayments.map((p) => _PaymentCard(
               payment: p,
               institutionId: widget.institutionId,
+              myStudentIds: myStudentIds,
               onChanged: () {
-                ref.invalidate(paymentsProvider(_periodParams));
-                ref.invalidate(periodTotalProvider(_periodParams));
+                // Stream провайдер обновляется автоматически через realtime
+                ref.invalidate(paymentsStreamByPeriodProvider(_periodParams));
               },
             )),
           ],
@@ -231,8 +308,8 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
         institutionId: widget.institutionId,
         canAddForAllStudents: canAddForAllStudents,
         onSuccess: () {
-          ref.invalidate(paymentsProvider(_periodParams));
-          ref.invalidate(periodTotalProvider(_periodParams));
+          // Stream провайдер обновляется автоматически через realtime
+          ref.invalidate(paymentsStreamByPeriodProvider(_periodParams));
         },
       ),
     );
@@ -1033,12 +1110,47 @@ class _PaymentCard extends ConsumerWidget {
   final Payment payment;
   final String institutionId;
   final VoidCallback onChanged;
+  final Set<String> myStudentIds;
 
   const _PaymentCard({
     required this.payment,
     required this.institutionId,
     required this.onChanged,
+    required this.myStudentIds,
   });
+
+  /// Проверяет, может ли пользователь управлять этой оплатой
+  bool _canManagePayment(WidgetRef ref) {
+    final permissions = ref.watch(myPermissionsProvider(institutionId));
+    final institutionAsync = ref.watch(currentInstitutionProvider(institutionId));
+    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+
+    final isOwner = institutionAsync.maybeWhen(
+      data: (inst) => inst.ownerId == currentUserId,
+      orElse: () => false,
+    );
+    final isAdmin = ref.watch(isAdminProvider(institutionId));
+    final hasFullAccess = isOwner || isAdmin;
+
+    if (hasFullAccess) return true;
+    if (permissions?.manageAllPayments ?? false) return true;
+
+    // Проверяем, это оплата своего ученика
+    if (permissions?.manageOwnStudentsPayments ?? true) {
+      // Проверяем основного ученика
+      if (myStudentIds.contains(payment.studentId)) {
+        return true;
+      }
+      // Для семейных абонементов проверяем всех участников
+      if (payment.subscription?.members != null) {
+        if (payment.subscription!.members!.any((m) => myStudentIds.contains(m.studentId))) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
 
   /// Извлекает название типа занятия из comment если это оплата занятия
   /// Формат: lesson:LESSON_ID|LESSON_TYPE_NAME
@@ -1108,28 +1220,51 @@ class _PaymentCard extends ConsumerWidget {
   }
 
   void _showPaymentOptions(BuildContext context, WidgetRef ref) {
+    final canManage = _canManagePayment(ref);
+
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Информация об оплате
             ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Редактировать'),
-              onTap: () {
-                Navigator.pop(context);
-                _showEditDialog(context, ref);
-              },
+              leading: const Icon(Icons.info_outline),
+              title: Text('${payment.student?.name ?? "Ученик"} — ${payment.amount.toInt()} ₸'),
+              subtitle: Text('${payment.lessonsCount} занятий'),
             ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Удалить', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _showDeleteConfirmation(context, ref);
-              },
-            ),
+            const Divider(),
+            if (canManage) ...[
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Редактировать'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditDialog(context, ref);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDeleteConfirmation(context, ref);
+                },
+              ),
+            ] else ...[
+              const ListTile(
+                leading: Icon(Icons.lock_outline, color: AppColors.textSecondary),
+                title: Text(
+                  'Нет прав на редактирование',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                subtitle: Text(
+                  'Вы можете редактировать только оплаты своих учеников',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
           ],
         ),
       ),

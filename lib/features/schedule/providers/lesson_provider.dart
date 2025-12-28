@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/schedule/repositories/lesson_repository.dart';
+import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/subscriptions/repositories/subscription_repository.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
@@ -353,6 +354,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
 
       _invalidateForRoom(roomId, date, institutionId: institutionId);
       _ref.invalidate(lessonProvider(id));
+      // Гибридный Realtime: обновляем список учеников для актуального баланса
+      _ref.invalidate(studentsProvider(institutionId));
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -390,6 +393,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
 
       _invalidateForRoom(roomId, date, institutionId: institutionId);
       _ref.invalidate(lessonProvider(id));
+      // Гибридный Realtime: обновляем список учеников для актуального баланса
+      _ref.invalidate(studentsProvider(institutionId));
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {

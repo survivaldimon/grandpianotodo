@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
@@ -178,13 +179,45 @@ class StudentRepository {
   }
 
   /// Стрим учеников (realtime)
-  /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
-  Stream<List<Student>> watchByInstitution(String institutionId) async* {
-    await for (final _ in _client.from('students').stream(primaryKey: ['id'])) {
-      // При любом изменении загружаем актуальные данные (включая архивированных)
-      final students = await getByInstitution(institutionId, includeArchived: true);
-      yield students;
+  /// Слушаем изменения в students И subscriptions (для обновления баланса)
+  Stream<List<Student>> watchByInstitution(String institutionId) {
+    final controller = StreamController<List<Student>>.broadcast();
+    StreamSubscription? studentsSubscription;
+    StreamSubscription? subscriptionsSubscription;
+
+    // Функция для загрузки и отправки данных
+    Future<void> loadAndEmit() async {
+      try {
+        final students = await getByInstitution(institutionId, includeArchived: true);
+        if (!controller.isClosed) {
+          controller.add(students);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
     }
+
+    // Слушаем students
+    studentsSubscription = _client
+        .from('students')
+        .stream(primaryKey: ['id'])
+        .listen((_) => loadAndEmit());
+
+    // Слушаем subscriptions (для обновления баланса при списании занятий)
+    subscriptionsSubscription = _client
+        .from('subscriptions')
+        .stream(primaryKey: ['id'])
+        .listen((_) => loadAndEmit());
+
+    // Очистка при закрытии стрима
+    controller.onCancel = () {
+      studentsSubscription?.cancel();
+      subscriptionsSubscription?.cancel();
+    };
+
+    return controller.stream;
   }
 
   // === Группы ===

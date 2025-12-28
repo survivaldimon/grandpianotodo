@@ -152,6 +152,20 @@ class StudentController extends StateNotifier<AsyncValue<void>> {
         phone: phone,
         comment: comment,
       );
+
+      // Автоматически привязываем созданного ученика к текущему пользователю
+      final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+      if (currentUserId != null) {
+        final bindingsController = _ref.read(studentBindingsControllerProvider.notifier);
+        await bindingsController.addTeacher(
+          studentId: student.id,
+          userId: currentUserId,
+          institutionId: institutionId,
+        );
+        // Инвалидируем кэш своих учеников
+        _ref.invalidate(myStudentIdsProvider(institutionId));
+      }
+
       _ref.invalidate(studentsProvider(institutionId));
       state = const AsyncValue.data(null);
       return student;
@@ -293,4 +307,19 @@ final studentsForPaymentProvider =
 
   // Фильтруем только своих учеников
   return activeStudents.where((s) => myStudentIds.contains(s.id)).toList();
+});
+
+/// Провайдер ID своих учеников (для фильтрации оплат)
+final myStudentIdsProvider =
+    FutureProvider.family<Set<String>, String>((ref, institutionId) async {
+  final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+  if (currentUserId == null) return {};
+
+  final bindingsRepo = ref.read(studentBindingsRepositoryProvider);
+  final ids = await bindingsRepo.getTeacherStudentIds(
+    currentUserId,
+    institutionId,
+  );
+
+  return ids.toSet();
 });

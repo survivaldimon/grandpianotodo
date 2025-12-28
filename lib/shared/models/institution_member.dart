@@ -19,8 +19,10 @@ class MemberPermissions {
   final bool viewAllSchedule;
   final bool addPaymentsForOwnStudents;
   final bool addPaymentsForAllStudents;
-  final bool managePayments;
-  final bool viewPayments;
+  final bool manageOwnStudentsPayments;
+  final bool manageAllPayments;
+  final bool viewOwnStudentsPayments;
+  final bool viewAllPayments;
   final bool viewStatistics;
   final bool archiveData;
 
@@ -42,8 +44,10 @@ class MemberPermissions {
     this.viewAllSchedule = true,
     this.addPaymentsForOwnStudents = true,
     this.addPaymentsForAllStudents = false,
-    this.managePayments = false,
-    this.viewPayments = true,
+    this.manageOwnStudentsPayments = true,
+    this.manageAllPayments = false,
+    this.viewOwnStudentsPayments = true,
+    this.viewAllPayments = false,
     this.viewStatistics = false,
     this.archiveData = false,
   });
@@ -67,8 +71,10 @@ class MemberPermissions {
         viewAllSchedule: true,
         addPaymentsForOwnStudents: true,
         addPaymentsForAllStudents: true,
-        managePayments: true,
-        viewPayments: true,
+        manageOwnStudentsPayments: true,
+        manageAllPayments: true,
+        viewOwnStudentsPayments: true,
+        viewAllPayments: true,
         viewStatistics: true,
         archiveData: true,
       );
@@ -97,8 +103,12 @@ class MemberPermissions {
         // Обратная совместимость: старое manage_payments -> addPaymentsForAllStudents
         addPaymentsForOwnStudents: json['add_payments_for_own_students'] as bool? ?? true,
         addPaymentsForAllStudents: json['add_payments_for_all_students'] as bool? ?? json['manage_payments'] as bool? ?? false,
-        managePayments: json['manage_payments'] as bool? ?? false,
-        viewPayments: json['view_payments'] as bool? ?? false,
+        // Обратная совместимость: старое manage_payments -> manageAllPayments
+        manageOwnStudentsPayments: json['manage_own_students_payments'] as bool? ?? true,
+        manageAllPayments: json['manage_all_payments'] as bool? ?? json['manage_payments'] as bool? ?? false,
+        // Обратная совместимость: старое view_payments -> viewOwnStudentsPayments
+        viewOwnStudentsPayments: json['view_own_students_payments'] as bool? ?? json['view_payments'] as bool? ?? true,
+        viewAllPayments: json['view_all_payments'] as bool? ?? false,
         viewStatistics: json['view_statistics'] as bool? ?? false,
         archiveData: json['archive_data'] as bool? ?? false,
       );
@@ -125,8 +135,14 @@ class MemberPermissions {
         'view_all_schedule': viewAllSchedule,
         'add_payments_for_own_students': addPaymentsForOwnStudents,
         'add_payments_for_all_students': addPaymentsForAllStudents,
-        'manage_payments': managePayments,
-        'view_payments': viewPayments,
+        'manage_own_students_payments': manageOwnStudentsPayments,
+        'manage_all_payments': manageAllPayments,
+        // Для обратной совместимости с RLS политикой в Supabase
+        'manage_payments': manageOwnStudentsPayments || manageAllPayments,
+        'view_own_students_payments': viewOwnStudentsPayments,
+        'view_all_payments': viewAllPayments,
+        // Для обратной совместимости с RLS политикой в Supabase
+        'view_payments': viewOwnStudentsPayments || viewAllPayments,
         'view_statistics': viewStatistics,
         'archive_data': archiveData,
       };
@@ -149,8 +165,10 @@ class MemberPermissions {
     bool? viewAllSchedule,
     bool? addPaymentsForOwnStudents,
     bool? addPaymentsForAllStudents,
-    bool? managePayments,
-    bool? viewPayments,
+    bool? manageOwnStudentsPayments,
+    bool? manageAllPayments,
+    bool? viewOwnStudentsPayments,
+    bool? viewAllPayments,
     bool? viewStatistics,
     bool? archiveData,
   }) =>
@@ -172,8 +190,10 @@ class MemberPermissions {
         viewAllSchedule: viewAllSchedule ?? this.viewAllSchedule,
         addPaymentsForOwnStudents: addPaymentsForOwnStudents ?? this.addPaymentsForOwnStudents,
         addPaymentsForAllStudents: addPaymentsForAllStudents ?? this.addPaymentsForAllStudents,
-        managePayments: managePayments ?? this.managePayments,
-        viewPayments: viewPayments ?? this.viewPayments,
+        manageOwnStudentsPayments: manageOwnStudentsPayments ?? this.manageOwnStudentsPayments,
+        manageAllPayments: manageAllPayments ?? this.manageAllPayments,
+        viewOwnStudentsPayments: viewOwnStudentsPayments ?? this.viewOwnStudentsPayments,
+        viewAllPayments: viewAllPayments ?? this.viewAllPayments,
         viewStatistics: viewStatistics ?? this.viewStatistics,
         archiveData: archiveData ?? this.archiveData,
       );

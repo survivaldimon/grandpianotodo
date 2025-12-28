@@ -20,15 +20,98 @@ class MainShell extends ConsumerStatefulWidget {
   ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends ConsumerState<MainShell> {
+class _MainShellState extends ConsumerState<MainShell>
+    with SingleTickerProviderStateMixin {
   Timer? _checkTimer;
   String? _lastInstitutionId;
   bool _isShowingDeletedDialog = false;
 
+  late AnimationController _animationController;
+  Animation<Offset> _slideAnimation = const AlwaysStoppedAnimation(Offset.zero);
+  int _lastKnownIndex = -1; // -1 означает "ещё не определён"
+  String? _lastLocation; // Для отслеживания смены маршрута
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkRouteChange();
+  }
+
+  void _checkRouteChange() {
+    final location = GoRouterState.of(context).matchedLocation;
+
+    // Если маршрут не изменился - ничего не делаем
+    if (location == _lastLocation) return;
+    _lastLocation = location;
+
+    // Определяем индекс вкладки
+    int newIndex = 0;
+    if (location.contains('/schedule')) {
+      newIndex = 1;
+    } else if (location.contains('/students')) {
+      newIndex = 2;
+    } else if (location.contains('/payments')) {
+      newIndex = 3;
+    } else if (location.contains('/settings') || location.contains('/statistics')) {
+      newIndex = 4;
+    }
+
+    // Запускаем анимацию после завершения текущего фрейма
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _animateToTab(newIndex);
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _animationController.dispose();
     _checkTimer?.cancel();
     super.dispose();
+  }
+
+  void _animateToTab(int newIndex) {
+    // Первый вызов - просто запоминаем индекс без анимации
+    if (_lastKnownIndex == -1) {
+      _lastKnownIndex = newIndex;
+      return;
+    }
+
+    // Если индекс не изменился - ничего не делаем
+    if (newIndex == _lastKnownIndex) {
+      return;
+    }
+
+    final previousIndex = _lastKnownIndex;
+    _lastKnownIndex = newIndex;
+
+    // Определяем направление:
+    // Если идём на вкладку с бо́льшим индексом (вправо) - страница въезжает справа
+    // Если идём на вкладку с меньшим индексом (влево) - страница въезжает слева
+    final goingToHigherIndex = newIndex > previousIndex;
+
+    setState(() {
+      _slideAnimation = Tween<Offset>(
+        begin: Offset(goingToHigherIndex ? 1.0 : -1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCubic,
+      ));
+    });
+
+    // Запускаем анимацию с начала
+    _animationController.forward(from: 0.0);
   }
 
   void _startMembershipCheck(String institutionId) {
@@ -130,7 +213,10 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
 
     return Scaffold(
-      body: widget.child,
+      body: SlideTransition(
+        position: _slideAnimation,
+        child: widget.child,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: (index) {

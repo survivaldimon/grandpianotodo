@@ -78,6 +78,19 @@ final paymentsStreamProvider =
   return repo.watchByInstitution(institutionId);
 });
 
+/// Стрим оплат за период (realtime) — для экрана оплат
+final paymentsStreamByPeriodProvider =
+    StreamProvider.family<List<Payment>, PeriodParams>((ref, params) {
+  final repo = ref.watch(paymentRepositoryProvider);
+  return repo.watchByInstitution(params.institutionId).map((payments) {
+    // Фильтруем по периоду на клиенте
+    return payments.where((p) {
+      return p.paidAt.isAfter(params.from.subtract(const Duration(seconds: 1))) &&
+          p.paidAt.isBefore(params.to.add(const Duration(seconds: 1)));
+    }).toList();
+  });
+});
+
 /// Провайдер суммы оплат за сегодня (realtime)
 final todayPaymentsTotalProvider =
     StreamProvider.family<double, String>((ref, institutionId) {
@@ -141,6 +154,8 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
       }
 
       _ref.invalidate(studentPaymentsProvider(studentId));
+      // Гибридный Realtime: инвалидируем stream для немедленного обновления
+      _ref.invalidate(paymentsStreamProvider(institutionId));
       state = const AsyncValue.data(null);
       return payment;
     } catch (e, st) {
@@ -169,6 +184,8 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
       );
 
       _ref.invalidate(studentPaymentsProvider(studentId));
+      // Гибридный Realtime: инвалидируем stream для немедленного обновления
+      _ref.invalidate(paymentsStreamProvider(institutionId));
       state = const AsyncValue.data(null);
       return payment;
     } catch (e, st) {
@@ -343,6 +360,8 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         _ref.invalidate(activeSubscriptionsProvider(studentId));
       }
 
+      // Гибридный Realtime: инвалидируем stream для немедленного обновления
+      _ref.invalidate(paymentsStreamProvider(institutionId));
       state = const AsyncValue.data(null);
       return payment;
     } catch (e, st) {

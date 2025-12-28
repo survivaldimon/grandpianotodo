@@ -320,10 +320,16 @@ class _MemberPermissionsScreenState
                   'Финансы',
                   [
                     _buildPermissionTile(
-                      'Просмотр оплат',
-                      'Видеть историю оплат',
-                      _permissions.viewPayments,
-                      (v) => setState(() => _permissions = _permissions.copyWith(viewPayments: v)),
+                      'Просмотр оплат своих учеников',
+                      'Видеть историю оплат своих учеников',
+                      _permissions.viewOwnStudentsPayments,
+                      (v) => setState(() => _permissions = _permissions.copyWith(viewOwnStudentsPayments: v)),
+                    ),
+                    _buildPermissionTile(
+                      'Просмотр всех оплат',
+                      'Видеть историю оплат всех учеников',
+                      _permissions.viewAllPayments,
+                      (v) => setState(() => _permissions = _permissions.copyWith(viewAllPayments: v)),
                     ),
                     _buildPermissionTile(
                       'Оплаты для своих учеников',
@@ -338,10 +344,16 @@ class _MemberPermissionsScreenState
                       (v) => setState(() => _permissions = _permissions.copyWith(addPaymentsForAllStudents: v)),
                     ),
                     _buildPermissionTile(
-                      'Управление оплатами',
-                      'Редактирование и удаление оплат',
-                      _permissions.managePayments,
-                      (v) => setState(() => _permissions = _permissions.copyWith(managePayments: v)),
+                      'Управление оплатами своих учеников',
+                      'Редактирование и удаление оплат своих учеников',
+                      _permissions.manageOwnStudentsPayments,
+                      (v) => setState(() => _permissions = _permissions.copyWith(manageOwnStudentsPayments: v)),
+                    ),
+                    _buildPermissionTile(
+                      'Управление всеми оплатами',
+                      'Редактирование и удаление оплат любых учеников',
+                      _permissions.manageAllPayments,
+                      (v) => setState(() => _permissions = _permissions.copyWith(manageAllPayments: v)),
                     ),
                     _buildPermissionTile(
                       'Просмотр статистики',

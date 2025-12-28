@@ -143,9 +143,10 @@ class PaymentRepository {
   /// Получить все оплаты заведения
   Future<List<Payment>> getByInstitution(String institutionId) async {
     try {
+      // Добавляем subscriptions с subscription_members для семейных абонементов
       final data = await _client
           .from('payments')
-          .select('*, students(*), payment_plans(*)')
+          .select('*, students(*), payment_plans(*), subscriptions(*, subscription_members(*, students(*)))')
           .eq('institution_id', institutionId)
           .order('paid_at', ascending: false);
 
