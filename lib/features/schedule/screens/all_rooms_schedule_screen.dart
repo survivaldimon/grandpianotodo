@@ -1293,8 +1293,12 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
 
     final startMinutes = lesson.startTime.hour * 60 + lesson.startTime.minute;
     final endMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
     final startOffset = (startMinutes - widget.startHour * 60) / 60 * _AllRoomsTimeGrid.hourHeight;
-    final duration = (endMinutes - startMinutes) / 60 * _AllRoomsTimeGrid.hourHeight;
+    final duration = durationMinutes / 60 * _AllRoomsTimeGrid.hourHeight;
+
+    // Показываем время только для занятий >= 30 минут
+    final showTime = durationMinutes >= 30;
 
     final color = _getLessonColor(lesson);
     final participant = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
@@ -1336,7 +1340,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                     const Icon(Icons.cancel, size: 12, color: AppColors.error),
                 ],
               ),
-              if (duration > 30)
+              if (showTime)
                 Text(
                   '${_formatTime(lesson.startTime)}-${_formatTime(lesson.endTime)}',
                   style: const TextStyle(
@@ -2803,6 +2807,20 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
   }
 
   Future<void> _saveChanges() async {
+    // Проверка минимальной длительности (15 минут)
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
+    if (durationMinutes < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Минимальная длительность занятия — 15 минут'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final controller = ref.read(lessonControllerProvider.notifier);
     final lesson = widget.lesson;
 
@@ -3551,6 +3569,20 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
 
   Future<void> _createLesson() async {
     if (_selectedStudent == null) return;
+
+    // Проверка минимальной длительности (15 минут)
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
+    if (durationMinutes < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Минимальная длительность занятия — 15 минут'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     final currentUserId = ref.read(currentUserIdProvider);
     if (currentUserId == null) return;
@@ -4928,6 +4960,20 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
   Future<void> _createLesson() async {
     if (_selectedStudent == null || _selectedRoom == null) return;
+
+    // Проверка минимальной длительности (15 минут)
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
+    if (durationMinutes < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Минимальная длительность занятия — 15 минут'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     final currentUserId = ref.read(currentUserIdProvider);
     if (currentUserId == null) return;
