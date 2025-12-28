@@ -499,6 +499,53 @@ CREATE INDEX idx_subscription_members_student ON subscription_members(student_id
 - При списании занятия сначала ищется личная подписка, затем семейная
 - Все участники делят общий пул занятий (lessons_remaining)
 
+### bookings (Бронирование кабинетов)
+
+```sql
+-- Бронирование кабинетов (блокировка для мероприятий)
+CREATE TABLE bookings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+  created_by UUID NOT NULL REFERENCES auth.users(id),
+  date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  archived_at TIMESTAMPTZ,
+
+  CONSTRAINT booking_end_after_start CHECK (end_time > start_time)
+);
+
+CREATE INDEX idx_bookings_institution_date ON bookings(institution_id, date);
+CREATE INDEX idx_bookings_date ON bookings(date);
+```
+
+### booking_rooms (Связь бронирования с кабинетами)
+
+```sql
+-- Связь брони с кабинетами (many-to-many)
+-- Позволяет одной бронью заблокировать несколько кабинетов
+CREATE TABLE booking_rooms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+
+  UNIQUE(booking_id, room_id)
+);
+
+CREATE INDEX idx_booking_rooms_room ON booking_rooms(room_id);
+CREATE INDEX idx_booking_rooms_booking ON booking_rooms(booking_id);
+```
+
+**Логика бронирования:**
+- Бронь блокирует кабинеты для создания занятий в указанное время
+- При создании занятия проверяется конфликт с бронями через `booking_rooms`
+- Одна бронь может включать несколько кабинетов
+- Право на создание брони: `createBookings` (по умолчанию `true`)
+- Удалить бронь может владелец заведения, администратор или создатель
+
 ## Row Level Security (RLS)
 
 ### Принцип
@@ -763,6 +810,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE subscriptions;
 ALTER PUBLICATION supabase_realtime ADD TABLE subscription_members;  -- Для семейных абонементов
 ALTER PUBLICATION supabase_realtime ADD TABLE institutions;          -- Для синхронизации рабочего времени
 ALTER PUBLICATION supabase_realtime ADD TABLE institution_members;   -- Для синхронизации прав участников
+ALTER PUBLICATION supabase_realtime ADD TABLE bookings;              -- Для бронирования кабинетов
+ALTER PUBLICATION supabase_realtime ADD TABLE booking_rooms;         -- Для связи броней с кабинетами
 ```
 
 ## Индексы для производительности

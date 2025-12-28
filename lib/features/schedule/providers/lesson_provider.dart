@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/schedule/repositories/lesson_repository.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
+import 'package:kabinet/features/students/repositories/student_repository.dart';
 import 'package:kabinet/features/subscriptions/repositories/subscription_repository.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
@@ -222,6 +223,9 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
 
   LessonController(this._repo, this._subscriptionRepo, this._ref) : super(const AsyncValue.data(null));
 
+  /// Получить репозиторий студентов для работы с долгом
+  StudentRepository get _studentRepo => _ref.read(studentRepositoryProvider);
+
   Future<Lesson?> create({
     required String institutionId,
     required String roomId,
@@ -342,13 +346,16 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         try {
           final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
 
-          // Привязываем занятие к подписке для расчёта стоимости
           if (subscriptionId != null) {
+            // Привязываем занятие к подписке для расчёта стоимости
             await _repo.setSubscriptionId(id, subscriptionId);
+          } else {
+            // Нет активной подписки — списываем напрямую (уход в долг)
+            await _studentRepo.decrementPrepaidCount(lesson.studentId!);
           }
         } catch (e) {
-          // Не критичная ошибка - занятие проведено, но подписка не списана
-          debugPrint('Error deducting subscription: $e');
+          // Не критичная ошибка - занятие проведено, но подписка/долг не списаны
+          debugPrint('Error deducting subscription/debt: $e');
         }
       }
 
@@ -372,22 +379,24 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
 
       await _repo.uncomplete(id);
 
-      // Возвращаем занятие на абонемент, если это индивидуальное занятие
+      // Возвращаем занятие на абонемент или уменьшаем долг
       // Ошибка возврата НЕ должна влиять на успешное изменение статуса
       if (lesson.studentId != null) {
         try {
-          await _subscriptionRepo.returnLesson(
-            lesson.studentId!,
-            subscriptionId: lesson.subscriptionId, // Возвращаем на ту же подписку
-          );
-
-          // Убираем привязку к подписке
           if (lesson.subscriptionId != null) {
+            // Было списано с подписки — возвращаем туда
+            await _subscriptionRepo.returnLesson(
+              lesson.studentId!,
+              subscriptionId: lesson.subscriptionId,
+            );
             await _repo.clearSubscriptionId(id);
+          } else {
+            // Было списано в долг — возвращаем (уменьшаем долг)
+            await _studentRepo.incrementPrepaidCount(lesson.studentId!);
           }
         } catch (e) {
-          // Не критичная ошибка - статус изменён, но подписка не возвращена
-          debugPrint('Error returning subscription: $e');
+          // Не критичная ошибка - статус изменён, но баланс не возвращён
+          debugPrint('Error returning subscription/debt: $e');
         }
       }
 

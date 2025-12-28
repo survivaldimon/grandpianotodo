@@ -24,6 +24,8 @@ import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
+import 'package:kabinet/features/bookings/models/booking.dart';
+import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 
 /// Класс для хранения состояния фильтров расписания
 class ScheduleFilters {
@@ -147,6 +149,9 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final lessonsAsync = ref.watch(
       lessonsByInstitutionStreamProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
     );
+    final bookingsAsync = ref.watch(
+      bookingsByInstitutionDateProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
+    );
 
     // Получаем права пользователя (используем StreamProvider для realtime обновления)
     final institutionAsync = ref.watch(currentInstitutionStreamProvider(widget.institutionId));
@@ -244,24 +249,23 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           const Divider(height: 1),
           Expanded(
             child: _viewMode == ScheduleViewMode.day
-                ? _buildDayView(roomsAsync, lessonsAsync, canManageRooms, workStartHour, workEndHour)
+                ? _buildDayView(roomsAsync, lessonsAsync, bookingsAsync, canManageRooms, workStartHour, workEndHour)
                 : _buildWeekView(roomsAsync, canManageRooms, workStartHour, workEndHour),
           ),
         ],
       ),
-      floatingActionButton: (isOwner || (permissions?.createLessons ?? false))
-          ? FloatingActionButton(
-              onPressed: () => _showQuickAddLessonSheet(roomsAsync.valueOrNull ?? []),
-              tooltip: 'Добавить занятие',
-              child: const Icon(Icons.add),
-            )
-          : null,
+      floatingActionButton: _buildFAB(
+        isOwner: isOwner,
+        permissions: permissions,
+        rooms: roomsAsync.valueOrNull ?? [],
+      ),
     );
   }
 
   Widget _buildDayView(
     AsyncValue<List<Room>> roomsAsync,
     AsyncValue<List<Lesson>> lessonsAsync,
+    AsyncValue<List<Booking>> bookingsAsync,
     bool canManageRooms,
     int workStartHour,
     int workEndHour,
@@ -273,13 +277,17 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorView.fromException(e),
         data: (lessons) {
+          // Получаем брони (пустой список при загрузке/ошибке)
+          final bookings = bookingsAsync.valueOrNull ?? [];
+
           final filteredLessons = _filters.isEmpty
               ? lessons
               : lessons.where((l) => _filters.matchesLesson(l)).toList();
 
-          // Вычисляем эффективные часы с учётом занятий вне рабочего времени
+          // Вычисляем эффективные часы с учётом занятий и броней вне рабочего времени
           final effectiveHours = _calculateEffectiveHours(
             lessons: lessons,
+            bookings: bookings,
             workStartHour: workStartHour,
             workEndHour: workEndHour,
           );
@@ -290,6 +298,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
                 : rooms,
             allRooms: rooms,
             lessons: filteredLessons,
+            bookings: bookings,
             selectedDate: _selectedDate,
             institutionId: widget.institutionId,
             selectedRoomId: _selectedRoomId,
@@ -298,6 +307,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             startHour: effectiveHours.$1,
             endHour: effectiveHours.$2,
             onLessonTap: _showLessonDetail,
+            onBookingTap: _showBookingDetail,
             onRoomTap: (roomId, currentOffset) {
               setState(() {
                 // Всегда сохраняем текущую позицию скролла
@@ -311,7 +321,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
                 }
               });
             },
-            onAddLesson: (room, hour, minute) => _showAddLessonSheet(room, hour, minute),
+            onAddLesson: (room, hour, minute) => _showAddLessonSheet(room, hour, minute, allRooms: rooms),
           );
         },
       ),
@@ -322,6 +332,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   /// Расширяет диапазон, если есть занятия вне рабочего времени
   (int, int) _calculateEffectiveHours({
     required List<Lesson> lessons,
+    List<Booking> bookings = const [],
     required int workStartHour,
     required int workEndHour,
   }) {
@@ -341,6 +352,21 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       }
       if (lessonEndHour > effectiveEnd) {
         effectiveEnd = lessonEndHour;
+      }
+    }
+
+    // Учитываем брони
+    for (final booking in bookings) {
+      final bookingStartHour = booking.startTime.hour;
+      final bookingEndHour = booking.endTime.minute > 0
+          ? booking.endTime.hour + 1
+          : booking.endTime.hour;
+
+      if (bookingStartHour < effectiveStart) {
+        effectiveStart = bookingStartHour;
+      }
+      if (bookingEndHour > effectiveEnd) {
+        effectiveEnd = bookingEndHour;
       }
     }
 
@@ -444,7 +470,23 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     );
   }
 
-  void _showAddLessonSheet(Room room, int hour, int minute) {
+  void _showBookingDetail(Booking booking) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _BookingDetailSheet(
+        booking: booking,
+        institutionId: widget.institutionId,
+        onUpdated: () {
+          ref.invalidate(bookingsByInstitutionDateProvider(
+            InstitutionDateParams(widget.institutionId, _selectedDate),
+          ));
+        },
+      ),
+    );
+  }
+
+  void _showAddLessonSheet(Room room, int hour, int minute, {List<Room>? allRooms}) {
     // Инвалидируем кеш справочников для получения актуальных данных
     ref.invalidate(subjectsProvider(widget.institutionId));
     ref.invalidate(lessonTypesProvider(widget.institutionId));
@@ -454,6 +496,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       isScrollControlled: true,
       builder: (context) => _AddLessonSheet(
         room: room,
+        allRooms: allRooms ?? [room], // Если не передан — только текущий кабинет
         date: _selectedDate,
         startHour: hour,
         startMinute: minute,
@@ -466,6 +509,104 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           ref.invalidate(lessonsByInstitutionStreamProvider(
             InstitutionDateParams(widget.institutionId, _selectedDate),
           ));
+          // Инвалидируем бронирования
+          ref.invalidate(bookingsByInstitutionDateProvider(
+            InstitutionDateParams(widget.institutionId, _selectedDate),
+          ));
+        },
+      ),
+    );
+  }
+
+  /// Создаёт FAB с меню (занятие или бронь)
+  Widget? _buildFAB({
+    required bool isOwner,
+    required MemberPermissions? permissions,
+    required List<Room> rooms,
+  }) {
+    final canCreateLessons = isOwner || (permissions?.createLessons ?? false);
+    final canCreateBookings = isOwner || (permissions?.createBookings ?? false);
+
+    if (!canCreateLessons && !canCreateBookings) return null;
+
+    // Открываем единую форму с переключателем режима
+    return FloatingActionButton(
+      onPressed: () => _showQuickAddLessonSheet(rooms),
+      tooltip: 'Добавить',
+      child: const Icon(Icons.add),
+    );
+  }
+
+  /// Показывает меню выбора: занятие или бронь
+  void _showAddMenu(List<Room> rooms) {
+    if (rooms.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Сначала добавьте кабинет'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.school),
+              title: const Text('Создать занятие'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showQuickAddLessonSheet(rooms);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.lock, color: AppColors.warning),
+              title: const Text('Забронировать кабинеты'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showQuickAddBookingSheet(rooms);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Показывает форму быстрого добавления брони
+  void _showQuickAddBookingSheet(List<Room> rooms) {
+    if (rooms.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Сначала добавьте кабинет'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _AddBookingSheet(
+        rooms: rooms,
+        initialDate: _selectedDate,
+        institutionId: widget.institutionId,
+        onCreated: (DateTime createdDate) {
+          // Инвалидируем провайдеры броней для выбранной даты
+          ref.invalidate(bookingsByInstitutionDateProvider(
+            InstitutionDateParams(widget.institutionId, createdDate),
+          ));
+          // Также инвалидируем для текущей выбранной даты
+          if (createdDate != _selectedDate) {
+            ref.invalidate(bookingsByInstitutionDateProvider(
+              InstitutionDateParams(widget.institutionId, _selectedDate),
+            ));
+          }
         },
       ),
     );
@@ -756,6 +897,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final List<Room> rooms; // Отфильтрованные кабинеты для отображения в сетке
   final List<Room> allRooms; // Все кабинеты для заголовков
   final List<Lesson> lessons;
+  final List<Booking> bookings;
   final DateTime selectedDate;
   final String institutionId;
   final String? selectedRoomId;
@@ -764,6 +906,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final int startHour;
   final int endHour;
   final void Function(Lesson) onLessonTap;
+  final void Function(Booking) onBookingTap;
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, int hour, int minute) onAddLesson;
 
@@ -771,9 +914,11 @@ class _AllRoomsTimeGrid extends StatefulWidget {
     required this.rooms,
     required this.allRooms,
     required this.lessons,
+    required this.bookings,
     required this.selectedDate,
     required this.institutionId,
     required this.onLessonTap,
+    required this.onBookingTap,
     required this.onRoomTap,
     required this.onAddLesson,
     required this.startHour,
@@ -888,6 +1033,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
   Widget build(BuildContext context) {
     final rooms = widget.rooms;
     final lessons = widget.lessons;
+    final bookings = widget.bookings;
     if (rooms.isEmpty) {
       return Center(
         child: Column(
@@ -1119,6 +1265,8 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                               ),
                               // Занятия
                               ...lessons.map((lesson) => _buildLessonBlock(context, lesson, roomColumnWidth)),
+                              // Брони
+                              ...bookings.expand((booking) => _buildBookingBlocks(context, booking, rooms, roomColumnWidth)),
                             ],
                           )
                         : SingleChildScrollView(
@@ -1154,6 +1302,8 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                   ),
                                   // Занятия
                                   ...lessons.map((lesson) => _buildLessonBlock(context, lesson, roomColumnWidth)),
+                                  // Брони
+                                  ...bookings.expand((booking) => _buildBookingBlocks(context, booking, rooms, roomColumnWidth)),
                                 ],
                               ),
                             ),
@@ -1385,6 +1535,98 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
       return AppColors.lessonGroup;
     }
     return AppColors.lessonIndividual;
+  }
+
+  /// Создаёт блоки для брони (один блок на каждый кабинет)
+  List<Widget> _buildBookingBlocks(
+    BuildContext context,
+    Booking booking,
+    List<Room> rooms,
+    double roomColumnWidth,
+  ) {
+    final widgets = <Widget>[];
+
+    for (final room in booking.rooms) {
+      final roomIndex = rooms.indexWhere((r) => r.id == room.id);
+      if (roomIndex == -1) continue;
+
+      final startMinutes = booking.startTime.hour * 60 + booking.startTime.minute;
+      final endMinutes = booking.endTime.hour * 60 + booking.endTime.minute;
+      final durationMinutes = endMinutes - startMinutes;
+      final startOffset = (startMinutes - widget.startHour * 60) / 60 * _AllRoomsTimeGrid.hourHeight;
+      final duration = durationMinutes / 60 * _AllRoomsTimeGrid.hourHeight;
+
+      // Показываем время только для броней >= 30 минут
+      final showTime = durationMinutes >= 30;
+
+      // Для коротких броней уменьшаем padding
+      final isShort = durationMinutes < 30;
+      final verticalPadding = isShort ? 2.0 : 4.0;
+      final horizontalPadding = isShort ? 3.0 : 4.0;
+      final fontSize = isShort ? 9.0 : 10.0;
+      final iconSize = isShort ? 10.0 : 12.0;
+
+      widgets.add(
+        Positioned(
+          top: startOffset,
+          left: roomIndex * roomColumnWidth + 2,
+          width: roomColumnWidth - 4,
+          child: GestureDetector(
+            onTap: () => widget.onBookingTap(booking),
+            child: Container(
+              height: duration,
+              clipBehavior: Clip.hardEdge,
+              padding: EdgeInsets.symmetric(
+                vertical: verticalPadding,
+                horizontal: horizontalPadding,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(AppSizes.radiusS),
+                border: Border.all(color: AppColors.warning, width: 1.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Row(
+                      children: [
+                        Icon(Icons.lock, size: iconSize, color: AppColors.warning),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            booking.description ?? 'Забронировано',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: fontSize,
+                              color: AppColors.warning,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (showTime)
+                    Text(
+                      booking.creator?.fullName ?? '',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: isShort ? 8.0 : 9.0,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return widgets;
   }
 }
 
@@ -2944,7 +3186,10 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
   }
 }
 
-/// Форма создания нового занятия
+/// Форма создания нового занятия или бронирования
+/// Режим формы: занятие или бронирование
+enum _AddFormMode { lesson, booking }
+
 /// Тип повтора занятий
 enum RepeatType {
   none('Без повтора'),
@@ -2959,6 +3204,7 @@ enum RepeatType {
 
 class _AddLessonSheet extends ConsumerStatefulWidget {
   final Room room;
+  final List<Room> allRooms; // Все кабинеты для режима бронирования
   final DateTime date;
   final int startHour;
   final int startMinute;
@@ -2967,6 +3213,7 @@ class _AddLessonSheet extends ConsumerStatefulWidget {
 
   const _AddLessonSheet({
     required this.room,
+    required this.allRooms,
     required this.date,
     required this.startHour,
     this.startMinute = 0,
@@ -2979,6 +3226,9 @@ class _AddLessonSheet extends ConsumerStatefulWidget {
 }
 
 class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
+  // Режим формы
+  _AddFormMode _mode = _AddFormMode.lesson;
+
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
   Student? _selectedStudent;
@@ -2986,7 +3236,7 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
   LessonType? _selectedLessonType;
   InstitutionMember? _selectedTeacher;
 
-  // Опции повтора
+  // Опции повтора (для занятий)
   RepeatType _repeatType = RepeatType.none;
   int _repeatCount = 4; // Количество повторений
   Set<int> _selectedWeekdays = {}; // 1=Пн, 7=Вс
@@ -2995,6 +3245,10 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
   List<DateTime> _conflictDates = []; // Даты с конфликтами
   bool _isCheckingConflicts = false;
 
+  // Опции для бронирования
+  Set<String> _selectedRoomIds = {};
+  final TextEditingController _descriptionController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -3002,6 +3256,14 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
     // Конец через час от начала
     final endMinutes = widget.startHour * 60 + widget.startMinute + 60;
     _endTime = TimeOfDay(hour: endMinutes ~/ 60, minute: endMinutes % 60);
+    // По умолчанию выбираем текущий кабинет для бронирования
+    _selectedRoomIds = {widget.room.id};
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   /// Генерирует список дат на основе типа повтора
@@ -3095,8 +3357,20 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
     final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
     final membersAsync = ref.watch(membersProvider(widget.institutionId));
     final controllerState = ref.watch(lessonControllerProvider);
+    final bookingControllerState = ref.watch(bookingControllerProvider);
 
     ref.listen(lessonControllerProvider, (prev, next) {
+      if (next.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
+
+    ref.listen(bookingControllerProvider, (prev, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -3111,6 +3385,10 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
         ? 'Кабинет ${widget.room.number}'
         : widget.room.name;
 
+    final isLoading = _mode == _AddFormMode.lesson
+        ? controllerState.isLoading
+        : bookingControllerState.isLoading;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -3123,12 +3401,15 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Заголовок с кнопкой закрытия
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Новое занятие',
-                  style: Theme.of(context).textTheme.titleLarge,
+                Expanded(
+                  child: Text(
+                    _mode == _AddFormMode.lesson ? 'Новое занятие' : 'Бронирование',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -3136,9 +3417,30 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+
+            // Переключатель режима: Занятие / Бронь
+            SegmentedButton<_AddFormMode>(
+              segments: const [
+                ButtonSegment<_AddFormMode>(
+                  value: _AddFormMode.lesson,
+                  label: Text('Занятие'),
+                  icon: Icon(Icons.school, size: 18),
+                ),
+                ButtonSegment<_AddFormMode>(
+                  value: _AddFormMode.booking,
+                  label: Text('Бронь'),
+                  icon: Icon(Icons.lock_clock, size: 18),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (Set<_AddFormMode> newSelection) {
+                setState(() => _mode = newSelection.first);
+              },
+            ),
             const SizedBox(height: 16),
 
-            // Информация о кабинете и дате
+            // Информация о дате (кабинет показываем только для занятия)
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -3147,10 +3449,12 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.door_front_door, size: 20, color: AppColors.textSecondary),
-                  const SizedBox(width: 8),
-                  Text(roomName),
-                  const SizedBox(width: 16),
+                  if (_mode == _AddFormMode.lesson) ...[
+                    const Icon(Icons.door_front_door, size: 20, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Text(roomName),
+                    const SizedBox(width: 16),
+                  ],
                   const Icon(Icons.calendar_today, size: 20, color: AppColors.textSecondary),
                   const SizedBox(width: 8),
                   Text(AppDateUtils.formatDayMonth(widget.date)),
@@ -3218,38 +3522,122 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Ученик
-            studentsAsync.when(
-              loading: () => const CircularProgressIndicator(),
-              error: (e, _) => ErrorView.inline(e),
-              data: (students) {
-                // Находим выбранного студента по ID в текущем списке
-                // (объекты могут быть разными после перезагрузки)
-                final currentStudent = _selectedStudent != null
-                    ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
-                    : null;
+            // ========== РЕЖИМ БРОНИРОВАНИЯ ==========
+            if (_mode == _AddFormMode.booking) ...[
+              // Выбор кабинетов (мультиселект)
+              Text(
+                'Кабинеты',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: widget.allRooms.map((room) {
+                  final isSelected = _selectedRoomIds.contains(room.id);
+                  final roomLabel = room.number != null
+                      ? 'Каб. ${room.number}'
+                      : room.name;
+                  return FilterChip(
+                    label: Text(roomLabel),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedRoomIds.add(room.id);
+                        } else {
+                          _selectedRoomIds.remove(room.id);
+                        }
+                      });
+                    },
+                    selectedColor: AppColors.warning.withValues(alpha: 0.3),
+                    checkmarkColor: AppColors.warning,
+                  );
+                }).toList(),
+              ),
+              if (_selectedRoomIds.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Выберите хотя бы один кабинет',
+                    style: TextStyle(
+                      color: AppColors.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (students.isEmpty)
-                      const Text(
-                        'Нет учеников. Добавьте ученика ниже.',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      )
-                    else
-                      DropdownButtonFormField<Student?>(
-                        decoration: const InputDecoration(
-                          labelText: 'Ученик *',
-                          prefixIcon: Icon(Icons.person),
-                        ),
-                        value: currentStudent,
-                        items: students.map((s) => DropdownMenuItem<Student?>(
-                          value: s,
-                          child: Text(s.name),
-                        )).toList(),
-                        onChanged: (student) {
-                          setState(() => _selectedStudent = student);
+              // Описание
+              TextField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Описание (опционально)',
+                  prefixIcon: Icon(Icons.description),
+                  hintText: 'Мероприятие, встреча и т.д.',
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 24),
+
+              // Кнопка создания брони
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.warning,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: isLoading || _selectedRoomIds.isEmpty
+                    ? null
+                    : _createBooking,
+                icon: const Icon(Icons.lock),
+                label: const Text('Забронировать'),
+              ),
+
+              if (isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+
+              const SizedBox(height: 8),
+            ],
+
+            // ========== РЕЖИМ ЗАНЯТИЯ ==========
+            if (_mode == _AddFormMode.lesson) ...[
+              // Ученик
+              studentsAsync.when(
+                loading: () => const CircularProgressIndicator(),
+                error: (e, _) => ErrorView.inline(e),
+                data: (students) {
+                  // Находим выбранного студента по ID в текущем списке
+                  // (объекты могут быть разными после перезагрузки)
+                  final currentStudent = _selectedStudent != null
+                      ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                      : null;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (students.isEmpty)
+                        const Text(
+                          'Нет учеников. Добавьте ученика ниже.',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        )
+                      else
+                        DropdownButtonFormField<Student?>(
+                          decoration: const InputDecoration(
+                            labelText: 'Ученик *',
+                            prefixIcon: Icon(Icons.person),
+                          ),
+                          value: currentStudent,
+                          items: students.map((s) => DropdownMenuItem<Student?>(
+                            value: s,
+                            child: Text(s.name),
+                          )).toList(),
+                          onChanged: (student) {
+                            setState(() => _selectedStudent = student);
                         },
                       ),
                     const SizedBox(height: 8),
@@ -3558,28 +3946,73 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                 ),
               ),
             ],
-            const SizedBox(height: 24),
 
-            // Кнопка создания
-            ElevatedButton.icon(
-              onPressed: controllerState.isLoading || _selectedStudent == null
-                  ? null
-                  : _createLesson,
-              icon: const Icon(Icons.add),
-              label: const Text('Создать занятие'),
-            ),
+              const SizedBox(height: 24),
 
-            if (controllerState.isLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 16),
-                child: Center(child: CircularProgressIndicator()),
+              // Кнопка создания занятия
+              ElevatedButton.icon(
+                onPressed: controllerState.isLoading || _selectedStudent == null
+                    ? null
+                    : _createLesson,
+                icon: const Icon(Icons.add),
+                label: const Text('Создать занятие'),
               ),
 
-            const SizedBox(height: 8),
+              if (controllerState.isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+
+              const SizedBox(height: 8),
+            ], // конец if (_mode == _AddFormMode.lesson)
           ],
         ),
       ),
     );
+  }
+
+  /// Создание бронирования
+  Future<void> _createBooking() async {
+    if (_selectedRoomIds.isEmpty) return;
+
+    // Проверка минимальной длительности (15 минут)
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
+    if (durationMinutes < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Минимальная длительность брони — 15 минут'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final controller = ref.read(bookingControllerProvider.notifier);
+
+    final booking = await controller.create(
+      institutionId: widget.institutionId,
+      roomIds: _selectedRoomIds.toList(),
+      date: widget.date,
+      startTime: _startTime,
+      endTime: _endTime,
+      description: _descriptionController.text.isNotEmpty
+          ? _descriptionController.text
+          : null,
+    );
+
+    if (booking != null && mounted) {
+      widget.onCreated();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Кабинеты забронированы'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   Future<void> _createLesson() async {
@@ -4639,6 +5072,9 @@ class _QuickAddLessonSheet extends ConsumerStatefulWidget {
 }
 
 class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
+  // Режим формы
+  _AddFormMode _mode = _AddFormMode.lesson;
+
   late DateTime _selectedDate;
   late Room? _selectedRoom;
   late TimeOfDay _startTime;
@@ -4648,15 +5084,29 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
   LessonType? _selectedLessonType;
   InstitutionMember? _selectedTeacher;
 
+  // Для режима бронирования
+  Set<String> _selectedRoomIds = {};
+  final TextEditingController _descriptionController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _selectedDate = widget.initialDate;
     _selectedRoom = widget.rooms.isNotEmpty ? widget.rooms.first : null;
+    // По умолчанию выбираем первый кабинет для бронирования
+    if (widget.rooms.isNotEmpty) {
+      _selectedRoomIds = {widget.rooms.first.id};
+    }
     final now = TimeOfDay.now();
     // Округляем до ближайшего часа
     _startTime = TimeOfDay(hour: now.hour, minute: 0);
     _endTime = TimeOfDay(hour: now.hour + 1, minute: 0);
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   @override
@@ -4666,8 +5116,24 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
     final membersAsync = ref.watch(membersProvider(widget.institutionId));
     final controllerState = ref.watch(lessonControllerProvider);
+    final bookingControllerState = ref.watch(bookingControllerProvider);
+
+    final isLoading = _mode == _AddFormMode.lesson
+        ? controllerState.isLoading
+        : bookingControllerState.isLoading;
 
     ref.listen(lessonControllerProvider, (prev, next) {
+      if (next.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
+
+    ref.listen(bookingControllerProvider, (prev, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -4690,12 +5156,15 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Заголовок
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Новое занятие',
-                  style: Theme.of(context).textTheme.titleLarge,
+                Expanded(
+                  child: Text(
+                    _mode == _AddFormMode.lesson ? 'Новое занятие' : 'Бронирование',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -4703,24 +5172,97 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
-            // Кабинет
-            DropdownButtonFormField<Room>(
-              decoration: const InputDecoration(
-                labelText: 'Кабинет *',
-                prefixIcon: Icon(Icons.door_front_door),
-              ),
-              value: _selectedRoom,
-              items: widget.rooms.map((r) => DropdownMenuItem<Room>(
-                value: r,
-                child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
-              )).toList(),
-              onChanged: (room) {
-                setState(() => _selectedRoom = room);
+            // Переключатель режима: Занятие / Бронь
+            SegmentedButton<_AddFormMode>(
+              segments: const [
+                ButtonSegment<_AddFormMode>(
+                  value: _AddFormMode.lesson,
+                  label: Text('Занятие'),
+                  icon: Icon(Icons.school, size: 18),
+                ),
+                ButtonSegment<_AddFormMode>(
+                  value: _AddFormMode.booking,
+                  label: Text('Бронь'),
+                  icon: Icon(Icons.lock_clock, size: 18),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (Set<_AddFormMode> newSelection) {
+                setState(() => _mode = newSelection.first);
               },
             ),
             const SizedBox(height: 16),
+
+            // ========== РЕЖИМ ЗАНЯТИЯ ==========
+            if (_mode == _AddFormMode.lesson) ...[
+              // Кабинет
+              DropdownButtonFormField<Room>(
+                decoration: const InputDecoration(
+                  labelText: 'Кабинет *',
+                  prefixIcon: Icon(Icons.door_front_door),
+                ),
+                value: _selectedRoom,
+                items: widget.rooms.map((r) => DropdownMenuItem<Room>(
+                  value: r,
+                  child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
+                )).toList(),
+                onChanged: (room) {
+                  setState(() => _selectedRoom = room);
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // ========== РЕЖИМ БРОНИРОВАНИЯ ==========
+            if (_mode == _AddFormMode.booking) ...[
+              // Выбор кабинетов (мультиселект)
+              Text(
+                'Кабинеты',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: widget.rooms.map((room) {
+                  final isSelected = _selectedRoomIds.contains(room.id);
+                  final roomLabel = room.number != null
+                      ? 'Каб. ${room.number}'
+                      : room.name;
+                  return FilterChip(
+                    label: Text(roomLabel),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedRoomIds.add(room.id);
+                        } else {
+                          _selectedRoomIds.remove(room.id);
+                        }
+                      });
+                    },
+                    selectedColor: AppColors.warning.withValues(alpha: 0.3),
+                    checkmarkColor: AppColors.warning,
+                  );
+                }).toList(),
+              ),
+              if (_selectedRoomIds.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Выберите хотя бы один кабинет',
+                    style: TextStyle(
+                      color: AppColors.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+            ],
 
             // Дата
             InkWell(
@@ -4800,33 +5342,71 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Ученик
-            studentsAsync.when(
-              loading: () => const CircularProgressIndicator(),
-              error: (e, _) => ErrorView.inline(e),
-              data: (students) {
-                // Находим выбранного студента по ID в текущем списке
-                // (объекты могут быть разными после перезагрузки)
-                final currentStudent = _selectedStudent != null
-                    ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
-                    : null;
+            // ========== Продолжение РЕЖИМА БРОНИРОВАНИЯ ==========
+            if (_mode == _AddFormMode.booking) ...[
+              // Описание
+              TextField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Описание (опционально)',
+                  prefixIcon: Icon(Icons.description),
+                  hintText: 'Мероприятие, встреча и т.д.',
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 24),
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (students.isEmpty)
-                      const Text(
-                        'Нет учеников. Добавьте ученика ниже.',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      )
-                    else
-                      DropdownButtonFormField<Student?>(
-                        decoration: const InputDecoration(
-                          labelText: 'Ученик *',
-                          prefixIcon: Icon(Icons.person),
-                        ),
-                        value: currentStudent,
-                        items: students.map((s) => DropdownMenuItem<Student?>(
+              // Кнопка создания брони
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.warning,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: isLoading || _selectedRoomIds.isEmpty
+                    ? null
+                    : _createBooking,
+                icon: const Icon(Icons.lock),
+                label: const Text('Забронировать'),
+              ),
+
+              if (isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+
+              const SizedBox(height: 8),
+            ],
+
+            // ========== Продолжение РЕЖИМА ЗАНЯТИЯ ==========
+            if (_mode == _AddFormMode.lesson) ...[
+              // Ученик
+              studentsAsync.when(
+                loading: () => const CircularProgressIndicator(),
+                error: (e, _) => ErrorView.inline(e),
+                data: (students) {
+                  // Находим выбранного студента по ID в текущем списке
+                  // (объекты могут быть разными после перезагрузки)
+                  final currentStudent = _selectedStudent != null
+                      ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                      : null;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (students.isEmpty)
+                        const Text(
+                          'Нет учеников. Добавьте ученика ниже.',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        )
+                      else
+                        DropdownButtonFormField<Student?>(
+                          decoration: const InputDecoration(
+                            labelText: 'Ученик *',
+                            prefixIcon: Icon(Icons.person),
+                          ),
+                          value: currentStudent,
+                          items: students.map((s) => DropdownMenuItem<Student?>(
                           value: s,
                           child: Text(s.name),
                         )).toList(),
@@ -4949,28 +5529,72 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 );
               },
             ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Кнопка создания
-            ElevatedButton.icon(
-              onPressed: controllerState.isLoading || _selectedStudent == null || _selectedRoom == null
-                  ? null
-                  : _createLesson,
-              icon: const Icon(Icons.add),
-              label: const Text('Создать занятие'),
-            ),
-
-            if (controllerState.isLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 16),
-                child: Center(child: CircularProgressIndicator()),
+              // Кнопка создания
+              ElevatedButton.icon(
+                onPressed: controllerState.isLoading || _selectedStudent == null || _selectedRoom == null
+                    ? null
+                    : _createLesson,
+                icon: const Icon(Icons.add),
+                label: const Text('Создать занятие'),
               ),
 
-            const SizedBox(height: 8),
+              if (controllerState.isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+
+              const SizedBox(height: 8),
+            ], // конец if (_mode == _AddFormMode.lesson)
           ],
         ),
       ),
     );
+  }
+
+  /// Создание бронирования
+  Future<void> _createBooking() async {
+    if (_selectedRoomIds.isEmpty) return;
+
+    // Проверка минимальной длительности (15 минут)
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
+    if (durationMinutes < 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Минимальная длительность брони — 15 минут'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final controller = ref.read(bookingControllerProvider.notifier);
+
+    final booking = await controller.create(
+      institutionId: widget.institutionId,
+      roomIds: _selectedRoomIds.toList(),
+      date: _selectedDate,
+      startTime: _startTime,
+      endTime: _endTime,
+      description: _descriptionController.text.isNotEmpty
+          ? _descriptionController.text
+          : null,
+    );
+
+    if (booking != null && mounted) {
+      widget.onCreated(_selectedDate);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Кабинеты забронированы'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   Future<void> _createLesson() async {
@@ -5087,5 +5711,554 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
         },
       ),
     );
+  }
+}
+
+/// Детали бронирования
+class _BookingDetailSheet extends ConsumerStatefulWidget {
+  final Booking booking;
+  final String institutionId;
+  final VoidCallback onUpdated;
+
+  const _BookingDetailSheet({
+    required this.booking,
+    required this.institutionId,
+    required this.onUpdated,
+  });
+
+  @override
+  ConsumerState<_BookingDetailSheet> createState() => _BookingDetailSheetState();
+}
+
+class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
+  bool _isDeleting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final booking = widget.booking;
+    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
+    final isOwner = institutionAsync.valueOrNull?.ownerId == currentUserId;
+    final isAdmin = ref.watch(isAdminProvider(widget.institutionId));
+    final hasFullAccess = isOwner || isAdmin;
+    final isCreator = booking.createdBy == currentUserId;
+    final canDelete = hasFullAccess || isCreator;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppSizes.radiusL),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: AppSizes.paddingS),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(AppSizes.paddingL),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSizes.paddingS),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppSizes.radiusS),
+                  ),
+                  child: const Icon(
+                    Icons.lock,
+                    color: AppColors.warning,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: AppSizes.paddingM),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        booking.description ?? 'Забронировано',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        booking.roomNames,
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
+          // Info
+          Padding(
+            padding: const EdgeInsets.all(AppSizes.paddingL),
+            child: Column(
+              children: [
+                // Time
+                Row(
+                  children: [
+                    Icon(Icons.access_time, color: Colors.grey[600], size: 20),
+                    const SizedBox(width: AppSizes.paddingM),
+                    Text(
+                      '${_formatTime(booking.startTime)} — ${_formatTime(booking.endTime)}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSizes.paddingM),
+
+                // Creator
+                Row(
+                  children: [
+                    Icon(Icons.person_outline, color: Colors.grey[600], size: 20),
+                    const SizedBox(width: AppSizes.paddingM),
+                    Text(
+                      booking.creator?.fullName ?? 'Неизвестный пользователь',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Actions
+          if (canDelete) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(AppSizes.paddingL),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isDeleting ? null : _handleDelete,
+                  icon: _isDeleting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline),
+                  label: Text(_isDeleting ? 'Удаление...' : 'Удалить бронь'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          SizedBox(height: MediaQuery.of(context).padding.bottom + AppSizes.paddingM),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _handleDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить бронь?'),
+        content: const Text('Бронирование будет удалено и кабинеты освободятся.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isDeleting = true);
+
+    final controller = ref.read(bookingControllerProvider.notifier);
+    final success = await controller.delete(
+      widget.booking.id,
+      widget.institutionId,
+      widget.booking.date,
+    );
+
+    if (mounted) {
+      Navigator.pop(context);
+      if (success) {
+        widget.onUpdated();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Бронь удалена')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка при удалении')),
+        );
+      }
+    }
+  }
+}
+
+/// Форма создания брони с мультиселектом кабинетов
+class _AddBookingSheet extends ConsumerStatefulWidget {
+  final List<Room> rooms;
+  final DateTime initialDate;
+  final String institutionId;
+  final ValueChanged<DateTime> onCreated;
+
+  const _AddBookingSheet({
+    required this.rooms,
+    required this.initialDate,
+    required this.institutionId,
+    required this.onCreated,
+  });
+
+  @override
+  ConsumerState<_AddBookingSheet> createState() => _AddBookingSheetState();
+}
+
+class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
+  late DateTime _selectedDate;
+  TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
+  final Set<String> _selectedRoomIds = {};
+  final _descriptionController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppSizes.radiusL),
+          ),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: AppSizes.paddingS),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(AppSizes.paddingL),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(AppSizes.paddingS),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppSizes.radiusS),
+                    ),
+                    child: const Icon(
+                      Icons.lock,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                  const SizedBox(width: AppSizes.paddingM),
+                  const Text(
+                    'Забронировать кабинеты',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1),
+
+            // Content
+            Expanded(
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(AppSizes.paddingL),
+                children: [
+                  // Выбор кабинетов (чекбоксы)
+                  const Text(
+                    'Выберите кабинеты',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: AppSizes.paddingS),
+                  ...widget.rooms.map((room) => CheckboxListTile(
+                    title: Text(room.displayName),
+                    value: _selectedRoomIds.contains(room.id),
+                    onChanged: (value) {
+                      setState(() {
+                        if (value == true) {
+                          _selectedRoomIds.add(room.id);
+                        } else {
+                          _selectedRoomIds.remove(room.id);
+                        }
+                      });
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  )),
+                  if (_selectedRoomIds.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Выберите минимум один кабинет',
+                        style: TextStyle(
+                          color: AppColors.error,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: AppSizes.paddingL),
+
+                  // Дата
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today),
+                    title: const Text('Дата'),
+                    trailing: Text(
+                      _formatDate(_selectedDate),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    onTap: _selectDate,
+                  ),
+
+                  const Divider(),
+
+                  // Время начала
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.access_time),
+                    title: const Text('Начало'),
+                    trailing: Text(
+                      _formatTime(_startTime),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    onTap: () => _selectTime(isStart: true),
+                  ),
+
+                  // Время окончания
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const SizedBox(width: 24),
+                    title: const Text('Окончание'),
+                    trailing: Text(
+                      _formatTime(_endTime),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    onTap: () => _selectTime(isStart: false),
+                  ),
+
+                  const Divider(),
+
+                  // Описание
+                  const SizedBox(height: AppSizes.paddingS),
+                  TextField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Описание (необязательно)',
+                      hintText: 'Например: Репетиция, Мероприятие',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+
+                  const SizedBox(height: AppSizes.paddingXL),
+
+                  // Кнопка создания
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _canSave && !_isSaving ? _handleSave : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.warning,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Забронировать'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool get _canSave {
+    if (_selectedRoomIds.isEmpty) return false;
+    // end_time > start_time
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    return endMinutes > startMinutes;
+  }
+
+  String _formatDate(DateTime date) {
+    const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    return '${weekdays[date.weekday - 1]}, ${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+  }
+
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  Future<void> _selectTime({required bool isStart}) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: isStart ? _startTime : _endTime,
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        if (isStart) {
+          _startTime = picked;
+          // Автоматически сдвигаем endTime если start >= end
+          final startMinutes = picked.hour * 60 + picked.minute;
+          final endMinutes = _endTime.hour * 60 + _endTime.minute;
+          if (startMinutes >= endMinutes) {
+            _endTime = TimeOfDay(
+              hour: (picked.hour + 1) % 24,
+              minute: picked.minute,
+            );
+          }
+        } else {
+          _endTime = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _handleSave() async {
+    if (!_canSave) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final controller = ref.read(bookingControllerProvider.notifier);
+      final booking = await controller.create(
+        institutionId: widget.institutionId,
+        roomIds: _selectedRoomIds.toList(),
+        date: _selectedDate,
+        startTime: _startTime,
+        endTime: _endTime,
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        if (booking != null) {
+          widget.onCreated(_selectedDate);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Кабинеты забронированы')),
+          );
+        } else {
+          final error = ref.read(bookingControllerProvider);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error.error?.toString() ?? 'Ошибка бронирования'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 }

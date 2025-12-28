@@ -160,6 +160,54 @@ class StudentRepository {
     }
   }
 
+  /// Списать занятие напрямую (уменьшить prepaid_lessons_count)
+  /// Используется когда нет активной подписки — уходит в долг
+  Future<void> decrementPrepaidCount(String id) async {
+    try {
+      await _client.rpc('decrement_student_prepaid', params: {'student_id': id});
+    } catch (e) {
+      // Fallback: прямое обновление если функция не существует
+      try {
+        final data = await _client
+            .from('students')
+            .select('prepaid_lessons_count')
+            .eq('id', id)
+            .single();
+        final currentCount = (data['prepaid_lessons_count'] as num?)?.toInt() ?? 0;
+        await _client
+            .from('students')
+            .update({'prepaid_lessons_count': currentCount - 1})
+            .eq('id', id);
+      } catch (e2) {
+        throw DatabaseException('Ошибка списания занятия: $e2');
+      }
+    }
+  }
+
+  /// Вернуть занятие напрямую (увеличить prepaid_lessons_count)
+  /// Используется при отмене завершённого занятия без подписки
+  Future<void> incrementPrepaidCount(String id) async {
+    try {
+      await _client.rpc('increment_student_prepaid', params: {'student_id': id});
+    } catch (e) {
+      // Fallback: прямое обновление если функция не существует
+      try {
+        final data = await _client
+            .from('students')
+            .select('prepaid_lessons_count')
+            .eq('id', id)
+            .single();
+        final currentCount = (data['prepaid_lessons_count'] as num?)?.toInt() ?? 0;
+        await _client
+            .from('students')
+            .update({'prepaid_lessons_count': currentCount + 1})
+            .eq('id', id);
+      } catch (e2) {
+        throw DatabaseException('Ошибка возврата занятия: $e2');
+      }
+    }
+  }
+
   /// Поиск учеников
   Future<List<Student>> search(String institutionId, String query) async {
     try {

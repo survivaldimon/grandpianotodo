@@ -70,6 +70,11 @@
   - Таблица `subscription_members` + VIEW `student_subscription_summary`
   - UI создания семейного абонемента (чекбоксы)
   - Отображение участников в карточках
+- **`SESSION_2025_12_28_PAYMENT_FILTERS.md`** — полный отчёт за 28.12.2025:
+  - Бронирование кабинетов (Room Bookings) — новая фича
+  - Исправление расчёта долга (VIEW student_subscription_summary)
+  - Редизайн фильтров оплат: Ученики, Предметы, Преподаватели, Тарифы
+  - Восстановление фич расписания после rebase
 - **`SESSION_2025_12_28_TAB_ANIMATIONS.md`** — анимация вкладок и исправления:
   - Slide-анимация переключения вкладок в стиле iOS
   - Автопривязка ученика к преподавателю при создании
@@ -268,6 +273,7 @@ final canViewOwnStudentsPayments = permissions?.viewOwnStudentsPayments ?? true;
 - `deleteOwnLessons: true`
 - `viewOwnStudentsPayments: true`
 - `addPaymentsForOwnStudents: true`
+- `createBookings: true` — право на бронирование кабинетов
 
 **Роль администратора (isAdmin):**
 - Администратор имеет все права владельца, **кроме удаления заведения**
@@ -494,7 +500,71 @@ await paymentController.createFamilyPayment(
 - `lib/features/students/repositories/student_repository.dart` — баланс из VIEW
 - `supabase/migrations/add_family_subscriptions.sql` — миграция
 
-### 25. Анимация переключения вкладок
+### 25. Бронирование кабинетов (Room Bookings)
+Кабинеты могут быть забронированы для мероприятий (репетиций, концертов и т.д.).
+
+**Основные принципы:**
+- Бронь блокирует создание занятий в выбранных кабинетах на указанное время
+- При создании брони можно выбрать **несколько кабинетов сразу**
+- Право на создание: `createBookings` (по умолчанию `true` для всех участников)
+- Удалить бронь может: владелец, администратор или создатель брони
+
+**Отображение в расписании:**
+- Цвет: **оранжевый** (`AppColors.warning`)
+- Иконка: `Icons.lock`
+- Всегда показывается имя создателя
+- Описание опционально
+
+**Структура БД:**
+```sql
+-- Основная таблица брони
+bookings (id, institution_id, created_by, date, start_time, end_time, description)
+
+-- Связь с кабинетами (many-to-many)
+booking_rooms (booking_id, room_id)
+```
+
+**Проверка конфликтов:**
+При создании занятия вызывается `hasTimeConflict()`, который проверяет:
+1. Конфликты с другими занятиями
+2. Конфликты с бронированиями через `booking_rooms`
+
+**Ключевые файлы:**
+- `lib/features/bookings/models/booking.dart` — модель Booking
+- `lib/features/bookings/repositories/booking_repository.dart` — CRUD + проверка конфликтов
+- `lib/features/bookings/providers/booking_provider.dart` — провайдеры Riverpod
+- `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — UI (блоки броней, форма создания)
+- `supabase/migrations/add_room_bookings.sql` — SQL миграция
+
+### 26. Фильтры на экране оплат
+Экран оплат поддерживает фильтрацию по нескольким критериям.
+
+**Доступные фильтры:**
+1. **Ученики** — мультиселект учеников
+2. **Предметы** — фильтр по студентам, связанным с предметами
+3. **Преподаватели** — фильтр по студентам, привязанным к преподавателям
+4. **Тарифы** — фильтр по тарифам оплаты (PaymentPlan)
+
+**UI:**
+- Горизонтальные кнопки с возможностью прокрутки
+- При нажатии открывается BottomSheet с чекбоксами
+- Активный фильтр подсвечивается (синяя рамка)
+- Кнопка сброса появляется при наличии активных фильтров
+
+**Логика фильтрации по предметам/преподавателям:**
+```dart
+// Провайдеры связей (локальные в payments_screen.dart)
+_studentSubjectBindingsProvider  // Map: subjectId → Set<studentId>
+_studentTeacherBindingsProvider  // Map: userId → Set<studentId>
+
+// При выборе предмета/преподавателя — показываются оплаты
+// только тех учеников, которые связаны с выбранными сущностями
+```
+
+**Ключевой файл:**
+- `lib/features/payments/screens/payments_screen.dart` — экран с фильтрами
+
+### 27. Анимация переключения вкладок
 При переключении вкладок нижней навигации используется slide-анимация в стиле iOS.
 
 **Логика:**
@@ -510,42 +580,6 @@ await paymentController.createFamilyPayment(
 | 3 | Оплаты (Payments) |
 | 4 | Настройки (Settings) |
 
-**Реализация в MainShell:**
-```dart
-class _MainShellState extends ConsumerState<MainShell>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  Animation<Offset> _slideAnimation = const AlwaysStoppedAnimation(Offset.zero);
-  int _lastKnownIndex = -1;
-  String? _lastLocation;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _checkRouteChange();  // Отслеживаем смену маршрута
-  }
-
-  void _animateToTab(int newIndex) {
-    if (_lastKnownIndex == -1 || newIndex == _lastKnownIndex) return;
-
-    final goingToHigherIndex = newIndex > _lastKnownIndex;
-    _lastKnownIndex = newIndex;
-
-    setState(() {
-      _slideAnimation = Tween<Offset>(
-        begin: Offset(goingToHigherIndex ? 1.0 : -1.0, 0.0),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutCubic,
-      ));
-    });
-
-    _animationController.forward(from: 0.0);
-  }
-}
-```
-
 **Важные особенности:**
 - Используется `didChangeDependencies` для отслеживания смены GoRouterState
 - `addPostFrameCallback` гарантирует запуск анимации после завершения фрейма
@@ -554,31 +588,12 @@ class _MainShellState extends ConsumerState<MainShell>
 
 **Файл:** `lib/features/dashboard/screens/main_shell.dart`
 
-### 26. Автопривязка ученика к преподавателю
+### 28. Автопривязка ученика к преподавателю
 При создании ученика он автоматически привязывается к текущему пользователю (преподавателю).
 
 **Проблема:** Участник создавал ученика, но не видел его в "своих учениках" и не мог добавить оплату.
 
-**Решение в `StudentController.create()`:**
-```dart
-Future<Student?> create({...}) async {
-  final student = await _repo.create(...);
-
-  // Автоматически привязываем созданного ученика к текущему пользователю
-  final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
-  if (currentUserId != null) {
-    final bindingsController = _ref.read(studentBindingsControllerProvider.notifier);
-    await bindingsController.addTeacher(
-      studentId: student.id,
-      userId: currentUserId,
-      institutionId: institutionId,
-    );
-    _ref.invalidate(myStudentIdsProvider(institutionId));
-  }
-
-  return student;
-}
-```
+**Решение:** В `StudentController.create()` добавлена автоматическая привязка созданного ученика к текущему пользователю через `studentBindingsController.addTeacher()`.
 
 **Файл:** `lib/features/students/providers/student_provider.dart`
 
