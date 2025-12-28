@@ -1303,6 +1303,13 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     final color = _getLessonColor(lesson);
     final participant = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
 
+    // Для коротких занятий уменьшаем padding
+    final isShort = durationMinutes < 30;
+    final verticalPadding = isShort ? 2.0 : 4.0;
+    final horizontalPadding = isShort ? 3.0 : 4.0;
+    final fontSize = isShort ? 9.0 : 10.0;
+    final iconSize = isShort ? 10.0 : 12.0;
+
     return Positioned(
       top: startOffset,
       left: roomIndex * roomColumnWidth + 2,
@@ -1311,7 +1318,11 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
         onTap: () => widget.onLessonTap(lesson),
         child: Container(
           height: duration,
-          padding: const EdgeInsets.all(4),
+          clipBehavior: Clip.hardEdge,
+          padding: EdgeInsets.symmetric(
+            vertical: verticalPadding,
+            horizontal: horizontalPadding,
+          ),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(AppSizes.radiusS),
@@ -1319,26 +1330,30 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      participant,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
+              Flexible(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        participant,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: fontSize,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  if (lesson.isRepeating)
-                    const Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
-                  if (lesson.status == LessonStatus.completed)
-                    const Icon(Icons.check_circle, size: 12, color: AppColors.success),
-                  if (lesson.status == LessonStatus.cancelled)
-                    const Icon(Icons.cancel, size: 12, color: AppColors.error),
-                ],
+                    if (lesson.isRepeating)
+                      Icon(Icons.repeat, size: iconSize, color: AppColors.textSecondary),
+                    if (lesson.status == LessonStatus.completed)
+                      Icon(Icons.check_circle, size: iconSize, color: AppColors.success),
+                    if (lesson.status == LessonStatus.cancelled)
+                      Icon(Icons.cancel, size: iconSize, color: AppColors.error),
+                  ],
+                ),
               ),
               if (showTime)
                 Text(
