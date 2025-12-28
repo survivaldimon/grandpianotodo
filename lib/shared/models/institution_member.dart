@@ -23,6 +23,7 @@ class MemberPermissions {
   final bool viewPayments;
   final bool viewStatistics;
   final bool archiveData;
+  final bool createBookings;
 
   const MemberPermissions({
     this.manageInstitution = false,
@@ -46,6 +47,7 @@ class MemberPermissions {
     this.viewPayments = true,
     this.viewStatistics = false,
     this.archiveData = false,
+    this.createBookings = true,
   });
 
   /// Полные права (для владельца)
@@ -71,6 +73,7 @@ class MemberPermissions {
         viewPayments: true,
         viewStatistics: true,
         archiveData: true,
+        createBookings: true,
       );
 
   /// Права по умолчанию для нового участника
@@ -101,6 +104,7 @@ class MemberPermissions {
         viewPayments: json['view_payments'] as bool? ?? false,
         viewStatistics: json['view_statistics'] as bool? ?? false,
         archiveData: json['archive_data'] as bool? ?? false,
+        createBookings: json['create_bookings'] as bool? ?? true,
       );
 
   Map<String, dynamic> toJson() => {
@@ -129,6 +133,7 @@ class MemberPermissions {
         'view_payments': viewPayments,
         'view_statistics': viewStatistics,
         'archive_data': archiveData,
+        'create_bookings': createBookings,
       };
 
   MemberPermissions copyWith({
@@ -153,6 +158,7 @@ class MemberPermissions {
     bool? viewPayments,
     bool? viewStatistics,
     bool? archiveData,
+    bool? createBookings,
   }) =>
       MemberPermissions(
         manageInstitution: manageInstitution ?? this.manageInstitution,
@@ -176,6 +182,7 @@ class MemberPermissions {
         viewPayments: viewPayments ?? this.viewPayments,
         viewStatistics: viewStatistics ?? this.viewStatistics,
         archiveData: archiveData ?? this.archiveData,
+        createBookings: createBookings ?? this.createBookings,
       );
 }
 

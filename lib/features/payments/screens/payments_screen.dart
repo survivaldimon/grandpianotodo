@@ -8,12 +8,54 @@ import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
+import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
+import 'package:kabinet/features/subjects/providers/subject_provider.dart';
+import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/models/payment.dart';
 import 'package:kabinet/shared/models/payment_plan.dart';
 import 'package:kabinet/shared/models/student.dart';
+import 'package:kabinet/shared/models/subject.dart';
 import 'package:collection/collection.dart';
+
+/// Провайдер связей ученик-предмет для заведения
+final _studentSubjectBindingsProvider =
+    FutureProvider.family<Map<String, Set<String>>, String>((ref, institutionId) async {
+  final client = SupabaseConfig.client;
+  final data = await client
+      .from('student_subjects')
+      .select('student_id, subject_id')
+      .eq('institution_id', institutionId);
+
+  // Map: subjectId -> Set<studentId>
+  final result = <String, Set<String>>{};
+  for (final item in data as List) {
+    final subjectId = item['subject_id'] as String;
+    final studentId = item['student_id'] as String;
+    result.putIfAbsent(subjectId, () => {}).add(studentId);
+  }
+  return result;
+});
+
+/// Провайдер связей ученик-преподаватель для заведения
+final _studentTeacherBindingsProvider =
+    FutureProvider.family<Map<String, Set<String>>, String>((ref, institutionId) async {
+  final client = SupabaseConfig.client;
+  final data = await client
+      .from('student_teachers')
+      .select('student_id, user_id')
+      .eq('institution_id', institutionId);
+
+  // Map: userId (teacher) -> Set<studentId>
+  final result = <String, Set<String>>{};
+  for (final item in data as List) {
+    final userId = item['user_id'] as String;
+    final studentId = item['student_id'] as String;
+    result.putIfAbsent(userId, () => {}).add(studentId);
+  }
+  return result;
+});
 
 /// Экран списка оплат
 class PaymentsScreen extends ConsumerStatefulWidget {
@@ -28,10 +70,418 @@ class PaymentsScreen extends ConsumerStatefulWidget {
 class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   late DateTime _selectedMonth;
 
+  // Фильтры
+  Set<String> _selectedStudentIds = {};
+  Set<String> _selectedSubjectIds = {};
+  Set<String> _selectedTeacherIds = {};
+  Set<String> _selectedPlanIds = {};
+
   @override
   void initState() {
     super.initState();
     _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  }
+
+  /// Проверяет, есть ли активные фильтры
+  bool get _hasActiveFilters =>
+      _selectedStudentIds.isNotEmpty ||
+      _selectedSubjectIds.isNotEmpty ||
+      _selectedTeacherIds.isNotEmpty ||
+      _selectedPlanIds.isNotEmpty;
+
+  /// Применяет фильтры к списку оплат
+  List<Payment> _applyFilters(
+    List<Payment> payments, {
+    required Map<String, Set<String>> subjectBindings,
+    required Map<String, Set<String>> teacherBindings,
+  }) {
+    return payments.where((p) {
+      // Фильтр по ученикам
+      if (_selectedStudentIds.isNotEmpty && !_selectedStudentIds.contains(p.studentId)) {
+        return false;
+      }
+
+      // Фильтр по предметам
+      if (_selectedSubjectIds.isNotEmpty) {
+        // Собираем студентов, связанных с выбранными предметами
+        final studentsWithSubjects = <String>{};
+        for (final subjectId in _selectedSubjectIds) {
+          studentsWithSubjects.addAll(subjectBindings[subjectId] ?? {});
+        }
+        if (!studentsWithSubjects.contains(p.studentId)) {
+          return false;
+        }
+      }
+
+      // Фильтр по преподавателям
+      if (_selectedTeacherIds.isNotEmpty) {
+        // Собираем студентов, связанных с выбранными преподавателями
+        final studentsWithTeachers = <String>{};
+        for (final teacherId in _selectedTeacherIds) {
+          studentsWithTeachers.addAll(teacherBindings[teacherId] ?? {});
+        }
+        if (!studentsWithTeachers.contains(p.studentId)) {
+          return false;
+        }
+      }
+
+      // Фильтр по тарифу
+      if (_selectedPlanIds.isNotEmpty &&
+          (p.paymentPlanId == null || !_selectedPlanIds.contains(p.paymentPlanId))) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
+  /// Сбрасывает все фильтры
+  void _resetFilters() {
+    setState(() {
+      _selectedStudentIds = {};
+      _selectedSubjectIds = {};
+      _selectedTeacherIds = {};
+      _selectedPlanIds = {};
+    });
+  }
+
+  /// Строит горизонтальную панель фильтров (кнопки)
+  Widget _buildFiltersRow({
+    required List<Student> students,
+    required List<Subject> subjects,
+    required List<InstitutionMember> members,
+    required List<PaymentPlan> plans,
+  }) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          // Кнопка "Ученики"
+          _FilterButton(
+            label: 'Ученики',
+            isActive: _selectedStudentIds.isNotEmpty,
+            onTap: () => _showStudentsSheet(students),
+          ),
+          const SizedBox(width: 8),
+          // Кнопка "Предметы"
+          _FilterButton(
+            label: 'Предметы',
+            isActive: _selectedSubjectIds.isNotEmpty,
+            onTap: () => _showSubjectsSheet(subjects),
+          ),
+          const SizedBox(width: 8),
+          // Кнопка "Преподаватели"
+          _FilterButton(
+            label: 'Преподаватели',
+            isActive: _selectedTeacherIds.isNotEmpty,
+            onTap: () => _showTeachersSheet(members),
+          ),
+          const SizedBox(width: 8),
+          // Кнопка "Тарифы"
+          _FilterButton(
+            label: 'Тарифы',
+            isActive: _selectedPlanIds.isNotEmpty,
+            onTap: () => _showPlansSheet(plans),
+          ),
+          // Кнопка сброса
+          if (_hasActiveFilters) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.clear, size: 20),
+              onPressed: _resetFilters,
+              tooltip: 'Сбросить фильтры',
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.grey[200],
+                padding: const EdgeInsets.all(8),
+                minimumSize: const Size(36, 36),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Показывает BottomSheet с выбором учеников
+  void _showStudentsSheet(List<Student> students) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Ученики', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedStudentIds = {});
+                        setSheetState(() {});
+                      },
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    CheckboxListTile(
+                      value: _selectedStudentIds.isEmpty,
+                      onChanged: (_) {
+                        setState(() => _selectedStudentIds = {});
+                        setSheetState(() {});
+                      },
+                      title: const Text('Все'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: AppColors.primary,
+                    ),
+                    ...students.map((student) {
+                      final isSelected = _selectedStudentIds.contains(student.id);
+                      return CheckboxListTile(
+                        value: isSelected,
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              _selectedStudentIds.add(student.id);
+                            } else {
+                              _selectedStudentIds.remove(student.id);
+                            }
+                          });
+                          setSheetState(() {});
+                        },
+                        title: Text(student.name),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: AppColors.primary,
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Показывает BottomSheet с выбором предметов
+  void _showSubjectsSheet(List<Subject> subjects) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Предметы', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedSubjectIds = {});
+                        setSheetState(() {});
+                      },
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    CheckboxListTile(
+                      value: _selectedSubjectIds.isEmpty,
+                      onChanged: (_) {
+                        setState(() => _selectedSubjectIds = {});
+                        setSheetState(() {});
+                      },
+                      title: const Text('Все'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: AppColors.primary,
+                    ),
+                    ...subjects.map((subject) {
+                      final isSelected = _selectedSubjectIds.contains(subject.id);
+                      return CheckboxListTile(
+                        value: isSelected,
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              _selectedSubjectIds.add(subject.id);
+                            } else {
+                              _selectedSubjectIds.remove(subject.id);
+                            }
+                          });
+                          setSheetState(() {});
+                        },
+                        title: Text(subject.name),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: AppColors.primary,
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Показывает BottomSheet с выбором преподавателей
+  void _showTeachersSheet(List<InstitutionMember> members) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Преподаватели', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedTeacherIds = {});
+                        setSheetState(() {});
+                      },
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    CheckboxListTile(
+                      value: _selectedTeacherIds.isEmpty,
+                      onChanged: (_) {
+                        setState(() => _selectedTeacherIds = {});
+                        setSheetState(() {});
+                      },
+                      title: const Text('Все'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: AppColors.primary,
+                    ),
+                    ...members.map((member) {
+                      final isSelected = _selectedTeacherIds.contains(member.userId);
+                      final name = member.profile?.fullName ?? member.roleName;
+                      return CheckboxListTile(
+                        value: isSelected,
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              _selectedTeacherIds.add(member.userId);
+                            } else {
+                              _selectedTeacherIds.remove(member.userId);
+                            }
+                          });
+                          setSheetState(() {});
+                        },
+                        title: Text(name),
+                        subtitle: member.profile?.email != null
+                            ? Text(member.profile!.email, style: TextStyle(fontSize: 12, color: Colors.grey[600]))
+                            : null,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: AppColors.primary,
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Показывает BottomSheet с выбором тарифов
+  void _showPlansSheet(List<PaymentPlan> plans) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Тарифы', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedPlanIds = {});
+                        setSheetState(() {});
+                      },
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    CheckboxListTile(
+                      value: _selectedPlanIds.isEmpty,
+                      onChanged: (_) {
+                        setState(() => _selectedPlanIds = {});
+                        setSheetState(() {});
+                      },
+                      title: const Text('Все'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: AppColors.primary,
+                    ),
+                    ...plans.map((plan) {
+                      final isSelected = _selectedPlanIds.contains(plan.id);
+                      return CheckboxListTile(
+                        value: isSelected,
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              _selectedPlanIds.add(plan.id);
+                            } else {
+                              _selectedPlanIds.remove(plan.id);
+                            }
+                          });
+                          setSheetState(() {});
+                        },
+                        title: Text(plan.name),
+                        subtitle: Text('${plan.lessonsCount} занятий'),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: AppColors.primary,
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   PeriodParams get _periodParams {
@@ -68,16 +518,19 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     final canAddForAllStudents = hasFullAccess ||
         (permissions?.addPaymentsForAllStudents ?? false);
 
+    // Получаем данные для фильтров
+    final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+    final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
+    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final plansAsync = ref.watch(paymentPlansProvider(widget.institutionId));
+
+    // Загружаем связи для фильтрации
+    final subjectBindingsAsync = ref.watch(_studentSubjectBindingsProvider(widget.institutionId));
+    final teacherBindingsAsync = ref.watch(_studentTeacherBindingsProvider(widget.institutionId));
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.payments),
-        actions: [
-          if (canAddPayments)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => _showAddPaymentDialog(context, canAddForAllStudents),
-            ),
-        ],
       ),
       floatingActionButton: canAddPayments
           ? FloatingActionButton(
@@ -102,12 +555,49 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               ],
             ),
           ),
+
+          // Фильтры (горизонтальные кнопки)
+          studentsAsync.maybeWhen(
+            data: (students) => subjectsAsync.maybeWhen(
+              data: (subjects) => membersAsync.maybeWhen(
+                data: (members) => plansAsync.maybeWhen(
+                  data: (plans) => _buildFiltersRow(
+                    students: students,
+                    subjects: subjects,
+                    members: members,
+                    plans: plans,
+                  ),
+                  orElse: () => _buildFiltersRow(
+                    students: students,
+                    subjects: subjects,
+                    members: members,
+                    plans: [],
+                  ),
+                ),
+                orElse: () => _buildFiltersRow(
+                  students: students,
+                  subjects: subjects,
+                  members: [],
+                  plans: [],
+                ),
+              ),
+              orElse: () => _buildFiltersRow(
+                students: students,
+                subjects: [],
+                members: [],
+                plans: [],
+              ),
+            ),
+            orElse: () => const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 12),
+
           // Total
           Container(
             margin: AppSizes.paddingHorizontalM,
             padding: AppSizes.paddingAllM,
             decoration: BoxDecoration(
-              color: AppColors.success.withOpacity(0.1),
+              color: AppColors.success.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppSizes.radiusM),
             ),
             child: Row(
@@ -142,6 +632,17 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 onRetry: () => ref.invalidate(paymentsProvider(_periodParams)),
               ),
               data: (payments) {
+                // Получаем связи для фильтрации
+                final subjectBindings = subjectBindingsAsync.valueOrNull ?? {};
+                final teacherBindings = teacherBindingsAsync.valueOrNull ?? {};
+
+                // Применяем фильтры
+                final filteredPayments = _applyFilters(
+                  payments,
+                  subjectBindings: subjectBindings,
+                  teacherBindings: teacherBindings,
+                );
+
                 if (payments.isEmpty) {
                   return const Center(
                     child: Text(
@@ -150,12 +651,34 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                     ),
                   );
                 }
+
+                if (filteredPayments.isEmpty && _hasActiveFilters) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.filter_list_off, size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Нет оплат по заданным фильтрам',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: _resetFilters,
+                          child: const Text('Сбросить фильтры'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(paymentsProvider(_periodParams));
                     ref.invalidate(periodTotalProvider(_periodParams));
                   },
-                  child: _buildPaymentsList(payments),
+                  child: _buildPaymentsList(filteredPayments),
                 );
               },
             ),
@@ -1276,6 +1799,59 @@ class _PaymentCard extends ConsumerWidget {
             child: const Text('Удалить'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Кнопка фильтра
+class _FilterButton extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _FilterButton({
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isActive ? AppColors.primary.withValues(alpha: 0.15) : Colors.grey[100],
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isActive ? AppColors.primary : Colors.grey[300]!,
+              width: isActive ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isActive ? AppColors.primary : Colors.grey[700],
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.arrow_drop_down,
+                size: 20,
+                color: isActive ? AppColors.primary : Colors.grey[600],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

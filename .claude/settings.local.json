@@ -42,7 +42,10 @@
       "Bash(/mnt/r/flutter/bin/dart analyze:*)",
       "Bash(find:*)",
       "Bash(git checkout:*)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "Bash(git fetch:*)",
+      "Bash(/mnt/c/flutter/bin/dart analyze:*)",
+      "Bash(/mnt/c/flutter/bin/flutter.bat analyze:*)"
     ]
   }
 }

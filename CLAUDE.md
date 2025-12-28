@@ -70,6 +70,11 @@
   - Таблица `subscription_members` + VIEW `student_subscription_summary`
   - UI создания семейного абонемента (чекбоксы)
   - Отображение участников в карточках
+- **`SESSION_2025_12_28_PAYMENT_FILTERS.md`** — полный отчёт за 28.12.2025:
+  - Бронирование кабинетов (Room Bookings) — новая фича
+  - Исправление расчёта долга (VIEW student_subscription_summary)
+  - Редизайн фильтров оплат: Ученики, Предметы, Преподаватели, Тарифы
+  - Восстановление фич расписания после rebase
 
 ## Валюта
 
@@ -248,6 +253,7 @@ final canEditStudent = isOwner ||
 - `deleteOwnLessons: true`
 - `viewPayments: true`
 - `addPaymentsForOwnStudents: true`
+- `createBookings: true` — право на бронирование кабинетов
 
 **Роль администратора (isAdmin):**
 - Администратор имеет все права владельца, **кроме удаления заведения**
@@ -473,6 +479,70 @@ await paymentController.createFamilyPayment(
 - `lib/features/subscriptions/repositories/subscription_repository.dart` — `createFamily`, `deductLesson`
 - `lib/features/students/repositories/student_repository.dart` — баланс из VIEW
 - `supabase/migrations/add_family_subscriptions.sql` — миграция
+
+### 25. Бронирование кабинетов (Room Bookings)
+Кабинеты могут быть забронированы для мероприятий (репетиций, концертов и т.д.).
+
+**Основные принципы:**
+- Бронь блокирует создание занятий в выбранных кабинетах на указанное время
+- При создании брони можно выбрать **несколько кабинетов сразу**
+- Право на создание: `createBookings` (по умолчанию `true` для всех участников)
+- Удалить бронь может: владелец, администратор или создатель брони
+
+**Отображение в расписании:**
+- Цвет: **оранжевый** (`AppColors.warning`)
+- Иконка: `Icons.lock`
+- Всегда показывается имя создателя
+- Описание опционально
+
+**Структура БД:**
+```sql
+-- Основная таблица брони
+bookings (id, institution_id, created_by, date, start_time, end_time, description)
+
+-- Связь с кабинетами (many-to-many)
+booking_rooms (booking_id, room_id)
+```
+
+**Проверка конфликтов:**
+При создании занятия вызывается `hasTimeConflict()`, который проверяет:
+1. Конфликты с другими занятиями
+2. Конфликты с бронированиями через `booking_rooms`
+
+**Ключевые файлы:**
+- `lib/features/bookings/models/booking.dart` — модель Booking
+- `lib/features/bookings/repositories/booking_repository.dart` — CRUD + проверка конфликтов
+- `lib/features/bookings/providers/booking_provider.dart` — провайдеры Riverpod
+- `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — UI (блоки броней, форма создания)
+- `supabase/migrations/add_room_bookings.sql` — SQL миграция
+
+### 26. Фильтры на экране оплат
+Экран оплат поддерживает фильтрацию по нескольким критериям.
+
+**Доступные фильтры:**
+1. **Ученики** — мультиселект учеников
+2. **Предметы** — фильтр по студентам, связанным с предметами
+3. **Преподаватели** — фильтр по студентам, привязанным к преподавателям
+4. **Тарифы** — фильтр по тарифам оплаты (PaymentPlan)
+
+**UI:**
+- Горизонтальные кнопки с возможностью прокрутки
+- При нажатии открывается BottomSheet с чекбоксами
+- Активный фильтр подсвечивается (синяя рамка)
+- Кнопка сброса появляется при наличии активных фильтров
+
+**Логика фильтрации по предметам/преподавателям:**
+```dart
+// Провайдеры связей (локальные в payments_screen.dart)
+_studentSubjectBindingsProvider  // Map: subjectId → Set<studentId>
+_studentTeacherBindingsProvider  // Map: userId → Set<studentId>
+
+// При выборе предмета/преподавателя — показываются оплаты
+// только тех учеников, которые связаны с выбранными сущностями
+```
+
+**Ключевой файл:**
+- `lib/features/payments/screens/payments_screen.dart` — экран с фильтрами
 
 
 ## CI/CD

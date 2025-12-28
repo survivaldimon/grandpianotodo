@@ -515,20 +515,22 @@ class LessonRepository {
     }
   }
 
-  /// Проверить конфликт времени
+  /// Проверить конфликт времени (с занятиями и бронями)
   Future<bool> hasTimeConflict({
     required String roomId,
     required DateTime date,
     required TimeOfDay startTime,
     required TimeOfDay endTime,
     String? excludeLessonId,
+    String? excludeBookingId,
   }) async {
     try {
       final dateStr = date.toIso8601String().split('T').first;
       final startStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
       final endStr = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
 
-      var query = _client
+      // 1. Проверяем конфликт с занятиями
+      var lessonQuery = _client
           .from('lessons')
           .select('id')
           .eq('room_id', roomId)
@@ -538,11 +540,28 @@ class LessonRepository {
           .gt('end_time', startStr);
 
       if (excludeLessonId != null) {
-        query = query.neq('id', excludeLessonId);
+        lessonQuery = lessonQuery.neq('id', excludeLessonId);
       }
 
-      final data = await query;
-      return (data as List).isNotEmpty;
+      final lessonData = await lessonQuery;
+      if ((lessonData as List).isNotEmpty) return true;
+
+      // 2. Проверяем конфликт с бронями
+      var bookingQuery = _client
+          .from('booking_rooms')
+          .select('booking_id, bookings!inner(id, date, start_time, end_time, archived_at)')
+          .eq('room_id', roomId)
+          .eq('bookings.date', dateStr)
+          .isFilter('bookings.archived_at', null)
+          .lt('bookings.start_time', endStr)
+          .gt('bookings.end_time', startStr);
+
+      if (excludeBookingId != null) {
+        bookingQuery = bookingQuery.neq('bookings.id', excludeBookingId);
+      }
+
+      final bookingData = await bookingQuery;
+      return (bookingData as List).isNotEmpty;
     } catch (e) {
       throw DatabaseException('Ошибка проверки конфликта: $e');
     }
