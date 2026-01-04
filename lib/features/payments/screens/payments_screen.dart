@@ -69,26 +69,22 @@ class PaymentsScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
-  late DateTime _selectedMonth;
+  final _dateFormat = DateFormat('dd.MM.yyyy', 'ru');
 
   // Фильтры
   Set<String> _selectedStudentIds = {};
   Set<String> _selectedSubjectIds = {};
   Set<String> _selectedTeacherIds = {};
   Set<String> _selectedPlanIds = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
-  }
+  Set<String> _selectedPaymentMethods = {}; // 'cash', 'card'
 
   /// Проверяет, есть ли активные фильтры
   bool get _hasActiveFilters =>
       _selectedStudentIds.isNotEmpty ||
       _selectedSubjectIds.isNotEmpty ||
       _selectedTeacherIds.isNotEmpty ||
-      _selectedPlanIds.isNotEmpty;
+      _selectedPlanIds.isNotEmpty ||
+      _selectedPaymentMethods.isNotEmpty;
 
   /// Применяет фильтры к списку оплат
   List<Payment> _applyFilters(
@@ -132,6 +128,12 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
         return false;
       }
 
+      // Фильтр по способу оплаты
+      if (_selectedPaymentMethods.isNotEmpty &&
+          !_selectedPaymentMethods.contains(p.paymentMethod)) {
+        return false;
+      }
+
       return true;
     }).toList();
   }
@@ -143,6 +145,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
       _selectedSubjectIds = {};
       _selectedTeacherIds = {};
       _selectedPlanIds = {};
+      _selectedPaymentMethods = {};
     });
   }
 
@@ -184,6 +187,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
             label: 'Тарифы',
             isActive: _selectedPlanIds.isNotEmpty,
             onTap: () => _showPlansSheet(plans),
+          ),
+          const SizedBox(width: 8),
+          // Кнопка "Способ оплаты"
+          _FilterButton(
+            label: 'Способ',
+            isActive: _selectedPaymentMethods.isNotEmpty,
+            onTap: () => _showPaymentMethodsSheet(),
           ),
           // Кнопка сброса
           if (_hasActiveFilters) ...[
@@ -485,17 +495,233 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     );
   }
 
-  PeriodParams get _periodParams {
-    final startOfMonth = _selectedMonth;
-    final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0, 23, 59, 59);
-    return PeriodParams(widget.institutionId, startOfMonth, endOfMonth);
+  /// Показывает BottomSheet с выбором способа оплаты
+  void _showPaymentMethodsSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Способ оплаты', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedPaymentMethods = {});
+                        setSheetState(() {});
+                      },
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Без ListView — всего 3 элемента, скролл не нужен
+              CheckboxListTile(
+                value: _selectedPaymentMethods.isEmpty,
+                onChanged: (_) {
+                  setState(() => _selectedPaymentMethods = {});
+                  setSheetState(() {});
+                },
+                title: const Text('Все'),
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: AppColors.primary,
+              ),
+              CheckboxListTile(
+                value: _selectedPaymentMethods.contains('card'),
+                onChanged: (checked) {
+                  setState(() {
+                    if (checked == true) {
+                      _selectedPaymentMethods.add('card');
+                    } else {
+                      _selectedPaymentMethods.remove('card');
+                    }
+                  });
+                  setSheetState(() {});
+                },
+                title: const Text('Карта'),
+                secondary: const Icon(Icons.credit_card, color: AppColors.primary),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              CheckboxListTile(
+                value: _selectedPaymentMethods.contains('cash'),
+                onChanged: (checked) {
+                  setState(() {
+                    if (checked == true) {
+                      _selectedPaymentMethods.add('cash');
+                    } else {
+                      _selectedPaymentMethods.remove('cash');
+                    }
+                  });
+                  setSheetState(() {});
+                },
+                title: const Text('Наличные'),
+                secondary: const Icon(Icons.payments_outlined, color: AppColors.success),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Получить даты для отображения в зависимости от выбранного периода
+  (DateTime, DateTime) _getDisplayDates(StatsPeriod period, CustomDateRange? customRange) {
+    if (period == StatsPeriod.custom && customRange != null) {
+      return (customRange.start, customRange.end);
+    }
+    return getPeriodDates(period, customRange: customRange);
+  }
+
+  String _periodLabel(StatsPeriod period) {
+    switch (period) {
+      case StatsPeriod.week:
+        return 'Неделя';
+      case StatsPeriod.month:
+        return 'Месяц';
+      case StatsPeriod.quarter:
+        return 'Квартал';
+      case StatsPeriod.year:
+        return 'Год';
+      case StatsPeriod.custom:
+        return 'Свой';
+    }
+  }
+
+  /// Выбрать предустановленный период и обновить даты
+  void _selectPresetPeriod(StatsPeriod period) {
+    ref.read(paymentsPeriodProvider.notifier).state = period;
+    final (start, end) = getPeriodDates(period);
+    ref.read(paymentsDateRangeProvider.notifier).state = CustomDateRange(start, end);
+  }
+
+  /// Можно ли перейти вперёд (не дальше сегодня)
+  bool _canNavigateForward(DateTime currentEnd) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return currentEnd.isBefore(today);
+  }
+
+  /// Навигация по периодам
+  void _navigatePeriod(StatsPeriod period, DateTime currentStart, DateTime currentEnd, {required bool forward}) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    DateTime newStart;
+    DateTime newEnd;
+
+    final duration = currentEnd.difference(currentStart);
+
+    switch (period) {
+      case StatsPeriod.week:
+        if (forward) {
+          newStart = currentStart.add(const Duration(days: 7));
+        } else {
+          newStart = currentStart.subtract(const Duration(days: 7));
+        }
+        newStart = newStart.subtract(Duration(days: newStart.weekday - 1));
+        newEnd = DateTime(newStart.year, newStart.month, newStart.day + 6, 23, 59, 59);
+        break;
+      case StatsPeriod.month:
+        if (forward) {
+          newStart = DateTime(currentStart.year, currentStart.month + 1, 1);
+        } else {
+          newStart = DateTime(currentStart.year, currentStart.month - 1, 1);
+        }
+        newEnd = DateTime(newStart.year, newStart.month + 1, 0, 23, 59, 59);
+        break;
+      case StatsPeriod.quarter:
+        final currentQuarterStart = ((currentStart.month - 1) ~/ 3) * 3 + 1;
+        if (forward) {
+          newStart = DateTime(currentStart.year, currentQuarterStart + 3, 1);
+        } else {
+          newStart = DateTime(currentStart.year, currentQuarterStart - 3, 1);
+        }
+        if (newStart.month < 1) {
+          newStart = DateTime(newStart.year - 1, 12 + newStart.month, 1);
+        } else if (newStart.month > 12) {
+          newStart = DateTime(newStart.year + 1, newStart.month - 12, 1);
+        }
+        newEnd = DateTime(newStart.year, newStart.month + 3, 0, 23, 59, 59);
+        break;
+      case StatsPeriod.year:
+        if (forward) {
+          newStart = DateTime(currentStart.year + 1, 1, 1);
+        } else {
+          newStart = DateTime(currentStart.year - 1, 1, 1);
+        }
+        newEnd = DateTime(newStart.year, 12, 31, 23, 59, 59);
+        break;
+      case StatsPeriod.custom:
+        if (forward) {
+          newStart = currentEnd.add(const Duration(days: 1));
+          newEnd = newStart.add(duration);
+        } else {
+          newEnd = currentStart.subtract(const Duration(days: 1));
+          newStart = newEnd.subtract(duration);
+        }
+        break;
+    }
+
+    if (newEnd.isAfter(today)) {
+      newEnd = today;
+    }
+
+    ref.read(paymentsDateRangeProvider.notifier).state = CustomDateRange(newStart, newEnd);
+  }
+
+  /// Выбор диапазона дат
+  Future<void> _selectDateRange(DateTime currentStart, DateTime currentEnd) async {
+    final now = DateTime.now();
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      initialDateRange: DateTimeRange(start: currentStart, end: currentEnd),
+      locale: const Locale('ru'),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: AppColors.primary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      ref.read(paymentsPeriodProvider.notifier).state = StatsPeriod.custom;
+      ref.read(paymentsDateRangeProvider.notifier).state = CustomDateRange(
+        picked.start,
+        picked.end,
+      );
+    }
+  }
+
+  PeriodParams _getPeriodParams(StatsPeriod period, CustomDateRange? customRange) {
+    final (start, end) = _getDisplayDates(period, customRange);
+    return PeriodParams(widget.institutionId, start, end);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Получаем период из провайдеров
+    final period = ref.watch(paymentsPeriodProvider);
+    final customRange = ref.watch(paymentsDateRangeProvider);
+    final periodParams = _getPeriodParams(period, customRange);
+    final (displayStart, displayEnd) = _getDisplayDates(period, customRange);
+
     // Используем StreamProvider для realtime обновлений
-    final paymentsAsync = ref.watch(paymentsStreamByPeriodProvider(_periodParams));
-    final monthName = DateFormat('LLLL yyyy', 'ru').format(_selectedMonth);
+    final paymentsAsync = ref.watch(paymentsStreamByPeriodProvider(periodParams));
 
     // Получаем права текущего пользователя
     final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
@@ -570,21 +796,86 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
           : null,
       body: Column(
         children: [
-          // Period selector
+          // Быстрый выбор периода (кнопки)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final p in [StatsPeriod.week, StatsPeriod.month, StatsPeriod.quarter, StatsPeriod.year])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(_periodLabel(p)),
+                        selected: p == period,
+                        onSelected: (_) => _selectPresetPeriod(p),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          // Выбор своего периода с навигацией
           Padding(
-            padding: AppSizes.paddingAllM,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                const Text('Период:'),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: _showMonthPicker,
-                  icon: const Icon(Icons.calendar_month, size: 18),
-                  label: Text(monthName[0].toUpperCase() + monthName.substring(1)),
+                // Стрелка назад
+                IconButton(
+                  onPressed: () => _navigatePeriod(period, displayStart, displayEnd, forward: false),
+                  icon: const Icon(Icons.chevron_left),
+                  color: AppColors.primary,
+                ),
+                // Даты
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectDateRange(displayStart, displayEnd),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: period == StatsPeriod.custom
+                              ? AppColors.primary
+                              : AppColors.border,
+                          width: period == StatsPeriod.custom ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            _dateFormat.format(displayStart),
+                            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.arrow_forward, size: 14, color: AppColors.textSecondary),
+                          const SizedBox(width: 6),
+                          Text(
+                            _dateFormat.format(displayEnd),
+                            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Стрелка вперёд
+                IconButton(
+                  onPressed: _canNavigateForward(displayEnd)
+                      ? () => _navigatePeriod(period, displayStart, displayEnd, forward: true)
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                  color: AppColors.primary,
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 8),
 
           // Фильтры (горизонтальные кнопки)
           if (canViewAnyPayments)
@@ -675,7 +966,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                     loading: () => const LoadingIndicator(),
                     error: (error, _) => ErrorView.fromException(
                       error,
-                      onRetry: () => ref.invalidate(paymentsStreamByPeriodProvider(_periodParams)),
+                      onRetry: () => ref.invalidate(paymentsStreamByPeriodProvider(periodParams)),
                     ),
                     data: (payments) {
                       // Если нужна фильтрация по своим ученикам, ждём загрузки myStudentIds
@@ -743,10 +1034,10 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
                       return RefreshIndicator(
                         onRefresh: () async {
-                          ref.invalidate(paymentsStreamByPeriodProvider(_periodParams));
+                          ref.invalidate(paymentsStreamByPeriodProvider(periodParams));
                           ref.invalidate(myStudentIdsProvider(widget.institutionId));
                         },
-                        child: _buildPaymentsList(filteredPayments, myStudentIds),
+                        child: _buildPaymentsList(filteredPayments, myStudentIds, periodParams),
                       );
                     },
                   ),
@@ -756,7 +1047,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     );
   }
 
-  Widget _buildPaymentsList(List<Payment> payments, Set<String> myStudentIds) {
+  Widget _buildPaymentsList(List<Payment> payments, Set<String> myStudentIds, PeriodParams periodParams) {
     // Group payments by date
     final groupedPayments = groupBy<Payment, String>(
       payments,
@@ -783,30 +1074,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               myStudentIds: myStudentIds,
               onChanged: () {
                 // Stream провайдер обновляется автоматически через realtime
-                ref.invalidate(paymentsStreamByPeriodProvider(_periodParams));
+                ref.invalidate(paymentsStreamByPeriodProvider(periodParams));
               },
             )),
           ],
         );
       },
     );
-  }
-
-  Future<void> _showMonthPicker() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedMonth,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      initialEntryMode: DatePickerEntryMode.calendarOnly,
-      locale: const Locale('ru'),
-    );
-
-    if (picked != null) {
-      setState(() {
-        _selectedMonth = DateTime(picked.year, picked.month, 1);
-      });
-    }
   }
 
   String _formatCurrency(double amount) {
@@ -824,7 +1098,10 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
         canAddForAllStudents: canAddForAllStudents,
         onSuccess: () {
           // Stream провайдер обновляется автоматически через realtime
-          ref.invalidate(paymentsStreamByPeriodProvider(_periodParams));
+          final period = ref.read(paymentsPeriodProvider);
+          final customRange = ref.read(paymentsDateRangeProvider);
+          final params = _getPeriodParams(period, customRange);
+          ref.invalidate(paymentsStreamByPeriodProvider(params));
         },
       ),
     );
@@ -864,6 +1141,35 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
   bool _hasDiscount = false;
   double _originalPrice = 0;
   bool _isFamilyMode = false;
+  String _paymentMethod = 'card'; // Способ оплаты: 'cash' или 'card'
+
+  // Для FAB прокрутки вниз
+  bool _showScrollDownFab = true;
+  ScrollController? _currentScrollController;
+
+  void _handleScrollNotification(ScrollNotification notification, ScrollController controller) {
+    // Сохраняем контроллер для использования в _scrollToBottom
+    _currentScrollController = controller;
+
+    if (notification is ScrollUpdateNotification) {
+      final maxScroll = notification.metrics.maxScrollExtent;
+      final currentScroll = notification.metrics.pixels;
+      // Скрываем FAB только когда совсем внизу (осталось меньше 50 пикселей)
+      final shouldShow = maxScroll > 50 && currentScroll < maxScroll - 50;
+      if (shouldShow != _showScrollDownFab) {
+        setState(() => _showScrollDownFab = shouldShow);
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_currentScrollController == null || !_currentScrollController!.hasClients) return;
+    _currentScrollController!.animateTo(
+      _currentScrollController!.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
 
   @override
   void dispose() {
@@ -966,6 +1272,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
         paymentPlanId: _selectedPlan?.id,
         amount: double.parse(_amountController.text),
         lessonsCount: int.parse(_lessonsController.text),
+        paymentMethod: _paymentMethod,
         validityDays: int.parse(_validityController.text),
         paidAt: _selectedDate,
         comment: comment.isEmpty ? null : comment,
@@ -978,6 +1285,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
         paymentPlanId: _selectedPlan?.id,
         amount: double.parse(_amountController.text),
         lessonsCount: int.parse(_lessonsController.text),
+        paymentMethod: _paymentMethod,
         paidAt: _selectedDate,
         comment: comment.isEmpty ? null : comment,
       );
@@ -1009,37 +1317,59 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
     final plansAsync = ref.watch(paymentPlansProvider(widget.institutionId));
     final controllerState = ref.watch(paymentControllerProvider);
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Индикатор
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        // Сохраняем контроллер сразу для использования в FAB
+        _currentScrollController = scrollController;
+        return Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          children: [
+            // Drag handle
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 20),
-
-                // Заголовок
+              ),
+            ),
+            // Скроллируемый контент с FAB
+            Expanded(
+              child: Stack(
+                children: [
+                  NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      _handleScrollNotification(notification, scrollController);
+                      return false;
+                    },
+                    child: ListView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      children: [
+                        Form(
+                          key: _formKey,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Заголовок
                 Row(
                   children: [
                     Container(
@@ -1324,6 +1654,45 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 ),
                 const SizedBox(height: 16),
 
+                // Способ оплаты
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Способ оплаты',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(
+                            value: 'card',
+                            label: Text('Карта'),
+                          ),
+                          ButtonSegment(
+                            value: 'cash',
+                            label: Text('Наличные'),
+                          ),
+                        ],
+                        selected: {_paymentMethod},
+                        onSelectionChanged: (Set<String> selected) {
+                          setState(() => _paymentMethod = selected.first);
+                        },
+                        style: const ButtonStyle(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
                 // Тариф
                 plansAsync.when(
                   loading: () => const LinearProgressIndicator(),
@@ -1336,13 +1705,14 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                     return DropdownButtonFormField<PaymentPlan?>(
                       decoration: InputDecoration(
                         labelText: 'Тариф',
-                        prefixIcon: const Icon(Icons.credit_card_outlined),
+                        isDense: true,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         filled: true,
                         fillColor: Colors.grey[50],
                       ),
+                      isExpanded: true,
                       value: currentPlan,
                       items: [
                         const DropdownMenuItem<PaymentPlan?>(
@@ -1495,7 +1865,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                         controller: _lessonsController,
                         decoration: InputDecoration(
                           labelText: 'Занятий',
-                          prefixIcon: const Icon(Icons.school_outlined),
+                          isDense: true,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -1510,13 +1880,13 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: TextFormField(
                         controller: _validityController,
                         decoration: InputDecoration(
-                          labelText: 'Срок (дней)',
-                          prefixIcon: const Icon(Icons.timer_outlined),
+                          labelText: 'Срок (дн.)',
+                          isDense: true,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -1591,12 +1961,31 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           ),
                   ),
                 ),
-                const SizedBox(height: 8),
-              ],
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // FAB для прокрутки вниз
+                  if (_showScrollDownFab)
+                    Positioned(
+                      right: 16,
+                      bottom: 16,
+                      child: FloatingActionButton.small(
+                        onPressed: _scrollToBottom,
+                        backgroundColor: AppColors.primary,
+                        child: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
+          ],
         ),
-      ),
+      );
+      },
     );
   }
 }
@@ -1696,6 +2085,11 @@ class _PaymentCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         onTap: () => _showPaymentOptions(context, ref),
+        leading: Icon(
+          payment.isCash ? Icons.payments_outlined : Icons.credit_card,
+          color: payment.isCash ? AppColors.success : AppColors.primary,
+          size: 24,
+        ),
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -1744,9 +2138,12 @@ class _PaymentCard extends ConsumerWidget {
           children: [
             // Информация об оплате
             ListTile(
-              leading: const Icon(Icons.info_outline),
+              leading: Icon(
+                payment.isCash ? Icons.payments_outlined : Icons.credit_card,
+                color: payment.isCash ? AppColors.success : AppColors.primary,
+              ),
               title: Text('${payment.student?.name ?? "Ученик"} — ${payment.amount.toInt()} ₸'),
-              subtitle: Text('${payment.lessonsCount} занятий'),
+              subtitle: Text('${payment.lessonsCount} занятий • ${payment.paymentMethodLabel}'),
             ),
             const Divider(),
             if (canManage) ...[
@@ -1791,90 +2188,114 @@ class _PaymentCard extends ConsumerWidget {
     final lessonsController = TextEditingController(text: payment.lessonsCount.toString());
     final commentController = TextEditingController(text: payment.comment ?? '');
     final formKey = GlobalKey<FormState>();
+    String selectedMethod = payment.paymentMethod;
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Редактировать оплату'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: amountController,
-                  decoration: const InputDecoration(
-                    labelText: 'Сумма',
-                    prefixIcon: Icon(Icons.payments),
-                    suffixText: '₸',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Редактировать оплату'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: amountController,
+                    decoration: const InputDecoration(
+                      labelText: 'Сумма',
+                      prefixIcon: Icon(Icons.payments),
+                      suffixText: '₸',
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Введите сумму';
+                      if (double.tryParse(v) == null) return 'Неверная сумма';
+                      return null;
+                    },
                   ),
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Введите сумму';
-                    if (double.tryParse(v) == null) return 'Неверная сумма';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: lessonsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Количество занятий',
-                    prefixIcon: Icon(Icons.event),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: lessonsController,
+                    decoration: const InputDecoration(
+                      labelText: 'Количество занятий',
+                      prefixIcon: Icon(Icons.event),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Введите количество';
+                      if (int.tryParse(v) == null) return 'Неверное число';
+                      return null;
+                    },
                   ),
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Введите количество';
-                    if (int.tryParse(v) == null) return 'Неверное число';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: commentController,
-                  decoration: const InputDecoration(
-                    labelText: 'Комментарий',
-                    prefixIcon: Icon(Icons.comment),
+                  const SizedBox(height: 16),
+                  // Способ оплаты
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'card',
+                        label: Text('Карта'),
+                        icon: Icon(Icons.credit_card),
+                      ),
+                      ButtonSegment(
+                        value: 'cash',
+                        label: Text('Наличные'),
+                        icon: Icon(Icons.payments_outlined),
+                      ),
+                    ],
+                    selected: {selectedMethod},
+                    onSelectionChanged: (Set<String> selected) {
+                      setDialogState(() => selectedMethod = selected.first);
+                    },
                   ),
-                  maxLines: 2,
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: commentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Комментарий',
+                      prefixIcon: Icon(Icons.comment),
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                final controller = ref.read(paymentControllerProvider.notifier);
-                final result = await controller.updatePayment(
-                  payment.id,
-                  studentId: payment.studentId,
-                  oldLessonsCount: payment.lessonsCount,
-                  amount: double.parse(amountController.text),
-                  lessonsCount: int.parse(lessonsController.text),
-                  comment: commentController.text.isEmpty ? null : commentController.text,
-                );
-                if (result != null && dialogContext.mounted) {
-                  Navigator.pop(dialogContext);
-                  onChanged();
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Оплата обновлена'),
-                      backgroundColor: Colors.green,
-                    ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Отмена'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  final controller = ref.read(paymentControllerProvider.notifier);
+                  final result = await controller.updatePayment(
+                    payment.id,
+                    studentId: payment.studentId,
+                    oldLessonsCount: payment.lessonsCount,
+                    amount: double.parse(amountController.text),
+                    lessonsCount: int.parse(lessonsController.text),
+                    paymentMethod: selectedMethod,
+                    comment: commentController.text.isEmpty ? null : commentController.text,
                   );
+                  if (result != null && dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                    onChanged();
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Оплата обновлена'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
                 }
-              }
-            },
-            child: const Text('Сохранить'),
-          ),
-        ],
+              },
+              child: const Text('Сохранить'),
+            ),
+          ],
+        ),
       ),
     );
   }

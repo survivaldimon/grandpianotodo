@@ -55,6 +55,7 @@ class PaymentRepository {
     String? paymentPlanId,
     required double amount,
     required int lessonsCount,
+    String paymentMethod = 'cash',
     DateTime? paidAt,
     String? comment,
   }) async {
@@ -69,6 +70,7 @@ class PaymentRepository {
             'payment_plan_id': paymentPlanId,
             'amount': amount,
             'lessons_count': lessonsCount,
+            'payment_method': paymentMethod,
             'paid_at': (paidAt ?? DateTime.now()).toIso8601String(),
             'recorded_by': _userId,
             'comment': comment,
@@ -89,6 +91,7 @@ class PaymentRepository {
     required double amount,
     required int lessonsCount,
     required String reason,
+    String paymentMethod = 'cash',
     String? comment,
   }) async {
     if (_userId == null) throw AuthAppException('Пользователь не авторизован');
@@ -103,6 +106,7 @@ class PaymentRepository {
             'lessons_count': lessonsCount,
             'is_correction': true,
             'correction_reason': reason,
+            'payment_method': paymentMethod,
             'paid_at': DateTime.now().toIso8601String(),
             'recorded_by': _userId,
             'comment': comment,
@@ -263,6 +267,7 @@ class PaymentRepository {
     required int oldLessonsCount,
     double? amount,
     int? lessonsCount,
+    String? paymentMethod,
     String? comment,
   }) async {
     if (_userId == null) throw AuthAppException('Пользователь не авторизован');
@@ -271,6 +276,7 @@ class PaymentRepository {
       final updates = <String, dynamic>{};
       if (amount != null) updates['amount'] = amount;
       if (lessonsCount != null) updates['lessons_count'] = lessonsCount;
+      if (paymentMethod != null) updates['payment_method'] = paymentMethod;
       if (comment != null) updates['comment'] = comment;
 
       final data = await _client

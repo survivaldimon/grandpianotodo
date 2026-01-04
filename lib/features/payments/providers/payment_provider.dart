@@ -3,7 +3,18 @@ import 'package:kabinet/features/payments/repositories/payment_repository.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/subscriptions/repositories/subscription_repository.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
+import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/shared/models/payment.dart';
+
+// Re-export types from statistics for use in payments screen
+export 'package:kabinet/features/statistics/providers/statistics_provider.dart'
+    show StatsPeriod, CustomDateRange, getPeriodDates;
+
+/// Провайдер выбранного типа периода для экрана оплат
+final paymentsPeriodProvider = StateProvider<StatsPeriod>((ref) => StatsPeriod.month);
+
+/// Провайдер кастомного диапазона дат для экрана оплат
+final paymentsDateRangeProvider = StateProvider<CustomDateRange?>((ref) => null);
 
 /// Провайдер репозитория оплат
 final paymentRepositoryProvider = Provider<PaymentRepository>((ref) {
@@ -116,6 +127,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     String? paymentPlanId,
     required double amount,
     required int lessonsCount,
+    String paymentMethod = 'cash',
     DateTime? paidAt,
     String? comment,
   }) async {
@@ -128,6 +140,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         paymentPlanId: paymentPlanId,
         amount: amount,
         lessonsCount: lessonsCount,
+        paymentMethod: paymentMethod,
         paidAt: paidAt,
         comment: comment,
       );
@@ -150,6 +163,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     required double amount,
     required int lessonsCount,
     required String reason,
+    String paymentMethod = 'cash',
     String? comment,
   }) async {
     state = const AsyncValue.loading();
@@ -160,6 +174,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         amount: amount,
         lessonsCount: lessonsCount,
         reason: reason,
+        paymentMethod: paymentMethod,
         comment: comment,
       );
 
@@ -181,6 +196,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     required int oldLessonsCount,
     double? amount,
     int? lessonsCount,
+    String? paymentMethod,
     String? comment,
   }) async {
     state = const AsyncValue.loading();
@@ -191,6 +207,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         oldLessonsCount: oldLessonsCount,
         amount: amount,
         lessonsCount: lessonsCount,
+        paymentMethod: paymentMethod,
         comment: comment,
       );
       _ref.invalidate(studentPaymentsProvider(studentId));
@@ -248,6 +265,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     String? paymentPlanId,
     required double amount,
     required int lessonsCount,
+    String paymentMethod = 'cash',
     int validityDays = 30,
     DateTime? paidAt,
     String? comment,
@@ -263,6 +281,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         paymentPlanId: paymentPlanId,
         amount: amount,
         lessonsCount: lessonsCount,
+        paymentMethod: paymentMethod,
         paidAt: paidAt,
         comment: comment,
       );

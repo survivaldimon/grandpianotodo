@@ -211,6 +211,9 @@ class _MemberTile extends ConsumerWidget {
                   case 'permissions':
                     context.push('/institutions/$institutionId/members/${member.id}/permissions');
                     break;
+                  case 'transfer':
+                    _showTransferOwnershipDialog(context, ref);
+                    break;
                   case 'remove':
                     _showRemoveDialog(context, ref);
                     break;
@@ -237,6 +240,18 @@ class _MemberTile extends ConsumerWidget {
                     ],
                   ),
                 ),
+                // Передача владения - только для владельца
+                if (isViewerOwner)
+                  PopupMenuItem(
+                    value: 'transfer',
+                    child: Row(
+                      children: [
+                        Icon(Icons.swap_horiz, size: 20, color: AppColors.warning),
+                        const SizedBox(width: 8),
+                        Text('Передать владение', style: TextStyle(color: AppColors.warning)),
+                      ],
+                    ),
+                  ),
                 const PopupMenuItem(
                   value: 'remove',
                   child: Row(
@@ -352,6 +367,129 @@ class _MemberTile extends ConsumerWidget {
       ref.invalidate(membersProvider(institutionId));
     } catch (e) {
       // Error handling
+    }
+  }
+
+  void _showTransferOwnershipDialog(BuildContext context, WidgetRef ref) {
+    final memberName = member.profile?.fullName ?? 'этого участника';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+            SizedBox(width: 8),
+            Text('Передать владение?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Вы собираетесь передать права владельца пользователю:',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.person, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      memberName,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Внимание!',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.error,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• Вы потеряете права владельца\n'
+                    '• Новый владелец сможет удалить заведение\n'
+                    '• Это действие нельзя отменить самостоятельно',
+                    style: TextStyle(fontSize: 13, color: AppColors.error),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _transferOwnership(context, ref);
+            },
+            child: const Text('Передать'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _transferOwnership(BuildContext context, WidgetRef ref) async {
+    try {
+      final repo = ref.read(institutionRepositoryProvider);
+      await repo.transferOwnership(institutionId, member.userId);
+
+      // Инвалидируем провайдеры
+      ref.invalidate(membersProvider(institutionId));
+      ref.invalidate(currentInstitutionProvider(institutionId));
+      ref.invalidate(currentInstitutionStreamProvider(institutionId));
+      ref.invalidate(myMembershipProvider(institutionId));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Права владельца переданы ${member.profile?.fullName ?? "участнику"}'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 }

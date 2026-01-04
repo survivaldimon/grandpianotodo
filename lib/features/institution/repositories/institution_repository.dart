@@ -394,4 +394,47 @@ class InstitutionRepository {
       throw DatabaseException('Ошибка восстановления заведения: $e');
     }
   }
+
+  /// Передать права владельца другому участнику
+  Future<void> transferOwnership(String institutionId, String newOwnerUserId) async {
+    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+
+    try {
+      // Проверить, что текущий пользователь - владелец
+      final institution = await getById(institutionId);
+      if (institution.ownerId != _userId) {
+        throw ValidationException('Только владелец может передать права');
+      }
+
+      // Проверить, что новый владелец - участник заведения
+      final newOwnerMember = await _client
+          .from('institution_members')
+          .select()
+          .eq('institution_id', institutionId)
+          .eq('user_id', newOwnerUserId)
+          .isFilter('archived_at', null)
+          .maybeSingle();
+
+      if (newOwnerMember == null) {
+        throw ValidationException('Пользователь не является участником заведения');
+      }
+
+      // Обновить owner_id в таблице institutions
+      await _client
+          .from('institutions')
+          .update({'owner_id': newOwnerUserId})
+          .eq('id', institutionId);
+
+      // Снять статус админа с нового владельца (владелец имеет все права автоматически)
+      await _client
+          .from('institution_members')
+          .update({'is_admin': false})
+          .eq('id', newOwnerMember['id']);
+
+    } on ValidationException {
+      rethrow;
+    } catch (e) {
+      throw DatabaseException('Ошибка передачи прав владельца: $e');
+    }
+  }
 }

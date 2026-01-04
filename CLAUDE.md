@@ -79,6 +79,12 @@
   - Slide-анимация переключения вкладок в стиле iOS
   - Автопривязка ученика к преподавателю при создании
   - Исправление видимости оплат для участников
+- **`SESSION_2026_01_04_PAYMENT_METHODS.md`** — способы оплаты (карта/наличные):
+  - Поле `payment_method` в таблице payments
+  - Фильтр по способу оплаты
+  - Статистика по способам на вкладках "Общие" и "Тарифы"
+  - DraggableScrollableSheet для форм
+  - FAB прокрутки вниз в форме добавления оплаты
 - **`SESSION_2026_01_04_PAYMENTS_FIX.md`** — исправления оплат и realtime:
   - Исправление удвоения занятий при оплате с тарифом
   - Realtime обновление баланса ученика после операций с оплатами
@@ -602,7 +608,159 @@ _studentTeacherBindingsProvider  // Map: userId → Set<studentId>
 
 **Файл:** `lib/features/students/providers/student_provider.dart`
 
-### 29. Тарифы — только шаблон для автозаполнения
+### 29. Способы оплаты (Payment Methods)
+Оплаты разделяются на два способа: **Карта** и **Наличные**.
+
+**Поле в таблице `payments`:**
+```sql
+payment_method TEXT NOT NULL DEFAULT 'cash'
+CHECK (payment_method IN ('cash', 'card'))
+```
+
+**Модель Payment:**
+```dart
+final String paymentMethod; // 'cash' или 'card'
+
+bool get isCash => paymentMethod == 'cash';
+bool get isCard => paymentMethod == 'card';
+String get paymentMethodLabel => isCard ? 'Карта' : 'Наличные';
+```
+
+**UI порядок:** Карта первая, Наличные вторая (default: 'card')
+
+**Форма добавления оплаты:**
+```dart
+SegmentedButton<String>(
+  segments: const [
+    ButtonSegment(value: 'card', label: Text('Карта')),
+    ButtonSegment(value: 'cash', label: Text('Наличные')),
+  ],
+  selected: {_paymentMethod},
+  onSelectionChanged: (selected) => setState(() => _paymentMethod = selected.first),
+)
+```
+
+**Фильтр на экране оплат:**
+- Кнопка "Способ" в горизонтальном списке фильтров
+- BottomSheet с чекбоксами: Все, Карта, Наличные
+- Мультиселект (можно выбрать оба)
+
+**Статистика:**
+- Вкладка "Общие": общая сумма картой/наличными, количество, проценты
+- Вкладка "Тарифы": разбивка по способам для каждого тарифа
+
+**Ключевые файлы:**
+- `lib/shared/models/payment.dart` — модель
+- `lib/features/payments/repositories/payment_repository.dart` — репозиторий
+- `lib/features/payments/screens/payments_screen.dart` — форма и фильтр
+- `lib/features/statistics/repositories/statistics_repository.dart` — статистика
+- `supabase/migrations/add_payment_method.sql` — миграция
+
+### 30. DraggableScrollableSheet для форм
+Большие формы (добавление оплаты) используют `DraggableScrollableSheet` для свайпа закрытия.
+
+**Преимущества:**
+- Свайп по любой области закрывает sheet
+- Синхронизация скролла контента с размером sheet
+- Drag handle отдельно от скроллируемого контента
+
+**Паттерн:**
+```dart
+return DraggableScrollableSheet(
+  initialChildSize: 0.9,
+  minChildSize: 0.5,
+  maxChildSize: 0.95,
+  expand: false,
+  builder: (context, scrollController) => Container(
+    child: Column(
+      children: [
+        // Drag handle (вне скролла)
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Center(child: /* handle widget */),
+        ),
+        // Скроллируемый контент
+        Expanded(
+          child: ListView(
+            controller: scrollController, // Важно!
+            children: [/* форма */],
+          ),
+        ),
+      ],
+    ),
+  ),
+);
+```
+
+### 31. FAB прокрутки вниз в формах
+Для длинных форм добавляется FAB со стрелкой вниз для быстрой прокрутки к кнопке отправки.
+
+**Логика:**
+- FAB появляется когда есть куда скроллить
+- FAB скрывается когда пользователь почти внизу (< 50px)
+- При нажатии — плавная анимация к низу
+
+**Реализация:**
+```dart
+// State
+bool _showScrollDownFab = true;
+ScrollController? _currentScrollController;
+
+void _handleScrollNotification(ScrollNotification notification, ScrollController controller) {
+  _currentScrollController = controller;
+  if (notification is ScrollUpdateNotification) {
+    final maxScroll = notification.metrics.maxScrollExtent;
+    final currentScroll = notification.metrics.pixels;
+    final shouldShow = maxScroll > 50 && currentScroll < maxScroll - 50;
+    if (shouldShow != _showScrollDownFab) {
+      setState(() => _showScrollDownFab = shouldShow);
+    }
+  }
+}
+
+void _scrollToBottom() {
+  _currentScrollController?.animateTo(
+    _currentScrollController!.position.maxScrollExtent,
+    duration: const Duration(milliseconds: 300),
+    curve: Curves.easeOut,
+  );
+}
+
+// В Stack
+if (_showScrollDownFab)
+  Positioned(
+    right: 16,
+    bottom: 16,
+    child: FloatingActionButton.small(
+      onPressed: _scrollToBottom,
+      child: const Icon(Icons.keyboard_arrow_down),
+    ),
+  ),
+```
+
+### 32. Адаптивность форм для маленьких экранов
+Для предотвращения overflow на маленьких экранах:
+
+**Принципы:**
+- Убирать `prefixIcon` из полей ввода
+- Использовать `isDense: true` для компактности
+- Использовать `isExpanded: true` для Dropdown
+- Убирать иконки из SegmentedButton
+- Уменьшать отступы между элементами
+
+**Пример компактного поля:**
+```dart
+TextFormField(
+  decoration: InputDecoration(
+    labelText: 'Занятий',
+    isDense: true, // Компактнее
+    // Без prefixIcon
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+)
+```
+
+### 33. Тарифы — только шаблон для автозаполнения
 Тариф (PaymentPlan) используется **только как шаблон** для автозаполнения поля "Занятия" при создании оплаты.
 
 **Логика оплаты:**
@@ -628,7 +786,7 @@ final plansAsync = ref.watch(paymentPlansProvider(institutionId));
 - `lib/features/payment_plans/providers/payment_plan_provider.dart` — единственный источник `paymentPlansProvider`
 - `lib/features/payments/providers/payment_provider.dart` — `PaymentController.create()` без создания подписки
 
-### 30. Realtime обновление баланса ученика
+### 34. Realtime обновление баланса ученика
 После любых операций с оплатами баланс ученика (предоплаченные занятия) обновляется в реальном времени.
 
 **Инвалидируемые провайдеры в `PaymentController`:**
@@ -646,7 +804,7 @@ _ref.invalidate(paymentsStreamProvider(institutionId)); // Realtime stream
 - `deleteByLessonId()` — удаление оплаты по ID занятия
 - `createFamilyPayment()` — создание семейного абонемента (для всех участников)
 
-### 31. Расчёт "Итого" на экране оплат
+### 35. Расчёт "Итого" на экране оплат
 "Итого" рассчитывается из **видимых** оплат с учётом прав пользователя.
 
 **Логика:**
