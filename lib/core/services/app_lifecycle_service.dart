@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Сервис управления жизненным циклом приложения
@@ -103,24 +104,26 @@ class AppLifecycleService with WidgetsBindingObserver {
         return;
       }
 
-      // Проверяем, не истёк ли токен
+      // Проверяем, не истёк ли токен или скоро истечёт
       final expiresAt = session.expiresAt;
       if (expiresAt != null) {
         final expiresAtDate = DateTime.fromMillisecondsSinceEpoch(expiresAt * 1000);
         final now = DateTime.now();
+        final difference = expiresAtDate.difference(now);
 
-        // Если токен истекает в течение 5 минут — обновляем
-        if (expiresAtDate.difference(now).inMinutes < 5) {
-          debugPrint('[AppLifecycle] Token expiring soon, refreshing...');
-          await client.auth.refreshSession();
-          debugPrint('[AppLifecycle] Session refreshed successfully');
+        // Если токен истёк или истекает в течение 10 минут — обновляем
+        if (difference.inMinutes < 10) {
+          debugPrint('[AppLifecycle] Token expired or expiring soon, refreshing...');
+          await SupabaseConfig.tryRecoverSession();
         } else {
-          debugPrint('[AppLifecycle] Token still valid');
+          debugPrint('[AppLifecycle] Token still valid for ${difference.inMinutes} min');
         }
+      } else {
+        // Нет информации об истечении — обновляем на всякий случай
+        await SupabaseConfig.tryRecoverSession();
       }
     } catch (e) {
       debugPrint('[AppLifecycle] Error refreshing session: $e');
-      // Не критичная ошибка — продолжаем работу
     }
   }
 

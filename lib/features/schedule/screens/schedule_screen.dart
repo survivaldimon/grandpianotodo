@@ -1014,7 +1014,7 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
     final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsProvider(widget.institutionId));
     final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
-    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
     final controllerState = ref.watch(lessonControllerProvider);
 
     ref.listen(lessonControllerProvider, (prev, next) {
@@ -1451,7 +1451,7 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
       if (lastLesson != null && mounted) {
         final subjectsAsync = ref.read(subjectsProvider(widget.institutionId));
         final lessonTypesAsync = ref.read(lessonTypesProvider(widget.institutionId));
-        final membersAsync = ref.read(membersProvider(widget.institutionId));
+        final membersAsync = ref.read(membersStreamProvider(widget.institutionId));
 
         setState(() {
           // Автозаполнение предмета

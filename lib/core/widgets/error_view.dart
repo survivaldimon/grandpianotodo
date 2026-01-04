@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/services/app_lifecycle_service.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
@@ -127,7 +128,10 @@ class ErrorView extends StatelessWidget {
             if (showRetryButton) ...[
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: () {
+                onPressed: () async {
+                  // Сначала пробуем восстановить сессию (на случай истёкшего токена)
+                  await SupabaseConfig.tryRecoverSession();
+
                   if (onRetry != null) {
                     onRetry!();
                   } else {

@@ -1810,7 +1810,7 @@ class _TeachersSection extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => Consumer(
         builder: (context, ref, _) {
-          final membersAsync = ref.watch(membersProvider(institutionId));
+          final membersAsync = ref.watch(membersStreamProvider(institutionId));
           final existingTeachers = ref.watch(studentTeachersProvider(studentId)).valueOrNull ?? [];
           final existingIds = existingTeachers.map((t) => t.userId).toSet();
 
