@@ -14,6 +14,11 @@ class GeneralStats {
   final double roomHours;
   final double avgLessonCost; // Средняя стоимость занятия
   final int paidLessonsCount; // Количество оплаченных занятий
+  // Статистика по способам оплаты
+  final double cashTotal; // Сумма наличными
+  final double cardTotal; // Сумма картой
+  final int cashCount; // Количество оплат наличными
+  final int cardCount; // Количество оплат картой
 
   const GeneralStats({
     required this.totalLessons,
@@ -27,6 +32,10 @@ class GeneralStats {
     required this.roomHours,
     required this.avgLessonCost,
     required this.paidLessonsCount,
+    this.cashTotal = 0,
+    this.cardTotal = 0,
+    this.cashCount = 0,
+    this.cardCount = 0,
   });
 }
 
@@ -92,6 +101,11 @@ class PaymentPlanStats {
   final int purchaseCount;
   final double totalAmount;
   final int totalLessons;
+  // Статистика по способам оплаты
+  final double cashTotal;
+  final double cardTotal;
+  final int cashCount;
+  final int cardCount;
 
   const PaymentPlanStats({
     this.planId,
@@ -99,6 +113,10 @@ class PaymentPlanStats {
     required this.purchaseCount,
     required this.totalAmount,
     required this.totalLessons,
+    this.cashTotal = 0,
+    this.cardTotal = 0,
+    this.cashCount = 0,
+    this.cardCount = 0,
   });
 }
 
@@ -169,7 +187,7 @@ class StatisticsRepository {
       // Получаем оплаты за период
       final paymentsData = await _client
           .from('payments')
-          .select('id, amount, comment, lessons_count')
+          .select('id, amount, comment, lessons_count, payment_method')
           .eq('institution_id', institutionId)
           .gte('paid_at', startDate.toIso8601String())
           .lte('paid_at', endDate.toIso8601String());
@@ -177,6 +195,11 @@ class StatisticsRepository {
       double totalPayments = 0;
       double totalDiscounts = 0;
       int discountedPaymentsCount = 0;
+      // Статистика по способам оплаты
+      double cashTotal = 0;
+      double cardTotal = 0;
+      int cashCount = 0;
+      int cardCount = 0;
 
       // Регулярка для парсинга скидки из комментария: "Скидка: 2000 ₸"
       final discountRegex = RegExp(r'Скидка:\s*(\d+(?:\.\d+)?)\s*₸?');
@@ -187,7 +210,17 @@ class StatisticsRepository {
       for (final p in paymentsData as List) {
         final amount = (p['amount'] as num).toDouble();
         final lessonsCount = p['lessons_count'] as int? ?? 1;
+        final paymentMethod = p['payment_method'] as String? ?? 'cash';
         totalPayments += amount;
+
+        // Статистика по способам оплаты
+        if (paymentMethod == 'card') {
+          cardTotal += amount;
+          cardCount++;
+        } else {
+          cashTotal += amount;
+          cashCount++;
+        }
 
         // Сохраняем стоимость за занятие
         paymentCostMap[p['id'] as String] = lessonsCount > 0 ? amount / lessonsCount : 0;
@@ -281,6 +314,10 @@ class StatisticsRepository {
         roomHours: roomHours,
         avgLessonCost: avgLessonCost,
         paidLessonsCount: paidLessonsCount,
+        cashTotal: cashTotal,
+        cardTotal: cardTotal,
+        cashCount: cashCount,
+        cardCount: cardCount,
       );
     } catch (e) {
       throw DatabaseException('Ошибка загрузки статистики: $e');
@@ -618,7 +655,7 @@ class StatisticsRepository {
       // Получаем оплаты за период с тарифами
       final paymentsData = await _client
           .from('payments')
-          .select('id, amount, lessons_count, payment_plan_id, comment, payment_plans(id, name)')
+          .select('id, amount, lessons_count, payment_plan_id, payment_method, comment, payment_plans(id, name)')
           .eq('institution_id', institutionId)
           .gte('paid_at', startDate.toIso8601String())
           .lte('paid_at', endDate.toIso8601String());
@@ -631,6 +668,8 @@ class StatisticsRepository {
         final planId = payment['payment_plan_id'] as String?;
         final plan = payment['payment_plans'] as Map<String, dynamic>?;
         final comment = payment['comment'] as String?;
+        final paymentMethod = payment['payment_method'] as String? ?? 'cash';
+        final amount = (payment['amount'] as num).toDouble();
 
         // Определяем название: тариф, тип занятия из comment, или "Свой вариант"
         String planName;
@@ -655,13 +694,25 @@ class StatisticsRepository {
             'count': 0,
             'amount': 0.0,
             'lessons': 0,
+            'cashTotal': 0.0,
+            'cardTotal': 0.0,
+            'cashCount': 0,
+            'cardCount': 0,
           };
         }
         planData[groupKey]!['count'] = (planData[groupKey]!['count'] as int) + 1;
-        planData[groupKey]!['amount'] =
-            (planData[groupKey]!['amount'] as double) + (payment['amount'] as num).toDouble();
+        planData[groupKey]!['amount'] = (planData[groupKey]!['amount'] as double) + amount;
         planData[groupKey]!['lessons'] =
             (planData[groupKey]!['lessons'] as int) + (payment['lessons_count'] as int);
+
+        // Статистика по способам оплаты
+        if (paymentMethod == 'card') {
+          planData[groupKey]!['cardTotal'] = (planData[groupKey]!['cardTotal'] as double) + amount;
+          planData[groupKey]!['cardCount'] = (planData[groupKey]!['cardCount'] as int) + 1;
+        } else {
+          planData[groupKey]!['cashTotal'] = (planData[groupKey]!['cashTotal'] as double) + amount;
+          planData[groupKey]!['cashCount'] = (planData[groupKey]!['cashCount'] as int) + 1;
+        }
       }
 
       return planData.entries.map((e) {
@@ -671,6 +722,10 @@ class StatisticsRepository {
           purchaseCount: e.value['count'] as int,
           totalAmount: e.value['amount'] as double,
           totalLessons: e.value['lessons'] as int,
+          cashTotal: e.value['cashTotal'] as double,
+          cardTotal: e.value['cardTotal'] as double,
+          cashCount: e.value['cashCount'] as int,
+          cardCount: e.value['cardCount'] as int,
         );
       }).toList()
         ..sort((a, b) => b.purchaseCount.compareTo(a.purchaseCount));

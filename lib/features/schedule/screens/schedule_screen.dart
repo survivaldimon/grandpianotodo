@@ -25,6 +25,7 @@ import 'package:kabinet/shared/models/subscription.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
+import 'package:kabinet/core/widgets/ios_time_picker.dart';
 
 /// Экран расписания кабинета
 class ScheduleScreen extends ConsumerStatefulWidget {
@@ -1068,9 +1069,10 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                     label: 'Начало',
                     time: _startTime,
                     onTap: () async {
-                      final time = await showTimePicker(
+                      final time = await showIosTimePicker(
                         context: context,
                         initialTime: _startTime,
+                        minuteInterval: 5,
                       );
                       if (time != null) {
                         setState(() {
@@ -1091,9 +1093,10 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                     label: 'Конец',
                     time: _endTime,
                     onTap: () async {
-                      final time = await showTimePicker(
+                      final time = await showIosTimePicker(
                         context: context,
                         initialTime: _endTime,
+                        minuteInterval: 5,
                       );
                       if (time != null) {
                         setState(() => _endTime = time);

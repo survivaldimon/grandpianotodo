@@ -504,9 +504,74 @@ class _GeneralTab extends ConsumerWidget {
               ),
             ],
           ),
+
+          // Способы оплаты (если есть оплаты)
+          if (stats.cashCount > 0 || stats.cardCount > 0) ...[
+            const SizedBox(height: 24),
+            _SectionTitle(title: 'Способы оплаты'),
+            _StatsGrid(
+              items: [
+                _StatItem(
+                  label: 'Карта',
+                  value: _formatMoney(stats.cardTotal),
+                  icon: Icons.credit_card,
+                  color: AppColors.primary,
+                ),
+                _StatItem(
+                  label: 'Наличные',
+                  value: _formatMoney(stats.cashTotal),
+                  icon: Icons.payments_outlined,
+                  color: AppColors.success,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Детализация по количеству и процентам
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.credit_card, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Карта: ${stats.cardCount} оплат (${_calcPercent(stats.cardTotal, stats.totalPayments)}%)',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.payments_outlined, color: AppColors.success, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Наличные: ${stats.cashCount} оплат (${_calcPercent(stats.cashTotal, stats.totalPayments)}%)',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _calcPercent(double part, double total) {
+    if (total <= 0) return '0';
+    return ((part / total) * 100).toStringAsFixed(0);
   }
 
   String _formatMoney(double amount) {
@@ -1077,6 +1142,70 @@ class _PaymentPlansTab extends ConsumerWidget {
               ),
             ],
 
+            // Способы оплаты (общие итоги)
+            Builder(
+              builder: (context) {
+                final totalCashTotal = stats.fold<double>(0, (sum, s) => sum + s.cashTotal);
+                final totalCardTotal = stats.fold<double>(0, (sum, s) => sum + s.cardTotal);
+                final totalCashCount = stats.fold<int>(0, (sum, s) => sum + s.cashCount);
+                final totalCardCount = stats.fold<int>(0, (sum, s) => sum + s.cardCount);
+
+                if (totalCashCount == 0 && totalCardCount == 0) {
+                  return const SizedBox.shrink();
+                }
+
+                return Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.credit_card, color: AppColors.primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Способы оплаты',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _SummaryItem(
+                                label: 'Карта ($totalCardCount)',
+                                value: _formatMoney(totalCardTotal),
+                                icon: Icons.credit_card,
+                                color: AppColors.primary,
+                              ),
+                              _SummaryItem(
+                                label: 'Наличные ($totalCashCount)',
+                                value: _formatMoney(totalCashTotal),
+                                icon: Icons.payments_outlined,
+                                color: AppColors.success,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+
             const SizedBox(height: 24),
             const _SectionTitle(title: 'По тарифам'),
             const SizedBox(height: 8),
@@ -1252,6 +1381,57 @@ class _PaymentPlanStatCard extends StatelessWidget {
                             fontSize: 15,
                           ),
                         ),
+                      ],
+                    ),
+                  ],
+                  // Способы оплаты для этого тарифа
+                  if (stat.cashCount > 0 || stat.cardCount > 0) ...[
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (stat.cardCount > 0) ...[
+                          const Icon(Icons.credit_card, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            formatter.format(stat.cardTotal),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.primary,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            ' (${stat.cardCount})',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        if (stat.cardCount > 0 && stat.cashCount > 0)
+                          const SizedBox(width: 16),
+                        if (stat.cashCount > 0) ...[
+                          const Icon(Icons.payments_outlined, size: 16, color: AppColors.success),
+                          const SizedBox(width: 4),
+                          Text(
+                            formatter.format(stat.cashTotal),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.success,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            ' (${stat.cashCount})',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],

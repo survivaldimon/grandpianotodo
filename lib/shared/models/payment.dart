@@ -13,6 +13,7 @@ class Payment {
   final int lessonsCount; // Может быть отрицательным для корректировок
   final bool isCorrection; // Флаг корректирующей записи
   final String? correctionReason; // Причина корректировки (обязательна если isCorrection=true)
+  final String paymentMethod; // Способ оплаты: 'cash' (наличные) или 'card' (карта)
   final DateTime paidAt;
   final String recordedBy;
   final String? comment;
@@ -33,6 +34,7 @@ class Payment {
     required this.lessonsCount,
     this.isCorrection = false,
     this.correctionReason,
+    this.paymentMethod = 'cash',
     required this.paidAt,
     required this.recordedBy,
     this.comment,
@@ -42,6 +44,15 @@ class Payment {
     this.recordedByProfile,
     this.subscription,
   });
+
+  /// Оплата наличными?
+  bool get isCash => paymentMethod == 'cash';
+
+  /// Оплата картой?
+  bool get isCard => paymentMethod == 'card';
+
+  /// Отображаемое название способа оплаты
+  String get paymentMethodLabel => isCard ? 'Карта' : 'Наличные';
 
   /// Это семейный абонемент?
   bool get isFamilySubscription => subscription?.isFamilySubscription ?? false;
@@ -74,6 +85,7 @@ class Payment {
       lessonsCount: json['lessons_count'] as int,
       isCorrection: json['is_correction'] as bool? ?? false,
       correctionReason: json['correction_reason'] as String?,
+      paymentMethod: json['payment_method'] as String? ?? 'cash', // Fallback для старых записей
       paidAt: DateTime.parse(json['paid_at'] as String),
       recordedBy: json['recorded_by'] as String,
       comment: json['comment'] as String?,
@@ -100,6 +112,7 @@ class Payment {
         'lessons_count': lessonsCount,
         'is_correction': isCorrection,
         'correction_reason': correctionReason,
+        'payment_method': paymentMethod,
         'paid_at': paidAt.toIso8601String(),
         'recorded_by': recordedBy,
         'comment': comment,

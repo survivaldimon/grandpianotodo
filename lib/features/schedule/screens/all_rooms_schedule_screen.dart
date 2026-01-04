@@ -24,6 +24,7 @@ import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
+import 'package:kabinet/core/widgets/ios_time_picker.dart';
 import 'package:kabinet/features/bookings/models/booking.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 
@@ -2846,9 +2847,10 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 Expanded(
                   child: InkWell(
                     onTap: () async {
-                      final time = await showTimePicker(
+                      final time = await showIosTimePicker(
                         context: context,
                         initialTime: _startTime,
+                        minuteInterval: 5,
                       );
                       if (time != null) {
                         setState(() {
@@ -2874,9 +2876,10 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 Expanded(
                   child: InkWell(
                     onTap: () async {
-                      final time = await showTimePicker(
+                      final time = await showIosTimePicker(
                         context: context,
                         initialTime: _endTime,
+                        minuteInterval: 5,
                       );
                       if (time != null) {
                         setState(() => _endTime = time);
@@ -3469,9 +3472,10 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                 Expanded(
                   child: InkWell(
                     onTap: () async {
-                      final time = await showTimePicker(
+                      final time = await showIosTimePicker(
                         context: context,
                         initialTime: _startTime,
+                        minuteInterval: 5,
                       );
                       if (time != null) {
                         setState(() {
@@ -3501,9 +3505,10 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                 Expanded(
                   child: InkWell(
                     onTap: () async {
-                      final time = await showTimePicker(
+                      final time = await showIosTimePicker(
                         context: context,
                         initialTime: _endTime,
+                        minuteInterval: 5,
                       );
                       if (time != null) {
                         setState(() => _endTime = time);
@@ -5293,9 +5298,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 Expanded(
                   child: InkWell(
                     onTap: () async {
-                      final time = await showTimePicker(
+                      final time = await showIosTimePicker(
                         context: context,
                         initialTime: _startTime,
+                        minuteInterval: 5,
                       );
                       if (time != null) {
                         setState(() {
@@ -5321,9 +5327,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 Expanded(
                   child: InkWell(
                     onTap: () async {
-                      final time = await showTimePicker(
+                      final time = await showIosTimePicker(
                         context: context,
                         initialTime: _endTime,
+                        minuteInterval: 5,
                       );
                       if (time != null) {
                         setState(() => _endTime = time);
@@ -6187,9 +6194,10 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
   }
 
   Future<void> _selectTime({required bool isStart}) async {
-    final picked = await showTimePicker(
+    final picked = await showIosTimePicker(
       context: context,
       initialTime: isStart ? _startTime : _endTime,
+      minuteInterval: 5,
     );
     if (picked != null && mounted) {
       setState(() {

@@ -421,6 +421,7 @@ CREATE TABLE payments (
   lessons_count INT NOT NULL,             -- Может быть отрицательным для корректировок
   is_correction BOOLEAN NOT NULL DEFAULT FALSE,  -- Флаг корректирующей записи
   correction_reason TEXT,                 -- Причина корректировки (обязательна если is_correction=true)
+  payment_method TEXT NOT NULL DEFAULT 'cash',  -- Способ оплаты: 'cash' (наличные) или 'card' (карта)
   paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   recorded_by UUID NOT NULL REFERENCES auth.users(id),
   comment TEXT,
@@ -429,11 +430,14 @@ CREATE TABLE payments (
   -- Причина корректировки обязательна для корректирующих записей
   CONSTRAINT correction_requires_reason CHECK (
     is_correction = FALSE OR correction_reason IS NOT NULL
-  )
+  ),
+  -- Способ оплаты только cash или card
+  CONSTRAINT check_payment_method CHECK (payment_method IN ('cash', 'card'))
 );
 
 CREATE INDEX idx_payments_student ON payments(student_id);
 CREATE INDEX idx_payments_institution_date ON payments(institution_id, paid_at);
+CREATE INDEX idx_payments_payment_method ON payments(payment_method);
 ```
 
 ### subscriptions
