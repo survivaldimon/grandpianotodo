@@ -396,43 +396,25 @@ class InstitutionRepository {
   }
 
   /// Передать права владельца другому участнику
+  /// Использует RPC функцию с SECURITY DEFINER для обхода RLS
   Future<void> transferOwnership(String institutionId, String newOwnerUserId) async {
     if (_userId == null) throw AuthAppException('Пользователь не авторизован');
 
     try {
-      // Проверить, что текущий пользователь - владелец
-      final institution = await getById(institutionId);
-      if (institution.ownerId != _userId) {
+      await _client.rpc('transfer_institution_ownership', params: {
+        'p_institution_id': institutionId,
+        'p_new_owner_id': newOwnerUserId,
+      });
+    } on PostgrestException catch (e) {
+      // Преобразуем ошибки PostgreSQL в понятные пользователю
+      if (e.message.contains('Только владелец')) {
         throw ValidationException('Только владелец может передать права');
-      }
-
-      // Проверить, что новый владелец - участник заведения
-      final newOwnerMember = await _client
-          .from('institution_members')
-          .select()
-          .eq('institution_id', institutionId)
-          .eq('user_id', newOwnerUserId)
-          .isFilter('archived_at', null)
-          .maybeSingle();
-
-      if (newOwnerMember == null) {
+      } else if (e.message.contains('не является участником')) {
         throw ValidationException('Пользователь не является участником заведения');
+      } else if (e.message.contains('не найдено')) {
+        throw ValidationException('Заведение не найдено');
       }
-
-      // Обновить owner_id в таблице institutions
-      await _client
-          .from('institutions')
-          .update({'owner_id': newOwnerUserId})
-          .eq('id', institutionId);
-
-      // Снять статус админа с нового владельца (владелец имеет все права автоматически)
-      await _client
-          .from('institution_members')
-          .update({'is_admin': false})
-          .eq('id', newOwnerMember['id']);
-
-    } on ValidationException {
-      rethrow;
+      throw DatabaseException('Ошибка передачи прав владельца: $e');
     } catch (e) {
       throw DatabaseException('Ошибка передачи прав владельца: $e');
     }

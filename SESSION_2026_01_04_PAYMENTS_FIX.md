@@ -99,6 +99,34 @@ visibleTotal = accessFiltered.fold<double>(0.0, (sum, p) => sum + p.amount);
 
 ---
 
+### 5. Исправление RLS ошибки при передаче прав владельца
+
+**Проблема:** При передаче прав владельца заведения другому участнику появлялась ошибка:
+```
+PostgrestException: new row violates row-level security policy for table "institutions"
+```
+
+**Причина:**
+RLS политика UPDATE для таблицы `institutions`:
+```sql
+WITH CHECK (auth.uid() = owner_id)
+```
+Эта проверка выполняется **после** обновления и проверяет **новое** значение `owner_id`. При передаче прав новый `owner_id` уже не равен `auth.uid()` текущего пользователя.
+
+**Решение:**
+Создана RPC функция `transfer_institution_ownership` с `SECURITY DEFINER` для обхода RLS:
+- Проверяет, что вызывающий пользователь — текущий владелец
+- Проверяет, что новый владелец — участник заведения
+- Обновляет `owner_id` в обход RLS
+- Снимает статус админа с нового владельца (он теперь владелец)
+
+**Изменённые файлы:**
+- `supabase/migrations/20260104_transfer_ownership_rpc.sql` — SQL миграция с RPC функцией
+- `lib/features/institution/repositories/institution_repository.dart` — использование RPC вместо прямого UPDATE
+- `DATABASE.md` — документация RPC функции
+
+---
+
 ## Технические детали
 
 ### Архитектура провайдеров тарифов (после рефакторинга)
@@ -138,3 +166,4 @@ _ref.invalidate(paymentsStreamProvider(institutionId)); // Realtime stream
 | Баланс не обновляется после удаления оплаты | ✅ Исправлено |
 | Тарифы не обновляются в realtime | ✅ Исправлено |
 | "Итого" показывает все оплаты вместо видимых | ✅ Исправлено |
+| RLS ошибка при передаче прав владельца | ✅ Исправлено |
