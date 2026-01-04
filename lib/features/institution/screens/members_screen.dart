@@ -24,15 +24,11 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
   @override
   void initState() {
     super.initState();
-    // Обновляем список участников при открытии экрана
-    Future.microtask(() {
-      ref.invalidate(membersProvider(widget.institutionId));
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
     final currentUserId = ref.watch(currentUserIdProvider);
 
@@ -44,7 +40,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorView.fromException(
           e,
-          onRetry: () => ref.invalidate(membersProvider(widget.institutionId)),
+          onRetry: () => ref.invalidate(membersStreamProvider(widget.institutionId)),
         ),
         data: (members) {
           if (members.isEmpty) {
@@ -386,7 +382,7 @@ class _MemberTile extends ConsumerWidget {
     try {
       final repo = ref.read(institutionRepositoryProvider);
       await repo.updateMemberRole(member.id, newRole);
-      ref.invalidate(membersProvider(institutionId));
+      ref.invalidate(membersStreamProvider(institutionId));
     } catch (e) {
       // Error handling
     }
@@ -499,7 +495,7 @@ class _MemberTile extends ConsumerWidget {
     try {
       final repo = ref.read(institutionRepositoryProvider);
       await repo.removeMember(member.id);
-      ref.invalidate(membersProvider(institutionId));
+      ref.invalidate(membersStreamProvider(institutionId));
     } catch (e) {
       // Error handling
     }
@@ -603,7 +599,7 @@ class _MemberTile extends ConsumerWidget {
       await repo.transferOwnership(institutionId, member.userId);
 
       // Инвалидируем провайдеры
-      ref.invalidate(membersProvider(institutionId));
+      ref.invalidate(membersStreamProvider(institutionId));
       ref.invalidate(currentInstitutionProvider(institutionId));
       ref.invalidate(currentInstitutionStreamProvider(institutionId));
       ref.invalidate(myMembershipProvider(institutionId));

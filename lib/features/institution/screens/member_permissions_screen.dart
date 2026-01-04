@@ -80,7 +80,7 @@ class _MemberPermissionsScreenState
         repo.updateMemberPermissions(widget.memberId, _permissions),
         if (_isOwnerViewing) repo.updateMemberAdminStatus(widget.memberId, _isAdmin),
       ]);
-      ref.invalidate(membersProvider(widget.institutionId));
+      ref.invalidate(membersStreamProvider(widget.institutionId));
       // Инвалидируем права для обновления по всему приложению
       ref.invalidate(myMembershipProvider(widget.institutionId));
 

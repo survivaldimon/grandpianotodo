@@ -978,7 +978,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
 
     return Container(

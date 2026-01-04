@@ -8,6 +8,7 @@ import 'package:kabinet/core/services/app_lifecycle_service.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
+import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
@@ -41,7 +42,7 @@ class _MainShellState extends ConsumerState<MainShell>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 150),
     );
 
     // Настраиваем callback для обновления данных при возврате из фона
@@ -75,6 +76,9 @@ class _MainShellState extends ConsumerState<MainShell>
 
     // Инвалидируем провайдеры учеников
     ref.invalidate(studentsProvider(institutionId));
+
+    // Инвалидируем провайдеры участников
+    ref.invalidate(membersStreamProvider(institutionId));
 
     // Инвалидируем провайдеры бронирований
     final today = DateTime.now();
@@ -147,11 +151,11 @@ class _MainShellState extends ConsumerState<MainShell>
 
     setState(() {
       _slideAnimation = Tween<Offset>(
-        begin: Offset(goingToHigherIndex ? 1.0 : -1.0, 0.0),
+        begin: Offset(goingToHigherIndex ? 0.3 : -0.3, 0.0), // Меньшее смещение = быстрее
         end: Offset.zero,
       ).animate(CurvedAnimation(
         parent: _animationController,
-        curve: Curves.easeOutCubic,
+        curve: Curves.easeOut,
       ));
     });
 

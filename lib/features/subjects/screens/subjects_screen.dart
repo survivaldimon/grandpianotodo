@@ -35,7 +35,7 @@ class SubjectsScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => _showAddDialog(context, ref),
+            onPressed: () => _showAddSheet(context, ref),
           ),
         ],
       ),
@@ -52,7 +52,7 @@ class SubjectsScreen extends ConsumerWidget {
               title: 'Нет предметов',
               subtitle: 'Добавьте первый предмет',
               action: ElevatedButton.icon(
-                onPressed: () => _showAddDialog(context, ref),
+                onPressed: () => _showAddSheet(context, ref),
                 icon: const Icon(Icons.add),
                 label: const Text('Добавить'),
               ),
@@ -71,7 +71,7 @@ class SubjectsScreen extends ConsumerWidget {
                 final subject = subjects[index];
                 return _SubjectCard(
                   subject: subject,
-                  onEdit: () => _showEditDialog(context, ref, subject),
+                  onEdit: () => _showEditSheet(context, ref, subject),
                   onDelete: () => _confirmDelete(context, ref, subject),
                 );
               },
@@ -82,126 +82,27 @@ class SubjectsScreen extends ConsumerWidget {
     );
   }
 
-  void _showAddDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    String? selectedColor;
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
+  void _showAddSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Новый предмет'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Название',
-                      hintText: 'Например: Фортепиано',
-                    ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Введите название' : null,
-                  ),
-                  const SizedBox(height: 24),
-                  _ColorPicker(
-                    selectedColor: selectedColor,
-                    onColorSelected: (color) =>
-                        setState(() => selectedColor = color),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  final controller =
-                      ref.read(subjectControllerProvider.notifier);
-                  final subject = await controller.create(
-                    institutionId: institutionId,
-                    name: nameController.text.trim(),
-                    color: selectedColor,
-                  );
-                  if (subject != null && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                }
-              },
-              child: const Text('Создать'),
-            ),
-          ],
-        ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _SubjectFormSheet(
+        institutionId: institutionId,
+        ref: ref,
       ),
     );
   }
 
-  void _showEditDialog(BuildContext context, WidgetRef ref, Subject subject) {
-    final nameController = TextEditingController(text: subject.name);
-    String? selectedColor = subject.color;
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
+  void _showEditSheet(BuildContext context, WidgetRef ref, Subject subject) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Редактировать предмет'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Название'),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Введите название' : null,
-                  ),
-                  const SizedBox(height: 24),
-                  _ColorPicker(
-                    selectedColor: selectedColor,
-                    onColorSelected: (color) =>
-                        setState(() => selectedColor = color),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  final controller =
-                      ref.read(subjectControllerProvider.notifier);
-                  final success = await controller.update(
-                    id: subject.id,
-                    institutionId: institutionId,
-                    name: nameController.text.trim(),
-                    color: selectedColor,
-                  );
-                  if (success && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                }
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
-        ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _SubjectFormSheet(
+        institutionId: institutionId,
+        ref: ref,
+        subject: subject,
       ),
     );
   }
@@ -236,6 +137,231 @@ class SubjectsScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// BottomSheet форма для создания/редактирования предмета
+class _SubjectFormSheet extends StatefulWidget {
+  final String institutionId;
+  final WidgetRef ref;
+  final Subject? subject;
+
+  const _SubjectFormSheet({
+    required this.institutionId,
+    required this.ref,
+    this.subject,
+  });
+
+  @override
+  State<_SubjectFormSheet> createState() => _SubjectFormSheetState();
+}
+
+class _SubjectFormSheetState extends State<_SubjectFormSheet> {
+  late final TextEditingController _nameController;
+  String? _selectedColor;
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+
+  bool get _isEditing => widget.subject != null;
+
+  static const _colors = [
+    '#4CAF50', // Green
+    '#2196F3', // Blue
+    '#FF9800', // Orange
+    '#9C27B0', // Purple
+    '#F44336', // Red
+    '#00BCD4', // Cyan
+    '#795548', // Brown
+    '#607D8B', // Blue Grey
+    '#E91E63', // Pink
+    '#009688', // Teal
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.subject?.name ?? '');
+    _selectedColor = widget.subject?.color;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final controller = widget.ref.read(subjectControllerProvider.notifier);
+
+    bool success = false;
+    if (_isEditing) {
+      success = await controller.update(
+        id: widget.subject!.id,
+        institutionId: widget.institutionId,
+        name: _nameController.text.trim(),
+        color: _selectedColor,
+      );
+    } else {
+      final subject = await controller.create(
+        institutionId: widget.institutionId,
+        name: _nameController.text.trim(),
+        color: _selectedColor,
+      );
+      success = subject != null;
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (success) {
+        Navigator.pop(context);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Индикатор перетаскивания
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                // Заголовок с иконкой
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.music_note,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _isEditing ? 'Редактировать предмет' : 'Новый предмет',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 24),
+
+                // Поле названия
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Название',
+                    hintText: 'Например: Фортепиано',
+                    prefixIcon: const Icon(Icons.edit_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Введите название' : null,
+                  textCapitalization: TextCapitalization.sentences,
+                  autofocus: !_isEditing,
+                ),
+                const SizedBox(height: 24),
+
+                // Выбор цвета
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Цвет',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: _colors.map((colorHex) {
+                    final color = Color(
+                        int.parse('FF${colorHex.replaceAll('#', '')}', radix: 16));
+                    final isSelected = _selectedColor == colorHex;
+
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedColor = colorHex),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: isSelected
+                              ? Border.all(color: Colors.white, width: 3)
+                              : null,
+                          boxShadow: isSelected
+                              ? [BoxShadow(color: color, blurRadius: 8)]
+                              : null,
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 20)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 32),
+
+                // Кнопка сохранения
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_isEditing ? 'Сохранить' : 'Создать'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -295,74 +421,6 @@ class _SubjectCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ColorPicker extends StatelessWidget {
-  final String? selectedColor;
-  final ValueChanged<String> onColorSelected;
-
-  const _ColorPicker({
-    required this.selectedColor,
-    required this.onColorSelected,
-  });
-
-  static const colors = [
-    '#4CAF50', // Green
-    '#2196F3', // Blue
-    '#FF9800', // Orange
-    '#9C27B0', // Purple
-    '#F44336', // Red
-    '#00BCD4', // Cyan
-    '#795548', // Brown
-    '#607D8B', // Blue Grey
-    '#E91E63', // Pink
-    '#009688', // Teal
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Цвет',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: colors.map((colorHex) {
-            final color = Color(int.parse('FF${colorHex.replaceAll('#', '')}', radix: 16));
-            final isSelected = selectedColor == colorHex;
-
-            return GestureDetector(
-              onTap: () => onColorSelected(colorHex),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: isSelected
-                      ? Border.all(color: Colors.white, width: 3)
-                      : null,
-                  boxShadow: isSelected
-                      ? [BoxShadow(color: color, blurRadius: 8)]
-                      : null,
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, color: Colors.white, size: 20)
-                    : null,
-              ),
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 }

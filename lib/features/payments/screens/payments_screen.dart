@@ -757,7 +757,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     // Получаем данные для фильтров
     final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
-    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
     final plansAsync = ref.watch(paymentPlansProvider(widget.institutionId));
 
     // Загружаем связи для фильтрации

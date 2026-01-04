@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Конфигурация Supabase
@@ -9,7 +10,36 @@ class SupabaseConfig {
     await Supabase.initialize(
       url: supabaseUrl,
       anonKey: supabaseAnonKey,
+      authOptions: const FlutterAuthClientOptions(
+        // Автоматическое обновление токена перед истечением
+        autoRefreshToken: true,
+      ),
     );
+
+    // Слушаем события авторизации для логирования
+    client.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      debugPrint('[Supabase] Auth event: $event');
+    });
+  }
+
+  /// Попытка восстановить сессию (вызывать при ошибках авторизации)
+  static Future<bool> tryRecoverSession() async {
+    try {
+      final session = client.auth.currentSession;
+      if (session == null) {
+        debugPrint('[Supabase] No session to recover');
+        return false;
+      }
+
+      // Принудительно обновляем токен
+      await client.auth.refreshSession();
+      debugPrint('[Supabase] Session recovered successfully');
+      return true;
+    } catch (e) {
+      debugPrint('[Supabase] Failed to recover session: $e');
+      return false;
+    }
   }
 
   static SupabaseClient get client => Supabase.instance.client;

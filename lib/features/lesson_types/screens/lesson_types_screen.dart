@@ -35,7 +35,7 @@ class LessonTypesScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => _showAddDialog(context, ref),
+            onPressed: () => _showAddSheet(context, ref),
           ),
         ],
       ),
@@ -52,7 +52,7 @@ class LessonTypesScreen extends ConsumerWidget {
               title: 'Нет типов занятий',
               subtitle: 'Добавьте первый тип занятия',
               action: ElevatedButton.icon(
-                onPressed: () => _showAddDialog(context, ref),
+                onPressed: () => _showAddSheet(context, ref),
                 icon: const Icon(Icons.add),
                 label: const Text('Добавить'),
               ),
@@ -71,7 +71,7 @@ class LessonTypesScreen extends ConsumerWidget {
                 final lessonType = lessonTypes[index];
                 return _LessonTypeCard(
                   lessonType: lessonType,
-                  onEdit: () => _showEditDialog(context, ref, lessonType),
+                  onEdit: () => _showEditSheet(context, ref, lessonType),
                   onDelete: () => _confirmDelete(context, ref, lessonType),
                 );
               },
@@ -82,200 +82,28 @@ class LessonTypesScreen extends ConsumerWidget {
     );
   }
 
-  void _showAddDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final durationController = TextEditingController(text: '60');
-    final priceController = TextEditingController();
-    bool isGroup = false;
-    String? selectedColor;
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
+  void _showAddSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Новый тип занятия'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Название'),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Введите название' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: durationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Длительность (минут)',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Введите длительность';
-                      final num = int.tryParse(v);
-                      if (num == null || num <= 0) return 'Некорректное значение';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: priceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Цена по умолчанию (необязательно)',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('Групповое занятие'),
-                    value: isGroup,
-                    onChanged: (v) => setState(() => isGroup = v),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  const SizedBox(height: 16),
-                  _ColorPicker(
-                    selectedColor: selectedColor,
-                    onColorSelected: (color) =>
-                        setState(() => selectedColor = color),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  final controller =
-                      ref.read(lessonTypeControllerProvider.notifier);
-                  final lessonType = await controller.create(
-                    institutionId: institutionId,
-                    name: nameController.text.trim(),
-                    defaultDurationMinutes: int.parse(durationController.text),
-                    defaultPrice: priceController.text.isNotEmpty
-                        ? double.tryParse(priceController.text)
-                        : null,
-                    isGroup: isGroup,
-                    color: selectedColor,
-                  );
-                  if (lessonType != null && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                }
-              },
-              child: const Text('Создать'),
-            ),
-          ],
-        ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _LessonTypeFormSheet(
+        institutionId: institutionId,
+        ref: ref,
       ),
     );
   }
 
-  void _showEditDialog(
+  void _showEditSheet(
       BuildContext context, WidgetRef ref, LessonType lessonType) {
-    final nameController = TextEditingController(text: lessonType.name);
-    final durationController =
-        TextEditingController(text: lessonType.defaultDurationMinutes.toString());
-    final priceController = TextEditingController(
-        text: lessonType.defaultPrice?.toString() ?? '');
-    bool isGroup = lessonType.isGroup;
-    String? selectedColor = lessonType.color;
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Редактировать тип занятия'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Название'),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Введите название' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: durationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Длительность (минут)',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Введите длительность';
-                      final num = int.tryParse(v);
-                      if (num == null || num <= 0) return 'Некорректное значение';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: priceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Цена по умолчанию (необязательно)',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('Групповое занятие'),
-                    value: isGroup,
-                    onChanged: (v) => setState(() => isGroup = v),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  const SizedBox(height: 16),
-                  _ColorPicker(
-                    selectedColor: selectedColor,
-                    onColorSelected: (color) =>
-                        setState(() => selectedColor = color),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  final controller =
-                      ref.read(lessonTypeControllerProvider.notifier);
-                  final success = await controller.update(
-                    id: lessonType.id,
-                    institutionId: institutionId,
-                    name: nameController.text.trim(),
-                    defaultDurationMinutes: int.parse(durationController.text),
-                    defaultPrice: priceController.text.isNotEmpty
-                        ? double.tryParse(priceController.text)
-                        : null,
-                    isGroup: isGroup,
-                    color: selectedColor,
-                  );
-                  if (success && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                }
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
-        ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _LessonTypeFormSheet(
+        institutionId: institutionId,
+        ref: ref,
+        lessonType: lessonType,
       ),
     );
   }
@@ -312,6 +140,437 @@ class LessonTypesScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// BottomSheet форма для создания/редактирования типа занятия
+class _LessonTypeFormSheet extends StatefulWidget {
+  final String institutionId;
+  final WidgetRef ref;
+  final LessonType? lessonType;
+
+  const _LessonTypeFormSheet({
+    required this.institutionId,
+    required this.ref,
+    this.lessonType,
+  });
+
+  @override
+  State<_LessonTypeFormSheet> createState() => _LessonTypeFormSheetState();
+}
+
+class _LessonTypeFormSheetState extends State<_LessonTypeFormSheet> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _customDurationController;
+  int _selectedDuration = 60;
+  bool _isCustomDuration = false;
+  bool _isGroup = false;
+  String? _selectedColor;
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+
+  bool get _isEditing => widget.lessonType != null;
+
+  static const _popularDurations = [30, 45, 60, 90, 120];
+
+  static const _colors = [
+    '#4CAF50', // Green
+    '#2196F3', // Blue
+    '#FF9800', // Orange
+    '#9C27B0', // Purple
+    '#F44336', // Red
+    '#00BCD4', // Cyan
+    '#795548', // Brown
+    '#607D8B', // Blue Grey
+    '#E91E63', // Pink
+    '#009688', // Teal
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController =
+        TextEditingController(text: widget.lessonType?.name ?? '');
+    _priceController = TextEditingController(
+        text: widget.lessonType?.defaultPrice?.toStringAsFixed(0) ?? '');
+
+    final existingDuration = widget.lessonType?.defaultDurationMinutes ?? 60;
+    // Проверяем, является ли существующая длительность нестандартной
+    if (_popularDurations.contains(existingDuration)) {
+      _selectedDuration = existingDuration;
+      _isCustomDuration = false;
+      _customDurationController = TextEditingController();
+    } else {
+      _selectedDuration = existingDuration;
+      _isCustomDuration = true;
+      _customDurationController = TextEditingController(text: existingDuration.toString());
+    }
+
+    _isGroup = widget.lessonType?.isGroup ?? false;
+    _selectedColor = widget.lessonType?.color;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _priceController.dispose();
+    _customDurationController.dispose();
+    super.dispose();
+  }
+
+  int get _effectiveDuration {
+    if (_isCustomDuration) {
+      return int.tryParse(_customDurationController.text) ?? 60;
+    }
+    return _selectedDuration;
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // Дополнительная валидация кастомной длительности
+    if (_isCustomDuration) {
+      final customValue = int.tryParse(_customDurationController.text);
+      if (customValue == null || customValue < 5 || customValue > 480) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Длительность должна быть от 5 до 480 минут'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() => _isLoading = true);
+
+    final controller = widget.ref.read(lessonTypeControllerProvider.notifier);
+
+    bool success = false;
+    if (_isEditing) {
+      success = await controller.update(
+        id: widget.lessonType!.id,
+        institutionId: widget.institutionId,
+        name: _nameController.text.trim(),
+        defaultDurationMinutes: _effectiveDuration,
+        defaultPrice: _priceController.text.isNotEmpty
+            ? double.tryParse(_priceController.text)
+            : null,
+        isGroup: _isGroup,
+        color: _selectedColor,
+      );
+    } else {
+      final lessonType = await controller.create(
+        institutionId: widget.institutionId,
+        name: _nameController.text.trim(),
+        defaultDurationMinutes: _effectiveDuration,
+        defaultPrice: _priceController.text.isNotEmpty
+            ? double.tryParse(_priceController.text)
+            : null,
+        isGroup: _isGroup,
+        color: _selectedColor,
+      );
+      success = lessonType != null;
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (success) {
+        Navigator.pop(context);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Индикатор перетаскивания
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                // Заголовок с иконкой
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.event_note,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _isEditing ? 'Редактировать тип занятия' : 'Новый тип занятия',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 24),
+
+                // Поле названия
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Название',
+                    hintText: 'Например: Индивидуальное',
+                    prefixIcon: const Icon(Icons.edit_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Введите название' : null,
+                  textCapitalization: TextCapitalization.sentences,
+                  autofocus: !_isEditing,
+                ),
+                const SizedBox(height: 20),
+
+                // Выбор длительности
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.timer_outlined, size: 18, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Длительность',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Популярные длительности
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ..._popularDurations.map((duration) {
+                      final isSelected = !_isCustomDuration && _selectedDuration == duration;
+                      return ChoiceChip(
+                        label: Text('$duration мин'),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() {
+                            _selectedDuration = duration;
+                            _isCustomDuration = false;
+                            _customDurationController.clear();
+                          });
+                        },
+                        selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                        labelStyle: TextStyle(
+                          color: isSelected ? AppColors.primary : null,
+                          fontWeight: isSelected ? FontWeight.bold : null,
+                        ),
+                        side: isSelected
+                            ? const BorderSide(color: AppColors.primary, width: 1.5)
+                            : null,
+                        showCheckmark: false,
+                      );
+                    }),
+                    // Chip "Другое"
+                    ChoiceChip(
+                      label: const Text('Другое'),
+                      selected: _isCustomDuration,
+                      onSelected: (_) {
+                        setState(() {
+                          _isCustomDuration = true;
+                        });
+                      },
+                      selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                      labelStyle: TextStyle(
+                        color: _isCustomDuration ? AppColors.primary : null,
+                        fontWeight: _isCustomDuration ? FontWeight.bold : null,
+                      ),
+                      side: _isCustomDuration
+                          ? const BorderSide(color: AppColors.primary, width: 1.5)
+                          : null,
+                      showCheckmark: false,
+                    ),
+                  ],
+                ),
+
+                // Поле ввода кастомной длительности
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  child: _isCustomDuration
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _customDurationController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Своя длительность',
+                                    hintText: 'Введите минуты',
+                                    suffixText: 'мин',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  autofocus: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 16),
+
+                // Поле цены
+                TextFormField(
+                  controller: _priceController,
+                  decoration: InputDecoration(
+                    labelText: 'Цена по умолчанию',
+                    hintText: 'Необязательно',
+                    prefixIcon: const Icon(Icons.payments_outlined),
+                    suffixText: '₸',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+
+                // Переключатель группового занятия
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SwitchListTile(
+                    title: const Text('Групповое занятие'),
+                    subtitle: Text(
+                      _isGroup
+                          ? 'Несколько учеников одновременно'
+                          : 'Один ученик',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                    secondary: Icon(
+                      _isGroup ? Icons.groups : Icons.person,
+                      color: AppColors.primary,
+                    ),
+                    value: _isGroup,
+                    onChanged: (v) => setState(() => _isGroup = v),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Выбор цвета
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Цвет',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: _colors.map((colorHex) {
+                    final color = Color(
+                        int.parse('FF${colorHex.replaceAll('#', '')}', radix: 16));
+                    final isSelected = _selectedColor == colorHex;
+
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedColor = colorHex),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: isSelected
+                              ? Border.all(color: Colors.white, width: 3)
+                              : null,
+                          boxShadow: isSelected
+                              ? [BoxShadow(color: color, blurRadius: 8)]
+                              : null,
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 20)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 32),
+
+                // Кнопка сохранения
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_isEditing ? 'Сохранить' : 'Создать'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -377,72 +636,6 @@ class _LessonTypeCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ColorPicker extends StatelessWidget {
-  final String? selectedColor;
-  final ValueChanged<String> onColorSelected;
-
-  const _ColorPicker({
-    required this.selectedColor,
-    required this.onColorSelected,
-  });
-
-  static const colors = [
-    '#4CAF50', // Green
-    '#2196F3', // Blue
-    '#FF9800', // Orange
-    '#9C27B0', // Purple
-    '#F44336', // Red
-    '#00BCD4', // Cyan
-    '#795548', // Brown
-    '#607D8B', // Blue Grey
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Цвет',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: colors.map((colorHex) {
-            final color = Color(int.parse('FF${colorHex.replaceAll('#', '')}', radix: 16));
-            final isSelected = selectedColor == colorHex;
-
-            return GestureDetector(
-              onTap: () => onColorSelected(colorHex),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: isSelected
-                      ? Border.all(color: Colors.white, width: 3)
-                      : null,
-                  boxShadow: isSelected
-                      ? [BoxShadow(color: color, blurRadius: 8)]
-                      : null,
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, color: Colors.white, size: 20)
-                    : null,
-              ),
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 }
