@@ -3,6 +3,7 @@ import 'package:kabinet/features/students/repositories/student_bindings_reposito
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/student_teacher.dart';
 import 'package:kabinet/shared/models/student_subject.dart';
+import 'package:kabinet/shared/models/student_lesson_type.dart';
 
 /// Провайдер репозитория привязок
 final studentBindingsRepositoryProvider =
@@ -22,6 +23,13 @@ final studentSubjectsProvider =
     FutureProvider.family<List<StudentSubject>, String>((ref, studentId) async {
   final repo = ref.watch(studentBindingsRepositoryProvider);
   return repo.getStudentSubjects(studentId);
+});
+
+/// Провайдер типов занятий ученика
+final studentLessonTypesProvider =
+    FutureProvider.family<List<StudentLessonType>, String>((ref, studentId) async {
+  final repo = ref.watch(studentBindingsRepositoryProvider);
+  return repo.getStudentLessonTypes(studentId);
 });
 
 /// Провайдер последнего занятия ученика (для автозаполнения)
@@ -138,24 +146,65 @@ class StudentBindingsController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// Добавить тип занятия к ученику
+  Future<bool> addLessonType({
+    required String studentId,
+    required String lessonTypeId,
+    required String institutionId,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.addStudentLessonType(
+        studentId: studentId,
+        lessonTypeId: lessonTypeId,
+        institutionId: institutionId,
+      );
+      _ref.invalidate(studentLessonTypesProvider(studentId));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Удалить тип занятия от ученика
+  Future<bool> removeLessonType(String studentId, String lessonTypeId) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.removeStudentLessonType(studentId, lessonTypeId);
+      _ref.invalidate(studentLessonTypesProvider(studentId));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
   /// Автоматически создать привязки при создании занятия
   /// Не блокирует и не выбрасывает ошибки
   Future<void> createBindingsFromLesson({
     required String studentId,
     required String teacherId,
     String? subjectId,
+    String? lessonTypeId,
     required String institutionId,
   }) async {
     await _repo.createBindingsFromLesson(
       studentId: studentId,
       teacherId: teacherId,
       subjectId: subjectId,
+      lessonTypeId: lessonTypeId,
       institutionId: institutionId,
     );
     // Инвалидируем кеш для обновления данных
     _ref.invalidate(studentTeachersProvider(studentId));
     if (subjectId != null) {
       _ref.invalidate(studentSubjectsProvider(studentId));
+    }
+    if (lessonTypeId != null) {
+      _ref.invalidate(studentLessonTypesProvider(studentId));
     }
   }
 }

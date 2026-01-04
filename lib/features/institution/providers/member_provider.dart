@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
+import 'package:kabinet/features/institution/repositories/institution_repository.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 
 /// Провайдер списка участников заведения
@@ -40,4 +41,32 @@ final membersProvider =
   }
 
   return members;
+});
+
+/// Контроллер для операций с участниками
+class MemberController extends StateNotifier<AsyncValue<void>> {
+  final InstitutionRepository _repo;
+  final Ref _ref;
+
+  MemberController(this._repo, this._ref) : super(const AsyncValue.data(null));
+
+  /// Обновить цвет участника
+  Future<bool> updateColor(String memberId, String institutionId, String? color) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.updateMemberColor(memberId, color);
+      _ref.invalidate(membersProvider(institutionId));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+}
+
+/// Провайдер контроллера участников
+final memberControllerProvider =
+    StateNotifierProvider<MemberController, AsyncValue<void>>((ref) {
+  return MemberController(InstitutionRepository(), ref);
 });

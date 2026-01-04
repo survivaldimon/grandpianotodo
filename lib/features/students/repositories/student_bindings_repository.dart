@@ -5,6 +5,7 @@ import 'package:kabinet/core/exceptions/app_exceptions.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/student_teacher.dart';
 import 'package:kabinet/shared/models/student_subject.dart';
+import 'package:kabinet/shared/models/student_lesson_type.dart';
 
 /// Репозиторий для работы с привязками учеников к преподавателям и предметам
 class StudentBindingsRepository {
@@ -183,6 +184,66 @@ class StudentBindingsRepository {
   }
 
   // ============================================
+  // STUDENT LESSON TYPES
+  // ============================================
+
+  /// Получить типы занятий ученика
+  Future<List<StudentLessonType>> getStudentLessonTypes(String studentId) async {
+    try {
+      final data = await _client
+          .from('student_lesson_types')
+          .select('*, lesson_types(*)')
+          .eq('student_id', studentId)
+          .order('created_at');
+
+      return (data as List)
+          .map((item) => StudentLessonType.fromJson(item))
+          .toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки типов занятий ученика: $e');
+    }
+  }
+
+  /// Добавить привязку типа занятия к ученику (upsert)
+  Future<StudentLessonType> addStudentLessonType({
+    required String studentId,
+    required String lessonTypeId,
+    required String institutionId,
+  }) async {
+    try {
+      final data = await _client
+          .from('student_lesson_types')
+          .upsert(
+            {
+              'student_id': studentId,
+              'lesson_type_id': lessonTypeId,
+              'institution_id': institutionId,
+            },
+            onConflict: 'student_id,lesson_type_id',
+          )
+          .select('*, lesson_types(*)')
+          .single();
+
+      return StudentLessonType.fromJson(data);
+    } catch (e) {
+      throw DatabaseException('Ошибка добавления типа занятия: $e');
+    }
+  }
+
+  /// Удалить привязку типа занятия от ученика
+  Future<void> removeStudentLessonType(String studentId, String lessonTypeId) async {
+    try {
+      await _client
+          .from('student_lesson_types')
+          .delete()
+          .eq('student_id', studentId)
+          .eq('lesson_type_id', lessonTypeId);
+    } catch (e) {
+      throw DatabaseException('Ошибка удаления типа занятия: $e');
+    }
+  }
+
+  // ============================================
   // АВТОМАТИЧЕСКОЕ СОЗДАНИЕ ПРИВЯЗОК
   // ============================================
 
@@ -192,6 +253,7 @@ class StudentBindingsRepository {
     required String studentId,
     required String teacherId,
     String? subjectId,
+    String? lessonTypeId,
     required String institutionId,
   }) async {
     try {
@@ -207,6 +269,7 @@ class StudentBindingsRepository {
 
       // Создаём привязку ученик-предмет если предмет указан
       if (subjectId != null) {
+        debugPrint('Creating subject binding: studentId=$studentId, subjectId=$subjectId');
         await _client.from('student_subjects').upsert(
           {
             'student_id': studentId,
@@ -215,11 +278,27 @@ class StudentBindingsRepository {
           },
           onConflict: 'student_id,subject_id',
         );
+        debugPrint('Subject binding created successfully');
       }
-    } catch (e) {
+
+      // Создаём привязку ученик-тип занятия если тип указан
+      if (lessonTypeId != null) {
+        debugPrint('Creating lesson type binding: studentId=$studentId, lessonTypeId=$lessonTypeId');
+        await _client.from('student_lesson_types').upsert(
+          {
+            'student_id': studentId,
+            'lesson_type_id': lessonTypeId,
+            'institution_id': institutionId,
+          },
+          onConflict: 'student_id,lesson_type_id',
+        );
+        debugPrint('Lesson type binding created successfully');
+      }
+    } catch (e, st) {
       // Логируем ошибку, но не прерываем выполнение
       // Привязки - вторичная функция, не должна блокировать создание занятия
-      debugPrint('Warning: Не удалось создать привязки: $e');
+      debugPrint('ERROR: Не удалось создать привязки: $e');
+      debugPrint('Stack trace: $st');
     }
   }
 

@@ -78,26 +78,29 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncValue.loading();
     try {
-      // Проверяем конфликты с другими бронями
-      final bookingConflicts = await _repo.checkBookingConflicts(
-        roomIds: roomIds,
-        date: date,
-        startTime: startTime,
-        endTime: endTime,
-      );
+      // Проверяем оба типа конфликтов параллельно
+      final results = await Future.wait([
+        _repo.checkBookingConflicts(
+          roomIds: roomIds,
+          date: date,
+          startTime: startTime,
+          endTime: endTime,
+        ),
+        _repo.checkLessonConflicts(
+          roomIds: roomIds,
+          date: date,
+          startTime: startTime,
+          endTime: endTime,
+        ),
+      ]);
+
+      final bookingConflicts = results[0];
+      final lessonConflicts = results[1];
 
       if (bookingConflicts.isNotEmpty) {
         throw Exception(
             'Кабинеты уже забронированы в это время: ${bookingConflicts.length} конфликтов');
       }
-
-      // Проверяем конфликты с занятиями
-      final lessonConflicts = await _repo.checkLessonConflicts(
-        roomIds: roomIds,
-        date: date,
-        startTime: startTime,
-        endTime: endTime,
-      );
 
       if (lessonConflicts.isNotEmpty) {
         throw Exception(

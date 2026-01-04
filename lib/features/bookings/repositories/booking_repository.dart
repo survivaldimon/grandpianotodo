@@ -243,31 +243,33 @@ class BookingRepository {
     String? excludeBookingId,
   }) async {
     try {
+      if (roomIds.isEmpty) return [];
+
       final dateStr = date.toIso8601String().split('T').first;
       final startStr = _formatTime(startTime);
       final endStr = _formatTime(endTime);
 
-      final conflictRoomIds = <String>[];
+      // Один запрос для всех кабинетов вместо цикла
+      var query = _client
+          .from('booking_rooms')
+          .select('room_id, bookings!inner(id, date, start_time, end_time, archived_at)')
+          .inFilter('room_id', roomIds)
+          .eq('bookings.date', dateStr)
+          .isFilter('bookings.archived_at', null)
+          .lt('bookings.start_time', endStr)
+          .gt('bookings.end_time', startStr);
 
-      for (final roomId in roomIds) {
-        var query = _client
-            .from('booking_rooms')
-            .select('booking_id, bookings!inner(id, date, start_time, end_time, archived_at)')
-            .eq('room_id', roomId)
-            .eq('bookings.date', dateStr)
-            .isFilter('bookings.archived_at', null)
-            .lt('bookings.start_time', endStr)
-            .gt('bookings.end_time', startStr);
-
-        if (excludeBookingId != null) {
-          query = query.neq('bookings.id', excludeBookingId);
-        }
-
-        final data = await query;
-        if ((data as List).isNotEmpty) {
-          conflictRoomIds.add(roomId);
-        }
+      if (excludeBookingId != null) {
+        query = query.neq('bookings.id', excludeBookingId);
       }
+
+      final data = await query;
+
+      // Собираем уникальные room_id с конфликтами
+      final conflictRoomIds = (data as List)
+          .map((item) => item['room_id'] as String)
+          .toSet()
+          .toList();
 
       return conflictRoomIds;
     } catch (e) {
@@ -284,26 +286,27 @@ class BookingRepository {
     required TimeOfDay endTime,
   }) async {
     try {
+      if (roomIds.isEmpty) return [];
+
       final dateStr = date.toIso8601String().split('T').first;
       final startStr = _formatTime(startTime);
       final endStr = _formatTime(endTime);
 
-      final conflictRoomIds = <String>[];
+      // Один запрос для всех кабинетов вместо цикла
+      final data = await _client
+          .from('lessons')
+          .select('room_id')
+          .inFilter('room_id', roomIds)
+          .eq('date', dateStr)
+          .isFilter('archived_at', null)
+          .lt('start_time', endStr)
+          .gt('end_time', startStr);
 
-      for (final roomId in roomIds) {
-        final data = await _client
-            .from('lessons')
-            .select('id')
-            .eq('room_id', roomId)
-            .eq('date', dateStr)
-            .isFilter('archived_at', null)
-            .lt('start_time', endStr)
-            .gt('end_time', startStr);
-
-        if ((data as List).isNotEmpty) {
-          conflictRoomIds.add(roomId);
-        }
-      }
+      // Собираем уникальные room_id с конфликтами
+      final conflictRoomIds = (data as List)
+          .map((item) => item['room_id'] as String)
+          .toSet()
+          .toList();
 
       return conflictRoomIds;
     } catch (e) {

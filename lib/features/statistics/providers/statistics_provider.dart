@@ -181,3 +181,23 @@ final studentAvgCostProvider =
   final repo = ref.watch(statisticsRepositoryProvider);
   return repo.getStudentAvgLessonCost(studentId: studentId);
 });
+
+/// Провайдер статистики занятий ученика (проведено/отменено)
+final studentLessonStatsProvider =
+    FutureProvider.family<({int completed, int cancelled}), String>((ref, studentId) async {
+  final repo = ref.watch(statisticsRepositoryProvider);
+  return repo.getStudentLessonStats(studentId: studentId);
+});
+
+/// Провайдер статистики занятий всех учеников заведения
+final allStudentsLessonStatsProvider =
+    FutureProvider.family<List<StudentLessonStatusStats>, StatsParams>((ref, params) async {
+  final repo = ref.watch(statisticsRepositoryProvider);
+  final (startDate, endDate) = getPeriodDates(params.period, customRange: params.customRange);
+
+  return repo.getAllStudentsLessonStats(
+    institutionId: params.institutionId,
+    startDate: startDate,
+    endDate: endDate,
+  );
+});

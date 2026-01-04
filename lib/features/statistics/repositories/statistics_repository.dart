@@ -94,6 +94,24 @@ class StudentStats {
   });
 }
 
+/// Статистика занятий ученика (проведено/отменено)
+class StudentLessonStatusStats {
+  final String studentId;
+  final String studentName;
+  final int completedCount;
+  final int cancelledCount;
+
+  const StudentLessonStatusStats({
+    required this.studentId,
+    required this.studentName,
+    required this.completedCount,
+    required this.cancelledCount,
+  });
+
+  int get totalCount => completedCount + cancelledCount;
+  double get cancellationRate => totalCount > 0 ? (cancelledCount / totalCount) * 100 : 0;
+}
+
 /// Статистика по тарифам оплаты
 class PaymentPlanStats {
   final String? planId;
@@ -848,6 +866,91 @@ class StatisticsRepository {
       );
     } catch (e) {
       throw DatabaseException('Ошибка расчёта средней стоимости: $e');
+    }
+  }
+
+  /// Получить статистику занятий ученика (проведено/отменено)
+  Future<({int completed, int cancelled})> getStudentLessonStats({
+    required String studentId,
+  }) async {
+    try {
+      final data = await _client
+          .from('lessons')
+          .select('status')
+          .eq('student_id', studentId)
+          .isFilter('archived_at', null);
+
+      final lessons = data as List;
+      final completed = lessons.where((l) => l['status'] == 'completed').length;
+      final cancelled = lessons.where((l) => l['status'] == 'cancelled').length;
+
+      return (completed: completed, cancelled: cancelled);
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки статистики занятий: $e');
+    }
+  }
+
+  /// Получить статистику занятий всех учеников заведения
+  Future<List<StudentLessonStatusStats>> getAllStudentsLessonStats({
+    required String institutionId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      var query = _client
+          .from('lessons')
+          .select('student_id, status, students(id, name)')
+          .eq('institution_id', institutionId)
+          .isFilter('archived_at', null)
+          .not('student_id', 'is', null);
+
+      // Добавляем фильтр по датам если указаны
+      if (startDate != null) {
+        final startStr = startDate.toIso8601String().split('T').first;
+        query = query.gte('date', startStr);
+      }
+      if (endDate != null) {
+        final endStr = endDate.toIso8601String().split('T').first;
+        query = query.lte('date', endStr);
+      }
+
+      final data = await query;
+      final lessons = data as List;
+
+      // Группируем по ученикам
+      final studentData = <String, Map<String, dynamic>>{};
+      for (final lesson in lessons) {
+        final studentId = lesson['student_id'] as String;
+        final student = lesson['students'] as Map<String, dynamic>?;
+        final status = lesson['status'] as String;
+
+        if (student != null) {
+          if (!studentData.containsKey(studentId)) {
+            studentData[studentId] = {
+              'name': student['name'],
+              'completed': 0,
+              'cancelled': 0,
+            };
+          }
+          if (status == 'completed') {
+            studentData[studentId]!['completed'] = (studentData[studentId]!['completed'] as int) + 1;
+          } else if (status == 'cancelled') {
+            studentData[studentId]!['cancelled'] = (studentData[studentId]!['cancelled'] as int) + 1;
+          }
+        }
+      }
+
+      return studentData.entries.map((e) {
+        return StudentLessonStatusStats(
+          studentId: e.key,
+          studentName: e.value['name'] as String,
+          completedCount: e.value['completed'] as int,
+          cancelledCount: e.value['cancelled'] as int,
+        );
+      }).toList()
+        ..sort((a, b) => b.completedCount.compareTo(a.completedCount));
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки статистики учеников: $e');
     }
   }
 }

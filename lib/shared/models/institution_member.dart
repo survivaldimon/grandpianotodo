@@ -217,6 +217,9 @@ class InstitutionMember {
   final DateTime joinedAt;
   final DateTime? archivedAt;
 
+  /// Цвет для отображения в расписании (hex, например '4CAF50')
+  final String? color;
+
   /// Профиль пользователя (join)
   final Profile? profile;
 
@@ -229,6 +232,7 @@ class InstitutionMember {
     this.isAdmin = false,
     required this.joinedAt,
     this.archivedAt,
+    this.color,
     this.profile,
   });
 
@@ -247,6 +251,7 @@ class InstitutionMember {
         archivedAt: json['archived_at'] != null
             ? DateTime.parse(json['archived_at'] as String)
             : null,
+        color: json['color'] as String?,
         profile: json['profiles'] != null
             ? Profile.fromJson(json['profiles'] as Map<String, dynamic>)
             : null,
@@ -266,6 +271,7 @@ class InstitutionMember {
         isAdmin: member.isAdmin,
         joinedAt: member.joinedAt,
         archivedAt: member.archivedAt,
+        color: member.color,
         profile: Profile.fromJson(profileData),
       );
 

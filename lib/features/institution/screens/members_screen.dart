@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
@@ -84,6 +85,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                 isCurrentUser: isCurrentUser,
                 isMemberOwner: isMemberOwner,
                 isViewerOwner: isOwner,
+                hasFullAccess: hasFullAccess,
                 institutionId: widget.institutionId,
               );
             },
@@ -100,6 +102,7 @@ class _MemberTile extends ConsumerWidget {
   final bool isCurrentUser;
   final bool isMemberOwner;
   final bool isViewerOwner;
+  final bool hasFullAccess;
   final String institutionId;
 
   const _MemberTile({
@@ -108,6 +111,7 @@ class _MemberTile extends ConsumerWidget {
     required this.isCurrentUser,
     required this.isMemberOwner,
     required this.isViewerOwner,
+    required this.hasFullAccess,
     required this.institutionId,
   });
 
@@ -121,21 +125,51 @@ class _MemberTile extends ConsumerWidget {
     final canEditThisMember = canManageMembers && !isMemberOwner && !isCurrentUser &&
         (!isMemberAdmin || isViewerOwner);
 
+    // Право менять цвет: себе самому или админ/владелец — любому
+    final canChangeColor = isCurrentUser || hasFullAccess;
+
+    // Парсим цвет участника
+    Color? memberColor;
+    if (member.color != null && member.color!.isNotEmpty) {
+      try {
+        memberColor = Color(int.parse('FF${member.color!.replaceAll('#', '')}', radix: 16));
+      } catch (_) {}
+    }
+
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: isMemberOwner
-            ? AppColors.primary
-            : isMemberAdmin
-                ? AppColors.primary.withValues(alpha: 0.7)
-                : AppColors.surfaceVariant,
-        child: Icon(
-          isMemberOwner
-              ? Icons.star
-              : isMemberAdmin
-                  ? Icons.admin_panel_settings
-                  : Icons.person,
-          color: (isMemberOwner || isMemberAdmin) ? Colors.white : AppColors.textSecondary,
-        ),
+      leading: Stack(
+        children: [
+          CircleAvatar(
+            backgroundColor: isMemberOwner
+                ? AppColors.primary
+                : isMemberAdmin
+                    ? AppColors.primary.withValues(alpha: 0.7)
+                    : AppColors.surfaceVariant,
+            child: Icon(
+              isMemberOwner
+                  ? Icons.star
+                  : isMemberAdmin
+                      ? Icons.admin_panel_settings
+                      : Icons.person,
+              color: (isMemberOwner || isMemberAdmin) ? Colors.white : AppColors.textSecondary,
+            ),
+          ),
+          // Индикатор цвета
+          if (memberColor != null)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: memberColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+              ),
+            ),
+        ],
       ),
       title: Row(
         children: [
@@ -201,10 +235,13 @@ class _MemberTile extends ConsumerWidget {
             ),
         ],
       ),
-      trailing: canEditThisMember
+      trailing: (canEditThisMember || canChangeColor)
           ? PopupMenuButton<String>(
               onSelected: (value) {
                 switch (value) {
+                  case 'color':
+                    _showColorPickerDialog(context, ref, memberColor);
+                    break;
                   case 'edit':
                     _showEditRoleDialog(context, ref);
                     break;
@@ -220,28 +257,50 @@ class _MemberTile extends ConsumerWidget {
                 }
               },
               itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 20),
-                      SizedBox(width: 8),
-                      Text('Изменить роль'),
-                    ],
+                // Изменить цвет — себе или админ/владелец любому
+                if (canChangeColor)
+                  PopupMenuItem(
+                    value: 'color',
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: memberColor ?? Colors.grey[300],
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.grey[400]!),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Изменить цвет'),
+                      ],
+                    ),
                   ),
-                ),
-                const PopupMenuItem(
-                  value: 'permissions',
-                  child: Row(
-                    children: [
-                      Icon(Icons.security, size: 20),
-                      SizedBox(width: 8),
-                      Text('Права доступа'),
-                    ],
+                if (canEditThisMember)
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 20),
+                        SizedBox(width: 8),
+                        Text('Изменить роль'),
+                      ],
+                    ),
                   ),
-                ),
+                if (canEditThisMember)
+                  const PopupMenuItem(
+                    value: 'permissions',
+                    child: Row(
+                      children: [
+                        Icon(Icons.security, size: 20),
+                        SizedBox(width: 8),
+                        Text('Права доступа'),
+                      ],
+                    ),
+                  ),
                 // Передача владения - только для владельца
-                if (isViewerOwner)
+                if (isViewerOwner && canEditThisMember)
                   PopupMenuItem(
                     value: 'transfer',
                     child: Row(
@@ -252,22 +311,25 @@ class _MemberTile extends ConsumerWidget {
                       ],
                     ),
                   ),
-                const PopupMenuItem(
-                  value: 'remove',
-                  child: Row(
-                    children: [
-                      Icon(Icons.person_remove, size: 20, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Удалить', style: TextStyle(color: Colors.red)),
-                    ],
+                if (canEditThisMember)
+                  const PopupMenuItem(
+                    value: 'remove',
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_remove, size: 20, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Удалить', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
                   ),
-                ),
               ],
             )
           : null,
       onTap: canEditThisMember
           ? () => context.push('/institutions/$institutionId/members/${member.id}/permissions')
-          : null,
+          : canChangeColor && isCurrentUser
+              ? () => _showColorPickerDialog(context, ref, memberColor)
+              : null,
     );
   }
 
@@ -327,6 +389,79 @@ class _MemberTile extends ConsumerWidget {
       ref.invalidate(membersProvider(institutionId));
     } catch (e) {
       // Error handling
+    }
+  }
+
+  void _showColorPickerDialog(BuildContext context, WidgetRef ref, Color? currentColor) {
+    Color selectedColor = currentColor ?? Colors.blue;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Выберите цвет'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              pickerColor: selectedColor,
+              onColorChanged: (color) => setState(() => selectedColor = color),
+              enableAlpha: false,
+              hexInputBar: true,
+              labelTypes: const [],
+              pickerAreaHeightPercent: 0.8,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Отмена'),
+            ),
+            if (currentColor != null)
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(dialogContext);
+                  await _updateMemberColor(context, ref, null);
+                },
+                child: const Text('Сбросить', style: TextStyle(color: AppColors.warning)),
+              ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                // Конвертируем Color в hex string без alpha (6 символов RGB)
+                final r = (selectedColor.r * 255).round().toRadixString(16).padLeft(2, '0');
+                final g = (selectedColor.g * 255).round().toRadixString(16).padLeft(2, '0');
+                final b = (selectedColor.b * 255).round().toRadixString(16).padLeft(2, '0');
+                final hex = '$r$g$b'.toUpperCase();
+                await _updateMemberColor(context, ref, hex);
+              },
+              child: const Text('Сохранить'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateMemberColor(BuildContext context, WidgetRef ref, String? color) async {
+    try {
+      final controller = ref.read(memberControllerProvider.notifier);
+      final success = await controller.updateColor(member.id, institutionId, color);
+      if (success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(color != null ? 'Цвет обновлён' : 'Цвет сброшен'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 

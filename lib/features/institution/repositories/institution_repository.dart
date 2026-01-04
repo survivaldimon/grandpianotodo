@@ -274,6 +274,18 @@ class InstitutionRepository {
     }
   }
 
+  /// Обновить цвет участника
+  Future<void> updateMemberColor(String memberId, String? color) async {
+    try {
+      await _client
+          .from('institution_members')
+          .update({'color': color})
+          .eq('id', memberId);
+    } catch (e) {
+      throw DatabaseException('Ошибка обновления цвета: $e');
+    }
+  }
+
   /// Удалить участника (архивация)
   Future<void> removeMember(String memberId) async {
     try {

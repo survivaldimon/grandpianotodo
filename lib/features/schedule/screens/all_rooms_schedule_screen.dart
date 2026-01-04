@@ -178,6 +178,15 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final workStartHour = institutionAsync.valueOrNull?.workStartHour ?? 8;
     final workEndHour = institutionAsync.valueOrNull?.workEndHour ?? 22;
 
+    // Получаем цвета преподавателей
+    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final teacherColors = membersAsync.maybeWhen(
+      data: (members) => {
+        for (final m in members) m.userId: m.color,
+      },
+      orElse: () => <String, String?>{},
+    );
+
     // Получаем название выбранного кабинета для заголовка
     String title = 'Расписание';
     if (_selectedRoomId != null) {
@@ -258,8 +267,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           const Divider(height: 1),
           Expanded(
             child: _viewMode == ScheduleViewMode.day
-                ? _buildDayView(roomsAsync, lessonsAsync, bookingsAsync, canManageRooms, workStartHour, workEndHour)
-                : _buildWeekView(roomsAsync, canManageRooms, workStartHour, workEndHour),
+                ? _buildDayView(roomsAsync, lessonsAsync, bookingsAsync, canManageRooms, workStartHour, workEndHour, teacherColors)
+                : _buildWeekView(roomsAsync, canManageRooms, workStartHour, workEndHour, teacherColors),
           ),
         ],
       ),
@@ -278,6 +287,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     bool canManageRooms,
     int workStartHour,
     int workEndHour,
+    Map<String, String?> teacherColors,
   ) {
     // Используем valueOrNull для предотвращения моргания при смене даты
     final rooms = roomsAsync.valueOrNull;
@@ -322,6 +332,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       canManageRooms: canManageRooms,
       startHour: effectiveHours.$1,
       endHour: effectiveHours.$2,
+      teacherColors: teacherColors,
       onLessonTap: _showLessonDetail,
       onBookingTap: _showBookingDetail,
       onRoomTap: (roomId, currentOffset) {
@@ -395,6 +406,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     bool canManageRooms,
     int workStartHour,
     int workEndHour,
+    Map<String, String?> teacherColors,
   ) {
     final weekStart = InstitutionWeekParams.getWeekStart(_selectedDate);
     final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
@@ -442,6 +454,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       canManageRooms: canManageRooms,
       startHour: effectiveHours.$1,
       endHour: effectiveHours.$2,
+      teacherColors: teacherColors,
       onRoomTap: (roomId, currentOffset) {
         setState(() {
           // Всегда сохраняем текущую позицию скролла
@@ -580,7 +593,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
               },
             ),
             ListTile(
-              leading: Icon(Icons.lock, color: AppColors.warning),
+              leading: Icon(Icons.lock, color: Colors.grey[700]),
               title: const Text('Забронировать кабинеты'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -936,6 +949,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final bool canManageRooms; // Может ли пользователь управлять кабинетами
   final int startHour;
   final int endHour;
+  final Map<String, String?> teacherColors; // userId → hex color
   final void Function(Lesson) onLessonTap;
   final void Function(Booking) onBookingTap;
   final void Function(String roomId, double currentOffset) onRoomTap;
@@ -955,6 +969,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
     required this.onAddLesson,
     required this.startHour,
     required this.endHour,
+    required this.teacherColors,
     this.selectedRoomId,
     this.restoreScrollOffset,
     this.canManageRooms = false,
@@ -1288,7 +1303,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                         child: Column(
                                           children: [
                                             for (int hour = widget.startHour; hour <= widget.endHour; hour++)
-                                              _buildCell(rooms[i], hour, lessons),
+                                              _buildCell(rooms[i], hour, lessons, bookings),
                                           ],
                                         ),
                                       ),
@@ -1326,7 +1341,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                           child: Column(
                                             children: [
                                               for (int hour = widget.startHour; hour <= widget.endHour; hour++)
-                                                _buildCell(rooms[i], hour, lessons),
+                                                _buildCell(rooms[i], hour, lessons, bookings),
                                             ],
                                           ),
                                         ),
@@ -1353,7 +1368,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
 
   /// Находит наибольший свободный промежуток в ячейке часа
   /// Возвращает (startMinuteInHour, endMinuteInHour) или null если нет свободного места >= 15 мин
-  ({int start, int end})? _findLargestGapInHour(Room room, int hour, List<Lesson> lessons) {
+  ({int start, int end})? _findLargestGapInHour(Room room, int hour, List<Lesson> lessons, List<Booking> bookings) {
     const minGapMinutes = 15;
     final hourStart = hour * 60;
     final hourEnd = (hour + 1) * 60;
@@ -1361,6 +1376,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     // Собираем занятые интервалы в этом часе
     final occupiedIntervals = <({int start, int end})>[];
 
+    // Занятия
     for (final lesson in lessons) {
       if (lesson.roomId != room.id) continue;
 
@@ -1372,6 +1388,24 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
         occupiedIntervals.add((
           start: lessonStart.clamp(hourStart, hourEnd),
           end: lessonEnd.clamp(hourStart, hourEnd),
+        ));
+      }
+    }
+
+    // Брони
+    for (final booking in bookings) {
+      // Проверяем, относится ли бронь к этому кабинету
+      final hasRoom = booking.rooms.any((r) => r.id == room.id);
+      if (!hasRoom) continue;
+
+      final bookingStart = booking.startTime.hour * 60 + booking.startTime.minute;
+      final bookingEnd = booking.endTime.hour * 60 + booking.endTime.minute;
+
+      // Пересекается ли бронь с этим часом?
+      if (bookingEnd > hourStart && bookingStart < hourEnd) {
+        occupiedIntervals.add((
+          start: bookingStart.clamp(hourStart, hourEnd),
+          end: bookingEnd.clamp(hourStart, hourEnd),
         ));
       }
     }
@@ -1421,8 +1455,8 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     return largest;
   }
 
-  Widget _buildCell(Room room, int hour, List<Lesson> lessons) {
-    final gap = _findLargestGapInHour(room, hour, lessons);
+  Widget _buildCell(Room room, int hour, List<Lesson> lessons, List<Booking> bookings) {
+    final gap = _findLargestGapInHour(room, hour, lessons, bookings);
 
     if (gap == null) {
       // Нет свободного места >= 15 мин
@@ -1483,6 +1517,8 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     final showTime = durationMinutes >= 30;
 
     final color = _getLessonColor(lesson);
+    final statusBorderColor = _getStatusBorderColor(lesson);
+    final borderColor = statusBorderColor ?? color;
     final participant = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
 
     // Для коротких занятий уменьшаем padding
@@ -1508,7 +1544,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(AppSizes.radiusS),
-            border: Border.all(color: color, width: 2),
+            border: Border.all(color: borderColor, width: 2),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1556,17 +1592,32 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
+  /// Возвращает основной цвет занятия (цвет преподавателя или fallback)
   Color _getLessonColor(Lesson lesson) {
+    // Цвет преподавателя (если есть)
+    final teacherColor = widget.teacherColors[lesson.teacherId];
+    if (teacherColor != null && teacherColor.isNotEmpty) {
+      try {
+        return Color(int.parse('FF${teacherColor.replaceAll('#', '')}', radix: 16));
+      } catch (_) {}
+    }
+
+    // Fallback на старую логику
+    if (lesson.group != null) {
+      return AppColors.lessonGroup;
+    }
+    return AppColors.lessonIndividual;
+  }
+
+  /// Возвращает цвет контура по статусу занятия (или null если обычный)
+  Color? _getStatusBorderColor(Lesson lesson) {
     if (lesson.status == LessonStatus.cancelled) {
       return AppColors.error;
     }
     if (lesson.status == LessonStatus.completed) {
       return AppColors.success;
     }
-    if (lesson.group != null) {
-      return AppColors.lessonGroup;
-    }
-    return AppColors.lessonIndividual;
+    return null;
   }
 
   /// Создаёт блоки для брони (один блок на каждый кабинет)
@@ -1613,9 +1664,9 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                 horizontal: horizontalPadding,
               ),
               decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.15),
+                color: Colors.grey.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(AppSizes.radiusS),
-                border: Border.all(color: AppColors.warning, width: 1.5),
+                border: Border.all(color: Colors.grey, width: 1.5),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1624,7 +1675,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                   Flexible(
                     child: Row(
                       children: [
-                        Icon(Icons.lock, size: iconSize, color: AppColors.warning),
+                        Icon(Icons.lock, size: iconSize, color: Colors.grey[700]),
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
@@ -1632,7 +1683,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: fontSize,
-                              color: AppColors.warning,
+                              color: Colors.grey[700],
                             ),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
@@ -1674,6 +1725,7 @@ class _WeekTimeGrid extends StatefulWidget {
   final bool canManageRooms; // Может ли пользователь управлять кабинетами
   final int startHour;
   final int endHour;
+  final Map<String, String?> teacherColors; // userId → hex color
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, DateTime date) onCellTap;
 
@@ -1688,6 +1740,7 @@ class _WeekTimeGrid extends StatefulWidget {
     required this.onCellTap,
     required this.startHour,
     required this.endHour,
+    required this.teacherColors,
     this.selectedRoomId,
     this.restoreScrollOffset,
     this.canManageRooms = false,
@@ -2215,38 +2268,72 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
-      children: lessons.map((lesson) => Container(
-        margin: const EdgeInsets.only(bottom: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        decoration: BoxDecoration(
-          color: _getLessonColor(lesson),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          '${lesson.startTime.hour}:${lesson.startTime.minute.toString().padLeft(2, '0')} ${lesson.student?.name ?? lesson.group?.name ?? ''}',
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
+      children: lessons.map((lesson) {
+        final color = _getLessonColor(lesson);
+        final statusBorderColor = _getStatusBorderColor(lesson);
+        final borderColor = statusBorderColor ?? color;
+        // Пастельный фон — светлее и менее насыщенный
+        final pastelColor = Color.lerp(color, Colors.white, 0.6)!;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          decoration: BoxDecoration(
+            color: pastelColor,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: borderColor, width: 1),
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      )).toList(),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${lesson.startTime.hour}:${lesson.startTime.minute.toString().padLeft(2, '0')} ${lesson.student?.name ?? lesson.group?.name ?? ''}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: color.computeLuminance() > 0.5 ? Colors.black87 : Colors.black87,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (lesson.status == LessonStatus.completed)
+                const Icon(Icons.check, size: 10, color: AppColors.success),
+              if (lesson.status == LessonStatus.cancelled)
+                const Icon(Icons.close, size: 10, color: AppColors.error),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
+  /// Возвращает основной цвет занятия (цвет преподавателя или fallback)
   Color _getLessonColor(Lesson lesson) {
+    // Цвет преподавателя (если есть)
+    final teacherColor = widget.teacherColors[lesson.teacherId];
+    if (teacherColor != null && teacherColor.isNotEmpty) {
+      try {
+        return Color(int.parse('FF${teacherColor.replaceAll('#', '')}', radix: 16));
+      } catch (_) {}
+    }
+
+    // Fallback на старую логику
+    if (lesson.group != null) {
+      return AppColors.lessonGroup;
+    }
+    return AppColors.lessonIndividual;
+  }
+
+  /// Возвращает цвет контура по статусу занятия (или null если обычный)
+  Color? _getStatusBorderColor(Lesson lesson) {
     if (lesson.status == LessonStatus.cancelled) {
       return AppColors.error;
     }
     if (lesson.status == LessonStatus.completed) {
       return AppColors.success;
     }
-    if (lesson.group != null) {
-      return AppColors.lessonGroup;
-    }
-    return AppColors.lessonIndividual;
+    return null;
   }
 }
 
@@ -3284,6 +3371,14 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
   Set<String> _selectedRoomIds = {};
   final TextEditingController _descriptionController = TextEditingController();
 
+  // Занятые кабинеты (для отображения как disabled)
+  Set<String> _occupiedRoomIds = {};
+  bool _isCheckingOccupancy = false;
+
+  // Для режима занятия — занят ли текущий кабинет
+  bool _isCurrentRoomOccupied = false;
+  bool _isCheckingCurrentRoom = false;
+
   @override
   void initState() {
     super.initState();
@@ -3291,8 +3386,91 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
     // Конец через час от начала
     final endMinutes = widget.startHour * 60 + widget.startMinute + 60;
     _endTime = TimeOfDay(hour: endMinutes ~/ 60, minute: endMinutes % 60);
-    // По умолчанию выбираем текущий кабинет для бронирования
+    // По умолчанию выбираем текущий кабинет (уберётся при проверке если занят)
     _selectedRoomIds = {widget.room.id};
+    // Проверяем занятость текущего кабинета
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkCurrentRoomOccupied();
+    });
+  }
+
+  /// Проверяет занят ли текущий кабинет в выбранное время (для режима занятия)
+  Future<void> _checkCurrentRoomOccupied() async {
+    if (_mode != _AddFormMode.lesson) return;
+
+    setState(() => _isCheckingCurrentRoom = true);
+
+    try {
+      final repo = ref.read(bookingRepositoryProvider);
+
+      // Проверяем конфликты параллельно
+      final results = await Future.wait([
+        repo.checkBookingConflicts(
+          roomIds: [widget.room.id],
+          date: widget.date,
+          startTime: _startTime,
+          endTime: _endTime,
+        ),
+        repo.checkLessonConflicts(
+          roomIds: [widget.room.id],
+          date: widget.date,
+          startTime: _startTime,
+          endTime: _endTime,
+        ),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _isCurrentRoomOccupied = results[0].isNotEmpty || results[1].isNotEmpty;
+          _isCheckingCurrentRoom = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCheckingCurrentRoom = false);
+      }
+    }
+  }
+
+  /// Проверяет какие кабинеты заняты в выбранное время
+  Future<void> _checkOccupiedRooms() async {
+    if (_mode != _AddFormMode.booking) return;
+
+    setState(() => _isCheckingOccupancy = true);
+
+    try {
+      final repo = ref.read(bookingRepositoryProvider);
+      final allRoomIds = widget.allRooms.map((r) => r.id).toList();
+
+      // Проверяем конфликты параллельно
+      final results = await Future.wait([
+        repo.checkBookingConflicts(
+          roomIds: allRoomIds,
+          date: widget.date,
+          startTime: _startTime,
+          endTime: _endTime,
+        ),
+        repo.checkLessonConflicts(
+          roomIds: allRoomIds,
+          date: widget.date,
+          startTime: _startTime,
+          endTime: _endTime,
+        ),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _occupiedRoomIds = {...results[0], ...results[1]};
+          // Убираем занятые кабинеты из выбранных
+          _selectedRoomIds.removeAll(_occupiedRoomIds);
+          _isCheckingOccupancy = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCheckingOccupancy = false);
+      }
+    }
   }
 
   @override
@@ -3471,6 +3649,12 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
               selected: {_mode},
               onSelectionChanged: (Set<_AddFormMode> newSelection) {
                 setState(() => _mode = newSelection.first);
+                // При переключении режима — проверяем занятость
+                if (newSelection.first == _AddFormMode.booking) {
+                  _checkOccupiedRooms();
+                } else {
+                  _checkCurrentRoomOccupied();
+                }
               },
             ),
             const SizedBox(height: 16),
@@ -3522,6 +3706,8 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                         if (_repeatType != RepeatType.none) {
                           _updatePreview();
                         }
+                        _checkOccupiedRooms();
+                        _checkCurrentRoomOccupied();
                       }
                     },
                     child: InputDecorator(
@@ -3544,6 +3730,8 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                       );
                       if (time != null) {
                         setState(() => _endTime = time);
+                        _checkOccupiedRooms();
+                        _checkCurrentRoomOccupied();
                       }
                     },
                     child: InputDecorator(
@@ -3557,16 +3745,56 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                 ),
               ],
             ),
+
+            // Предупреждение о занятости кабинета (для режима занятия)
+            if (_mode == _AddFormMode.lesson && _isCurrentRoomOccupied)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 18),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Кабинет занят в это время',
+                        style: TextStyle(
+                          color: AppColors.error,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (_isCheckingCurrentRoom)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 16),
 
             // ========== РЕЖИМ БРОНИРОВАНИЯ ==========
             if (_mode == _AddFormMode.booking) ...[
               // Выбор кабинетов (мультиселект)
-              Text(
-                'Кабинеты',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppColors.textSecondary,
+              Row(
+                children: [
+                  Text(
+                    'Кабинеты',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                  if (_isCheckingOccupancy) ...[
+                    const SizedBox(width: 8),
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
+                  ],
+                ],
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -3574,27 +3802,44 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                 runSpacing: 8,
                 children: widget.allRooms.map((room) {
                   final isSelected = _selectedRoomIds.contains(room.id);
+                  final isOccupied = _occupiedRoomIds.contains(room.id);
                   final roomLabel = room.number != null
                       ? 'Каб. ${room.number}'
                       : room.name;
                   return FilterChip(
-                    label: Text(roomLabel),
+                    label: Text(
+                      roomLabel,
+                      style: TextStyle(
+                        color: isOccupied ? Colors.grey : null,
+                        decoration: isOccupied ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
                     selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedRoomIds.add(room.id);
-                        } else {
-                          _selectedRoomIds.remove(room.id);
-                        }
-                      });
-                    },
+                    showCheckmark: false,
+                    onSelected: isOccupied
+                        ? null
+                        : (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedRoomIds.add(room.id);
+                              } else {
+                                _selectedRoomIds.remove(room.id);
+                              }
+                            });
+                          },
                     selectedColor: AppColors.warning.withValues(alpha: 0.3),
-                    checkmarkColor: AppColors.warning,
+                    disabledColor: Colors.grey.shade200,
+                    side: BorderSide(
+                      color: isOccupied
+                          ? Colors.grey.shade300
+                          : isSelected
+                              ? AppColors.warning
+                              : Colors.grey.shade300,
+                    ),
                   );
                 }).toList(),
               ),
-              if (_selectedRoomIds.isEmpty)
+              if (_selectedRoomIds.isEmpty && _occupiedRoomIds.length < widget.allRooms.length)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
@@ -3602,6 +3847,18 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                     style: TextStyle(
                       color: AppColors.error,
                       fontSize: 12,
+                    ),
+                  ),
+                ),
+              if (_occupiedRoomIds.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Зачёркнутые кабинеты заняты в это время',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ),
@@ -3675,6 +3932,10 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
                           )).toList(),
                           onChanged: (student) {
                             setState(() => _selectedStudent = student);
+                            // Автозаполнение типа занятия из привязок ученика
+                            if (student != null) {
+                              _autoFillLessonTypeFromStudent(student.id);
+                            }
                         },
                       ),
                     const SizedBox(height: 8),
@@ -4149,15 +4410,20 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
     }
   }
 
-  /// Создаёт привязки ученик-преподаватель и ученик-предмет (upsert - не падает если уже есть)
+  /// Создаёт привязки ученик-преподаватель, ученик-предмет и ученик-тип занятия (upsert - не падает если уже есть)
   void _createBindings(String teacherId) {
     if (_selectedStudent == null) return;
+
+    debugPrint('_createBindings [_AddLessonSheet]:');
+    debugPrint('  studentId: ${_selectedStudent!.id}');
+    debugPrint('  lessonTypeId: ${_selectedLessonType?.id}');
 
     // Запускаем в фоне, не блокируем UI
     ref.read(studentBindingsControllerProvider.notifier).createBindingsFromLesson(
       studentId: _selectedStudent!.id,
       teacherId: teacherId,
       subjectId: _selectedSubject?.id,
+      lessonTypeId: _selectedLessonType?.id,
       institutionId: widget.institutionId,
     );
   }
@@ -4189,6 +4455,39 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
     }
   }
 
+  /// Автозаполнение типа занятия из привязок ученика (если у него один тип)
+  Future<void> _autoFillLessonTypeFromStudent(String studentId) async {
+    try {
+      final studentLessonTypes = await ref.read(
+        studentLessonTypesProvider(studentId).future,
+      );
+
+      // Если у ученика ровно один привязанный тип занятия — автозаполняем
+      if (studentLessonTypes.length == 1 && mounted) {
+        final studentLessonType = studentLessonTypes.first;
+        if (studentLessonType.lessonTypeId.isNotEmpty) {
+          // Ищем тип в общем списке по ID (важно для совпадения ссылок в dropdown)
+          final allLessonTypes = await ref.read(lessonTypesProvider(widget.institutionId).future);
+          final matchingType = allLessonTypes.where((lt) => lt.id == studentLessonType.lessonTypeId).firstOrNull;
+          if (matchingType != null && mounted) {
+            setState(() {
+              _selectedLessonType = matchingType;
+              // Также обновляем время окончания на основе длительности типа
+              final startMinutes = _startTime.hour * 60 + _startTime.minute;
+              final endMinutes = startMinutes + matchingType.defaultDurationMinutes;
+              _endTime = TimeOfDay(
+                hour: endMinutes ~/ 60,
+                minute: endMinutes % 60,
+              );
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Игнорируем ошибки — это не критично
+    }
+  }
+
   String _formatTime(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
@@ -4206,6 +4505,10 @@ class _AddLessonSheetState extends ConsumerState<_AddLessonSheet> {
             final newStudent = students.where((s) => s.id == student.id).firstOrNull;
             if (mounted) {
               setState(() => _selectedStudent = newStudent);
+              // Автозаполнение типа занятия для нового ученика
+              if (newStudent != null) {
+                _autoFillLessonTypeFromStudent(newStudent.id);
+              }
             }
           });
         },
@@ -5125,12 +5428,20 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
   Set<String> _selectedRoomIds = {};
   final TextEditingController _descriptionController = TextEditingController();
 
+  // Занятые кабинеты (для отображения как disabled)
+  Set<String> _occupiedRoomIds = {};
+  bool _isCheckingOccupancy = false;
+
+  // Для режима занятия — занят ли выбранный кабинет
+  bool _isSelectedRoomOccupied = false;
+  bool _isCheckingSelectedRoom = false;
+
   @override
   void initState() {
     super.initState();
     _selectedDate = widget.initialDate;
     _selectedRoom = widget.rooms.isNotEmpty ? widget.rooms.first : null;
-    // По умолчанию выбираем первый кабинет для бронирования
+    // По умолчанию выбираем первый кабинет (уберётся при проверке если занят)
     if (widget.rooms.isNotEmpty) {
       _selectedRoomIds = {widget.rooms.first.id};
     }
@@ -5138,6 +5449,90 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     // Округляем до ближайшего часа
     _startTime = TimeOfDay(hour: now.hour, minute: 0);
     _endTime = TimeOfDay(hour: now.hour + 1, minute: 0);
+    // Проверяем занятость кабинетов
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkOccupiedRooms();
+      _checkSelectedRoomOccupied();
+    });
+  }
+
+  /// Проверяет занят ли выбранный кабинет в выбранное время (для режима занятия)
+  Future<void> _checkSelectedRoomOccupied() async {
+    if (_mode != _AddFormMode.lesson || _selectedRoom == null) return;
+
+    setState(() => _isCheckingSelectedRoom = true);
+
+    try {
+      final repo = ref.read(bookingRepositoryProvider);
+
+      // Проверяем конфликты параллельно
+      final results = await Future.wait([
+        repo.checkBookingConflicts(
+          roomIds: [_selectedRoom!.id],
+          date: _selectedDate,
+          startTime: _startTime,
+          endTime: _endTime,
+        ),
+        repo.checkLessonConflicts(
+          roomIds: [_selectedRoom!.id],
+          date: _selectedDate,
+          startTime: _startTime,
+          endTime: _endTime,
+        ),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _isSelectedRoomOccupied = results[0].isNotEmpty || results[1].isNotEmpty;
+          _isCheckingSelectedRoom = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCheckingSelectedRoom = false);
+      }
+    }
+  }
+
+  /// Проверяет какие кабинеты заняты в выбранное время
+  Future<void> _checkOccupiedRooms() async {
+    if (_mode != _AddFormMode.booking) return;
+
+    setState(() => _isCheckingOccupancy = true);
+
+    try {
+      final repo = ref.read(bookingRepositoryProvider);
+      final allRoomIds = widget.rooms.map((r) => r.id).toList();
+
+      // Проверяем конфликты параллельно
+      final results = await Future.wait([
+        repo.checkBookingConflicts(
+          roomIds: allRoomIds,
+          date: _selectedDate,
+          startTime: _startTime,
+          endTime: _endTime,
+        ),
+        repo.checkLessonConflicts(
+          roomIds: allRoomIds,
+          date: _selectedDate,
+          startTime: _startTime,
+          endTime: _endTime,
+        ),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _occupiedRoomIds = {...results[0], ...results[1]};
+          // Убираем занятые кабинеты из выбранных
+          _selectedRoomIds.removeAll(_occupiedRoomIds);
+          _isCheckingOccupancy = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCheckingOccupancy = false);
+      }
+    }
   }
 
   @override
@@ -5228,6 +5623,12 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
               selected: {_mode},
               onSelectionChanged: (Set<_AddFormMode> newSelection) {
                 setState(() => _mode = newSelection.first);
+                // При переключении режима — проверяем занятость
+                if (newSelection.first == _AddFormMode.booking) {
+                  _checkOccupiedRooms();
+                } else {
+                  _checkSelectedRoomOccupied();
+                }
               },
             ),
             const SizedBox(height: 16),
@@ -5247,6 +5648,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 )).toList(),
                 onChanged: (room) {
                   setState(() => _selectedRoom = room);
+                  _checkSelectedRoomOccupied();
                 },
               ),
               const SizedBox(height: 16),
@@ -5255,11 +5657,23 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             // ========== РЕЖИМ БРОНИРОВАНИЯ ==========
             if (_mode == _AddFormMode.booking) ...[
               // Выбор кабинетов (мультиселект)
-              Text(
-                'Кабинеты',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppColors.textSecondary,
+              Row(
+                children: [
+                  Text(
+                    'Кабинеты',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                  if (_isCheckingOccupancy) ...[
+                    const SizedBox(width: 8),
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
+                  ],
+                ],
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -5267,27 +5681,44 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 runSpacing: 8,
                 children: widget.rooms.map((room) {
                   final isSelected = _selectedRoomIds.contains(room.id);
+                  final isOccupied = _occupiedRoomIds.contains(room.id);
                   final roomLabel = room.number != null
                       ? 'Каб. ${room.number}'
                       : room.name;
                   return FilterChip(
-                    label: Text(roomLabel),
+                    label: Text(
+                      roomLabel,
+                      style: TextStyle(
+                        color: isOccupied ? Colors.grey : null,
+                        decoration: isOccupied ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
                     selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedRoomIds.add(room.id);
-                        } else {
-                          _selectedRoomIds.remove(room.id);
-                        }
-                      });
-                    },
+                    showCheckmark: false,
+                    onSelected: isOccupied
+                        ? null
+                        : (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedRoomIds.add(room.id);
+                              } else {
+                                _selectedRoomIds.remove(room.id);
+                              }
+                            });
+                          },
                     selectedColor: AppColors.warning.withValues(alpha: 0.3),
-                    checkmarkColor: AppColors.warning,
+                    disabledColor: Colors.grey.shade200,
+                    side: BorderSide(
+                      color: isOccupied
+                          ? Colors.grey.shade300
+                          : isSelected
+                              ? AppColors.warning
+                              : Colors.grey.shade300,
+                    ),
                   );
                 }).toList(),
               ),
-              if (_selectedRoomIds.isEmpty)
+              if (_selectedRoomIds.isEmpty && _occupiedRoomIds.length < widget.rooms.length)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
@@ -5295,6 +5726,18 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                     style: TextStyle(
                       color: AppColors.error,
                       fontSize: 12,
+                    ),
+                  ),
+                ),
+              if (_occupiedRoomIds.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Зачёркнутые кабинеты заняты в это время',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ),
@@ -5312,6 +5755,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 );
                 if (date != null) {
                   setState(() => _selectedDate = date);
+                  _checkOccupiedRooms();
+                  _checkSelectedRoomOccupied();
                 }
               },
               child: InputDecorator(
@@ -5344,6 +5789,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                             minute: endMinutes % 60,
                           );
                         });
+                        _checkOccupiedRooms();
+                        _checkSelectedRoomOccupied();
                       }
                     },
                     child: InputDecorator(
@@ -5366,6 +5813,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                       );
                       if (time != null) {
                         setState(() => _endTime = time);
+                        _checkOccupiedRooms();
+                        _checkSelectedRoomOccupied();
                       }
                     },
                     child: InputDecorator(
@@ -5379,6 +5828,34 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 ),
               ],
             ),
+
+            // Предупреждение о занятости кабинета (для режима занятия)
+            if (_mode == _AddFormMode.lesson && _isSelectedRoomOccupied)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 18),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Кабинет занят в это время',
+                        style: TextStyle(
+                          color: AppColors.error,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (_isCheckingSelectedRoom)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 16),
 
             // ========== Продолжение РЕЖИМА БРОНИРОВАНИЯ ==========
@@ -5451,6 +5928,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                         )).toList(),
                         onChanged: (student) {
                           setState(() => _selectedStudent = student);
+                          // Автозаполнение типа занятия из привязок ученика
+                          if (student != null) {
+                            _autoFillLessonTypeFromStudent(student.id);
+                          }
                         },
                       ),
                     const SizedBox(height: 8),
@@ -5688,15 +6169,20 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     }
   }
 
-  /// Создаёт привязки ученик-преподаватель и ученик-предмет (upsert - не падает если уже есть)
+  /// Создаёт привязки ученик-преподаватель, ученик-предмет и ученик-тип занятия (upsert - не падает если уже есть)
   void _createBindings(String teacherId) {
     if (_selectedStudent == null) return;
+
+    debugPrint('_createBindings [_QuickAddLessonSheet]:');
+    debugPrint('  studentId: ${_selectedStudent!.id}');
+    debugPrint('  lessonTypeId: ${_selectedLessonType?.id}');
 
     // Запускаем в фоне, не блокируем UI
     ref.read(studentBindingsControllerProvider.notifier).createBindingsFromLesson(
       studentId: _selectedStudent!.id,
       teacherId: teacherId,
       subjectId: _selectedSubject?.id,
+      lessonTypeId: _selectedLessonType?.id,
       institutionId: widget.institutionId,
     );
   }
@@ -5728,6 +6214,39 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     }
   }
 
+  /// Автозаполнение типа занятия из привязок ученика (если у него один тип)
+  Future<void> _autoFillLessonTypeFromStudent(String studentId) async {
+    try {
+      final studentLessonTypes = await ref.read(
+        studentLessonTypesProvider(studentId).future,
+      );
+
+      // Если у ученика ровно один привязанный тип занятия — автозаполняем
+      if (studentLessonTypes.length == 1 && mounted) {
+        final studentLessonType = studentLessonTypes.first;
+        if (studentLessonType.lessonTypeId.isNotEmpty) {
+          // Ищем тип в общем списке по ID (важно для совпадения ссылок в dropdown)
+          final allLessonTypes = await ref.read(lessonTypesProvider(widget.institutionId).future);
+          final matchingType = allLessonTypes.where((lt) => lt.id == studentLessonType.lessonTypeId).firstOrNull;
+          if (matchingType != null && mounted) {
+            setState(() {
+              _selectedLessonType = matchingType;
+              // Также обновляем время окончания на основе длительности типа
+              final startMinutes = _startTime.hour * 60 + _startTime.minute;
+              final endMinutes = startMinutes + matchingType.defaultDurationMinutes;
+              _endTime = TimeOfDay(
+                hour: endMinutes ~/ 60,
+                minute: endMinutes % 60,
+              );
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Игнорируем ошибки — это не критично
+    }
+  }
+
   String _formatTime(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
@@ -5745,6 +6264,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             final newStudent = students.where((s) => s.id == student.id).firstOrNull;
             if (mounted) {
               setState(() => _selectedStudent = newStudent);
+              // Автозаполнение типа занятия для нового ученика
+              if (newStudent != null) {
+                _autoFillLessonTypeFromStudent(newStudent.id);
+              }
             }
           });
         },
@@ -5814,12 +6337,12 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
                 Container(
                   padding: const EdgeInsets.all(AppSizes.paddingS),
                   decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.15),
+                    color: Colors.grey.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(AppSizes.radiusS),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.lock,
-                    color: AppColors.warning,
+                    color: Colors.grey[700],
                     size: 24,
                   ),
                 ),
@@ -6044,12 +6567,12 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                   Container(
                     padding: const EdgeInsets.all(AppSizes.paddingS),
                     decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: 0.15),
+                      color: Colors.grey.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(AppSizes.radiusS),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.lock,
-                      color: AppColors.warning,
+                      color: Colors.grey[700],
                     ),
                   ),
                   const SizedBox(width: AppSizes.paddingM),
@@ -6072,7 +6595,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                 controller: scrollController,
                 padding: const EdgeInsets.all(AppSizes.paddingL),
                 children: [
-                  // Выбор кабинетов (чекбоксы)
+                  // Выбор кабинетов (чипы)
                   const Text(
                     'Выберите кабинеты',
                     style: TextStyle(
@@ -6081,25 +6604,35 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                     ),
                   ),
                   const SizedBox(height: AppSizes.paddingS),
-                  ...widget.rooms.map((room) => CheckboxListTile(
-                    title: Text(room.displayName),
-                    value: _selectedRoomIds.contains(room.id),
-                    onChanged: (value) {
-                      setState(() {
-                        if (value == true) {
-                          _selectedRoomIds.add(room.id);
-                        } else {
-                          _selectedRoomIds.remove(room.id);
-                        }
-                      });
-                    },
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                  )),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: widget.rooms.map((room) {
+                      final isSelected = _selectedRoomIds.contains(room.id);
+                      return FilterChip(
+                        label: Text(room.displayName),
+                        selected: isSelected,
+                        onSelected: (value) {
+                          setState(() {
+                            if (value) {
+                              _selectedRoomIds.add(room.id);
+                            } else {
+                              _selectedRoomIds.remove(room.id);
+                            }
+                          });
+                        },
+                        showCheckmark: false,
+                        selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                        checkmarkColor: AppColors.primary,
+                        side: BorderSide(
+                          color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                        ),
+                      );
+                    }).toList(),
+                  ),
                   if (_selectedRoomIds.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         'Выберите минимум один кабинет',
                         style: TextStyle(
@@ -6171,7 +6704,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                     child: ElevatedButton(
                       onPressed: _canSave && !_isSaving ? _handleSave : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.warning,
+                        backgroundColor: Colors.grey[700],
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),

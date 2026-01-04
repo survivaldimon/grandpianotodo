@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/empty_state.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
+import 'package:kabinet/features/groups/providers/group_provider.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
@@ -17,23 +19,141 @@ import 'package:kabinet/features/students/providers/student_bindings_provider.da
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/subject.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
+import 'package:kabinet/shared/models/student_group.dart';
+
+// ============================================================================
+// ЛОКАЛЬНЫЕ ПРОВАЙДЕРЫ СВЯЗЕЙ ДЛЯ ФИЛЬТРАЦИИ
+// ============================================================================
+
+/// Связи: преподаватель (userId) → Set<studentId>
+final _studentTeacherBindingsProvider =
+    FutureProvider.family<Map<String, Set<String>>, String>((ref, institutionId) async {
+  final client = SupabaseConfig.client;
+  final data = await client
+      .from('student_teachers')
+      .select('student_id, user_id')
+      .eq('institution_id', institutionId);
+
+  final result = <String, Set<String>>{};
+  for (final item in data as List) {
+    final userId = item['user_id'] as String;
+    final studentId = item['student_id'] as String;
+    result.putIfAbsent(userId, () => {}).add(studentId);
+  }
+  return result;
+});
+
+/// Связи: направление (subjectId) → Set<studentId>
+final _studentSubjectBindingsProvider =
+    FutureProvider.family<Map<String, Set<String>>, String>((ref, institutionId) async {
+  final client = SupabaseConfig.client;
+  final data = await client
+      .from('student_subjects')
+      .select('student_id, subject_id')
+      .eq('institution_id', institutionId);
+
+  final result = <String, Set<String>>{};
+  for (final item in data as List) {
+    final subjectId = item['subject_id'] as String;
+    final studentId = item['student_id'] as String;
+    result.putIfAbsent(subjectId, () => {}).add(studentId);
+  }
+  return result;
+});
+
+/// Связи: группа (groupId) → Set<studentId>
+final _studentGroupBindingsProvider =
+    FutureProvider.family<Map<String, Set<String>>, String>((ref, institutionId) async {
+  final client = SupabaseConfig.client;
+  final data = await client
+      .from('student_group_members')
+      .select('student_id, group_id, student_groups!inner(institution_id)')
+      .eq('student_groups.institution_id', institutionId);
+
+  final result = <String, Set<String>>{};
+  for (final item in data as List) {
+    final groupId = item['group_id'] as String;
+    final studentId = item['student_id'] as String;
+    result.putIfAbsent(groupId, () => {}).add(studentId);
+  }
+  return result;
+});
+
+/// Последняя активность: studentId → дата последнего завершённого занятия
+final _studentLastActivityProvider =
+    FutureProvider.family<Map<String, DateTime?>, String>((ref, institutionId) async {
+  final client = SupabaseConfig.client;
+
+  // Получаем последнее завершённое занятие для каждого ученика
+  final data = await client
+      .from('lessons')
+      .select('student_id, date')
+      .eq('institution_id', institutionId)
+      .eq('status', 'completed')
+      .isFilter('archived_at', null)
+      .not('student_id', 'is', null)
+      .order('date', ascending: false);
+
+  final result = <String, DateTime?>{};
+  for (final item in data as List) {
+    final studentId = item['student_id'] as String?;
+    if (studentId == null) continue;
+
+    // Берём только первую (последнюю по дате) запись для каждого ученика
+    if (!result.containsKey(studentId)) {
+      final dateStr = item['date'] as String;
+      result[studentId] = DateTime.parse(dateStr);
+    }
+  }
+  return result;
+});
+
+// ============================================================================
+// ЭКРАН СПИСКА УЧЕНИКОВ
+// ============================================================================
 
 /// Экран списка учеников
-class StudentsListScreen extends ConsumerWidget {
+class StudentsListScreen extends ConsumerStatefulWidget {
   final String institutionId;
 
   const StudentsListScreen({super.key, required this.institutionId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudentsListScreen> createState() => _StudentsListScreenState();
+}
+
+class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
+  // Расширенные фильтры
+  Set<String> _selectedTeacherIds = {};
+  Set<String> _selectedSubjectIds = {};
+  Set<String> _selectedGroupIds = {};
+  int? _inactivityDays; // null = все, 7/14/30/60 дней без занятий
+
+  bool get _hasAdvancedFilters =>
+      _selectedTeacherIds.isNotEmpty ||
+      _selectedSubjectIds.isNotEmpty ||
+      _selectedGroupIds.isNotEmpty ||
+      _inactivityDays != null;
+
+  void _resetAdvancedFilters() {
+    setState(() {
+      _selectedTeacherIds = {};
+      _selectedSubjectIds = {};
+      _selectedGroupIds = {};
+      _inactivityDays = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Проверяем права
-    final permissions = ref.watch(myPermissionsProvider(institutionId));
-    final institutionAsync = ref.watch(currentInstitutionProvider(institutionId));
+    final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
+    final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
     final isOwner = institutionAsync.maybeWhen(
       data: (inst) => inst.ownerId == ref.watch(currentUserIdProvider),
       orElse: () => false,
     );
-    final isAdmin = ref.watch(isAdminProvider(institutionId));
+    final isAdmin = ref.watch(isAdminProvider(widget.institutionId));
     final hasFullAccess = isOwner || isAdmin;
     final canManageAllStudents = hasFullAccess || (permissions?.manageAllStudents ?? false);
     final canAddStudent = hasFullAccess ||
@@ -42,8 +162,19 @@ class StudentsListScreen extends ConsumerWidget {
 
     final filter = ref.watch(studentFilterProvider);
     final studentsAsync = ref.watch(filteredStudentsProvider(
-      StudentFilterParams(institutionId: institutionId, onlyMyStudents: !canManageAllStudents),
+      StudentFilterParams(institutionId: widget.institutionId, onlyMyStudents: !canManageAllStudents),
     ));
+
+    // Загружаем данные для фильтров
+    final teacherBindingsAsync = ref.watch(_studentTeacherBindingsProvider(widget.institutionId));
+    final subjectBindingsAsync = ref.watch(_studentSubjectBindingsProvider(widget.institutionId));
+    final groupBindingsAsync = ref.watch(_studentGroupBindingsProvider(widget.institutionId));
+    final lastActivityAsync = ref.watch(_studentLastActivityProvider(widget.institutionId));
+
+    // Для отображения в фильтрах
+    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
+    final groupsAsync = ref.watch(groupsProvider(widget.institutionId));
 
     return Scaffold(
       appBar: AppBar(
@@ -52,7 +183,7 @@ class StudentsListScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.groups),
             tooltip: 'Группы',
-            onPressed: () => context.push('/institutions/$institutionId/groups'),
+            onPressed: () => context.push('/institutions/${widget.institutionId}/groups'),
           ),
           IconButton(
             icon: const Icon(Icons.search),
@@ -70,7 +201,7 @@ class StudentsListScreen extends ConsumerWidget {
           : null,
       body: Column(
         children: [
-          // Filter chips
+          // Основные фильтры (Все/Мои/С долгом/Архив)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -81,7 +212,6 @@ class StudentsListScreen extends ConsumerWidget {
                   selected: filter == StudentFilter.all,
                   onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.all,
                 ),
-                // Кнопка "Мои" только для тех, кто видит всех учеников
                 if (canManageAllStudents) ...[
                   const SizedBox(width: 8),
                   FilterChip(
@@ -105,35 +235,107 @@ class StudentsListScreen extends ConsumerWidget {
               ],
             ),
           ),
-          // Students list
+
+          // Расширенные фильтры (по преподавателю, направлению, группе, активности)
+          if (canManageAllStudents) ...[
+            const Divider(height: 1),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  // Фильтр по преподавателю
+                  _FilterButton(
+                    label: 'Преподаватель',
+                    isActive: _selectedTeacherIds.isNotEmpty,
+                    onPressed: () => _showTeacherFilter(
+                      membersAsync.valueOrNull ?? [],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Фильтр по направлению
+                  _FilterButton(
+                    label: 'Направление',
+                    isActive: _selectedSubjectIds.isNotEmpty,
+                    onPressed: () => _showSubjectFilter(
+                      subjectsAsync.valueOrNull ?? [],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Фильтр по группе
+                  _FilterButton(
+                    label: 'Группа',
+                    isActive: _selectedGroupIds.isNotEmpty,
+                    onPressed: () => _showGroupFilter(
+                      groupsAsync.valueOrNull ?? [],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Фильтр по активности
+                  _FilterButton(
+                    label: 'Активность',
+                    isActive: _inactivityDays != null,
+                    onPressed: () => _showActivityFilter(),
+                  ),
+                  // Кнопка сброса
+                  if (_hasAdvancedFilters) ...[
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: _resetAdvancedFilters,
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+
+          // Список учеников
           Expanded(
             child: studentsAsync.when(
               loading: () => const LoadingIndicator(),
               error: (error, _) => ErrorView.fromException(
                 error,
                 onRetry: () => ref.invalidate(filteredStudentsProvider(
-                  StudentFilterParams(institutionId: institutionId, onlyMyStudents: !canManageAllStudents),
+                  StudentFilterParams(institutionId: widget.institutionId, onlyMyStudents: !canManageAllStudents),
                 )),
               ),
               data: (students) {
-                if (students.isEmpty) {
+                // Применяем расширенные фильтры
+                final filteredStudents = _applyAdvancedFilters(
+                  students,
+                  teacherBindings: teacherBindingsAsync.valueOrNull ?? {},
+                  subjectBindings: subjectBindingsAsync.valueOrNull ?? {},
+                  groupBindings: groupBindingsAsync.valueOrNull ?? {},
+                  lastActivityMap: lastActivityAsync.valueOrNull ?? {},
+                );
+
+                if (filteredStudents.isEmpty) {
+                  if (_hasAdvancedFilters) {
+                    return _buildFilteredEmptyState();
+                  }
                   return _buildEmptyState(context, ref, filter);
                 }
+
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(filteredStudentsProvider(
-                      StudentFilterParams(institutionId: institutionId, onlyMyStudents: !canManageAllStudents),
+                      StudentFilterParams(institutionId: widget.institutionId, onlyMyStudents: !canManageAllStudents),
                     ));
+                    ref.invalidate(_studentTeacherBindingsProvider(widget.institutionId));
+                    ref.invalidate(_studentSubjectBindingsProvider(widget.institutionId));
+                    ref.invalidate(_studentGroupBindingsProvider(widget.institutionId));
+                    ref.invalidate(_studentLastActivityProvider(widget.institutionId));
                   },
                   child: ListView.builder(
                     padding: AppSizes.paddingHorizontalM,
-                    itemCount: students.length,
+                    itemCount: filteredStudents.length,
                     itemBuilder: (context, index) {
-                      final student = students[index];
+                      final student = filteredStudents[index];
                       return _StudentCard(
                         student: student,
                         onTap: () {
-                          context.go('/institutions/$institutionId/students/${student.id}');
+                          context.go('/institutions/${widget.institutionId}/students/${student.id}');
                         },
                       );
                     },
@@ -141,6 +343,417 @@ class StudentsListScreen extends ConsumerWidget {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Применение расширенных фильтров
+  List<Student> _applyAdvancedFilters(
+    List<Student> students, {
+    required Map<String, Set<String>> teacherBindings,
+    required Map<String, Set<String>> subjectBindings,
+    required Map<String, Set<String>> groupBindings,
+    required Map<String, DateTime?> lastActivityMap,
+  }) {
+    if (!_hasAdvancedFilters) return students;
+
+    return students.where((s) {
+      // Фильтр по преподавателю
+      if (_selectedTeacherIds.isNotEmpty) {
+        final studentTeachers = teacherBindings.entries
+            .where((e) => e.value.contains(s.id))
+            .map((e) => e.key)
+            .toSet();
+        if (studentTeachers.intersection(_selectedTeacherIds).isEmpty) {
+          return false;
+        }
+      }
+
+      // Фильтр по направлению
+      if (_selectedSubjectIds.isNotEmpty) {
+        final studentSubjects = subjectBindings.entries
+            .where((e) => e.value.contains(s.id))
+            .map((e) => e.key)
+            .toSet();
+        if (studentSubjects.intersection(_selectedSubjectIds).isEmpty) {
+          return false;
+        }
+      }
+
+      // Фильтр по группе
+      if (_selectedGroupIds.isNotEmpty) {
+        final studentGroups = groupBindings.entries
+            .where((e) => e.value.contains(s.id))
+            .map((e) => e.key)
+            .toSet();
+        if (studentGroups.intersection(_selectedGroupIds).isEmpty) {
+          return false;
+        }
+      }
+
+      // Фильтр по активности (неактивные за N дней)
+      if (_inactivityDays != null) {
+        final lastActivity = lastActivityMap[s.id];
+        if (lastActivity == null) {
+          // Нет занятий вообще = неактивен
+          return true;
+        }
+        final daysSinceLastLesson = DateTime.now().difference(lastActivity).inDays;
+        if (daysSinceLastLesson < _inactivityDays!) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+  }
+
+  /// Показать фильтр по преподавателю
+  void _showTeacherFilter(List<InstitutionMember> members) {
+    final activeMembers = members.where((m) => !m.isArchived).toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Заголовок
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Преподаватель',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedTeacherIds = {});
+                        setSheetState(() {});
+                      },
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Список преподавателей
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    // "Все"
+                    CheckboxListTile(
+                      value: _selectedTeacherIds.isEmpty,
+                      onChanged: (_) {
+                        setState(() => _selectedTeacherIds = {});
+                        setSheetState(() {});
+                      },
+                      title: const Text('Все'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    // Преподаватели
+                    ...activeMembers.map((member) => CheckboxListTile(
+                      value: _selectedTeacherIds.contains(member.userId),
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked == true) {
+                            _selectedTeacherIds.add(member.userId);
+                          } else {
+                            _selectedTeacherIds.remove(member.userId);
+                          }
+                        });
+                        setSheetState(() {});
+                      },
+                      title: Text(member.profile?.fullName ?? 'Без имени'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    )),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Показать фильтр по направлению
+  void _showSubjectFilter(List<Subject> subjects) {
+    final activeSubjects = subjects.where((s) => s.archivedAt == null).toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Заголовок
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Направление',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedSubjectIds = {});
+                        setSheetState(() {});
+                      },
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Список направлений
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    // "Все"
+                    CheckboxListTile(
+                      value: _selectedSubjectIds.isEmpty,
+                      onChanged: (_) {
+                        setState(() => _selectedSubjectIds = {});
+                        setSheetState(() {});
+                      },
+                      title: const Text('Все'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    // Направления
+                    ...activeSubjects.map((subject) {
+                      final color = subject.color != null
+                          ? Color(int.parse('0xFF${subject.color!.replaceAll('#', '')}'))
+                          : AppColors.primary;
+                      return CheckboxListTile(
+                        value: _selectedSubjectIds.contains(subject.id),
+                        onChanged: (checked) {
+                          setState(() {
+                            if (checked == true) {
+                              _selectedSubjectIds.add(subject.id);
+                            } else {
+                              _selectedSubjectIds.remove(subject.id);
+                            }
+                          });
+                          setSheetState(() {});
+                        },
+                        title: Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(subject.name),
+                          ],
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Показать фильтр по группе
+  void _showGroupFilter(List<StudentGroup> groups) {
+    final activeGroups = groups.where((g) => g.archivedAt == null).toList();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Заголовок
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Группа',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedGroupIds = {});
+                        setSheetState(() {});
+                      },
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Список групп
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    // "Все"
+                    CheckboxListTile(
+                      value: _selectedGroupIds.isEmpty,
+                      onChanged: (_) {
+                        setState(() => _selectedGroupIds = {});
+                        setSheetState(() {});
+                      },
+                      title: const Text('Все'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    // Группы
+                    ...activeGroups.map((group) => CheckboxListTile(
+                      value: _selectedGroupIds.contains(group.id),
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked == true) {
+                            _selectedGroupIds.add(group.id);
+                          } else {
+                            _selectedGroupIds.remove(group.id);
+                          }
+                        });
+                        setSheetState(() {});
+                      },
+                      title: Text(group.name),
+                      subtitle: Text('${group.membersCount} учеников'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    )),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Показать фильтр по активности
+  void _showActivityFilter() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Заголовок
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Активность',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _inactivityDays = null);
+                        setSheetState(() {});
+                      },
+                      child: const Text('Сбросить'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Опции
+              RadioListTile<int?>(
+                value: null,
+                groupValue: _inactivityDays,
+                onChanged: (value) {
+                  setState(() => _inactivityDays = value);
+                  setSheetState(() {});
+                },
+                title: const Text('Все'),
+              ),
+              RadioListTile<int?>(
+                value: 7,
+                groupValue: _inactivityDays,
+                onChanged: (value) {
+                  setState(() => _inactivityDays = value);
+                  setSheetState(() {});
+                },
+                title: const Text('Нет занятий 7+ дней'),
+              ),
+              RadioListTile<int?>(
+                value: 14,
+                groupValue: _inactivityDays,
+                onChanged: (value) {
+                  setState(() => _inactivityDays = value);
+                  setSheetState(() {});
+                },
+                title: const Text('Нет занятий 14+ дней'),
+              ),
+              RadioListTile<int?>(
+                value: 30,
+                groupValue: _inactivityDays,
+                onChanged: (value) {
+                  setState(() => _inactivityDays = value);
+                  setSheetState(() {});
+                },
+                title: const Text('Нет занятий 30+ дней'),
+              ),
+              RadioListTile<int?>(
+                value: 60,
+                groupValue: _inactivityDays,
+                onChanged: (value) {
+                  setState(() => _inactivityDays = value);
+                  setSheetState(() {});
+                },
+                title: const Text('Нет занятий 60+ дней'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilteredEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.filter_list_off,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Нет учеников по заданным фильтрам',
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: _resetAdvancedFilters,
+            child: const Text('Сбросить фильтры'),
           ),
         ],
       ),
@@ -182,14 +795,14 @@ class StudentsListScreen extends ConsumerWidget {
   }
 
   void _showAddStudentDialog(BuildContext context, WidgetRef ref) {
-    final permissions = ref.read(myPermissionsProvider(institutionId));
-    final institutionAsync = ref.read(currentInstitutionProvider(institutionId));
+    final permissions = ref.read(myPermissionsProvider(widget.institutionId));
+    final institutionAsync = ref.read(currentInstitutionProvider(widget.institutionId));
     final currentUserId = ref.read(currentUserIdProvider);
     final isOwner = institutionAsync.maybeWhen(
       data: (inst) => inst.ownerId == currentUserId,
       orElse: () => false,
     );
-    final isAdmin = ref.read(isAdminProvider(institutionId));
+    final isAdmin = ref.read(isAdminProvider(widget.institutionId));
     final hasFullAccess = isOwner || isAdmin;
     final canManageAllStudents = hasFullAccess || (permissions?.manageAllStudents ?? false);
 
@@ -198,13 +811,73 @@ class StudentsListScreen extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (dialogContext) => _AddStudentSheet(
-        institutionId: institutionId,
+        institutionId: widget.institutionId,
         canManageAllStudents: canManageAllStudents,
         currentUserId: currentUserId,
       ),
     );
   }
 }
+
+// ============================================================================
+// ВИДЖЕТ КНОПКИ ФИЛЬТРА
+// ============================================================================
+
+class _FilterButton extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback onPressed;
+
+  const _FilterButton({
+    required this.label,
+    required this.isActive,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isActive ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isActive ? AppColors.primary : Colors.grey[300]!,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isActive ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.arrow_drop_down,
+                size: 20,
+                color: isActive ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// ФОРМА СОЗДАНИЯ УЧЕНИКА
+// ============================================================================
 
 /// Форма создания нового ученика
 class _AddStudentSheet extends ConsumerStatefulWidget {
@@ -676,6 +1349,10 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     );
   }
 }
+
+// ============================================================================
+// КАРТОЧКА УЧЕНИКА
+// ============================================================================
 
 class _StudentCard extends StatelessWidget {
   final Student student;

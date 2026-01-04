@@ -872,12 +872,148 @@ class _StudentsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final topStudentsAsync = ref.watch(topStudentsProvider(params));
     final debtorsAsync = ref.watch(debtorsProvider(institutionId));
+    final generalStatsAsync = ref.watch(generalStatsProvider(params));
+    final lessonStatsAsync = ref.watch(allStudentsLessonStatsProvider(params));
 
     return ListView(
       children: [
-        // Топ учеников
+        // Статистика занятий (проведено/отменено)
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: _SectionTitle(title: 'Статистика занятий'),
+        ),
+        generalStatsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: ErrorView.inline(e),
+          ),
+          data: (stats) {
+            final total = stats.completedLessons + stats.cancelledLessons;
+            final cancellationRate = total > 0
+                ? (stats.cancelledLessons / total * 100).toStringAsFixed(1)
+                : '0';
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        // Проведено
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: AppColors.success,
+                                  size: 24,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  stats.completedLessons.toString(),
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                                const Text(
+                                  'Проведено',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Отменено
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.cancel,
+                                  color: AppColors.error,
+                                  size: 24,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  stats.cancelledLessons.toString(),
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.error,
+                                  ),
+                                ),
+                                const Text(
+                                  'Отменено',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.error,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (stats.cancelledLessons > 0) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Процент отмен: $cancellationRate%',
+                          style: const TextStyle(
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+
+        const Divider(height: 32),
+
+        // Топ учеников
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: _SectionTitle(title: 'Топ по занятиям'),
         ),
         topStudentsAsync.when(
@@ -972,6 +1108,119 @@ class _StudentsTab extends ConsumerWidget {
                       color: AppColors.error,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+
+        const Divider(height: 32),
+
+        // Статистика по каждому ученику
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: _SectionTitle(title: 'По ученикам'),
+        ),
+        lessonStatsAsync.when(
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: ErrorView.inline(e),
+          ),
+          data: (stats) {
+            if (stats.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Нет данных за период'),
+              );
+            }
+
+            return Column(
+              children: stats.map((stat) {
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        // Имя ученика
+                        Expanded(
+                          child: Text(
+                            stat.studentName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 15,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Проведено
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.check_circle,
+                                size: 16,
+                                color: AppColors.success,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                stat.completedCount.toString(),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.success,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Отменено
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.cancel,
+                                size: 16,
+                                color: AppColors.error,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                stat.cancelledCount.toString(),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );
