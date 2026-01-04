@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/core/services/app_lifecycle_service.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 
 /// Виджет отображения ошибки с кнопкой повтора
@@ -7,16 +8,19 @@ class ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
   final bool compact;
+  final bool showRetryButton;
 
   const ErrorView({
     super.key,
     this.message = AppStrings.errorOccurred,
     this.onRetry,
     this.compact = false,
+    this.showRetryButton = true,
   });
 
   /// Фабричный конструктор для AsyncValue ошибок
   /// Автоматически определяет тип ошибки и показывает user-friendly сообщение
+  /// Если onRetry не передан, используется AppLifecycleService.forceRefresh()
   factory ErrorView.fromException(
     Object error, {
     VoidCallback? onRetry,
@@ -27,6 +31,7 @@ class ErrorView extends StatelessWidget {
       message: message,
       onRetry: onRetry,
       compact: compact,
+      showRetryButton: true, // Всегда показываем кнопку retry
     );
   }
 
@@ -72,6 +77,16 @@ class ErrorView extends StatelessWidget {
     return AppStrings.errorOccurred;
   }
 
+  /// Определяет, является ли ошибка проблемой с сетью
+  bool get _isConnectionError {
+    final msgLower = message.toLowerCase();
+    return msgLower.contains('сеть') ||
+        msgLower.contains('соединен') ||
+        msgLower.contains('интернет') ||
+        msgLower.contains('подключ') ||
+        message == AppStrings.networkError;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Компактный режим - только текст
@@ -88,23 +103,38 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.error_outline,
+            Icon(
+              _isConnectionError ? Icons.wifi_off : Icons.error_outline,
               size: 64,
-              color: AppColors.error,
+              color: _isConnectionError ? AppColors.textSecondary : AppColors.error,
             ),
             const SizedBox(height: 16),
             Text(
+              _isConnectionError ? 'Нет соединения с сервером' : 'Произошла ошибка',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
             ),
-            if (onRetry != null) ...[
+            if (showRetryButton) ...[
               const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: onRetry,
+              ElevatedButton.icon(
+                onPressed: () {
+                  if (onRetry != null) {
+                    onRetry!();
+                  } else {
+                    // Используем глобальное обновление через сервис
+                    AppLifecycleService.instance.forceRefresh();
+                  }
+                },
                 icon: const Icon(Icons.refresh),
                 label: const Text(AppStrings.retry),
               ),

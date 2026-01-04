@@ -79,6 +79,11 @@
   - Slide-анимация переключения вкладок в стиле iOS
   - Автопривязка ученика к преподавателю при создании
   - Исправление видимости оплат для участников
+- **`SESSION_2026_01_04_PAYMENTS_FIX.md`** — исправления оплат и realtime:
+  - Исправление удвоения занятий при оплате с тарифом
+  - Realtime обновление баланса ученика после операций с оплатами
+  - Удаление дублирующегося `paymentPlansProvider`
+  - Исправление "Итого" для отображения только видимых оплат
 
 ## Валюта
 
@@ -596,6 +601,79 @@ _studentTeacherBindingsProvider  // Map: userId → Set<studentId>
 **Решение:** В `StudentController.create()` добавлена автоматическая привязка созданного ученика к текущему пользователю через `studentBindingsController.addTeacher()`.
 
 **Файл:** `lib/features/students/providers/student_provider.dart`
+
+### 29. Тарифы — только шаблон для автозаполнения
+Тариф (PaymentPlan) используется **только как шаблон** для автозаполнения поля "Занятия" при создании оплаты.
+
+**Логика оплаты:**
+1. При выборе тарифа — поле "Занятия" заполняется из `plan.lessonsCount`
+2. Создаётся только платёж (Payment)
+3. Триггер `handle_payment_insert` в БД добавляет занятия в `prepaid_lessons_count`
+4. **Подписка НЕ создаётся** для обычных оплат
+
+**Исключение — семейные абонементы:**
+- Для семейных оплат создаётся подписка с общим пулом занятий
+- Используется метод `createFamilyPayment()` с параметром `validityDays`
+
+**Единый источник провайдера тарифов:**
+```dart
+// ПРАВИЛЬНО — использовать только этот провайдер:
+import 'package:kabinet/features/payment_plans/providers/payment_plan_provider.dart';
+final plansAsync = ref.watch(paymentPlansProvider(institutionId));
+
+// НЕПРАВИЛЬНО — НЕ создавать дубликаты в других файлах!
+```
+
+**Ключевые файлы:**
+- `lib/features/payment_plans/providers/payment_plan_provider.dart` — единственный источник `paymentPlansProvider`
+- `lib/features/payments/providers/payment_provider.dart` — `PaymentController.create()` без создания подписки
+
+### 30. Realtime обновление баланса ученика
+После любых операций с оплатами баланс ученика (предоплаченные занятия) обновляется в реальном времени.
+
+**Инвалидируемые провайдеры в `PaymentController`:**
+```dart
+_ref.invalidate(studentPaymentsProvider(studentId));  // История оплат
+_ref.invalidate(studentProvider(studentId));          // Данные ученика (баланс)
+_ref.invalidate(paymentsStreamProvider(institutionId)); // Realtime stream
+```
+
+**Методы, инвалидирующие `studentProvider`:**
+- `create()` — создание оплаты
+- `createCorrection()` — создание корректировки
+- `updatePayment()` — редактирование оплаты
+- `deletePayment()` — удаление оплаты
+- `deleteByLessonId()` — удаление оплаты по ID занятия
+- `createFamilyPayment()` — создание семейного абонемента (для всех участников)
+
+### 31. Расчёт "Итого" на экране оплат
+"Итого" рассчитывается из **видимых** оплат с учётом прав пользователя.
+
+**Логика:**
+```dart
+// Фильтрация по правам доступа
+List<Payment> accessFiltered = allPayments;
+if (!canViewAllPayments) {
+  accessFiltered = allPayments.where((p) {
+    if (myStudentIds.contains(p.studentId)) return true;
+    if (p.subscription?.members != null) {
+      return p.subscription!.members!.any(
+        (m) => myStudentIds.contains(m.studentId),
+      );
+    }
+    return false;
+  }).toList();
+}
+
+// Сумма только видимых оплат
+visibleTotal = accessFiltered.fold<double>(0.0, (sum, p) => sum + p.amount);
+```
+
+**Отображение:**
+- Владелец/админ: `"Итого:"` — сумма всех оплат за период
+- Участник: `"Итого (ваши ученики):"` — сумма только оплат своих учеников
+
+**Файл:** `lib/features/payments/screens/payments_screen.dart`
 
 
 ## CI/CD

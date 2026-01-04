@@ -11,7 +11,7 @@ import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
-import 'package:kabinet/features/payments/providers/payment_provider.dart' hide paymentPlansProvider;
+import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/payment_plans/providers/payment_plan_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
@@ -219,6 +219,7 @@ class StudentDetailScreen extends ConsumerWidget {
                   hasDebt: hasDebt,
                   studentId: studentId,
                   onAddPayment: canEditStudent ? () => _showAddPaymentDialog(context, ref) : null,
+                  showAvgCost: hasFullAccess, // Только владелец/админ видит среднюю стоимость
                 ),
                 const SizedBox(height: 24),
 
@@ -615,12 +616,14 @@ class _BalanceAndCostCard extends ConsumerWidget {
   final bool hasDebt;
   final String studentId;
   final VoidCallback? onAddPayment;
+  final bool showAvgCost;
 
   const _BalanceAndCostCard({
     required this.student,
     required this.hasDebt,
     required this.studentId,
     this.onAddPayment,
+    this.showAvgCost = true,
   });
 
   @override
@@ -665,17 +668,18 @@ class _BalanceAndCostCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-                // Разделитель
-                Container(
-                  width: 1,
-                  height: 60,
-                  color: hasDebt
-                      ? AppColors.error.withOpacity(0.3)
-                      : AppColors.primary.withOpacity(0.3),
-                ),
-                // Средняя стоимость
-                Expanded(
-                  child: avgCostAsync.when(
+                // Разделитель и средняя стоимость (только для владельца/админа)
+                if (showAvgCost) ...[
+                  Container(
+                    width: 1,
+                    height: 60,
+                    color: hasDebt
+                        ? AppColors.error.withOpacity(0.3)
+                        : AppColors.primary.withOpacity(0.3),
+                  ),
+                  // Средняя стоимость
+                  Expanded(
+                    child: avgCostAsync.when(
                     loading: () => const Center(
                       child: SizedBox(
                         height: 20,
@@ -740,6 +744,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                     },
                   ),
                 ),
+                ], // if (showAvgCost)
               ],
             ),
             if (onAddPayment != null) ...[
@@ -1303,7 +1308,6 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
       paymentPlanId: _selectedPlan?.id,
       amount: double.parse(_amountController.text),
       lessonsCount: int.parse(_lessonsController.text),
-      validityDays: int.parse(_validityController.text),
       paidAt: _selectedDate,
       comment: comment.isEmpty ? null : comment,
     );

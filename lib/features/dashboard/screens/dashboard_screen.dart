@@ -129,42 +129,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             ),
             const SizedBox(height: 12),
 
-            // Неотмеченные занятия
-            unmarkedLessonsAsync.when(
-              data: (lessons) {
-                final subtitle = lessons.isEmpty
-                    ? AppStrings.noUnmarkedLessons
-                    : lessons.take(2).map((l) {
-                        final date = AppDateUtils.formatDayMonth(l.date);
-                        final time =
-                            '${l.startTime.hour.toString().padLeft(2, '0')}:${l.startTime.minute.toString().padLeft(2, '0')}';
-                        return '$date $time';
-                      }).join(', ');
+            // Неотмеченные занятия (без моргания при обновлении)
+            Builder(builder: (context) {
+              final lessons = unmarkedLessonsAsync.valueOrNull;
+
+              // Показываем loading только при первой загрузке (когда данных ещё нет)
+              if (lessons == null) {
                 return _DashboardCard(
                   title: AppStrings.unmarkedLessons,
-                  trailing: lessons.length.toString(),
-                  subtitle: subtitle,
+                  trailing: '...',
                   icon: Icons.pending_actions,
-                  iconColor: lessons.isEmpty ? AppColors.success : AppColors.error,
-                  onTap: lessons.isEmpty
-                      ? null
-                      : () => _showUnmarkedLessonsSheet(context, ref, lessons),
+                  onTap: null,
                 );
-              },
-              loading: () => _DashboardCard(
+              }
+
+              final subtitle = lessons.isEmpty
+                  ? AppStrings.noUnmarkedLessons
+                  : lessons.take(2).map((l) {
+                      final date = AppDateUtils.formatDayMonth(l.date);
+                      final time =
+                          '${l.startTime.hour.toString().padLeft(2, '0')}:${l.startTime.minute.toString().padLeft(2, '0')}';
+                      return '$date $time';
+                    }).join(', ');
+              return _DashboardCard(
                 title: AppStrings.unmarkedLessons,
-                trailing: '...',
+                trailing: lessons.length.toString(),
+                subtitle: subtitle,
                 icon: Icons.pending_actions,
-                onTap: null,
-              ),
-              error: (_, __) => _DashboardCard(
-                title: AppStrings.unmarkedLessons,
-                trailing: '—',
-                icon: Icons.pending_actions,
-                iconColor: AppColors.error,
-                onTap: null,
-              ),
-            ),
+                iconColor: lessons.isEmpty ? AppColors.success : AppColors.error,
+                onTap: lessons.isEmpty
+                    ? null
+                    : () => _showUnmarkedLessonsSheet(context, ref, lessons),
+              );
+            }),
             const SizedBox(height: 12),
 
             // Ближайшее занятие
@@ -572,6 +569,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: lessonsAsync.when(
+                    skipLoadingOnRefresh: true,
                     data: (lessons) => Text(
                       '${AppStrings.unmarkedLessons} (${lessons.length})',
                       style: Theme.of(context).textTheme.titleMedium,

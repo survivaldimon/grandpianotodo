@@ -4,8 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/core/services/app_lifecycle_service.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
+import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
+import 'package:kabinet/features/payments/providers/payment_provider.dart';
+import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
+import 'package:kabinet/features/students/providers/student_provider.dart';
 
 /// Провайдер ID текущего заведения
 final currentInstitutionIdProvider = StateProvider<String?>((ref) => null);
@@ -38,6 +43,46 @@ class _MainShellState extends ConsumerState<MainShell>
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
+
+    // Настраиваем callback для обновления данных при возврате из фона
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupLifecycleService();
+    });
+  }
+
+  void _setupLifecycleService() {
+    final lifecycleService = AppLifecycleService.instance;
+    lifecycleService.initialize(ref);
+    lifecycleService.setRefreshCallback(_refreshAllData);
+  }
+
+  /// Инвалидация всех ключевых провайдеров при возврате из фона
+  void _refreshAllData(String institutionId) {
+    debugPrint('[MainShell] Refreshing all data for institution: $institutionId');
+
+    // Инвалидируем провайдеры заведения
+    ref.invalidate(currentInstitutionStreamProvider(institutionId));
+    ref.invalidate(currentInstitutionProvider(institutionId));
+    ref.invalidate(myMembershipProvider(institutionId));
+
+    // Инвалидируем провайдеры расписания
+    ref.invalidate(unmarkedLessonsProvider(institutionId));
+    ref.invalidate(unmarkedLessonsStreamProvider(institutionId));
+    ref.invalidate(institutionTodayLessonsProvider(institutionId));
+
+    // Инвалидируем провайдеры оплат
+    ref.invalidate(paymentsStreamProvider(institutionId));
+
+    // Инвалидируем провайдеры учеников
+    ref.invalidate(studentsProvider(institutionId));
+
+    // Инвалидируем провайдеры бронирований
+    final today = DateTime.now();
+    ref.invalidate(bookingsByInstitutionDateProvider(
+      InstitutionDateParams(institutionId, today),
+    ));
+
+    debugPrint('[MainShell] All providers invalidated');
   }
 
   @override
@@ -210,6 +255,8 @@ class _MainShellState extends ConsumerState<MainShell>
     // Запускаем периодическую проверку членства
     if (institutionId != null) {
       _startMembershipCheck(institutionId);
+      // Обновляем ID заведения в сервисе для инвалидации при resumed
+      AppLifecycleService.instance.setCurrentInstitution(institutionId);
     }
 
     return Scaffold(

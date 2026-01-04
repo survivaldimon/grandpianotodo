@@ -120,6 +120,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   double? _savedScrollOffset; // Сохранённая позиция скролла для восстановления
   ScheduleFilters _filters = const ScheduleFilters();
   ScheduleViewMode _viewMode = ScheduleViewMode.day;
+  int _scrollResetKey = 0; // Ключ для принудительного сброса скролла
 
   @override
   void initState() {
@@ -141,6 +142,15 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         InstitutionDateParams(widget.institutionId, _selectedDate),
       ));
     }
+  }
+
+  /// Переход к сегодняшней дате с прокруткой к началу
+  void _goToToday() {
+    setState(() {
+      _selectedDate = DateTime.now();
+      _savedScrollOffset = null;
+      _scrollResetKey++; // Принудительный сброс скролла сетки
+    });
   }
 
   @override
@@ -216,9 +226,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             onPressed: _selectDate,
           ),
           TextButton(
-            onPressed: () {
-              setState(() => _selectedDate = DateTime.now());
-            },
+            onPressed: _goToToday,
             child: const Text(AppStrings.today),
           ),
         ],
@@ -270,61 +278,65 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     int workStartHour,
     int workEndHour,
   ) {
-    return roomsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorView.fromException(e),
-      data: (rooms) => lessonsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorView.fromException(e),
-        data: (lessons) {
-          // Получаем брони (пустой список при загрузке/ошибке)
-          final bookings = bookingsAsync.valueOrNull ?? [];
+    // Используем valueOrNull для предотвращения моргания при смене даты
+    final rooms = roomsAsync.valueOrNull;
+    final lessons = lessonsAsync.valueOrNull;
 
-          final filteredLessons = _filters.isEmpty
-              ? lessons
-              : lessons.where((l) => _filters.matchesLesson(l)).toList();
+    // Показываем loading только при первой загрузке (когда данных ещё нет)
+    if (rooms == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-          // Вычисляем эффективные часы с учётом занятий и броней вне рабочего времени
-          final effectiveHours = _calculateEffectiveHours(
-            lessons: lessons,
-            bookings: bookings,
-            workStartHour: workStartHour,
-            workEndHour: workEndHour,
-          );
+    // Для занятий: показываем пустой список если данные ещё загружаются
+    // Это предотвращает ошибку "Нет соединения" при смене даты
+    final lessonsList = lessons ?? [];
 
-          return _AllRoomsTimeGrid(
-            rooms: _selectedRoomId != null
-                ? rooms.where((r) => r.id == _selectedRoomId).toList()
-                : rooms,
-            allRooms: rooms,
-            lessons: filteredLessons,
-            bookings: bookings,
-            selectedDate: _selectedDate,
-            institutionId: widget.institutionId,
-            selectedRoomId: _selectedRoomId,
-            restoreScrollOffset: _savedScrollOffset,
-            canManageRooms: canManageRooms,
-            startHour: effectiveHours.$1,
-            endHour: effectiveHours.$2,
-            onLessonTap: _showLessonDetail,
-            onBookingTap: _showBookingDetail,
-            onRoomTap: (roomId, currentOffset) {
-              setState(() {
-                // Всегда сохраняем текущую позицию скролла
-                _savedScrollOffset = currentOffset;
-                if (_selectedRoomId == roomId) {
-                  // Возвращаемся к общему виду
-                  _selectedRoomId = null;
-                } else {
-                  // Переходим к одному кабинету
-                  _selectedRoomId = roomId;
-                }
-              });
-            },
-            onAddLesson: (room, hour, minute) => _showAddLessonSheet(room, hour, minute, allRooms: rooms),
-          );
-        },
-      ),
+    // Получаем брони (пустой список при загрузке/ошибке)
+    final bookings = bookingsAsync.valueOrNull ?? [];
+
+    final filteredLessons = _filters.isEmpty
+        ? lessonsList
+        : lessonsList.where((l) => _filters.matchesLesson(l)).toList();
+
+    // Вычисляем эффективные часы с учётом занятий и броней вне рабочего времени
+    final effectiveHours = _calculateEffectiveHours(
+      lessons: lessonsList,
+      bookings: bookings,
+      workStartHour: workStartHour,
+      workEndHour: workEndHour,
+    );
+
+    return _AllRoomsTimeGrid(
+      key: ValueKey('grid_$_scrollResetKey'), // Для принудительного сброса скролла
+      rooms: _selectedRoomId != null
+          ? rooms.where((r) => r.id == _selectedRoomId).toList()
+          : rooms,
+      allRooms: rooms,
+      lessons: filteredLessons,
+      bookings: bookings,
+      selectedDate: _selectedDate,
+      institutionId: widget.institutionId,
+      selectedRoomId: _selectedRoomId,
+      restoreScrollOffset: _savedScrollOffset,
+      canManageRooms: canManageRooms,
+      startHour: effectiveHours.$1,
+      endHour: effectiveHours.$2,
+      onLessonTap: _showLessonDetail,
+      onBookingTap: _showBookingDetail,
+      onRoomTap: (roomId, currentOffset) {
+        setState(() {
+          // Всегда сохраняем текущую позицию скролла
+          _savedScrollOffset = currentOffset;
+          if (_selectedRoomId == roomId) {
+            // Возвращаемся к общему виду
+            _selectedRoomId = null;
+          } else {
+            // Переходим к одному кабинету
+            _selectedRoomId = roomId;
+          }
+        });
+      },
+      onAddLesson: (room, hour, minute) => _showAddLessonSheet(room, hour, minute, allRooms: rooms),
     );
   }
 
@@ -387,66 +399,69 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
     final weekLessonsAsync = ref.watch(lessonsByInstitutionWeekProvider(weekParams));
 
-    return roomsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorView.fromException(e),
-      data: (rooms) => weekLessonsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorView.fromException(e),
-        data: (lessonsByDay) {
-          // Применяем фильтры к занятиям каждого дня
-          final filteredLessonsByDay = <DateTime, List<Lesson>>{};
-          for (final entry in lessonsByDay.entries) {
-            filteredLessonsByDay[entry.key] = _filters.isEmpty
-                ? entry.value
-                : entry.value.where((l) => _filters.matchesLesson(l)).toList();
+    // Используем valueOrNull для предотвращения ошибки при смене недели
+    final rooms = roomsAsync.valueOrNull;
+    final lessonsByDay = weekLessonsAsync.valueOrNull;
+
+    // Показываем loading только при первой загрузке
+    if (rooms == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Для занятий: показываем пустой map если данные ещё загружаются
+    final lessonsMap = lessonsByDay ?? <DateTime, List<Lesson>>{};
+
+    // Применяем фильтры к занятиям каждого дня
+    final filteredLessonsByDay = <DateTime, List<Lesson>>{};
+    for (final entry in lessonsMap.entries) {
+      filteredLessonsByDay[entry.key] = _filters.isEmpty
+          ? entry.value
+          : entry.value.where((l) => _filters.matchesLesson(l)).toList();
+    }
+
+    // Вычисляем эффективные часы для всей недели
+    final allLessons = lessonsMap.values.expand((list) => list).toList();
+    final effectiveHours = _calculateEffectiveHours(
+      lessons: allLessons,
+      workStartHour: workStartHour,
+      workEndHour: workEndHour,
+    );
+
+    return _WeekTimeGrid(
+      key: ValueKey('week_grid_$_scrollResetKey'), // Для принудительного сброса скролла
+      rooms: _selectedRoomId != null
+          ? rooms.where((r) => r.id == _selectedRoomId).toList()
+          : rooms,
+      allRooms: rooms,
+      lessonsByDay: filteredLessonsByDay,
+      weekStart: weekStart,
+      institutionId: widget.institutionId,
+      selectedRoomId: _selectedRoomId,
+      restoreScrollOffset: _savedScrollOffset,
+      canManageRooms: canManageRooms,
+      startHour: effectiveHours.$1,
+      endHour: effectiveHours.$2,
+      onRoomTap: (roomId, currentOffset) {
+        setState(() {
+          // Всегда сохраняем текущую позицию скролла
+          _savedScrollOffset = currentOffset;
+          if (_selectedRoomId == roomId) {
+            // Возвращаемся к общему виду
+            _selectedRoomId = null;
+          } else {
+            // Переходим к одному кабинету
+            _selectedRoomId = roomId;
           }
-
-          // Вычисляем эффективные часы для всей недели
-          final allLessons = lessonsByDay.values.expand((list) => list).toList();
-          final effectiveHours = _calculateEffectiveHours(
-            lessons: allLessons,
-            workStartHour: workStartHour,
-            workEndHour: workEndHour,
-          );
-
-          return _WeekTimeGrid(
-            rooms: _selectedRoomId != null
-                ? rooms.where((r) => r.id == _selectedRoomId).toList()
-                : rooms,
-            allRooms: rooms,
-            lessonsByDay: filteredLessonsByDay,
-            weekStart: weekStart,
-            institutionId: widget.institutionId,
-            selectedRoomId: _selectedRoomId,
-            restoreScrollOffset: _savedScrollOffset,
-            canManageRooms: canManageRooms,
-            startHour: effectiveHours.$1,
-            endHour: effectiveHours.$2,
-            onRoomTap: (roomId, currentOffset) {
-              setState(() {
-                // Всегда сохраняем текущую позицию скролла
-                _savedScrollOffset = currentOffset;
-                if (_selectedRoomId == roomId) {
-                  // Возвращаемся к общему виду
-                  _selectedRoomId = null;
-                } else {
-                  // Переходим к одному кабинету
-                  _selectedRoomId = roomId;
-                }
-              });
-            },
-            onCellTap: (room, date) {
-              // Переключаемся на дневной вид с выбранной датой и кабинетом
-              setState(() {
-                _selectedDate = date;
-                _selectedRoomId = room.id;
-                _viewMode = ScheduleViewMode.day;
-              });
-            },
-          );
-        },
-      ),
+        });
+      },
+      onCellTap: (room, date) {
+        // Переключаемся на дневной вид с выбранной датой и кабинетом
+        setState(() {
+          _selectedDate = date;
+          _selectedRoomId = room.id;
+          _viewMode = ScheduleViewMode.day;
+        });
+      },
     );
   }
 
@@ -815,7 +830,22 @@ class _WeekDaySelectorState extends State<_WeekDaySelector> {
   @override
   void didUpdateWidget(_WeekDaySelector oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Не прокручиваем автоматически - пользователь сам листает
+    // Прокручиваем к выбранной дате если она изменилась на "сегодня"
+    // (кнопка "Сегодня" в AppBar)
+    if (!AppDateUtils.isSameDay(oldWidget.selectedDate, widget.selectedDate)) {
+      if (AppDateUtils.isToday(widget.selectedDate)) {
+        // Плавно прокручиваем к сегодня
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _calculateOffset(widget.selectedDate),
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    }
   }
 
   double _calculateOffset(DateTime date) {
@@ -911,6 +941,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final void Function(Room room, int hour, int minute) onAddLesson;
 
   const _AllRoomsTimeGrid({
+    super.key,
     required this.rooms,
     required this.allRooms,
     required this.lessons,
@@ -1646,6 +1677,7 @@ class _WeekTimeGrid extends StatefulWidget {
   final void Function(Room room, DateTime date) onCellTap;
 
   const _WeekTimeGrid({
+    super.key,
     required this.rooms,
     required this.allRooms,
     required this.lessonsByDay,

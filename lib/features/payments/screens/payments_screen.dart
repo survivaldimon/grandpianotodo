@@ -10,6 +10,7 @@ import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
+import 'package:kabinet/features/payment_plans/providers/payment_plan_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
@@ -537,8 +538,25 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     final subjectBindingsAsync = ref.watch(_studentSubjectBindingsProvider(widget.institutionId));
     final teacherBindingsAsync = ref.watch(_studentTeacherBindingsProvider(widget.institutionId));
 
-    // Итого за период
-    final totalAsync = ref.watch(periodTotalProvider(_periodParams));
+    // Вычисляем итого из видимых оплат
+    final myStudentIds = myStudentIdsAsync.valueOrNull ?? {};
+    double? visibleTotal;
+    if (paymentsAsync.hasValue) {
+      final allPayments = paymentsAsync.value!;
+      List<Payment> accessFiltered = allPayments;
+      if (!canViewAllPayments) {
+        accessFiltered = allPayments.where((p) {
+          if (myStudentIds.contains(p.studentId)) return true;
+          if (p.subscription?.members != null) {
+            return p.subscription!.members!.any(
+              (m) => myStudentIds.contains(m.studentId),
+            );
+          }
+          return false;
+        }).toList();
+      }
+      visibleTotal = accessFiltered.fold<double>(0.0, (sum, p) => sum + p.amount);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -605,7 +623,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
             ),
           if (canViewAnyPayments) const SizedBox(height: 12),
 
-          // Total
+          // Total (рассчитывается из видимых оплат)
           if (canViewAnyPayments)
             Container(
               margin: AppSizes.paddingHorizontalM,
@@ -618,21 +636,21 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(canViewAllPayments ? 'Итого:' : 'Итого (ваши ученики):'),
-                  totalAsync.when(
-                    data: (total) => Text(
-                      _formatCurrency(total),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.success,
-                          ),
-                    ),
-                    loading: () => const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    error: (_, __) => const Text('—'),
-                  ),
+                  visibleTotal != null
+                      ? Text(
+                          _formatCurrency(visibleTotal),
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.success,
+                              ),
+                        )
+                      : paymentsAsync.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('—'),
                 ],
               ),
             ),
@@ -657,7 +675,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                     loading: () => const LoadingIndicator(),
                     error: (error, _) => ErrorView.fromException(
                       error,
-                      onRetry: () => ref.invalidate(paymentsProvider(_periodParams)),
+                      onRetry: () => ref.invalidate(paymentsStreamByPeriodProvider(_periodParams)),
                     ),
                     data: (payments) {
                       // Если нужна фильтрация по своим ученикам, ждём загрузки myStudentIds
@@ -725,8 +743,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
                       return RefreshIndicator(
                         onRefresh: () async {
-                          ref.invalidate(paymentsProvider(_periodParams));
-                          ref.invalidate(periodTotalProvider(_periodParams));
+                          ref.invalidate(paymentsStreamByPeriodProvider(_periodParams));
                           ref.invalidate(myStudentIdsProvider(widget.institutionId));
                         },
                         child: _buildPaymentsList(filteredPayments, myStudentIds),
@@ -961,7 +978,6 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
         paymentPlanId: _selectedPlan?.id,
         amount: double.parse(_amountController.text),
         lessonsCount: int.parse(_lessonsController.text),
-        validityDays: int.parse(_validityController.text),
         paidAt: _selectedDate,
         comment: comment.isEmpty ? null : comment,
       );

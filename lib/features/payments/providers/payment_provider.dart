@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/features/payments/repositories/payment_repository.dart';
+import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/subscriptions/repositories/subscription_repository.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/shared/models/payment.dart';
-import 'package:kabinet/shared/models/payment_plan.dart';
 
 /// Провайдер репозитория оплат
 final paymentRepositoryProvider = Provider<PaymentRepository>((ref) {
@@ -64,13 +64,6 @@ final periodTotalProvider =
   return total;
 });
 
-/// Провайдер тарифов заведения
-final paymentPlansProvider =
-    FutureProvider.family<List<PaymentPlan>, String>((ref, institutionId) async {
-  final repo = ref.watch(paymentRepositoryProvider);
-  return repo.getPlans(institutionId);
-});
-
 /// Стрим оплат (realtime)
 final paymentsStreamProvider =
     StreamProvider.family<List<Payment>, String>((ref, institutionId) {
@@ -114,20 +107,21 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
 
   PaymentController(this._repo, this._subscriptionRepo, this._ref) : super(const AsyncValue.data(null));
 
-  /// Создать оплату и подписку
+  /// Создать оплату
+  /// Тариф используется только для автозаполнения полей, подписка НЕ создаётся
+  /// Занятия добавляются в prepaid_lessons_count через триггер в БД
   Future<Payment?> create({
     required String institutionId,
     required String studentId,
     String? paymentPlanId,
     required double amount,
     required int lessonsCount,
-    int validityDays = 30, // Срок действия подписки
     DateTime? paidAt,
     String? comment,
   }) async {
     state = const AsyncValue.loading();
     try {
-      // Создаём платёж
+      // Создаём платёж (триггер автоматически добавит занятия в prepaid_lessons_count)
       final payment = await _repo.create(
         institutionId: institutionId,
         studentId: studentId,
@@ -138,22 +132,8 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         comment: comment,
       );
 
-      // Создаём подписку ТОЛЬКО для абонементов (пакет > 1 занятия)
-      // Разовая оплата (1 занятие) НЕ создаёт подписку
-      if (lessonsCount > 1) {
-        final expiresAt = DateTime.now().add(Duration(days: validityDays));
-        await _subscriptionRepo.create(
-          institutionId: institutionId,
-          studentId: studentId,
-          paymentId: payment.id,
-          lessonsTotal: lessonsCount,
-          expiresAt: expiresAt,
-        );
-        _ref.invalidate(studentSubscriptionsProvider(studentId));
-        _ref.invalidate(activeSubscriptionsProvider(studentId));
-      }
-
       _ref.invalidate(studentPaymentsProvider(studentId));
+      _ref.invalidate(studentProvider(studentId));
       // Гибридный Realtime: инвалидируем stream для немедленного обновления
       _ref.invalidate(paymentsStreamProvider(institutionId));
       state = const AsyncValue.data(null);
@@ -184,6 +164,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
       );
 
       _ref.invalidate(studentPaymentsProvider(studentId));
+      _ref.invalidate(studentProvider(studentId));
       // Гибридный Realtime: инвалидируем stream для немедленного обновления
       _ref.invalidate(paymentsStreamProvider(institutionId));
       state = const AsyncValue.data(null);
@@ -191,65 +172,6 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       return null;
-    }
-  }
-
-  Future<PaymentPlan?> createPlan({
-    required String institutionId,
-    required String name,
-    required double price,
-    required int lessonsCount,
-    int validityDays = 30,
-  }) async {
-    state = const AsyncValue.loading();
-    try {
-      final plan = await _repo.createPlan(
-        institutionId: institutionId,
-        name: name,
-        price: price,
-        lessonsCount: lessonsCount,
-        validityDays: validityDays,
-      );
-
-      _ref.invalidate(paymentPlansProvider(institutionId));
-      state = const AsyncValue.data(null);
-      return plan;
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      return null;
-    }
-  }
-
-  Future<bool> updatePlan(
-    String id, {
-    required String institutionId,
-    String? name,
-    double? price,
-    int? lessonsCount,
-    int? validityDays,
-  }) async {
-    state = const AsyncValue.loading();
-    try {
-      await _repo.updatePlan(id, name: name, price: price, lessonsCount: lessonsCount, validityDays: validityDays);
-      _ref.invalidate(paymentPlansProvider(institutionId));
-      state = const AsyncValue.data(null);
-      return true;
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      return false;
-    }
-  }
-
-  Future<bool> archivePlan(String id, String institutionId) async {
-    state = const AsyncValue.loading();
-    try {
-      await _repo.archivePlan(id);
-      _ref.invalidate(paymentPlansProvider(institutionId));
-      state = const AsyncValue.data(null);
-      return true;
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      return false;
     }
   }
 
@@ -272,6 +194,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         comment: comment,
       );
       _ref.invalidate(studentPaymentsProvider(studentId));
+      _ref.invalidate(studentProvider(studentId));
       state = const AsyncValue.data(null);
       return payment;
     } catch (e, st) {
@@ -286,6 +209,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
       await _repo.delete(paymentId);
       if (studentId != null) {
         _ref.invalidate(studentPaymentsProvider(studentId));
+        _ref.invalidate(studentProvider(studentId));
       }
       state = const AsyncValue.data(null);
       return true;
@@ -307,6 +231,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
       final success = await _repo.deleteByLessonId(lessonId);
       if (success && studentId != null) {
         _ref.invalidate(studentPaymentsProvider(studentId));
+        _ref.invalidate(studentProvider(studentId));
       }
       state = const AsyncValue.data(null);
       return success;
@@ -355,6 +280,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
       // Инвалидируем провайдеры для всех участников
       for (final studentId in studentIds) {
         _ref.invalidate(studentPaymentsProvider(studentId));
+        _ref.invalidate(studentProvider(studentId));
         _ref.invalidate(studentSubscriptionsProvider(studentId));
         _ref.invalidate(studentAllSubscriptionsProvider(studentId));
         _ref.invalidate(activeSubscriptionsProvider(studentId));
