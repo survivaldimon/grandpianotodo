@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/core/theme/theme_provider.dart';
 import 'package:kabinet/features/auth/providers/auth_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
@@ -206,6 +207,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: () {
                   context.push('/institutions/$institutionId/profile');
                 },
+              ),
+              ListTile(
+                leading: const Icon(Icons.brightness_6),
+                title: const Text('Тема оформления'),
+                subtitle: Text(getThemeModeLabel(ref.watch(themeModeProvider))),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showThemeDialog(context, ref),
               ),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
@@ -509,6 +517,58 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Диалог выбора темы оформления
+  void _showThemeDialog(BuildContext context, WidgetRef ref) {
+    final currentMode = ref.read(themeModeProvider);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Тема оформления'),
+        contentPadding: const EdgeInsets.only(top: 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<ThemeMode>(
+              title: const Text('Как в системе'),
+              subtitle: const Text('Автоматически'),
+              value: ThemeMode.system,
+              groupValue: currentMode,
+              onChanged: (mode) {
+                ref.read(themeModeProvider.notifier).setThemeMode(mode!);
+                Navigator.pop(ctx);
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Тёмная'),
+              value: ThemeMode.dark,
+              groupValue: currentMode,
+              onChanged: (mode) {
+                ref.read(themeModeProvider.notifier).setThemeMode(mode!);
+                Navigator.pop(ctx);
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Светлая'),
+              value: ThemeMode.light,
+              groupValue: currentMode,
+              onChanged: (mode) {
+                ref.read(themeModeProvider.notifier).setThemeMode(mode!);
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
+        ],
       ),
     );
   }

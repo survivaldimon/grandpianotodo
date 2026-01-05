@@ -134,7 +134,7 @@ class _MemberPermissionsScreenState
                 // Заголовок с именем участника
                 Container(
                   padding: const EdgeInsets.all(16),
-                  color: AppColors.surfaceVariant,
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -150,7 +150,7 @@ class _MemberPermissionsScreenState
                                 ),
                                 Text(
                                   _roleName,
-                                  style: TextStyle(color: AppColors.textSecondary),
+                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 ),
                               ],
                             ),

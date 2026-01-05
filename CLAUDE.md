@@ -90,6 +90,12 @@
   - Realtime обновление баланса ученика после операций с оплатами
   - Удаление дублирующегося `paymentPlansProvider`
   - Исправление "Итого" для отображения только видимых оплат
+- **`SESSION_2026_01_05_DARK_THEME.md`** — тёмная тема:
+  - Полноценная тёмная тема для всего приложения
+  - Провайдер темы (SharedPreferences + Riverpod)
+  - Выбор темы в настройках (система/тёмная/светлая)
+  - Исправление hardcoded цветов во всех экранах
+  - Удаление устаревшего экрана расписания кабинета
 
 ## Валюта
 
@@ -833,6 +839,63 @@ visibleTotal = accessFiltered.fold<double>(0.0, (sum, p) => sum + p.amount);
 
 **Файл:** `lib/features/payments/screens/payments_screen.dart`
 
+### 36. Тёмная тема (Dark Theme)
+Приложение поддерживает тёмную тему с тремя режимами: система, тёмная, светлая.
+
+**Архитектура:**
+```
+lib/core/theme/
+├── app_colors.dart      # Палитра цветов (light + dark)
+├── app_theme.dart       # ThemeData (lightTheme + darkTheme)
+└── theme_provider.dart  # Riverpod провайдер + SharedPreferences
+```
+
+**Выбор темы:**
+- Настройки → "Тема оформления"
+- По умолчанию: "Как в системе"
+- Сохраняется в SharedPreferences
+
+**ВАЖНО: Theme-aware цвета**
+При создании UI **НИКОГДА** не используй hardcoded цвета:
+
+```dart
+// ❌ НЕПРАВИЛЬНО
+fillColor: Colors.grey[50],
+color: AppColors.textSecondary,
+const BoxDecoration(color: AppColors.surface),
+
+// ✅ ПРАВИЛЬНО
+fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+color: Theme.of(context).colorScheme.onSurfaceVariant,
+BoxDecoration(color: Theme.of(context).colorScheme.surface),
+```
+
+**Справочник ColorScheme:**
+| Назначение | Свойство |
+|------------|----------|
+| Основной фон | `colorScheme.surface` |
+| Фон полей ввода | `colorScheme.surfaceContainerLow` |
+| Отключённый фон | `colorScheme.surfaceContainerHighest` |
+| Основной текст | `colorScheme.onSurface` |
+| Вторичный текст | `colorScheme.onSurfaceVariant` |
+| Границы | `dividerColor` или `colorScheme.outlineVariant` |
+| Hint текст | `colorScheme.outline` |
+
+**Ключевые файлы:**
+- `lib/core/theme/theme_provider.dart` — провайдер темы
+- `lib/features/institution/screens/settings_screen.dart` — UI выбора темы
+
+### 37. Экран списка кабинетов
+Настройки → Кабинеты — управление кабинетами заведения.
+
+**Поведение:**
+- Клик на карточку кабинета → открывается форма редактирования
+- Меню (⋮) → "Редактировать" или "Удалить"
+- Режим сортировки: стрелки вверх/вниз для изменения порядка
+
+**Файл:** `lib/features/rooms/screens/rooms_screen.dart`
+
+**Примечание:** Экран расписания отдельного кабинета (`schedule_screen.dart`) был удалён как избыточный — основное расписание показывает все кабинеты.
 
 ## CI/CD
 

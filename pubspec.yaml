@@ -28,6 +28,7 @@ dependencies:
   equatable: ^2.0.7
   fpdart: ^1.1.0
   collection: ^1.18.0
+  shared_preferences: ^2.2.2
 
   # UI
   flutter_svg: ^2.0.16

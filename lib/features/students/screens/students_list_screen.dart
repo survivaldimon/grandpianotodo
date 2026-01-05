@@ -740,14 +740,14 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
           Icon(
             Icons.filter_list_off,
             size: 64,
-            color: Colors.grey[400],
+            color: Theme.of(context).colorScheme.outline,
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Нет учеников по заданным фильтрам',
             style: TextStyle(
               fontSize: 16,
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
@@ -847,7 +847,7 @@ class _FilterButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isActive ? AppColors.primary : Colors.grey[300]!,
+              color: isActive ? AppColors.primary : Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
           child: Row(
@@ -856,7 +856,7 @@ class _FilterButton extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: isActive ? AppColors.primary : AppColors.textPrimary,
+                  color: isActive ? AppColors.primary : Theme.of(context).colorScheme.onSurface,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                   fontSize: 14,
                 ),
@@ -865,7 +865,7 @@ class _FilterButton extends StatelessWidget {
               Icon(
                 Icons.arrow_drop_down,
                 size: 20,
-                color: isActive ? AppColors.primary : AppColors.textSecondary,
+                color: isActive ? AppColors.primary : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -982,9 +982,9 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1004,7 +1004,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1027,11 +1027,11 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Новый ученик',
                             style: TextStyle(
                               fontSize: 22,
@@ -1041,7 +1041,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                           Text(
                             'Заполните данные ученика',
                             style: TextStyle(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
                             ),
                           ),
@@ -1063,7 +1063,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.words,
                   validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя ученика' : null,
@@ -1081,7 +1081,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   keyboardType: TextInputType.phone,
                 ),
@@ -1123,11 +1123,11 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           filled: true,
-                          fillColor: Colors.grey[100],
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                         ),
                         child: Text(
                           teacherName,
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                         ),
                       );
                     }
@@ -1141,11 +1141,11 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           filled: true,
-                          fillColor: Colors.grey[50],
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                         ),
-                        child: const Text(
+                        child: Text(
                           'Нет доступных преподавателей',
-                          style: TextStyle(color: AppColors.textSecondary),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                       );
                     }
@@ -1159,8 +1159,9 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[50],
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                       ),
+                      dropdownColor: Theme.of(context).colorScheme.surfaceContainer,
                       hint: const Text('Выберите преподавателя'),
                       items: activeMembers.map((member) => DropdownMenuItem(
                         value: member,
@@ -1197,8 +1198,9 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[50],
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                       ),
+                      dropdownColor: Theme.of(context).colorScheme.surfaceContainer,
                       hint: const Text('Выберите направление'),
                       items: activeSubjects.map((subject) {
                         final color = subject.color != null
@@ -1239,7 +1241,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   maxLines: 2,
                 ),
@@ -1334,16 +1336,16 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     return Container(
       height: 56,
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          Icon(Icons.hourglass_empty, color: Colors.grey[400]),
+          Icon(Icons.hourglass_empty, color: Theme.of(context).colorScheme.outline),
           const SizedBox(width: 12),
-          Text(label, style: TextStyle(color: Colors.grey[500])),
+          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.outline)),
         ],
       ),
     );
@@ -1382,13 +1384,13 @@ class _StudentCard extends StatelessWidget {
             Icon(
               hasDebt ? Icons.warning_amber : Icons.school,
               size: 14,
-              color: hasDebt ? AppColors.error : AppColors.textSecondary,
+              color: hasDebt ? AppColors.error : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 4),
             Text(
               '${student.balance} занятий',
               style: TextStyle(
-                color: hasDebt ? AppColors.error : AppColors.textSecondary,
+                color: hasDebt ? AppColors.error : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],

@@ -287,6 +287,9 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     TimeOfDay? endTime,
     String? comment,
     LessonStatus? status,
+    String? studentId,
+    String? subjectId,
+    String? lessonTypeId,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -312,6 +315,9 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         startTime: startTime,
         endTime: endTime,
         comment: comment,
+        studentId: studentId,
+        subjectId: subjectId,
+        lessonTypeId: lessonTypeId,
       );
 
       if (status != null) {

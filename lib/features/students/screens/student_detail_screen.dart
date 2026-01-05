@@ -809,7 +809,7 @@ class _LessonStatsCard extends ConsumerWidget {
         }
 
         return Card(
-          color: Colors.grey[100],
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -818,7 +818,7 @@ class _LessonStatsCard extends ConsumerWidget {
                 Text(
                   'Статистика занятий',
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
                 const SizedBox(height: 12),
@@ -1487,9 +1487,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
     });
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1509,7 +1509,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1565,7 +1565,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -1691,7 +1691,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                     hintText: 'Размер скидки',
                                     suffixText: '₸',
                                     filled: true,
-                                    fillColor: Colors.white,
+                                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                                     contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 12,
                                       vertical: 12,
@@ -2330,7 +2330,7 @@ class _LessonTypesSection extends ConsumerWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: Theme.of(context).colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),

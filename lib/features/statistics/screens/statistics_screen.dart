@@ -530,7 +530,7 @@ class _GeneralTab extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -542,7 +542,7 @@ class _GeneralTab extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           'Карта: ${stats.cardCount} оплат (${_calcPercent(stats.cardTotal, stats.totalPayments)}%)',
-                          style: const TextStyle(fontSize: 13),
+                          style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
                         ),
                       ),
                     ],
@@ -555,7 +555,7 @@ class _GeneralTab extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           'Наличные: ${stats.cashCount} оплат (${_calcPercent(stats.cashTotal, stats.totalPayments)}%)',
-                          style: const TextStyle(fontSize: 13),
+                          style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
                         ),
                       ),
                     ],
@@ -902,7 +902,7 @@ class _StudentsTab extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -1578,7 +1578,7 @@ class _PaymentPlanStatCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey[50],
+                color: Theme.of(context).colorScheme.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -1819,7 +1819,7 @@ class _StatCard extends StatelessWidget {
                 child: Text(
                   item.label,
                   style: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12,
                   ),
                   overflow: TextOverflow.ellipsis,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
@@ -179,6 +178,15 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final workStartHour = institutionAsync.valueOrNull?.workStartHour ?? 8;
     final workEndHour = institutionAsync.valueOrNull?.workEndHour ?? 22;
 
+    // Получаем цвета преподавателей
+    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final teacherColors = membersAsync.maybeWhen(
+      data: (members) => {
+        for (final m in members) m.userId: m.color,
+      },
+      orElse: () => <String, String?>{},
+    );
+
     // Получаем название выбранного кабинета для заголовка
     String title = 'Расписание';
     if (_selectedRoomId != null) {
@@ -259,8 +267,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           const Divider(height: 1),
           Expanded(
             child: _viewMode == ScheduleViewMode.day
-                ? _buildDayView(roomsAsync, lessonsAsync, bookingsAsync, canManageRooms, workStartHour, workEndHour)
-                : _buildWeekView(roomsAsync, canManageRooms, workStartHour, workEndHour),
+                ? _buildDayView(roomsAsync, lessonsAsync, bookingsAsync, canManageRooms, workStartHour, workEndHour, teacherColors)
+                : _buildWeekView(roomsAsync, canManageRooms, workStartHour, workEndHour, teacherColors),
           ),
         ],
       ),
@@ -279,6 +287,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     bool canManageRooms,
     int workStartHour,
     int workEndHour,
+    Map<String, String?> teacherColors,
   ) {
     // Используем valueOrNull для предотвращения моргания при смене даты
     final rooms = roomsAsync.valueOrNull;
@@ -323,6 +332,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       canManageRooms: canManageRooms,
       startHour: effectiveHours.$1,
       endHour: effectiveHours.$2,
+      teacherColors: teacherColors,
       onLessonTap: _showLessonDetail,
       onBookingTap: _showBookingDetail,
       onRoomTap: (roomId, currentOffset) {
@@ -397,6 +407,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     bool canManageRooms,
     int workStartHour,
     int workEndHour,
+    Map<String, String?> teacherColors,
   ) {
     final weekStart = InstitutionWeekParams.getWeekStart(_selectedDate);
     final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
@@ -444,6 +455,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       canManageRooms: canManageRooms,
       startHour: effectiveHours.$1,
       endHour: effectiveHours.$2,
+      teacherColors: teacherColors,
       onRoomTap: (roomId, currentOffset) {
         setState(() {
           // Всегда сохраняем текущую позицию скролла
@@ -597,7 +609,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
               },
             ),
             ListTile(
-              leading: Icon(Icons.lock, color: AppColors.warning),
+              leading: Icon(Icons.lock, color: Colors.grey[700]),
               title: const Text('Забронировать кабинеты'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -932,7 +944,7 @@ class _WeekDaySelectorState extends State<_WeekDaySelector> {
                       AppDateUtils.formatShortWeekday(date),
                       style: TextStyle(
                         fontSize: 12,
-                        color: isSelected ? Colors.white : AppColors.textSecondary,
+                        color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -941,7 +953,7 @@ class _WeekDaySelectorState extends State<_WeekDaySelector> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                        color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -967,6 +979,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final bool canManageRooms; // Может ли пользователь управлять кабинетами
   final int startHour;
   final int endHour;
+  final Map<String, String?> teacherColors; // userId → hex color
   final void Function(Lesson) onLessonTap;
   final void Function(Booking) onBookingTap;
   final void Function(String roomId, double currentOffset) onRoomTap;
@@ -987,6 +1000,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
     required this.onAddLesson,
     required this.startHour,
     required this.endHour,
+    required this.teacherColors,
     this.selectedRoomId,
     this.restoreScrollOffset,
     this.canManageRooms = false,
@@ -1158,9 +1172,9 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
         // Заголовки кабинетов
         Container(
           height: 40,
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-            color: AppColors.surface,
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
+            color: Theme.of(context).colorScheme.surface,
           ),
           child: Row(
             children: [
@@ -1321,7 +1335,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                         child: Column(
                                           children: [
                                             for (int hour = widget.startHour; hour <= widget.endHour; hour++)
-                                              _buildCell(rooms[i], hour, lessons),
+                                              _buildCell(rooms[i], hour, lessons, bookings),
                                           ],
                                         ),
                                       ),
@@ -1359,7 +1373,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                           child: Column(
                                             children: [
                                               for (int hour = widget.startHour; hour <= widget.endHour; hour++)
-                                                _buildCell(rooms[i], hour, lessons),
+                                                _buildCell(rooms[i], hour, lessons, bookings),
                                             ],
                                           ),
                                         ),
@@ -1386,7 +1400,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
 
   /// Находит наибольший свободный промежуток в ячейке часа
   /// Возвращает (startMinuteInHour, endMinuteInHour) или null если нет свободного места >= 15 мин
-  ({int start, int end})? _findLargestGapInHour(Room room, int hour, List<Lesson> lessons) {
+  ({int start, int end})? _findLargestGapInHour(Room room, int hour, List<Lesson> lessons, List<Booking> bookings) {
     const minGapMinutes = 15;
     final hourStart = hour * 60;
     final hourEnd = (hour + 1) * 60;
@@ -1405,6 +1419,24 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
         occupiedIntervals.add((
           start: lessonStart.clamp(hourStart, hourEnd),
           end: lessonEnd.clamp(hourStart, hourEnd),
+        ));
+      }
+    }
+
+    // Добавляем брони как занятые интервалы
+    for (final booking in bookings) {
+      // Проверяем, относится ли бронь к этому кабинету
+      final hasRoom = booking.rooms.any((r) => r.id == room.id);
+      if (!hasRoom) continue;
+
+      final bookingStart = booking.startTime.hour * 60 + booking.startTime.minute;
+      final bookingEnd = booking.endTime.hour * 60 + booking.endTime.minute;
+
+      // Пересекается ли бронь с этим часом?
+      if (bookingEnd > hourStart && bookingStart < hourEnd) {
+        occupiedIntervals.add((
+          start: bookingStart.clamp(hourStart, hourEnd),
+          end: bookingEnd.clamp(hourStart, hourEnd),
         ));
       }
     }
@@ -1454,8 +1486,8 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     return largest;
   }
 
-  Widget _buildCell(Room room, int hour, List<Lesson> lessons) {
-    final gap = _findLargestGapInHour(room, hour, lessons);
+  Widget _buildCell(Room room, int hour, List<Lesson> lessons, List<Booking> bookings) {
+    final gap = _findLargestGapInHour(room, hour, lessons, bookings);
 
     if (gap == null) {
       // Нет свободного места >= 15 мин
@@ -1589,17 +1621,32 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
+  /// Возвращает основной цвет занятия (цвет преподавателя или fallback)
   Color _getLessonColor(Lesson lesson) {
+    // Цвет преподавателя (если есть)
+    final teacherColor = widget.teacherColors[lesson.teacherId];
+    if (teacherColor != null && teacherColor.isNotEmpty) {
+      try {
+        return Color(int.parse('FF${teacherColor.replaceAll('#', '')}', radix: 16));
+      } catch (_) {}
+    }
+
+    // Fallback на старую логику
+    if (lesson.group != null) {
+      return AppColors.lessonGroup;
+    }
+    return AppColors.lessonIndividual;
+  }
+
+  /// Возвращает цвет контура по статусу занятия (или null если обычный)
+  Color? _getStatusBorderColor(Lesson lesson) {
     if (lesson.status == LessonStatus.cancelled) {
       return AppColors.error;
     }
     if (lesson.status == LessonStatus.completed) {
       return AppColors.success;
     }
-    if (lesson.group != null) {
-      return AppColors.lessonGroup;
-    }
-    return AppColors.lessonIndividual;
+    return null;
   }
 
   /// Создаёт блоки для брони (один блок на каждый кабинет)
@@ -1646,9 +1693,9 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                 horizontal: horizontalPadding,
               ),
               decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.15),
+                color: Colors.grey.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(AppSizes.radiusS),
-                border: Border.all(color: AppColors.warning, width: 1.5),
+                border: Border.all(color: Colors.grey, width: 1.5),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1657,7 +1704,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                   Flexible(
                     child: Row(
                       children: [
-                        Icon(Icons.lock, size: iconSize, color: AppColors.warning),
+                        Icon(Icons.lock, size: iconSize, color: Colors.grey[700]),
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
@@ -1665,7 +1712,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: fontSize,
-                              color: AppColors.warning,
+                              color: Colors.grey[700],
                             ),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
@@ -1707,6 +1754,7 @@ class _WeekTimeGrid extends StatefulWidget {
   final bool canManageRooms; // Может ли пользователь управлять кабинетами
   final int startHour;
   final int endHour;
+  final Map<String, String?> teacherColors; // userId → hex color
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, DateTime date) onCellTap;
   final VoidCallback? onAddRoom;
@@ -1722,6 +1770,7 @@ class _WeekTimeGrid extends StatefulWidget {
     required this.onCellTap,
     required this.startHour,
     required this.endHour,
+    required this.teacherColors,
     this.selectedRoomId,
     this.restoreScrollOffset,
     this.canManageRooms = false,
@@ -1959,9 +2008,9 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             // Заголовки кабинетов (всегда показываем все, как в режиме День)
             Container(
               height: 40,
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.border)),
-                color: AppColors.surface,
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
+                color: Theme.of(context).colorScheme.surface,
               ),
               child: Row(
                 children: [
@@ -1969,14 +2018,14 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                   Container(
                     width: _WeekTimeGrid.dayLabelWidth,
                     alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      border: Border(right: BorderSide(color: AppColors.border)),
+                    decoration: BoxDecoration(
+                      border: Border(right: BorderSide(color: Theme.of(context).dividerColor)),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Неделя',
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -2194,8 +2243,8 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: isSelected ? AppColors.primary.withValues(alpha: 0.15) : null,
-              border: const Border(
-                left: BorderSide(color: AppColors.border, width: 0.5),
+              border: Border(
+                left: BorderSide(color: Theme.of(context).dividerColor, width: 0.5),
               ),
             ),
             child: Text(
@@ -2203,7 +2252,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                color: isSelected ? AppColors.primary : Theme.of(context).colorScheme.onSurface,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -2271,13 +2320,17 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     );
   }
 
+  /// Возвращает основной цвет занятия (цвет преподавателя или fallback)
   Color _getLessonColor(Lesson lesson) {
-    if (lesson.status == LessonStatus.cancelled) {
-      return AppColors.error;
+    // Цвет преподавателя (если есть)
+    final teacherColor = widget.teacherColors[lesson.teacherId];
+    if (teacherColor != null && teacherColor.isNotEmpty) {
+      try {
+        return Color(int.parse('FF${teacherColor.replaceAll('#', '')}', radix: 16));
+      } catch (_) {}
     }
-    if (lesson.status == LessonStatus.completed) {
-      return AppColors.success;
-    }
+
+    // Fallback на старую логику
     if (lesson.group != null) {
       return AppColors.lessonGroup;
     }
@@ -2365,155 +2418,296 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       }
     });
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+    // Определяем цвет по статусу или преподавателю
+    Color accentColor = AppColors.primary;
+    if (_isCancelled) {
+      accentColor = AppColors.error;
+    } else if (_isCompleted) {
+      accentColor = AppColors.success;
+    }
+
+    final participantName = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
+
+    // Получаем имя преподавателя из списка участников
+    final membersAsync = ref.watch(membersProvider(widget.institutionId));
+    final teacherName = membersAsync.maybeWhen(
+      data: (members) {
+        final teacher = members.where((m) => m.userId == lesson.teacherId).firstOrNull;
+        return teacher?.profile?.fullName;
+      },
+      orElse: () => null,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  lesson.student?.name ?? lesson.group?.name ?? 'Занятие',
-                  style: Theme.of(context).textTheme.titleLarge,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  widget.onUpdated();
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _InfoRow(icon: Icons.access_time, value: timeStr),
-          if (lesson.room != null)
-            _InfoRow(
-              icon: Icons.door_front_door,
-              value: lesson.room!.number != null
-                  ? 'Кабинет ${lesson.room!.number}'
-                  : lesson.room!.name,
-            ),
-          if (lesson.subject != null)
-            _InfoRow(icon: Icons.music_note, value: lesson.subject!.name),
-          if (lesson.lessonType != null)
-            _InfoRow(icon: Icons.category, value: lesson.lessonType!.name),
-          if (hasPrice)
-            _InfoRow(
-              icon: Icons.attach_money,
-              value: '${lesson.lessonType!.defaultPrice!.toStringAsFixed(0)} ₸',
-            ),
-          if (lesson.isRepeating)
-            const _InfoRow(
-              icon: Icons.repeat,
-              value: 'Повторяющееся занятие',
-            ),
-          const SizedBox(height: 16),
-
-          // Чекбоксы статуса
+          // Drag handle
           Container(
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
+              color: Theme.of(context).colorScheme.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
             ),
-            child: Row(
+          ),
+
+          Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Проведено
-                Expanded(
-                  child: _StatusCheckbox(
-                    label: 'Проведено',
-                    value: _isCompleted,
-                    color: AppColors.success,
-                    isLoading: _isLoading || controllerState.isLoading,
-                    onChanged: (value) => _handleStatusChange(completed: value),
-                  ),
-                ),
-                // Отменено
-                Expanded(
-                  child: _StatusCheckbox(
-                    label: 'Отменено',
-                    value: _isCancelled,
-                    color: AppColors.warning,
-                    isLoading: _isLoading || controllerState.isLoading,
-                    onChanged: (value) => _handleStatusChange(cancelled: value),
-                  ),
-                ),
-                // Оплачено (если есть цена и ученик)
-                if (hasPrice && hasStudent)
-                  Expanded(
-                    child: _StatusCheckbox(
-                      label: 'Оплачено',
-                      value: _isPaid,
-                      color: AppColors.primary,
-                      isLoading: _isLoading || controllerState.isLoading || _isLoadingPayment,
-                      onChanged: (value) {
-                        if (value == true) {
-                          _handlePayment();
-                        } else {
-                          _handleRemovePayment();
-                        }
+                // Заголовок с аватаром
+                Row(
+                  children: [
+                    // Аватар участника
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        lesson.group != null ? Icons.groups : Icons.person,
+                        color: accentColor,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Имя и преподаватель
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            participantName,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (teacherName != null) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.school, size: 14, color: AppColors.textSecondary),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    teacherName,
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 14,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    // Кнопка закрытия
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        widget.onUpdated();
+                        Navigator.pop(context);
                       },
                     ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // Информационная карточка
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
                   ),
+                  child: Column(
+                    children: [
+                      // Время
+                      _DetailRow(
+                        icon: Icons.access_time_rounded,
+                        label: 'Время',
+                        value: timeStr,
+                      ),
+                      // Кабинет
+                      if (lesson.room != null)
+                        _DetailRow(
+                          icon: Icons.door_front_door_rounded,
+                          label: 'Кабинет',
+                          value: lesson.room!.number != null
+                              ? '№${lesson.room!.number}'
+                              : lesson.room!.name,
+                        ),
+                      // Предмет
+                      if (lesson.subject != null)
+                        _DetailRow(
+                          icon: Icons.music_note_rounded,
+                          label: 'Предмет',
+                          value: lesson.subject!.name,
+                        ),
+                      // Тип занятия
+                      if (lesson.lessonType != null)
+                        _DetailRow(
+                          icon: Icons.category_rounded,
+                          label: 'Тип',
+                          value: lesson.lessonType!.name,
+                        ),
+                      // Стоимость
+                      if (hasPrice)
+                        _DetailRow(
+                          icon: Icons.payments_rounded,
+                          label: 'Стоимость',
+                          value: '${lesson.lessonType!.defaultPrice!.toStringAsFixed(0)} ₸',
+                          valueColor: AppColors.primary,
+                        ),
+                      // Повторяющееся
+                      if (lesson.isRepeating)
+                        _DetailRow(
+                          icon: Icons.repeat_rounded,
+                          label: 'Повтор',
+                          value: 'Да',
+                        ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Статусы
+                Row(
+                  children: [
+                    // Проведено
+                    Expanded(
+                      child: _StatusButton(
+                        label: 'Проведено',
+                        icon: Icons.check_circle_rounded,
+                        isActive: _isCompleted,
+                        color: AppColors.success,
+                        isLoading: _isLoading || controllerState.isLoading,
+                        onTap: () => _handleStatusChange(completed: !_isCompleted),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Отменено
+                    Expanded(
+                      child: _StatusButton(
+                        label: 'Отменено',
+                        icon: Icons.cancel_rounded,
+                        isActive: _isCancelled,
+                        color: AppColors.error,
+                        isLoading: _isLoading || controllerState.isLoading,
+                        onTap: () => _handleStatusChange(cancelled: !_isCancelled),
+                      ),
+                    ),
+                    // Оплачено (если есть цена и ученик)
+                    if (hasPrice && hasStudent) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatusButton(
+                          label: 'Оплачено',
+                          icon: Icons.monetization_on_rounded,
+                          isActive: _isPaid,
+                          color: AppColors.primary,
+                          isLoading: _isLoading || controllerState.isLoading || _isLoadingPayment,
+                          onTap: () {
+                            if (_isPaid) {
+                              _handleRemovePayment();
+                            } else {
+                              _handlePayment();
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // Кнопки действий
+                Row(
+                  children: [
+                    // Редактировать
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: controllerState.isLoading || _isLoading
+                            ? null
+                            : () {
+                                Navigator.pop(context);
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  builder: (ctx) => _EditLessonSheet(
+                                    lesson: lesson,
+                                    institutionId: widget.institutionId,
+                                    onUpdated: widget.onUpdated,
+                                  ),
+                                );
+                              },
+                        icon: const Icon(Icons.edit_rounded, size: 18),
+                        label: const Text('Изменить'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Удалить (только если есть право)
+                    if (canDelete) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: controllerState.isLoading || _isLoading
+                              ? null
+                              : _deleteLesson,
+                          icon: const Icon(Icons.delete_rounded, size: 18),
+                          label: const Text('Удалить'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            foregroundColor: AppColors.error,
+                            side: const BorderSide(color: AppColors.error),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                if (controllerState.isLoading || _isLoading)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+
+                const SizedBox(height: 8),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Кнопка редактирования
-          OutlinedButton.icon(
-            onPressed: controllerState.isLoading || _isLoading
-                ? null
-                : () {
-                    Navigator.pop(context);
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (ctx) => _EditLessonSheet(
-                        lesson: lesson,
-                        institutionId: widget.institutionId,
-                        onUpdated: widget.onUpdated,
-                      ),
-                    );
-                  },
-            icon: const Icon(Icons.edit),
-            label: const Text('Редактировать'),
-          ),
-
-          if (controllerState.isLoading || _isLoading)
-            const Padding(
-              padding: EdgeInsets.only(top: 16),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-
-          const SizedBox(height: 16),
-
-          // Кнопка удаления (только если есть право)
-          if (canDelete)
-            TextButton.icon(
-              onPressed: controllerState.isLoading || _isLoading
-                  ? null
-                  : _deleteLesson,
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('Удалить занятие'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.error,
-              ),
-            ),
-
-          const SizedBox(height: 8),
         ],
       ),
     );
@@ -2816,6 +3010,108 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
+/// Строка детальной информации в карточке занятия
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.textSecondary),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: TextStyle(
+              color: valueColor ?? AppColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Кнопка статуса занятия (проведено/отменено/оплачено)
+class _StatusButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isActive;
+  final Color color;
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  const _StatusButton({
+    required this.label,
+    required this.icon,
+    required this.isActive,
+    required this.color,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isActive ? color.withValues(alpha: 0.15) : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isActive ? color : AppColors.border,
+            width: isActive ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: isActive ? color : AppColors.textSecondary,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isActive ? color : AppColors.textSecondary,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Форма редактирования занятия
 class _EditLessonSheet extends ConsumerStatefulWidget {
   final Lesson lesson;
@@ -2836,10 +3132,10 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
   late DateTime _date;
-  Student? _selectedStudent;
-  Subject? _selectedSubject;
-  LessonType? _selectedLessonType;
-  Room? _selectedRoom;
+  String? _selectedStudentId;
+  String? _selectedSubjectId;
+  String? _selectedLessonTypeId;
+  String? _selectedRoomId;
 
   @override
   void initState() {
@@ -2847,6 +3143,10 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
     _startTime = widget.lesson.startTime;
     _endTime = widget.lesson.endTime;
     _date = widget.lesson.date;
+    _selectedStudentId = widget.lesson.studentId;
+    _selectedSubjectId = widget.lesson.subjectId;
+    _selectedLessonTypeId = widget.lesson.lessonTypeId;
+    _selectedRoomId = widget.lesson.roomId;
   }
 
   @override
@@ -2970,22 +3270,19 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               loading: () => const SizedBox.shrink(),
               error: (e, _) => const SizedBox.shrink(),
               data: (rooms) {
-                _selectedRoom ??= rooms.firstWhere(
-                  (r) => r.id == widget.lesson.roomId,
-                  orElse: () => rooms.first,
-                );
-                return DropdownButtonFormField<Room>(
+                final selectedRoom = rooms.where((r) => r.id == _selectedRoomId).firstOrNull;
+                return DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
                     labelText: 'Кабинет',
                     prefixIcon: Icon(Icons.door_front_door),
                   ),
-                  value: _selectedRoom,
-                  items: rooms.map((r) => DropdownMenuItem<Room>(
-                    value: r,
+                  value: selectedRoom?.id,
+                  items: rooms.map((r) => DropdownMenuItem<String>(
+                    value: r.id,
                     child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
                   )).toList(),
-                  onChanged: (room) {
-                    setState(() => _selectedRoom = room);
+                  onChanged: (roomId) {
+                    setState(() => _selectedRoomId = roomId);
                   },
                 );
               },
@@ -2997,22 +3294,19 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               loading: () => const CircularProgressIndicator(),
               error: (e, _) => ErrorView.inline(e),
               data: (students) {
-                _selectedStudent ??= students.firstWhere(
-                  (s) => s.id == widget.lesson.studentId,
-                  orElse: () => students.first,
-                );
-                return DropdownButtonFormField<Student?>(
+                final selectedStudent = students.where((s) => s.id == _selectedStudentId).firstOrNull;
+                return DropdownButtonFormField<String?>(
                   decoration: const InputDecoration(
                     labelText: 'Ученик',
                     prefixIcon: Icon(Icons.person),
                   ),
-                  value: _selectedStudent,
-                  items: students.map((s) => DropdownMenuItem<Student?>(
-                    value: s,
+                  value: selectedStudent?.id,
+                  items: students.map((s) => DropdownMenuItem<String?>(
+                    value: s.id,
                     child: Text(s.name),
                   )).toList(),
-                  onChanged: (student) {
-                    setState(() => _selectedStudent = student);
+                  onChanged: (studentId) {
+                    setState(() => _selectedStudentId = studentId);
                   },
                 );
               },
@@ -3025,30 +3319,24 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               error: (e, _) => const SizedBox.shrink(),
               data: (subjects) {
                 if (subjects.isEmpty) return const SizedBox.shrink();
-                _selectedSubject ??= widget.lesson.subjectId != null
-                    ? subjects.firstWhere(
-                        (s) => s.id == widget.lesson.subjectId,
-                        orElse: () => subjects.first,
-                      )
-                    : null;
-                return DropdownButtonFormField<Subject?>(
+                return DropdownButtonFormField<String?>(
                   decoration: const InputDecoration(
                     labelText: 'Предмет',
                     prefixIcon: Icon(Icons.music_note),
                   ),
-                  value: _selectedSubject,
+                  value: _selectedSubjectId,
                   items: [
-                    const DropdownMenuItem<Subject?>(
+                    const DropdownMenuItem<String?>(
                       value: null,
                       child: Text('Не выбран'),
                     ),
-                    ...subjects.map((s) => DropdownMenuItem<Subject?>(
-                      value: s,
+                    ...subjects.map((s) => DropdownMenuItem<String?>(
+                      value: s.id,
                       child: Text(s.name),
                     )),
                   ],
-                  onChanged: (subject) {
-                    setState(() => _selectedSubject = subject);
+                  onChanged: (subjectId) {
+                    setState(() => _selectedSubjectId = subjectId);
                   },
                 );
               },
@@ -3061,38 +3349,35 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               error: (e, _) => const SizedBox.shrink(),
               data: (lessonTypes) {
                 if (lessonTypes.isEmpty) return const SizedBox.shrink();
-                _selectedLessonType ??= widget.lesson.lessonTypeId != null
-                    ? lessonTypes.firstWhere(
-                        (lt) => lt.id == widget.lesson.lessonTypeId,
-                        orElse: () => lessonTypes.first,
-                      )
-                    : null;
-                return DropdownButtonFormField<LessonType?>(
+                return DropdownButtonFormField<String?>(
                   decoration: const InputDecoration(
                     labelText: 'Тип занятия',
                     prefixIcon: Icon(Icons.category),
                   ),
-                  value: _selectedLessonType,
+                  value: _selectedLessonTypeId,
                   items: [
-                    const DropdownMenuItem<LessonType?>(
+                    const DropdownMenuItem<String?>(
                       value: null,
                       child: Text('Не выбран'),
                     ),
-                    ...lessonTypes.map((lt) => DropdownMenuItem<LessonType?>(
-                      value: lt,
+                    ...lessonTypes.map((lt) => DropdownMenuItem<String?>(
+                      value: lt.id,
                       child: Text('${lt.name} (${lt.defaultDurationMinutes} мин)'),
                     )),
                   ],
-                  onChanged: (lessonType) {
+                  onChanged: (lessonTypeId) {
                     setState(() {
-                      _selectedLessonType = lessonType;
-                      if (lessonType != null) {
-                        final startMinutes = _startTime.hour * 60 + _startTime.minute;
-                        final endMinutes = startMinutes + lessonType.defaultDurationMinutes;
-                        _endTime = TimeOfDay(
-                          hour: endMinutes ~/ 60,
-                          minute: endMinutes % 60,
-                        );
+                      _selectedLessonTypeId = lessonTypeId;
+                      if (lessonTypeId != null) {
+                        final lessonType = lessonTypes.where((lt) => lt.id == lessonTypeId).firstOrNull;
+                        if (lessonType != null) {
+                          final startMinutes = _startTime.hour * 60 + _startTime.minute;
+                          final endMinutes = startMinutes + lessonType.defaultDurationMinutes;
+                          _endTime = TimeOfDay(
+                            hour: endMinutes ~/ 60,
+                            minute: endMinutes % 60,
+                          );
+                        }
                       }
                     });
                   },
@@ -3210,10 +3495,13 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
           roomId: lesson.roomId,
           date: lesson.date,
           institutionId: widget.institutionId,
-          newRoomId: _selectedRoom?.id,
+          newRoomId: _selectedRoomId,
           newDate: _date,
           startTime: _startTime,
           endTime: _endTime,
+          studentId: _selectedStudentId,
+          subjectId: _selectedSubjectId,
+          lessonTypeId: _selectedLessonTypeId,
         );
         message = 'Занятие обновлено';
       }
@@ -3232,10 +3520,13 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
         roomId: lesson.roomId,
         date: lesson.date,
         institutionId: widget.institutionId,
-        newRoomId: _selectedRoom?.id,
+        newRoomId: _selectedRoomId,
         newDate: _date,
         startTime: _startTime,
         endTime: _endTime,
+        studentId: _selectedStudentId,
+        subjectId: _selectedSubjectId,
+        lessonTypeId: _selectedLessonTypeId,
       );
 
       if (success && mounted) {
@@ -3334,9 +3625,9 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -3356,7 +3647,7 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -3535,9 +3826,9 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -3557,7 +3848,7 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -3767,9 +4058,9 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -3789,7 +4080,7 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -4056,9 +4347,9 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -4078,7 +4369,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -5937,7 +6228,7 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -6167,7 +6458,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: Theme.of(context).colorScheme.outlineVariant,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

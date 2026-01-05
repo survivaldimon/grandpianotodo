@@ -10,7 +10,6 @@ import 'package:kabinet/features/institution/screens/join_institution_screen.dar
 import 'package:kabinet/features/dashboard/screens/main_shell.dart';
 import 'package:kabinet/features/dashboard/screens/dashboard_screen.dart';
 import 'package:kabinet/features/rooms/screens/rooms_screen.dart';
-import 'package:kabinet/features/schedule/screens/schedule_screen.dart';
 import 'package:kabinet/features/schedule/screens/all_rooms_schedule_screen.dart';
 import 'package:kabinet/features/students/screens/students_list_screen.dart';
 import 'package:kabinet/features/students/screens/student_detail_screen.dart';
@@ -121,15 +120,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => RoomsScreen(
               institutionId: state.pathParameters['institutionId']!,
             ),
-            routes: [
-              GoRoute(
-                path: ':roomId/schedule',
-                builder: (context, state) => ScheduleScreen(
-                  roomId: state.pathParameters['roomId']!,
-                  institutionId: state.pathParameters['institutionId']!,
-                ),
-              ),
-            ],
           ),
 
           // Students

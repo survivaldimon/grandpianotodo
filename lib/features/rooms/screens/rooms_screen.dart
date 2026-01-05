@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
@@ -99,9 +98,6 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         return _RoomCard(
           room: room,
           institutionId: widget.institutionId,
-          onTap: () {
-            context.go('/institutions/${widget.institutionId}/rooms/${room.id}/schedule');
-          },
         );
       },
     );
@@ -232,9 +228,9 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -254,7 +250,7 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -277,11 +273,11 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Новый кабинет',
                             style: TextStyle(
                               fontSize: 22,
@@ -291,7 +287,7 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                           Text(
                             'Заполните данные кабинета',
                             style: TextStyle(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
                             ),
                           ),
@@ -313,7 +309,7 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
@@ -334,7 +330,7 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
                 ),
@@ -378,12 +374,10 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
 class _RoomCard extends ConsumerWidget {
   final Room room;
   final String institutionId;
-  final VoidCallback onTap;
 
   const _RoomCard({
     required this.room,
     required this.institutionId,
-    required this.onTap,
   });
 
   @override
@@ -394,7 +388,7 @@ class _RoomCard extends ConsumerWidget {
         leading: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(AppSizes.radiusM),
           ),
           child: const Icon(
@@ -408,7 +402,7 @@ class _RoomCard extends ConsumerWidget {
           icon: const Icon(Icons.more_vert),
           onPressed: () => _showOptions(context, ref),
         ),
-        onTap: onTap,
+        onTap: () => _showEditDialog(context, ref),
       ),
     );
   }
@@ -420,14 +414,6 @@ class _RoomCard extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('Открыть расписание'),
-              onTap: () {
-                Navigator.pop(context);
-                onTap();
-              },
-            ),
             ListTile(
               leading: const Icon(Icons.edit),
               title: const Text('Редактировать'),
@@ -570,9 +556,9 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -592,7 +578,7 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -615,11 +601,11 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Редактировать кабинет',
                             style: TextStyle(
                               fontSize: 22,
@@ -629,7 +615,7 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                           Text(
                             'Измените данные кабинета',
                             style: TextStyle(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
                             ),
                           ),
@@ -651,7 +637,7 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
@@ -672,7 +658,7 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
                 ),

@@ -203,7 +203,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               onPressed: _resetFilters,
               tooltip: 'Сбросить фильтры',
               style: IconButton.styleFrom(
-                backgroundColor: Colors.grey[200],
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
                 padding: const EdgeInsets.all(8),
                 minimumSize: const Size(36, 36),
               ),
@@ -1326,9 +1326,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
         // Сохраняем контроллер сразу для использования в FAB
         _currentScrollController = scrollController;
         return Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1344,7 +1344,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: Theme.of(context).colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1417,7 +1417,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                   decoration: BoxDecoration(
                     color: _isFamilyMode
                         ? AppColors.primary.withValues(alpha: 0.1)
-                        : Colors.grey[100],
+                        : Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(12),
                     border: _isFamilyMode
                         ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
@@ -1523,7 +1523,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           const SizedBox(height: 8),
                           Container(
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[300]!),
+                              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             constraints: const BoxConstraints(maxHeight: 200),
@@ -1549,7 +1549,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                     radius: 16,
                                     backgroundColor: isSelected
                                         ? AppColors.primary
-                                        : Colors.grey[200],
+                                        : Theme.of(context).colorScheme.surfaceContainerHigh,
                                     child: Text(
                                       student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
                                       style: TextStyle(
@@ -1598,7 +1598,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           filled: true,
-                          fillColor: Colors.grey[50],
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                         ),
                         value: currentStudent,
                         items: students.map((s) => DropdownMenuItem(
@@ -1621,7 +1621,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -1710,7 +1710,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[50],
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                       ),
                       isExpanded: true,
                       value: currentPlan,
@@ -1737,7 +1737,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                     decoration: BoxDecoration(
                       color: _hasDiscount
                           ? AppColors.warning.withValues(alpha: 0.1)
-                          : Colors.grey[100],
+                          : Theme.of(context).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(12),
                       border: _hasDiscount
                           ? Border.all(color: AppColors.warning.withValues(alpha: 0.3))
@@ -1846,7 +1846,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   keyboardType: TextInputType.number,
                   validator: (v) {
@@ -1870,7 +1870,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           filled: true,
-                          fillColor: Colors.grey[50],
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                         ),
                         keyboardType: TextInputType.number,
                         validator: (v) {
@@ -1891,7 +1891,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           filled: true,
-                          fillColor: Colors.grey[50],
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                         ),
                         keyboardType: TextInputType.number,
                         validator: (v) {
@@ -1916,7 +1916,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   maxLines: 2,
                 ),
@@ -2366,7 +2366,7 @@ class _FilterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isActive ? AppColors.primary.withValues(alpha: 0.15) : Colors.grey[100],
+      color: isActive ? AppColors.primary.withValues(alpha: 0.15) : Theme.of(context).colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -2376,7 +2376,7 @@ class _FilterButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isActive ? AppColors.primary : Colors.grey[300]!,
+              color: isActive ? AppColors.primary : Theme.of(context).colorScheme.outlineVariant,
               width: isActive ? 1.5 : 1,
             ),
           ),
