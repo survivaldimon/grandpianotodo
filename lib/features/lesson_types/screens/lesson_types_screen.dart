@@ -48,13 +48,16 @@ class _LessonTypesScreenState extends ConsumerState<LessonTypesScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: lessonTypesAsync.when(
-        loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView.fromException(
-          error,
-          onRetry: () => ref.invalidate(lessonTypesProvider(widget.institutionId)),
-        ),
-        data: (lessonTypes) {
+      body: Builder(
+        builder: (context) {
+          final lessonTypes = lessonTypesAsync.valueOrNull;
+
+          // Показываем loading только при первой загрузке
+          if (lessonTypes == null) {
+            return const LoadingIndicator();
+          }
+
+          // Всегда показываем данные (даже если фоном ошибка)
           if (lessonTypes.isEmpty) {
             return EmptyState(
               icon: Icons.event_note_outlined,

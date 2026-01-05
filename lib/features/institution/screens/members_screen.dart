@@ -8,7 +8,6 @@ import 'package:kabinet/features/institution/providers/institution_provider.dart
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
-import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран управления участниками заведения
 class MembersScreen extends ConsumerStatefulWidget {
@@ -36,13 +35,16 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
       appBar: AppBar(
         title: const Text(AppStrings.teamMembers),
       ),
-      body: membersAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorView.fromException(
-          e,
-          onRetry: () => ref.invalidate(membersStreamProvider(widget.institutionId)),
-        ),
-        data: (members) {
+      body: Builder(
+        builder: (context) {
+          final members = membersAsync.valueOrNull;
+
+          // Показываем loading только при первой загрузке
+          if (members == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Всегда показываем данные (даже если фоном ошибка)
           if (members.isEmpty) {
             return const Center(
               child: Text('Нет участников'),

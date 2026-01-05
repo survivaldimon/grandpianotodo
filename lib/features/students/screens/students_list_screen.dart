@@ -6,7 +6,6 @@ import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
-import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/empty_state.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
@@ -290,17 +289,18 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
             ),
           ],
 
-          // Список учеников
+          // Список учеников (НИКОГДА не показываем ошибку - используем valueOrNull)
           Expanded(
-            child: studentsAsync.when(
-              loading: () => const LoadingIndicator(),
-              error: (error, _) => ErrorView.fromException(
-                error,
-                onRetry: () => ref.invalidate(filteredStudentsProvider(
-                  StudentFilterParams(institutionId: widget.institutionId, onlyMyStudents: !canManageAllStudents),
-                )),
-              ),
-              data: (students) {
+            child: Builder(
+              builder: (context) {
+                final students = studentsAsync.valueOrNull;
+
+                // Показываем loading только при первой загрузке (нет данных)
+                if (students == null) {
+                  return const LoadingIndicator();
+                }
+
+                // Всегда показываем данные (даже если фоном идёт обновление или ошибка)
                 // Применяем расширенные фильтры
                 final filteredStudents = _applyAdvancedFilters(
                   students,

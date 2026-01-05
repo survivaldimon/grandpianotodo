@@ -6,7 +6,6 @@ import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/features/statistics/repositories/statistics_repository.dart';
-import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран статистики
 class StatisticsScreen extends ConsumerStatefulWidget {
@@ -358,10 +357,13 @@ class _GeneralTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(generalStatsProvider(params));
 
-    return statsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorView.fromException(e),
-      data: (stats) => ListView(
+    final stats = statsAsync.valueOrNull;
+
+    if (stats == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // Занятия
@@ -565,7 +567,6 @@ class _GeneralTab extends ConsumerWidget {
             ),
           ],
         ],
-      ),
     );
   }
 
@@ -592,16 +593,18 @@ class _SubjectsTab extends ConsumerWidget {
     final generalStatsAsync = ref.watch(generalStatsProvider(params));
     final formatter = NumberFormat('#,###', 'ru_RU');
 
-    return statsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorView.fromException(e),
-      data: (stats) {
-        if (stats.isEmpty) {
-          return const Center(child: Text('Нет данных за период'));
-        }
+    final stats = statsAsync.valueOrNull;
 
-        // Получаем общую среднюю стоимость для приблизительного расчёта
-        final generalStats = generalStatsAsync.valueOrNull;
+    if (stats == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (stats.isEmpty) {
+      return const Center(child: Text('Нет данных за период'));
+    }
+
+    // Получаем общую среднюю стоимость для приблизительного расчёта
+    final generalStats = generalStatsAsync.valueOrNull;
         final double approxAvgCost = generalStats != null &&
                 generalStats.completedLessons > 0 &&
                 generalStats.totalPayments > 0
@@ -714,8 +717,6 @@ class _SubjectsTab extends ConsumerWidget {
             );
           },
         );
-      },
-    );
   }
 }
 
@@ -731,16 +732,18 @@ class _TeachersTab extends ConsumerWidget {
     final generalStatsAsync = ref.watch(generalStatsProvider(params));
     final formatter = NumberFormat('#,###', 'ru_RU');
 
-    return statsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorView.fromException(e),
-      data: (stats) {
-        if (stats.isEmpty) {
-          return const Center(child: Text('Нет данных за период'));
-        }
+    final stats = statsAsync.valueOrNull;
 
-        // Получаем общую среднюю стоимость для приблизительного расчёта
-        final generalStats = generalStatsAsync.valueOrNull;
+    if (stats == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (stats.isEmpty) {
+      return const Center(child: Text('Нет данных за период'));
+    }
+
+    // Получаем общую среднюю стоимость для приблизительного расчёта
+    final generalStats = generalStatsAsync.valueOrNull;
         final double approxAvgCost = generalStats != null &&
                 generalStats.completedLessons > 0 &&
                 generalStats.totalPayments > 0
@@ -853,8 +856,6 @@ class _TeachersTab extends ConsumerWidget {
             );
           },
         );
-      },
-    );
   }
 }
 
@@ -882,16 +883,16 @@ class _StudentsTab extends ConsumerWidget {
           padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: _SectionTitle(title: 'Статистика занятий'),
         ),
-        generalStatsAsync.when(
-          loading: () => const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: ErrorView.inline(e),
-          ),
-          data: (stats) {
+        Builder(
+          builder: (context) {
+            final stats = generalStatsAsync.valueOrNull;
+
+            if (stats == null) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
             final total = stats.completedLessons + stats.cancelledLessons;
             final cancellationRate = total > 0
                 ? (stats.cancelledLessons / total * 100).toStringAsFixed(1)
@@ -1016,18 +1017,18 @@ class _StudentsTab extends ConsumerWidget {
           padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: _SectionTitle(title: 'Топ по занятиям'),
         ),
-        topStudentsAsync.when(
-          loading: () => const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32),
-              child: CircularProgressIndicator(),
-            ),
-          ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: ErrorView.inline(e),
-          ),
-          data: (students) {
+        Builder(
+          builder: (context) {
+            final students = topStudentsAsync.valueOrNull;
+
+            if (students == null) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
             if (students.isEmpty) {
               return const Padding(
                 padding: EdgeInsets.all(16),
@@ -1069,18 +1070,18 @@ class _StudentsTab extends ConsumerWidget {
           padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: _SectionTitle(title: 'Должники'),
         ),
-        debtorsAsync.when(
-          loading: () => const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32),
-              child: CircularProgressIndicator(),
-            ),
-          ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: ErrorView.inline(e),
-          ),
-          data: (debtors) {
+        Builder(
+          builder: (context) {
+            final debtors = debtorsAsync.valueOrNull;
+
+            if (debtors == null) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
             if (debtors.isEmpty) {
               return const Padding(
                 padding: EdgeInsets.all(16),
@@ -1123,18 +1124,18 @@ class _StudentsTab extends ConsumerWidget {
           padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: _SectionTitle(title: 'По ученикам'),
         ),
-        lessonStatsAsync.when(
-          loading: () => const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32),
-              child: CircularProgressIndicator(),
-            ),
-          ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: ErrorView.inline(e),
-          ),
-          data: (stats) {
+        Builder(
+          builder: (context) {
+            final stats = lessonStatsAsync.valueOrNull;
+
+            if (stats == null) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
             if (stats.isEmpty) {
               return const Padding(
                 padding: EdgeInsets.all(16),
@@ -1259,18 +1260,20 @@ class _PaymentPlansTab extends ConsumerWidget {
     final statsAsync = ref.watch(paymentPlanStatsProvider(params));
     final generalStatsAsync = ref.watch(generalStatsProvider(params));
 
-    return statsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorView.fromException(e),
-      data: (stats) {
-        if (stats.isEmpty) {
-          return const Center(child: Text('Нет данных за период'));
-        }
+    final stats = statsAsync.valueOrNull;
 
-        // Считаем итоги
-        final totalPurchases = stats.fold<int>(0, (sum, s) => sum + s.purchaseCount);
-        final totalAmount = stats.fold<double>(0, (sum, s) => sum + s.totalAmount);
-        final totalLessons = stats.fold<int>(0, (sum, s) => sum + s.totalLessons);
+    if (stats == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (stats.isEmpty) {
+      return const Center(child: Text('Нет данных за период'));
+    }
+
+    // Считаем итоги
+    final totalPurchases = stats.fold<int>(0, (sum, s) => sum + s.purchaseCount);
+    final totalAmount = stats.fold<double>(0, (sum, s) => sum + s.totalAmount);
+    final totalLessons = stats.fold<int>(0, (sum, s) => sum + s.totalLessons);
 
         // Получаем данные о скидках
         final generalStats = generalStatsAsync.valueOrNull;
@@ -1461,8 +1464,6 @@ class _PaymentPlansTab extends ConsumerWidget {
             ...stats.map((stat) => _PaymentPlanStatCard(stat: stat)),
           ],
         );
-      },
-    );
   }
 
   String _formatMoney(double amount) {

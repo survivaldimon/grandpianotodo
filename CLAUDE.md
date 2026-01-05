@@ -112,6 +112,12 @@
   - FAB для добавления новых элементов
   - Случайный цвет при создании, редактируемый при изменении
   - Поддержка цвета для тарифов оплаты
+- **`SESSION_2026_01_05_NO_CONNECTION_ERROR_FIX.md`** — финальное решение "Нет соединения с сервером":
+  - Паттерн valueOrNull для resilient UI
+  - Исправлены: Dashboard (неотмеченные занятия), Payments, Students
+  - Данные ВСЕГДА видны (даже при потере связи)
+  - ConnectionManager переподключается в фоне
+  - Как в Instagram/Telegram — соединение НИКОГДА не теряется
 
 ## Валюта
 
@@ -210,6 +216,57 @@ void _reconnectAllStreams() {
 - Callback для инвалидации всех провайдеров
 
 **Зависимости:** `connectivity_plus: ^6.1.0` в pubspec.yaml
+
+### 5c. Resilient UI — паттерн valueOrNull (ВАЖНО!)
+
+**КРИТИЧНОЕ ПРАВИЛО:** НИКОГДА не показывай ErrorView при потере связи с сервером!
+
+**Проблема со стандартным подходом:**
+```dart
+// ❌ ПЛОХО — при потере связи все данные исчезнут!
+paymentsAsync.when(
+  loading: () => CircularProgressIndicator(),
+  error: (e, _) => ErrorView(...),  // ← Пропадают все данные!
+  data: (payments) => ListView(...),
+)
+```
+
+**Правильный подход — valueOrNull:**
+```dart
+// ✅ ХОРОШО — данные ВСЕГДА видны
+final payments = paymentsAsync.valueOrNull;
+
+// Loading только при ПЕРВОЙ загрузке (когда данных еще нет)
+if (payments == null) {
+  return CircularProgressIndicator();
+}
+
+// ВСЕГДА показываем данные (даже если фоном ошибка)
+return ListView(payments);
+```
+
+**Как это работает:**
+- `valueOrNull` сохраняет последнее успешное значение (кеш Riverpod)
+- При потере связи: stream выбрасывает ошибку, НО данные остаются в кеше
+- Пользователь **продолжает видеть данные** — не видит ErrorView
+- ConnectionManager переподключается в фоне
+- При восстановлении связи → данные автоматически обновляются
+- Realtime обновления работают корректно
+
+**Преимущества:**
+✅ НИКОГДА не показываем "Нет соединения с сервером"
+✅ Данные ВСЕГДА видны пользователю
+✅ Автоматическое переподключение в фоне
+✅ Плавный UX как в Instagram/Telegram
+✅ Нет мигания при Realtime обновлениях
+
+**Где применено:**
+- `lib/features/dashboard/screens/dashboard_screen.dart` — неотмеченные занятия
+- `lib/features/payments/screens/payments_screen.dart` — список оплат
+- `lib/features/students/screens/students_list_screen.dart` — список учеников
+- `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — расписание (shimmer)
+
+**ВСЕГДА используй этот паттерн** для StreamProvider с данными, которые должны оставаться видимыми при потере связи.
 
 ### 6. Архивация vs Удаление
 - "Удаление" сущностей = установка `archived_at` timestamp
