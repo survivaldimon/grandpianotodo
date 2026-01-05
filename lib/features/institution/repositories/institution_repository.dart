@@ -47,15 +47,10 @@ class InstitutionRepository {
 
   /// Стрим заведения по ID (realtime)
   Stream<Institution> watchById(String id) async* {
-    // Сначала выдаём текущее значение
-    yield await getById(id);
-
-    // Слушаем изменения
     await for (final _ in _client
         .from('institutions')
         .stream(primaryKey: ['id'])
         .eq('id', id)) {
-      // При любом изменении загружаем актуальные данные
       yield await getById(id);
     }
   }
@@ -212,11 +207,6 @@ class InstitutionRepository {
       return;
     }
 
-    // Сначала выдаём текущее значение
-    final initialMembership = await getMyMembership(institutionId);
-    yield initialMembership;
-
-    // Слушаем изменения в заведении (stream поддерживает только один eq)
     await for (final data in _client
         .from('institution_members')
         .stream(primaryKey: ['id'])

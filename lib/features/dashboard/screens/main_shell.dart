@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/services/app_lifecycle_service.dart';
+import 'package:kabinet/core/services/connection_manager.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
@@ -55,6 +56,19 @@ class _MainShellState extends ConsumerState<MainShell>
     final lifecycleService = AppLifecycleService.instance;
     lifecycleService.initialize(ref);
     lifecycleService.setRefreshCallback(_refreshAllData);
+
+    // Инициализируем ConnectionManager
+    ConnectionManager.instance.initialize();
+    ConnectionManager.instance.setReconnectCallback(_reconnectAllStreams);
+  }
+
+  /// Переподключение всех streams при восстановлении соединения
+  void _reconnectAllStreams() {
+    final institutionId = ref.read(currentInstitutionIdProvider);
+    if (institutionId != null) {
+      debugPrint('[MainShell] Reconnecting all streams for: $institutionId');
+      _refreshAllData(institutionId);
+    }
   }
 
   /// Инвалидация всех ключевых провайдеров при возврате из фона
@@ -259,8 +273,12 @@ class _MainShellState extends ConsumerState<MainShell>
     // Запускаем периодическую проверку членства
     if (institutionId != null) {
       _startMembershipCheck(institutionId);
-      // Обновляем ID заведения в сервисе для инвалидации при resumed
+      // Обновляем ID заведения в сервисах для инвалидации при resumed/reconnect
       AppLifecycleService.instance.setCurrentInstitution(institutionId);
+      // Сохраняем ID для ConnectionManager
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(currentInstitutionIdProvider.notifier).state = institutionId;
+      });
     }
 
     return Scaffold(

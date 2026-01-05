@@ -252,6 +252,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           if (_viewMode == ScheduleViewMode.day)
             _WeekDaySelector(
               selectedDate: _selectedDate,
+              scrollToTodayKey: _scrollResetKey,
               onDateSelected: (date) {
                 setState(() => _selectedDate = date);
               },
@@ -845,10 +846,12 @@ class _WeekSelector extends StatelessWidget {
 class _WeekDaySelector extends StatefulWidget {
   final DateTime selectedDate;
   final ValueChanged<DateTime> onDateSelected;
+  final int scrollToTodayKey;
 
   const _WeekDaySelector({
     required this.selectedDate,
     required this.onDateSelected,
+    this.scrollToTodayKey = 0,
   });
 
   @override
@@ -874,21 +877,23 @@ class _WeekDaySelectorState extends State<_WeekDaySelector> {
   @override
   void didUpdateWidget(_WeekDaySelector oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Прокручиваем к выбранной дате если она изменилась на "сегодня"
-    // (кнопка "Сегодня" в AppBar)
-    if (!AppDateUtils.isSameDay(oldWidget.selectedDate, widget.selectedDate)) {
-      if (AppDateUtils.isToday(widget.selectedDate)) {
-        // Плавно прокручиваем к сегодня
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _calculateOffset(widget.selectedDate),
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      }
+    // Прокручиваем к сегодня при нажатии кнопки "Сегодня" (scrollToTodayKey изменился)
+    // или при изменении даты на сегодняшнюю
+    final keyChanged = oldWidget.scrollToTodayKey != widget.scrollToTodayKey;
+    final dateChangedToToday = !AppDateUtils.isSameDay(oldWidget.selectedDate, widget.selectedDate) &&
+        AppDateUtils.isToday(widget.selectedDate);
+
+    if (keyChanged || dateChangedToToday) {
+      // Плавно прокручиваем к сегодня
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _calculateOffset(widget.selectedDate),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
     }
   }
 

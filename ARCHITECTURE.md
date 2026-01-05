@@ -28,6 +28,9 @@ lib/
 │   │   ├── date_utils.dart        # Работа с датами
 │   │   ├── validators.dart        # Валидаторы форм
 │   │   └── extensions.dart        # Extension methods
+│   ├── services/
+│   │   ├── connection_manager.dart # Управление соединением (мониторинг, переподключение)
+│   │   └── app_lifecycle_service.dart # Обработка фона/переднего плана
 │   ├── exceptions/
 │   │   └── app_exceptions.dart    # Кастомные исключения
 │   └── widgets/                   # Переиспользуемые виджеты

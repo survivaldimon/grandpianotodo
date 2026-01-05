@@ -629,7 +629,6 @@ class LessonRepository {
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
   Stream<List<Lesson>> watchByRoom(String roomId, DateTime date) async* {
     await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
-      // При любом изменении загружаем актуальные данные
       final lessons = await getByRoomAndDate(roomId, date);
       yield lessons;
     }
@@ -640,12 +639,7 @@ class LessonRepository {
   /// Примечание: слушаем ВСЕ изменения в таблице без фильтра,
   /// т.к. Supabase Realtime не отправляет DELETE события с фильтром корректно
   Stream<List<Lesson>> watchByInstitution(String institutionId, DateTime date) async* {
-    // Используем стрим для отслеживания изменений (без фильтра для DELETE событий)
-    await for (final _ in _client
-        .from('lessons')
-        .stream(primaryKey: ['id'])) {
-      // При любом изменении - загружаем полные данные с joins
-      // Фильтрация по institution_id происходит в getByInstitutionAndDate
+    await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
       final lessons = await getByInstitutionAndDate(institutionId, date);
       yield lessons;
     }
@@ -659,9 +653,7 @@ class LessonRepository {
     required bool isAdminOrOwner,
     String? teacherId,
   }) async* {
-    // Используем стрим для отслеживания изменений (без фильтра для DELETE событий)
     await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
-      // При любом изменении - загружаем полные данные с joins
       final lessons = await getUnmarkedLessons(
         institutionId: institutionId,
         isAdminOrOwner: isAdminOrOwner,

@@ -318,23 +318,14 @@ class BookingRepository {
   Stream<List<Booking>> watchByInstitutionAndDate(
     String institutionId,
     DateTime date,
-  ) {
-    final dateStr = date.toIso8601String().split('T').first;
-
-    // Realtime stream для bookings
-    return _client
+  ) async* {
+    await for (final _ in _client
         .from('bookings')
         .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)
-        .asyncMap((data) async {
-      // Фильтруем по дате и archived_at на клиенте
-      final filtered = data.where((item) =>
-          item['date'] == dateStr && item['archived_at'] == null);
-
-      if (filtered.isEmpty) return <Booking>[];
-
-      // Загружаем полные данные с joins
-      return getByInstitutionAndDate(institutionId, date);
-    });
+        .eq('institution_id', institutionId)) {
+      // При любом изменении загружаем актуальные данные
+      final bookings = await getByInstitutionAndDate(institutionId, date);
+      yield bookings;
+    }
   }
 }

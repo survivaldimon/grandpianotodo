@@ -90,6 +90,11 @@
   - Realtime обновление баланса ученика после операций с оплатами
   - Удаление дублирующегося `paymentPlansProvider`
   - Исправление "Итого" для отображения только видимых оплат
+- **`SESSION_2026_01_05_CONNECTION_MANAGER.md`** — управление соединением:
+  - ConnectionManager — централизованное управление как в топовых приложениях
+  - Автоматическое переподключение при восстановлении сети
+  - Упрощение репозиториев для быстрой загрузки
+  - Исправление кнопки "Сегодня" в расписании
 - **`SESSION_2026_01_05_DARK_THEME.md`** — тёмная тема:
   - Полноценная тёмная тема для всего приложения
   - Провайдер темы (SharedPreferences + Riverpod)
@@ -159,6 +164,41 @@ ALTER PUBLICATION supabase_realtime ADD TABLE table_name;
 ```
 
 **Проверка:** Все таблицы должны быть в DATABASE.md → секция Realtime
+
+### 5b. ConnectionManager — Управление соединением
+Централизованный менеджер соединения, работающий как в топовых приложениях (Instagram, Telegram).
+
+**Файл:** `lib/core/services/connection_manager.dart`
+
+```dart
+// Состояния соединения
+enum AppConnectionState {
+  connected,        // Работает
+  connecting,       // Подключение
+  offline,          // Нет интернета
+  serverUnavailable // Сервер недоступен
+}
+
+// Инициализация в MainShell
+ConnectionManager.instance.initialize();
+ConnectionManager.instance.setReconnectCallback(_reconnectAllStreams);
+
+// Callback для переподключения
+void _reconnectAllStreams() {
+  final institutionId = ref.read(currentInstitutionIdProvider);
+  if (institutionId != null) {
+    _refreshAllData(institutionId); // Инвалидация всех провайдеров
+  }
+}
+```
+
+**Функции:**
+- Мониторинг сети через `connectivity_plus`
+- Health check сервера каждые 30 секунд
+- Автоматическое переподключение при восстановлении сети
+- Callback для инвалидации всех провайдеров
+
+**Зависимости:** `connectivity_plus: ^6.1.0` в pubspec.yaml
 
 ### 6. Архивация vs Удаление
 - "Удаление" сущностей = установка `archived_at` timestamp
@@ -839,7 +879,43 @@ visibleTotal = accessFiltered.fold<double>(0.0, (sum, p) => sum + p.amount);
 
 **Файл:** `lib/features/payments/screens/payments_screen.dart`
 
-### 36. Тёмная тема (Dark Theme)
+### 36. Кнопка "Сегодня" в расписании
+Кнопка "Сегодня" в AppBar расписания **всегда** прокручивает селектор дат к сегодняшней дате.
+
+**Проблема (исправлено):**
+Кнопка работала только если была выбрана другая дата. Если дата уже "сегодня" — прокрутка не происходила.
+
+**Решение:**
+Добавлен параметр `scrollToTodayKey` в `_WeekDaySelector`:
+
+```dart
+class _WeekDaySelector extends StatefulWidget {
+  final DateTime selectedDate;
+  final ValueChanged<DateTime> onDateSelected;
+  final int scrollToTodayKey; // Ключ для принудительной прокрутки
+
+  // ...
+}
+
+// В didUpdateWidget проверяем изменение ключа:
+final keyChanged = oldWidget.scrollToTodayKey != widget.scrollToTodayKey;
+if (keyChanged || dateChangedToToday) {
+  // Прокрутка к сегодня
+}
+```
+
+**Использование:**
+```dart
+_WeekDaySelector(
+  selectedDate: _selectedDate,
+  scrollToTodayKey: _scrollResetKey, // Увеличивается в _goToToday()
+  onDateSelected: (date) => setState(() => _selectedDate = date),
+)
+```
+
+**Файл:** `lib/features/schedule/screens/all_rooms_schedule_screen.dart`
+
+### 37. Тёмная тема (Dark Theme)
 Приложение поддерживает тёмную тему с тремя режимами: система, тёмная, светлая.
 
 **Архитектура:**
@@ -885,7 +961,7 @@ BoxDecoration(color: Theme.of(context).colorScheme.surface),
 - `lib/core/theme/theme_provider.dart` — провайдер темы
 - `lib/features/institution/screens/settings_screen.dart` — UI выбора темы
 
-### 37. Экран списка кабинетов
+### 38. Экран списка кабинетов
 Настройки → Кабинеты — управление кабинетами заведения.
 
 **Поведение:**
