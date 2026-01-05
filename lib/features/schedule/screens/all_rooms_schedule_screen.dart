@@ -26,6 +26,7 @@ import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/ios_time_picker.dart';
 import 'package:kabinet/core/widgets/color_picker_field.dart';
+import 'package:kabinet/core/widgets/shimmer_loading.dart';
 import 'package:kabinet/features/bookings/models/booking.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 
@@ -128,6 +129,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Предзагружаем соседние даты при первом входе
+    _preloadAdjacentDates();
   }
 
   @override
@@ -152,6 +155,34 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       _selectedDate = DateTime.now();
       _savedScrollOffset = null;
       _scrollResetKey++; // Принудительный сброс скролла сетки
+    });
+    _preloadAdjacentDates();
+  }
+
+  /// Предзагрузка данных для соседних дат (±3 дня)
+  void _preloadAdjacentDates() {
+    // Используем addPostFrameCallback чтобы не блокировать текущий build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      // Загружаем данные для дат от -3 до +3 дней (исключая текущую)
+      for (int i = -3; i <= 3; i++) {
+        if (i == 0) continue; // Текущая дата уже загружается через watch
+
+        final adjacentDate = _selectedDate.add(Duration(days: i));
+        final params = InstitutionDateParams(widget.institutionId, adjacentDate);
+
+        // Используем read() для фоновой загрузки без rebuild
+        ref.read(lessonsByInstitutionStreamProvider(params).future).catchError((error) {
+          // Игнорируем ошибки предзагрузки
+          return <Lesson>[];
+        });
+
+        ref.read(bookingsByInstitutionDateProvider(params).future).catchError((error) {
+          // Игнорируем ошибки предзагрузки
+          return <Booking>[];
+        });
+      }
     });
   }
 
@@ -256,6 +287,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
               scrollToTodayKey: _scrollResetKey,
               onDateSelected: (date) {
                 setState(() => _selectedDate = date);
+                _preloadAdjacentDates();
               },
             ),
           // Селектор недели (для недельного режима)
@@ -295,9 +327,22 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final rooms = roomsAsync.valueOrNull;
     final lessons = lessonsAsync.valueOrNull;
 
-    // Показываем loading только при первой загрузке (когда данных ещё нет)
+    // Показываем shimmer-скелетон при первой загрузке кабинетов
     if (rooms == null) {
-      return const Center(child: CircularProgressIndicator());
+      return ScheduleSkeletonLoader(
+        roomCount: 3,
+        startHour: workStartHour,
+        endHour: workEndHour,
+      );
+    }
+
+    // Показываем shimmer при загрузке занятий (смена даты)
+    if (lessonsAsync.isLoading && lessons == null) {
+      return ScheduleSkeletonLoader(
+        roomCount: rooms.length.clamp(1, 5),
+        startHour: workStartHour,
+        endHour: workEndHour,
+      );
     }
 
     // Для занятий: показываем пустой список если данные ещё загружаются
@@ -419,9 +464,14 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final rooms = roomsAsync.valueOrNull;
     final lessonsByDay = weekLessonsAsync.valueOrNull;
 
-    // Показываем loading только при первой загрузке
+    // Показываем shimmer-скелетон при первой загрузке кабинетов
     if (rooms == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const WeekScheduleSkeletonLoader(dayCount: 7);
+    }
+
+    // Показываем shimmer при загрузке занятий недели (смена недели)
+    if (weekLessonsAsync.isLoading && lessonsByDay == null) {
+      return const WeekScheduleSkeletonLoader(dayCount: 7);
     }
 
     // Для занятий: показываем пустой map если данные ещё загружаются
@@ -713,6 +763,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     );
     if (date != null) {
       setState(() => _selectedDate = date);
+      _preloadAdjacentDates();
     }
   }
 
@@ -5503,6 +5554,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 );
                 if (date != null) {
                   setState(() => _selectedDate = date);
+                  // Предзагрузка не нужна — это локальное состояние формы
                 }
               },
               child: InputDecorator(
@@ -6591,6 +6643,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
     );
     if (picked != null && mounted) {
       setState(() => _selectedDate = picked);
+      // Предзагрузка не нужна — это локальное состояние формы
     }
   }
 

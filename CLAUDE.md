@@ -101,6 +101,11 @@
   - Выбор темы в настройках (система/тёмная/светлая)
   - Исправление hardcoded цветов во всех экранах
   - Удаление устаревшего экрана расписания кабинета
+- **`SESSION_2026_01_05_SHIMMER_PRELOAD.md`** — shimmer-анимация и предзагрузка:
+  - Shimmer-скелетон для загрузки расписания (как в Instagram)
+  - Предзагрузка соседних дат (±3 дня) для мгновенного переключения
+  - Realtime обновления для предзагруженных дат
+  - Пустая сетка без фейковых занятий
 - **`SESSION_2026_01_05_COLOR_PICKER.md`** — унифицированный выбор цветов:
   - Создан ColorPickerField — единый виджет для выбора цвета
   - Обновлены экраны типов занятий, предметов, тарифов
@@ -979,6 +984,7 @@ BoxDecoration(color: Theme.of(context).colorScheme.surface),
 
 **Примечание:** Экран расписания отдельного кабинета (`schedule_screen.dart`) был удалён как избыточный — основное расписание показывает все кабинеты.
 
+<<<<<<< HEAD
 ### 39. Унифицированный выбор цветов (ColorPickerField)
 Для всех сущностей с цветами (типы занятий, предметы, тарифы, участники) используется единый компонент выбора цвета.
 
@@ -1040,6 +1046,60 @@ ColorPickerField(
 - Миграция: `supabase/migrations/add_payment_plan_color.sql`
 
 **ВАЖНО:** Quick add диалоги в расписании (добавление ученика/предмета/типа занятия) **НЕ** показывают выбор цвета — используется только `getRandomPresetColor()`.
+
+### 40. Shimmer-анимация загрузки и предзагрузка дат
+Расписание использует shimmer-скелетон для индикации загрузки и предзагружает соседние даты.
+
+**Shimmer-анимация:**
+```dart
+// Показывается вместо CircularProgressIndicator
+if (rooms == null || (lessonsAsync.isLoading && lessons == null)) {
+  return ScheduleSkeletonLoader(
+    roomCount: rooms?.length.clamp(1, 5) ?? 3,
+    startHour: workStartHour,
+    endHour: workEndHour,
+  );
+}
+```
+
+**Компоненты shimmer:**
+- `ShimmerLoading` — базовый виджет с мерцающим градиентом
+- `ShimmerBlock` — блок-заполнитель
+- `ScheduleSkeletonLoader` — скелетон дневного режима (пустая сетка)
+- `WeekScheduleSkeletonLoader` — скелетон недельного режима (пустая сетка)
+
+**Предзагрузка соседних дат (±3 дня):**
+```dart
+void _preloadAdjacentDates() {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    for (int i = -3; i <= 3; i++) {
+      if (i == 0) continue; // Текущая дата через watch
+
+      final adjacentDate = _selectedDate.add(Duration(days: i));
+      final params = InstitutionDateParams(widget.institutionId, adjacentDate);
+
+      // Фоновая загрузка без rebuild
+      ref.read(lessonsByInstitutionStreamProvider(params).future).catchError((_) => <Lesson>[]);
+      ref.read(bookingsByInstitutionDateProvider(params).future).catchError((_) => <Booking>[]);
+    }
+  });
+}
+```
+
+**Когда вызывается:**
+- При первом входе на экран (`initState`)
+- При нажатии "Сегодня"
+- При выборе даты через селектор или календарь
+
+**Преимущества:**
+- Мгновенное переключение между датами (данные в кеше)
+- Realtime обновления для предзагруженных дат (StreamProvider подписан)
+- Не блокирует UI (addPostFrameCallback + ref.read)
+- Оптимальный диапазон ±3 дня (баланс скорость/трафик)
+
+**Файлы:**
+- `lib/core/widgets/shimmer_loading.dart` — shimmer-компоненты
+- `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — интеграция
 
 ## CI/CD
 

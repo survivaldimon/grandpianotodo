@@ -35,10 +35,12 @@ lib/
 │   │   └── app_exceptions.dart    # Кастомные исключения
 │   └── widgets/                   # Переиспользуемые виджеты
 │       ├── loading_overlay.dart
+│       ├── shimmer_loading.dart   # Shimmer-анимация для скелетонов
 │       ├── error_view.dart
 │       ├── empty_state.dart
 │       ├── confirmation_dialog.dart
-│       └── custom_app_bar.dart
+│       ├── custom_app_bar.dart
+│       └── ios_time_picker.dart   # iOS-стиль пикер времени
 │
 ├── features/                      # Функциональные модули
 │   ├── auth/                      # Аутентификация
