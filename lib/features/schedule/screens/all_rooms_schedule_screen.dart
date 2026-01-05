@@ -634,81 +634,6 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     );
   }
 
-  /// Показывает меню выбора: занятие или бронь
-  void _showAddMenu(List<Room> rooms) {
-    if (rooms.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Сначала добавьте кабинет'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.school),
-              title: const Text('Создать занятие'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showQuickAddLessonSheet(rooms);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.lock, color: Colors.grey[700]),
-              title: const Text('Забронировать кабинеты'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showQuickAddBookingSheet(rooms);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Показывает форму быстрого добавления брони
-  void _showQuickAddBookingSheet(List<Room> rooms) {
-    if (rooms.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Сначала добавьте кабинет'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _AddBookingSheet(
-        rooms: rooms,
-        initialDate: _selectedDate,
-        institutionId: widget.institutionId,
-        onCreated: (DateTime createdDate) {
-          // Инвалидируем провайдеры броней для выбранной даты
-          ref.invalidate(bookingsByInstitutionDateProvider(
-            InstitutionDateParams(widget.institutionId, createdDate),
-          ));
-          // Также инвалидируем для текущей выбранной даты
-          if (createdDate != _selectedDate) {
-            ref.invalidate(bookingsByInstitutionDateProvider(
-              InstitutionDateParams(widget.institutionId, _selectedDate),
-            ));
-          }
-        },
-      ),
-    );
-  }
-
   /// Показывает форму быстрого добавления занятия (из FAB)
   void _showQuickAddLessonSheet(List<Room> rooms) {
     if (rooms.isEmpty) {
@@ -1121,15 +1046,6 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     // Добавляем listeners обратно
     _headerScrollController.addListener(_syncGridFromHeader);
     _gridScrollController.addListener(_syncHeaderFromGrid);
-  }
-
-  void _restoreScrollPosition(double offset) {
-    if (_headerScrollController.hasClients) {
-      _headerScrollController.jumpTo(offset);
-    }
-    if (_gridScrollController.hasClients) {
-      _gridScrollController.jumpTo(offset);
-    }
   }
 
   void _syncGridFromHeader() {
@@ -1695,17 +1611,6 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     return AppColors.lessonIndividual;
   }
 
-  /// Возвращает цвет контура по статусу занятия (или null если обычный)
-  Color? _getStatusBorderColor(Lesson lesson) {
-    if (lesson.status == LessonStatus.cancelled) {
-      return AppColors.error;
-    }
-    if (lesson.status == LessonStatus.completed) {
-      return AppColors.success;
-    }
-    return null;
-  }
-
   /// Создаёт блоки для брони (один блок на каждый кабинет)
   List<Widget> _buildBookingBlocks(
     BuildContext context,
@@ -1911,17 +1816,6 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     _headerScrollController.addListener(_syncFromHeader);
   }
 
-  void _restoreScrollPosition(double offset) {
-    if (_headerScrollController.hasClients) {
-      _headerScrollController.jumpTo(offset);
-    }
-    for (final controller in _dayControllers) {
-      if (controller.hasClients) {
-        controller.jumpTo(offset);
-      }
-    }
-  }
-
   void _syncFromHeader() {
     if (_isSyncing) return;
     if (!_headerScrollController.hasClients) return;
@@ -2058,7 +1952,6 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             ? availableWidth / rooms.length
             : _WeekTimeGrid.minRoomColumnWidth;
         final totalWidth = rooms.length * roomColumnWidth;
-        final needsHorizontalScroll = !fitsOnScreen;
 
         return Column(
           children: [
@@ -3004,66 +2897,6 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
 
   String _formatTime(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  }
-}
-
-/// Чекбокс для статуса занятия
-class _StatusCheckbox extends StatelessWidget {
-  final String label;
-  final bool value;
-  final Color color;
-  final bool isLoading;
-  final void Function(bool?)? onChanged;
-
-  const _StatusCheckbox({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.isLoading,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Checkbox(
-          value: value,
-          onChanged: isLoading ? null : onChanged,
-          activeColor: color,
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: value ? color : AppColors.textSecondary,
-            fontWeight: value ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String value;
-
-  const _InfoRow({required this.icon, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: AppColors.textSecondary),
-          const SizedBox(width: 8),
-          Text(value, style: const TextStyle(color: AppColors.textSecondary)),
-        ],
-      ),
-    );
   }
 }
 
@@ -4642,12 +4475,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     _studentsExpanded = _selectedStudents.isNotEmpty;
   }
 
-  bool get _hasChanges =>
-      _selectedTeachers != widget.currentFilters.teacherIds ||
-      _selectedStudents != widget.currentFilters.studentIds ||
-      _selectedLessonTypes != widget.currentFilters.lessonTypeIds ||
-      _selectedSubjects != widget.currentFilters.subjectIds;
-
   bool get _hasFilters =>
       _selectedTeachers.isNotEmpty ||
       _selectedStudents.isNotEmpty ||
@@ -5814,7 +5641,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                         icon: const Icon(Icons.add, size: 20),
                         tooltip: 'Добавить предмет',
                         style: IconButton.styleFrom(
-                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                           foregroundColor: AppColors.primary,
                         ),
                       ),
@@ -5873,7 +5700,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                         icon: const Icon(Icons.add, size: 20),
                         tooltip: 'Добавить тип занятия',
                         style: IconButton.styleFrom(
-                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                           foregroundColor: AppColors.primary,
                         ),
                       ),

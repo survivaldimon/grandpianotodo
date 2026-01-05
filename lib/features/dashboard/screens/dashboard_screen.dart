@@ -334,8 +334,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   return ListTile(
                     leading: CircleAvatar(
                       backgroundColor: daysLeft <= 3
-                          ? AppColors.error.withOpacity(0.2)
-                          : AppColors.warning.withOpacity(0.2),
+                          ? AppColors.error.withValues(alpha: 0.2)
+                          : AppColors.warning.withValues(alpha: 0.2),
                       child: Text(
                         '$daysLeft',
                         style: TextStyle(
@@ -355,7 +355,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.error.withOpacity(0.1),
+                              color: AppColors.error.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
@@ -715,7 +715,7 @@ class _DashboardCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: (iconColor ?? AppColors.primary).withOpacity(0.1),
+                  color: (iconColor ?? AppColors.primary).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppSizes.radiusM),
                 ),
                 child: Icon(
