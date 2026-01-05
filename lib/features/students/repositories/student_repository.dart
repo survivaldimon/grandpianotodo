@@ -160,6 +160,17 @@ class StudentRepository {
     }
   }
 
+  /// Полностью удалить ученика и все его данные
+  /// ВАЖНО: Удаляет ВСЁ - занятия, оплаты, подписки, связи
+  /// Это действие НЕОБРАТИМО!
+  Future<void> deleteCompletely(String id) async {
+    try {
+      await _client.rpc('delete_student_completely', params: {'p_student_id': id});
+    } catch (e) {
+      throw DatabaseException('Ошибка удаления ученика: $e');
+    }
+  }
+
   /// Списать занятие напрямую (уменьшить prepaid_lessons_count)
   /// Используется когда нет активной подписки — уходит в долг
   Future<void> decrementPrepaidCount(String id) async {

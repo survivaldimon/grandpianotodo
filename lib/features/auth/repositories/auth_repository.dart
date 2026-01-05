@@ -71,11 +71,25 @@ class AuthRepository {
   /// Сброс пароля
   Future<void> resetPassword(String email) async {
     try {
-      await _client.auth.resetPasswordForEmail(email);
+      await _client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: SupabaseConfig.authCallbackUrl,
+      );
     } on AuthException catch (e) {
       throw AuthAppException(_mapAuthError(e.message));
     } catch (e) {
       throw AuthAppException('Ошибка сброса пароля: $e');
+    }
+  }
+
+  /// Вход по Magic Link (без пароля)
+  Future<void> signInWithMagicLink(String email) async {
+    try {
+      await _client.auth.signInWithOtp(email: email);
+    } on AuthException catch (e) {
+      throw AuthAppException(_mapAuthError(e.message));
+    } catch (e) {
+      throw AuthAppException('Ошибка отправки ссылки: $e');
     }
   }
 

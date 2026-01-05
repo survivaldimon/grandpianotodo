@@ -97,10 +97,12 @@ class StudentDetailScreen extends ConsumerWidget {
                       _confirmArchive(context, ref, student);
                     } else if (value == 'restore') {
                       _confirmRestore(context, ref, student);
+                    } else if (value == 'delete') {
+                      _confirmDeleteCompletely(context, ref, student);
                     }
                   },
                   itemBuilder: (context) => [
-                    if (student.isArchived)
+                    if (student.isArchived) ...[
                       const PopupMenuItem(
                         value: 'restore',
                         child: Row(
@@ -110,8 +112,18 @@ class StudentDetailScreen extends ConsumerWidget {
                             Text('Разархивировать', style: TextStyle(color: Colors.green)),
                           ],
                         ),
-                      )
-                    else
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_forever, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Удалить навсегда', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ] else
                       const PopupMenuItem(
                         value: 'archive',
                         child: Row(
@@ -449,6 +461,87 @@ class StudentDetailScreen extends ConsumerWidget {
             child: const Text(
               'Разархивировать',
               style: TextStyle(color: Colors.green),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteCompletely(BuildContext context, WidgetRef ref, Student student) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Text('Удалить навсегда?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Вы собираетесь ПОЛНОСТЬЮ УДАЛИТЬ ученика "${student.name}" и все связанные данные:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            const Text('• Все занятия из расписания'),
+            const Text('• Все оплаты'),
+            const Text('• Все подписки (включая семейные)'),
+            const Text('• Связи с преподавателями и предметами'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Это действие НЕОБРАТИМО!',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final controller = ref.read(studentControllerProvider.notifier);
+              final success = await controller.deleteCompletely(studentId, institutionId);
+              if (success && context.mounted) {
+                Navigator.pop(context); // Закрыть диалог
+                context.pop(); // Вернуться к списку учеников
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Ученик и все данные удалены'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text(
+              'Удалить навсегда',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],

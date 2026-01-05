@@ -30,6 +30,10 @@ class AppStrings {
   static const String confirmPassword = 'Подтвердите пароль';
   static const String fullName = 'Полное имя';
   static const String forgotPassword = 'Забыли пароль?';
+  static const String resetPassword = 'Восстановить пароль';
+  static const String resetPasswordTitle = 'Восстановление пароля';
+  static const String resetPasswordMessage = 'Введите email, указанный при регистрации. Мы отправим вам ссылку для сброса пароля.';
+  static const String resetPasswordSuccess = 'Письмо отправлено! Проверьте свою почту.';
   static const String noAccount = 'Нет аккаунта?';
   static const String hasAccount = 'Уже есть аккаунт?';
   static const String loginWithGoogle = 'Войти через Google';

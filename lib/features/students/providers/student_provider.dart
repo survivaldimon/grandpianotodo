@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
+import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
+import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/features/students/repositories/student_repository.dart';
 import 'package:kabinet/shared/models/student.dart';
@@ -215,6 +217,27 @@ class StudentController extends StateNotifier<AsyncValue<void>> {
       await _repo.restore(id);
       _ref.invalidate(studentsProvider(institutionId));
       _ref.invalidate(studentProvider(id));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Полностью удалить ученика и все его данные
+  /// ВАЖНО: Удаляет ВСЁ - занятия, оплаты, подписки. НЕОБРАТИМО!
+  Future<bool> deleteCompletely(String id, String institutionId) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.deleteCompletely(id);
+      // Инвалидируем все связанные провайдеры
+      _ref.invalidate(studentsProvider(institutionId));
+      _ref.invalidate(studentProvider(id));
+      // Инвалидируем расписание (т.к. занятия удаляются)
+      _ref.invalidate(lessonsByInstitutionStreamProvider);
+      // Инвалидируем оплаты
+      _ref.invalidate(paymentsStreamProvider(institutionId));
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {

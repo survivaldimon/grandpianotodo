@@ -45,5 +45,17 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Deep Links for Supabase Auth -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.kabinet.kabinet</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.kabinet.kabinet</string>
+		</dict>
+	</array>
 </dict>
 </plist>

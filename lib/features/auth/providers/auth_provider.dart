@@ -68,6 +68,30 @@ class AuthController extends StateNotifier<AuthFormState> {
     await _repo.signOut();
   }
 
+  Future<bool> resetPassword(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _repo.resetPassword(email);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> signInWithMagicLink(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _repo.signInWithMagicLink(email);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
   void clearError() {
     state = state.copyWith(error: null);
   }

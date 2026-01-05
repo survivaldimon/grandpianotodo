@@ -4,6 +4,7 @@ import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/features/auth/screens/splash_screen.dart';
 import 'package:kabinet/features/auth/screens/login_screen.dart';
 import 'package:kabinet/features/auth/screens/register_screen.dart';
+import 'package:kabinet/features/auth/screens/reset_password_screen.dart';
 import 'package:kabinet/features/institution/screens/institutions_list_screen.dart';
 import 'package:kabinet/features/institution/screens/create_institution_screen.dart';
 import 'package:kabinet/features/institution/screens/join_institution_screen.dart';
@@ -39,6 +40,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Если на странице splash — не редиректим (она сама разберётся)
       if (state.matchedLocation == '/splash') return null;
 
+      // Если на странице сброса пароля — не редиректим
+      if (state.matchedLocation == '/reset-password') return null;
+
       // Если не авторизован и не на auth странице — редирект на логин
       if (!isAuthenticated && !isOnAuthPage) {
         return '/login';
@@ -64,6 +68,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) => const ResetPasswordScreen(),
       ),
 
       // Institutions

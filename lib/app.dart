@@ -1,17 +1,53 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/router/app_router.dart';
 import 'package:kabinet/core/theme/app_theme.dart';
 import 'package:kabinet/core/theme/theme_provider.dart';
 import 'package:kabinet/core/config/app_config.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
 
 /// Главный виджет приложения
-class KabinetApp extends ConsumerWidget {
+class KabinetApp extends ConsumerStatefulWidget {
   const KabinetApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<KabinetApp> createState() => _KabinetAppState();
+}
+
+class _KabinetAppState extends ConsumerState<KabinetApp> {
+  StreamSubscription<AuthState>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAuthListener();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _setupAuthListener() {
+    // Глобальный слушатель для обработки PASSWORD_RECOVERY когда приложение уже запущено
+    _authSubscription = SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
+      debugPrint('[KabinetApp] Global auth event: ${data.event}');
+
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        debugPrint('[KabinetApp] Password recovery detected, navigating to reset-password');
+        // Используем GoRouter для навигации
+        final router = ref.read(routerProvider);
+        router.go('/reset-password');
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 

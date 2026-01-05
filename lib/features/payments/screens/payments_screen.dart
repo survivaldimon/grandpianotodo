@@ -252,7 +252,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                       },
                       title: const Text('Все'),
                       controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: AppColors.primary,
                     ),
                     ...students.map((student) {
                       final isSelected = _selectedStudentIds.contains(student.id);
@@ -270,7 +269,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                         },
                         title: Text(student.name),
                         controlAffinity: ListTileControlAffinity.leading,
-                        activeColor: AppColors.primary,
                       );
                     }),
                   ],
@@ -321,7 +319,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                       },
                       title: const Text('Все'),
                       controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: AppColors.primary,
                     ),
                     ...subjects.map((subject) {
                       final isSelected = _selectedSubjectIds.contains(subject.id);
@@ -339,7 +336,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                         },
                         title: Text(subject.name),
                         controlAffinity: ListTileControlAffinity.leading,
-                        activeColor: AppColors.primary,
                       );
                     }),
                   ],
@@ -390,7 +386,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                       },
                       title: const Text('Все'),
                       controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: AppColors.primary,
                     ),
                     ...members.map((member) {
                       final isSelected = _selectedTeacherIds.contains(member.userId);
@@ -412,7 +407,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                             ? Text(member.profile!.email, style: TextStyle(fontSize: 12, color: Colors.grey[600]))
                             : null,
                         controlAffinity: ListTileControlAffinity.leading,
-                        activeColor: AppColors.primary,
                       );
                     }),
                   ],
@@ -463,7 +457,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                       },
                       title: const Text('Все'),
                       controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: AppColors.primary,
                     ),
                     ...plans.map((plan) {
                       final isSelected = _selectedPlanIds.contains(plan.id);
@@ -482,7 +475,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                         title: Text(plan.name),
                         subtitle: Text('${plan.lessonsCount} занятий'),
                         controlAffinity: ListTileControlAffinity.leading,
-                        activeColor: AppColors.primary,
                       );
                     }),
                   ],
@@ -530,7 +522,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 },
                 title: const Text('Все'),
                 controlAffinity: ListTileControlAffinity.leading,
-                activeColor: AppColors.primary,
               ),
               CheckboxListTile(
                 value: _selectedPaymentMethods.contains('card'),
@@ -1469,7 +1460,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                             }
                           });
                         },
-                        activeColor: AppColors.primary,
+                        activeTrackColor: AppColors.primary,
                       ),
                     ],
                   ),
@@ -1559,7 +1550,6 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                     ),
                                   ),
                                   controlAffinity: ListTileControlAffinity.trailing,
-                                  activeColor: AppColors.primary,
                                   dense: true,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                                 );
@@ -1600,7 +1590,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           filled: true,
                           fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                         ),
-                        value: currentStudent,
+                        initialValue: currentStudent,
                         items: students.map((s) => DropdownMenuItem(
                           value: s,
                           child: Text(s.name),
@@ -1713,7 +1703,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                         fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                       ),
                       isExpanded: true,
-                      value: currentPlan,
+                      initialValue: currentPlan,
                       items: [
                         const DropdownMenuItem<PaymentPlan?>(
                           value: null,
@@ -2084,7 +2074,7 @@ class _PaymentCard extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        onTap: () => _showPaymentOptions(context, ref),
+        onTap: () => _showEditDialog(context, ref),
         leading: Icon(
           payment.isCash ? Icons.payments_outlined : Icons.credit_card,
           color: payment.isCash ? AppColors.success : AppColors.primary,
@@ -2127,226 +2117,535 @@ class _PaymentCard extends ConsumerWidget {
     );
   }
 
-  void _showPaymentOptions(BuildContext context, WidgetRef ref) {
+  void _showEditDialog(BuildContext context, WidgetRef ref) {
     final canManage = _canManagePayment(ref);
 
     showModalBottomSheet(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Информация об оплате
-            ListTile(
-              leading: Icon(
-                payment.isCash ? Icons.payments_outlined : Icons.credit_card,
-                color: payment.isCash ? AppColors.success : AppColors.primary,
-              ),
-              title: Text('${payment.student?.name ?? "Ученик"} — ${payment.amount.toInt()} ₸'),
-              subtitle: Text('${payment.lessonsCount} занятий • ${payment.paymentMethodLabel}'),
-            ),
-            const Divider(),
-            if (canManage) ...[
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Редактировать'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showEditDialog(context, ref);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Удалить', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showDeleteConfirmation(context, ref);
-                },
-              ),
-            ] else ...[
-              const ListTile(
-                leading: Icon(Icons.lock_outline, color: AppColors.textSecondary),
-                title: Text(
-                  'Нет прав на редактирование',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-                subtitle: Text(
-                  'Вы можете редактировать только оплаты своих учеников',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ],
-        ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dialogContext) => _EditPaymentSheet(
+        payment: payment,
+        institutionId: institutionId,
+        canManage: canManage,
+        onChanged: onChanged,
       ),
     );
   }
+}
 
-  void _showEditDialog(BuildContext context, WidgetRef ref) {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final amountController = TextEditingController(text: payment.amount.toInt().toString());
-    final lessonsController = TextEditingController(text: payment.lessonsCount.toString());
-    final commentController = TextEditingController(text: payment.comment ?? '');
-    final formKey = GlobalKey<FormState>();
-    String selectedMethod = payment.paymentMethod;
+/// Форма редактирования оплаты
+class _EditPaymentSheet extends ConsumerStatefulWidget {
+  final Payment payment;
+  final String institutionId;
+  final bool canManage;
+  final VoidCallback onChanged;
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Редактировать оплату'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: amountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Сумма',
-                      prefixIcon: Icon(Icons.payments),
-                      suffixText: '₸',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Введите сумму';
-                      if (double.tryParse(v) == null) return 'Неверная сумма';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: lessonsController,
-                    decoration: const InputDecoration(
-                      labelText: 'Количество занятий',
-                      prefixIcon: Icon(Icons.event),
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Введите количество';
-                      if (int.tryParse(v) == null) return 'Неверное число';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  // Способ оплаты
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
-                        value: 'card',
-                        label: Text('Карта'),
-                        icon: Icon(Icons.credit_card),
-                      ),
-                      ButtonSegment(
-                        value: 'cash',
-                        label: Text('Наличные'),
-                        icon: Icon(Icons.payments_outlined),
-                      ),
-                    ],
-                    selected: {selectedMethod},
-                    onSelectionChanged: (Set<String> selected) {
-                      setDialogState(() => selectedMethod = selected.first);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: commentController,
-                    decoration: const InputDecoration(
-                      labelText: 'Комментарий',
-                      prefixIcon: Icon(Icons.comment),
-                    ),
-                    maxLines: 2,
-                  ),
-                ],
-              ),
-            ),
+  const _EditPaymentSheet({
+    required this.payment,
+    required this.institutionId,
+    required this.canManage,
+    required this.onChanged,
+  });
+
+  @override
+  ConsumerState<_EditPaymentSheet> createState() => _EditPaymentSheetState();
+}
+
+class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _amountController;
+  late final TextEditingController _lessonsController;
+  late final TextEditingController _commentController;
+  late String _selectedMethod;
+  bool _isLoading = false;
+
+  // Для FAB прокрутки вниз
+  bool _showScrollDownFab = true;
+  ScrollController? _currentScrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(text: widget.payment.amount.toInt().toString());
+    _lessonsController = TextEditingController(text: widget.payment.lessonsCount.toString());
+    _commentController = TextEditingController(text: widget.payment.comment ?? '');
+    _selectedMethod = widget.payment.paymentMethod;
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _lessonsController.dispose();
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  void _handleScrollNotification(ScrollNotification notification, ScrollController controller) {
+    _currentScrollController = controller;
+    if (notification is ScrollUpdateNotification || notification is ScrollEndNotification) {
+      final maxScroll = notification.metrics.maxScrollExtent;
+      final currentScroll = notification.metrics.pixels;
+      // Показываем FAB только если есть куда скроллить (больше 100px) и мы не внизу
+      final shouldShow = maxScroll > 100 && currentScroll < maxScroll - 100;
+      if (shouldShow != _showScrollDownFab) {
+        setState(() => _showScrollDownFab = shouldShow);
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_currentScrollController == null || !_currentScrollController!.hasClients) return;
+    _currentScrollController!.animateTo(
+      _currentScrollController!.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final controller = ref.read(paymentControllerProvider.notifier);
+    final result = await controller.updatePayment(
+      widget.payment.id,
+      studentId: widget.payment.studentId,
+      oldLessonsCount: widget.payment.lessonsCount,
+      amount: double.parse(_amountController.text),
+      lessonsCount: int.parse(_lessonsController.text),
+      paymentMethod: _selectedMethod,
+      comment: _commentController.text.isEmpty ? null : _commentController.text,
+    );
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (result != null) {
+        widget.onChanged();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Оплата обновлена'),
+            backgroundColor: Colors.green,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Отмена'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  final controller = ref.read(paymentControllerProvider.notifier);
-                  final result = await controller.updatePayment(
-                    payment.id,
-                    studentId: payment.studentId,
-                    oldLessonsCount: payment.lessonsCount,
-                    amount: double.parse(amountController.text),
-                    lessonsCount: int.parse(lessonsController.text),
-                    paymentMethod: selectedMethod,
-                    comment: commentController.text.isEmpty ? null : commentController.text,
-                  );
-                  if (result != null && dialogContext.mounted) {
-                    Navigator.pop(dialogContext);
-                    onChanged();
-                    scaffoldMessenger.showSnackBar(
-                      const SnackBar(
-                        content: Text('Оплата обновлена'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
-        ),
-      ),
-    );
+        );
+      }
+    }
   }
 
-  void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-    showDialog(
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Удалить оплату?'),
         content: Text(
-          'Оплата на сумму ${payment.amount.toInt()} ₸ будет удалена. '
-          'Баланс ученика уменьшится на ${payment.lessonsCount} занятий.',
+          'Оплата на сумму ${widget.payment.amount.toInt()} ₸ будет удалена. '
+          'Баланс ученика уменьшится на ${widget.payment.lessonsCount} занятий.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Отмена'),
           ),
           TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              final controller = ref.read(paymentControllerProvider.notifier);
-              final success = await controller.deletePayment(
-                payment.id,
-                studentId: payment.studentId,
-              );
-              if (success) {
-                onChanged();
-                scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Оплата удалена'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              } else {
-                final state = ref.read(paymentControllerProvider);
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Ошибка удаления: ${state.error}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
+            onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Удалить'),
           ),
         ],
       ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isLoading = true);
+
+    final controller = ref.read(paymentControllerProvider.notifier);
+    final success = await controller.deletePayment(
+      widget.payment.id,
+      studentId: widget.payment.studentId,
+    );
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (success) {
+        widget.onChanged();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Оплата удалена'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else {
+        final state = ref.read(paymentControllerProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка удаления: ${state.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final displayName = widget.payment.displayMemberNames.isNotEmpty
+        ? widget.payment.displayMemberNames
+        : widget.payment.student?.name ?? 'Ученик';
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      expand: false,
+      snap: true,
+      snapSizes: const [0.7, 0.9],
+      builder: (context, scrollController) {
+        // Обновляем состояние FAB после первого рендера
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final maxScroll = scrollController.position.maxScrollExtent;
+          final currentScroll = scrollController.position.pixels;
+          final shouldShow = maxScroll > 100 && currentScroll < maxScroll - 100;
+          if (shouldShow != _showScrollDownFab) {
+            setState(() => _showScrollDownFab = shouldShow);
+          }
+        });
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+              // Скроллируемый контент с FAB
+              Expanded(
+                child: Stack(
+                  children: [
+                    NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        _handleScrollNotification(notification, scrollController);
+                        return false;
+                      },
+                      child: ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                        children: [
+                          if (!widget.canManage) ...[
+                            // Баннер "Нет прав"
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppColors.warning.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppColors.warning.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.lock_outline, color: AppColors.warning),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Нет прав на редактирование',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.warning,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Вы можете редактировать только оплаты своих учеников',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Заголовок
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: (widget.payment.isCash ? AppColors.success : AppColors.primary)
+                                            .withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(
+                                        widget.payment.isCash ? Icons.payments_outlined : Icons.credit_card,
+                                        color: widget.payment.isCash ? AppColors.success : AppColors.primary,
+                                        size: 28,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            displayName,
+                                            style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Оплата от ${DateFormat('d MMMM yyyy', 'ru').format(widget.payment.paidAt)}',
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 24),
+
+                                // Сумма
+                                TextFormField(
+                                  controller: _amountController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Сумма',
+                                    suffixText: '₸',
+                                    prefixIcon: const Icon(Icons.payments_outlined),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    filled: true,
+                                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  enabled: widget.canManage,
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Введите сумму';
+                                    if (double.tryParse(v) == null) return 'Неверная сумма';
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Количество занятий
+                                TextFormField(
+                                  controller: _lessonsController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Количество занятий',
+                                    prefixIcon: const Icon(Icons.event),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    filled: true,
+                                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  enabled: widget.canManage,
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Введите количество';
+                                    if (int.tryParse(v) == null) return 'Неверное число';
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Способ оплаты
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Способ оплаты',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: SegmentedButton<String>(
+                                        segments: const [
+                                          ButtonSegment(
+                                            value: 'card',
+                                            label: Text('Карта'),
+                                          ),
+                                          ButtonSegment(
+                                            value: 'cash',
+                                            label: Text('Наличные'),
+                                          ),
+                                        ],
+                                        selected: {_selectedMethod},
+                                        onSelectionChanged: widget.canManage
+                                            ? (Set<String> selected) {
+                                                setState(() => _selectedMethod = selected.first);
+                                              }
+                                            : null,
+                                        style: const ButtonStyle(
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Комментарий
+                                TextFormField(
+                                  controller: _commentController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Комментарий',
+                                    prefixIcon: const Icon(Icons.comment_outlined),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    filled: true,
+                                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                                  ),
+                                  maxLines: 3,
+                                  enabled: widget.canManage,
+                                ),
+                                const SizedBox(height: 24),
+
+                                // Кнопка сохранения
+                                if (widget.canManage) ...[
+                                  SizedBox(
+                                    height: 52,
+                                    child: ElevatedButton(
+                                      onPressed: _isLoading ? null : _submit,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              height: 24,
+                                              width: 24,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                                              ),
+                                            )
+                                          : Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                const Icon(Icons.check),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Сохранить изменения',
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  // Кнопка удаления
+                                  SizedBox(
+                                    height: 52,
+                                    child: OutlinedButton(
+                                      onPressed: _isLoading ? null : _delete,
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.red,
+                                        side: const BorderSide(color: Colors.red),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              height: 24,
+                                              width: 24,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation(Colors.red),
+                                              ),
+                                            )
+                                          : const Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.delete_outline),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'Удалить оплату',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // FAB для прокрутки вниз
+                    if (_showScrollDownFab && widget.canManage)
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: FloatingActionButton.small(
+                          onPressed: _scrollToBottom,
+                          backgroundColor: AppColors.primary,
+                          child: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

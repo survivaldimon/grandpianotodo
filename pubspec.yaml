@@ -33,6 +33,9 @@ dependencies:
   # Network
   connectivity_plus: ^6.1.0
 
+  # Deep Links
+  app_links: ^6.4.0
+
   # UI
   flutter_svg: ^2.0.16
   cached_network_image: ^3.4.1

@@ -41,6 +41,71 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  void _showForgotPasswordDialog() {
+    final emailController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(AppStrings.resetPasswordTitle),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(AppStrings.resetPasswordMessage),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: AppStrings.email,
+                  prefixIcon: Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                validator: Validators.email,
+                autofocus: true,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(AppStrings.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+
+              final controller = ref.read(authControllerProvider.notifier);
+              final success = await controller.resetPassword(
+                emailController.text.trim(),
+              );
+
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+
+              if (success && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(AppStrings.resetPasswordSuccess),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 5),
+                  ),
+                );
+              }
+            },
+            child: const Text(AppStrings.resetPassword),
+          ),
+        ],
+      ),
+    ).then((_) => emailController.dispose());
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
@@ -117,11 +182,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: authState.isLoading
-                        ? null
-                        : () {
-                            // TODO: Forgot password dialog
-                          },
+                    onPressed: authState.isLoading ? null : _showForgotPasswordDialog,
                     child: const Text(AppStrings.forgotPassword),
                   ),
                 ),
