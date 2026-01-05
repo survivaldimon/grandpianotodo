@@ -47,7 +47,8 @@
       "Bash(/mnt/c/flutter/bin/dart analyze:*)",
       "Bash(/mnt/c/flutter/bin/flutter.bat analyze:*)",
       "Bash(findstr:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(git merge:*)"
     ]
   }
 }

@@ -374,10 +374,18 @@ CREATE TABLE lesson_students (
   lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id),
   attended BOOLEAN NOT NULL DEFAULT TRUE, -- Присутствовал или пропустил
-  
+  subscription_id UUID REFERENCES subscriptions(id), -- ID подписки, с которой списано занятие
+
   UNIQUE(lesson_id, student_id)
 );
+
+-- Индекс для быстрого поиска по подписке
+CREATE INDEX idx_lesson_students_subscription_id
+ON lesson_students(subscription_id)
+WHERE subscription_id IS NOT NULL;
 ```
+
+**Примечание:** `subscription_id` используется для корректного возврата занятия при снятии статуса "Проведено".
 
 ### lesson_history
 

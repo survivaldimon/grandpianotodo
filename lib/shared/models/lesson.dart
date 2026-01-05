@@ -61,6 +61,9 @@ class Lesson extends BaseModel {
   final Student? student;
   final StudentGroup? group;
 
+  /// Участники группового занятия (join)
+  final List<LessonStudent>? lessonStudents;
+
   const Lesson({
     required super.id,
     required super.createdAt,
@@ -87,6 +90,7 @@ class Lesson extends BaseModel {
     this.lessonType,
     this.student,
     this.group,
+    this.lessonStudents,
   });
 
   /// Является ли занятие частью повторяющейся серии
@@ -97,6 +101,13 @@ class Lesson extends BaseModel {
 
   /// Групповое ли занятие
   bool get isGroupLesson => groupId != null;
+
+  /// Количество присутствующих участников группового занятия
+  int get attendedCount =>
+      lessonStudents?.where((ls) => ls.attended).length ?? 0;
+
+  /// Общее количество участников группового занятия
+  int get totalStudentsCount => lessonStudents?.length ?? 0;
 
   /// Длительность в минутах
   int get durationMinutes {
@@ -152,6 +163,11 @@ class Lesson extends BaseModel {
         group: json['student_groups'] != null
             ? StudentGroup.fromJson(
                 json['student_groups'] as Map<String, dynamic>)
+            : null,
+        lessonStudents: json['lesson_students'] != null
+            ? (json['lesson_students'] as List)
+                .map((ls) => LessonStudent.fromJson(ls as Map<String, dynamic>))
+                .toList()
             : null,
       );
 
@@ -216,6 +232,7 @@ class Lesson extends BaseModel {
         lessonType: lessonType,
         student: student,
         group: group,
+        lessonStudents: lessonStudents,
       );
 
   static TimeOfDay _parseTime(String time) {
@@ -233,6 +250,7 @@ class LessonStudent {
   final String lessonId;
   final String studentId;
   final bool attended;
+  final String? subscriptionId; // ID подписки, с которой списано занятие
 
   /// Связанный студент (join)
   final Student? student;
@@ -242,6 +260,7 @@ class LessonStudent {
     required this.lessonId,
     required this.studentId,
     this.attended = true,
+    this.subscriptionId,
     this.student,
   });
 
@@ -250,6 +269,7 @@ class LessonStudent {
         lessonId: json['lesson_id'] as String,
         studentId: json['student_id'] as String,
         attended: json['attended'] as bool? ?? true,
+        subscriptionId: json['subscription_id'] as String?,
         student: json['students'] != null
             ? Student.fromJson(json['students'] as Map<String, dynamic>)
             : null,

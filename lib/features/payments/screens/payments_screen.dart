@@ -1279,7 +1279,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
     Payment? payment;
 
     if (_isFamilyMode) {
-      // Семейный абонемент
+      // Групповой абонемент
       payment = await controller.createFamilyPayment(
         institutionId: widget.institutionId,
         studentIds: _selectedFamilyStudents.map((s) => s.id).toList(),
@@ -1313,7 +1313,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isFamilyMode
-                ? 'Семейный абонемент добавлен'
+                ? 'Групповой абонемент добавлен'
                 : 'Оплата добавлена'),
             backgroundColor: Colors.green,
           ),
@@ -1449,7 +1449,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Семейный абонемент',
+                              'Групповой абонемент',
                               style: TextStyle(
                                 fontWeight: FontWeight.w500,
                               ),

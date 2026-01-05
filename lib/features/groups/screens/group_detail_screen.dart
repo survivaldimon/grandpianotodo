@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/groups/providers/group_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
+import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/student_group.dart';
+import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран деталей группы
@@ -284,32 +286,18 @@ class _GroupDetailContent extends ConsumerWidget {
   }
 
   void _showAddMemberDialog(BuildContext context, WidgetRef ref) {
-    final studentsAsync = ref.read(studentsProvider(institutionId));
+    final existingIds = (group.members ?? []).map((m) => m.id).toSet();
 
-    studentsAsync.whenData((allStudents) {
-      final existingIds = (group.members ?? []).map((m) => m.id).toSet();
-      final availableStudents = allStudents
-          .where((s) => !existingIds.contains(s.id))
-          .toList();
-
-      if (availableStudents.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Все ученики уже в группе'),
-          ),
-        );
-        return;
-      }
-
-      showDialog(
-        context: context,
-        builder: (dialogContext) => _AddMemberDialog(
-          availableStudents: availableStudents,
-          groupId: group.id,
-          institutionId: institutionId,
-        ),
-      );
-    });
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _AddMemberSheet(
+        groupId: group.id,
+        institutionId: institutionId,
+        existingMemberIds: existingIds,
+      ),
+    );
   }
 }
 
@@ -326,29 +314,55 @@ class _MemberTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: AppColors.surfaceVariant,
-        child: Text(
-          student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+    final hasDebt = student.prepaidLessonsCount < 0;
+    final balance = student.prepaidLessonsCount;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: hasDebt
+              ? AppColors.error.withValues(alpha: 0.1)
+              : AppColors.primary.withValues(alpha: 0.1),
+          child: Icon(
+            Icons.person,
+            color: hasDebt ? AppColors.error : AppColors.primary,
+          ),
         ),
-      ),
-      title: Text(student.name),
-      subtitle: student.prepaidLessonsCount != 0
-          ? Text(
-              'Баланс: ${student.prepaidLessonsCount}',
+        title: Text(student.name),
+        subtitle: Row(
+          children: [
+            Icon(
+              hasDebt ? Icons.warning_amber : Icons.school,
+              size: 14,
+              color: hasDebt ? AppColors.error : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$balance занятий',
               style: TextStyle(
-                color: student.prepaidLessonsCount < 0
-                    ? Colors.red
-                    : AppColors.textSecondary,
+                color: hasDebt ? AppColors.error : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-            )
-          : null,
-      trailing: IconButton(
-        icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-        onPressed: () => _showRemoveDialog(context, ref),
-        tooltip: 'Удалить из группы',
+            ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                Icons.remove_circle_outline,
+                color: AppColors.error.withValues(alpha: 0.7),
+              ),
+              onPressed: () => _showRemoveDialog(context, ref),
+              tooltip: 'Удалить из группы',
+            ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
+        onTap: () {
+          context.push('/institutions/$institutionId/students/${student.id}');
+        },
       ),
     );
   }
@@ -384,79 +398,541 @@ class _MemberTile extends ConsumerWidget {
   }
 }
 
-class _AddMemberDialog extends ConsumerStatefulWidget {
-  final List<Student> availableStudents;
+// ============================================================================
+// SHEET ДОБАВЛЕНИЯ УЧАСТНИКОВ В ГРУППУ
+// ============================================================================
+
+class _AddMemberSheet extends ConsumerStatefulWidget {
   final String groupId;
   final String institutionId;
+  final Set<String> existingMemberIds;
 
-  const _AddMemberDialog({
-    required this.availableStudents,
+  const _AddMemberSheet({
     required this.groupId,
     required this.institutionId,
+    required this.existingMemberIds,
   });
 
   @override
-  ConsumerState<_AddMemberDialog> createState() => _AddMemberDialogState();
+  ConsumerState<_AddMemberSheet> createState() => _AddMemberSheetState();
 }
 
-class _AddMemberDialogState extends ConsumerState<_AddMemberDialog> {
+class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
+  final _searchController = TextEditingController();
   final Set<String> _selectedIds = {};
+  String _searchQuery = '';
+  bool _isAdding = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Добавить участников'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ListView.builder(
-          shrinkWrap: true,
-          itemCount: widget.availableStudents.length,
-          itemBuilder: (context, index) {
-            final student = widget.availableStudents[index];
-            final isSelected = _selectedIds.contains(student.id);
+    final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+    final allStudents = studentsAsync.valueOrNull ?? [];
 
-            return CheckboxListTile(
-              title: Text(student.name),
-              value: isSelected,
-              onChanged: (value) {
-                setState(() {
-                  if (value == true) {
-                    _selectedIds.add(student.id);
-                  } else {
-                    _selectedIds.remove(student.id);
-                  }
-                });
-              },
-            );
-          },
+    // Фильтруем: убираем уже добавленных в группу
+    final availableStudents = allStudents
+        .where((s) => !widget.existingMemberIds.contains(s.id))
+        .where((s) => s.archivedAt == null)
+        .toList();
+
+    // Применяем поиск
+    final filteredStudents = _searchQuery.isEmpty
+        ? availableStudents
+        : availableStudents.where((s) {
+            return s.name.toLowerCase().contains(_searchQuery.toLowerCase());
+          }).toList();
+
+    // Выбранные ученики для отображения chips
+    final selectedStudents = availableStudents
+        .where((s) => _selectedIds.contains(s.id))
+        .toList();
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Drag handle
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // Заголовок
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.person_add, color: AppColors.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Добавить участников',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Выберите учеников для группы',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+
+          // Поиск
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Поиск ученика...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              onChanged: (value) => setState(() => _searchQuery = value),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Кнопка создания нового ученика
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Material(
+              color: AppColors.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: () => _showCreateStudentDialog(),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.add,
+                          color: AppColors.success,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Создать нового ученика',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.success,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios,
+                        size: 16,
+                        color: AppColors.success,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Chips выбранных учеников
+          if (selectedStudents.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Выбрано: ${selectedStudents.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: selectedStudents.map((student) {
+                      return Chip(
+                        label: Text(
+                          student.name,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        deleteIcon: const Icon(Icons.close, size: 18),
+                        onDeleted: () {
+                          setState(() => _selectedIds.remove(student.id));
+                        },
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                        side: BorderSide.none,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+
+          // Список учеников
+          Expanded(
+            child: studentsAsync.isLoading && allStudents.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : filteredStudents.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _searchQuery.isNotEmpty
+                                  ? Icons.search_off
+                                  : Icons.people_outline,
+                              size: 48,
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _searchQuery.isNotEmpty
+                                  ? 'Ничего не найдено'
+                                  : availableStudents.isEmpty
+                                      ? 'Все ученики уже в группе'
+                                      : 'Нет доступных учеников',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            if (_searchQuery.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                                child: const Text('Сбросить поиск'),
+                              ),
+                            ],
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: filteredStudents.length,
+                        itemBuilder: (context, index) {
+                          final student = filteredStudents[index];
+                          final isSelected = _selectedIds.contains(student.id);
+
+                          return CheckboxListTile(
+                            value: isSelected,
+                            onChanged: (value) {
+                              setState(() {
+                                if (value == true) {
+                                  _selectedIds.add(student.id);
+                                } else {
+                                  _selectedIds.remove(student.id);
+                                }
+                              });
+                            },
+                            title: Text(student.name),
+                            subtitle: student.balance != 0
+                                ? Text(
+                                    'Баланс: ${student.balance}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: student.balance < 0
+                                          ? AppColors.error
+                                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                  )
+                                : null,
+                            secondary: CircleAvatar(
+                              backgroundColor: isSelected
+                                  ? AppColors.primary.withValues(alpha: 0.2)
+                                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+                              child: Text(
+                                student.name.isNotEmpty
+                                    ? student.name[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            controlAffinity: ListTileControlAffinity.trailing,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                          );
+                        },
+                      ),
+          ),
+
+          // Sticky кнопка добавления
+          Container(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              12 + MediaQuery.of(context).viewPadding.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _selectedIds.isEmpty || _isAdding
+                    ? null
+                    : _addSelectedMembers,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isAdding
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        _selectedIds.isEmpty
+                            ? 'Выберите учеников'
+                            : 'Добавить (${_selectedIds.length})',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addSelectedMembers() async {
+    setState(() => _isAdding = true);
+
+    try {
+      final controller = ref.read(groupControllerProvider.notifier);
+
+      for (final studentId in _selectedIds) {
+        await controller.addMember(
+          widget.groupId,
+          studentId,
+          widget.institutionId,
+        );
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _selectedIds.length == 1
+                  ? 'Ученик добавлен в группу'
+                  : 'Добавлено учеников: ${_selectedIds.length}',
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isAdding = false);
+      }
+    }
+  }
+
+  void _showCreateStudentDialog() {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.person_add, color: AppColors.success, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text('Новый ученик'),
+            ],
+          ),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'ФИО *',
+                    hintText: 'Иванов Иван',
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  autofocus: true,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Введите имя' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Телефон',
+                    hintText: '+7 (777) 123-45-67',
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Отмена'),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+
+                      setDialogState(() => isLoading = true);
+
+                      final controller = ref.read(studentControllerProvider.notifier);
+                      final currentUserId = ref.read(currentUserIdProvider);
+
+                      final student = await controller.create(
+                        institutionId: widget.institutionId,
+                        name: nameController.text.trim(),
+                        phone: phoneController.text.isEmpty
+                            ? null
+                            : phoneController.text.trim(),
+                      );
+
+                      if (student != null) {
+                        // Автопривязка к преподавателю
+                        if (currentUserId != null) {
+                          final bindingsController =
+                              ref.read(studentBindingsControllerProvider.notifier);
+                          await bindingsController.addTeacher(
+                            studentId: student.id,
+                            userId: currentUserId,
+                            institutionId: widget.institutionId,
+                          );
+                        }
+
+                        // Автоматически выбираем созданного ученика
+                        setState(() => _selectedIds.add(student.id));
+
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Ученик "${student.name}" создан и выбран'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        }
+                      } else {
+                        setDialogState(() => isLoading = false);
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Создать'),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Отмена'),
-        ),
-        ElevatedButton(
-          onPressed: _selectedIds.isEmpty
-              ? null
-              : () async {
-                  final controller = ref.read(groupControllerProvider.notifier);
-
-                  for (final studentId in _selectedIds) {
-                    await controller.addMember(
-                      widget.groupId,
-                      studentId,
-                      widget.institutionId,
-                    );
-                  }
-
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                  }
-                },
-          child: Text('Добавить (${_selectedIds.length})'),
-        ),
-      ],
     );
   }
 }
+

@@ -24,7 +24,8 @@ class LessonRepository {
             subjects(*),
             lesson_types(*),
             students(*),
-            student_groups(*)
+            student_groups(*),
+            lesson_students(*, students(*))
           ''')
           .eq('room_id', roomId)
           .eq('date', dateStr)
@@ -53,7 +54,8 @@ class LessonRepository {
             subjects(*),
             lesson_types(*),
             students(*),
-            student_groups(*)
+            student_groups(*),
+            lesson_students(*, students(*))
           ''')
           .eq('institution_id', institutionId)
           .eq('date', dateStr)
@@ -81,7 +83,8 @@ class LessonRepository {
             subjects(*),
             lesson_types(*),
             students(*),
-            student_groups(*)
+            student_groups(*),
+            lesson_students(*, students(*))
           ''')
           .eq('teacher_id', _userId!)
           .eq('date', dateStr)
@@ -105,7 +108,8 @@ class LessonRepository {
             subjects(*),
             lesson_types(*),
             students(*),
-            student_groups(*)
+            student_groups(*),
+            lesson_students(*, students(*))
           ''')
           .eq('id', id)
           .single();
@@ -117,6 +121,8 @@ class LessonRepository {
   }
 
   /// Создать занятие
+  /// Для групповых занятий (groupId != null) автоматически создаёт
+  /// записи в lesson_students для всех участников группы
   Future<Lesson> create({
     required String institutionId,
     required String roomId,
@@ -154,7 +160,17 @@ class LessonRepository {
           .select()
           .single();
 
-      return Lesson.fromJson(data);
+      final lesson = Lesson.fromJson(data);
+
+      // Для групповых занятий создаём записи участников
+      if (groupId != null) {
+        final memberIds = await getGroupMemberIds(groupId);
+        if (memberIds.isNotEmpty) {
+          await createLessonStudents(lesson.id, memberIds);
+        }
+      }
+
+      return lesson;
     } catch (e) {
       throw DatabaseException('Ошибка создания занятия: $e');
     }
@@ -207,7 +223,19 @@ class LessonRepository {
           .insert(records)
           .select();
 
-      return (data as List).map((item) => Lesson.fromJson(item)).toList();
+      final lessons = (data as List).map((item) => Lesson.fromJson(item)).toList();
+
+      // Для групповых занятий создаём записи участников для каждого занятия
+      if (groupId != null) {
+        final memberIds = await getGroupMemberIds(groupId);
+        if (memberIds.isNotEmpty) {
+          for (final lesson in lessons) {
+            await createLessonStudents(lesson.id, memberIds);
+          }
+        }
+      }
+
+      return lessons;
     } catch (e) {
       throw DatabaseException('Ошибка создания серии занятий: $e');
     }
@@ -236,7 +264,8 @@ class LessonRepository {
             subjects(*),
             lesson_types(*),
             students(*),
-            student_groups(*)
+            student_groups(*),
+            lesson_students(*, students(*))
           ''')
           .eq('repeat_group_id', repeatGroupId)
           .isFilter('archived_at', null)
@@ -284,7 +313,7 @@ class LessonRepository {
     try {
       final dateStr = fromDate.toIso8601String().split('T').first;
 
-      // Сначала удаляем историю
+      // Получаем ID занятий для удаления
       final lessonIds = await _client
           .from('lessons')
           .select('id')
@@ -292,14 +321,22 @@ class LessonRepository {
           .gte('date', dateStr)
           .isFilter('archived_at', null);
 
+      // Удаляем связанные данные для каждого занятия
       for (final lesson in lessonIds as List) {
+        final lessonId = lesson['id'];
+        // 1. Удаляем участников
+        await _client
+            .from('lesson_students')
+            .delete()
+            .eq('lesson_id', lessonId);
+        // 2. Удаляем историю
         await _client
             .from('lesson_history')
             .delete()
-            .eq('lesson_id', lesson['id']);
+            .eq('lesson_id', lessonId);
       }
 
-      // Затем удаляем занятия
+      // Удаляем сами занятия
       await _client
           .from('lessons')
           .delete()
@@ -482,13 +519,19 @@ class LessonRepository {
   /// Удалить занятие полностью
   Future<void> delete(String id) async {
     try {
-      // Сначала удаляем историю занятия
+      // 1. Удаляем участников группового занятия
+      await _client
+          .from('lesson_students')
+          .delete()
+          .eq('lesson_id', id);
+
+      // 2. Удаляем историю занятия
       await _client
           .from('lesson_history')
           .delete()
           .eq('lesson_id', id);
 
-      // Затем удаляем само занятие
+      // 3. Удаляем само занятие
       await _client
           .from('lessons')
           .delete()
@@ -586,7 +629,8 @@ class LessonRepository {
             subjects(*),
             lesson_types(*),
             students(*),
-            student_groups(*)
+            student_groups(*),
+            lesson_students(*, students(*))
           ''')
           .eq('institution_id', institutionId)
           .eq('status', 'scheduled')
@@ -660,6 +704,154 @@ class LessonRepository {
         teacherId: teacherId,
       );
       yield lessons;
+    }
+  }
+
+  // ============================================================
+  // МЕТОДЫ ДЛЯ РАБОТЫ С УЧАСТНИКАМИ ГРУППОВОГО ЗАНЯТИЯ
+  // ============================================================
+
+  /// Получить участников группового занятия
+  Future<List<LessonStudent>> getLessonStudents(String lessonId) async {
+    try {
+      final data = await _client
+          .from('lesson_students')
+          .select('*, students(*)')
+          .eq('lesson_id', lessonId)
+          .order('id');
+
+      return (data as List)
+          .map((item) => LessonStudent.fromJson(item))
+          .toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки участников занятия: $e');
+    }
+  }
+
+  /// Создать записи участников для группового занятия
+  /// Используется при создании занятия с groupId
+  Future<void> createLessonStudents(
+    String lessonId,
+    List<String> studentIds,
+  ) async {
+    if (studentIds.isEmpty) return;
+
+    try {
+      final records = studentIds
+          .map((sid) => {
+                'lesson_id': lessonId,
+                'student_id': sid,
+                'attended': true, // По умолчанию все присутствуют
+              })
+          .toList();
+
+      await _client.from('lesson_students').insert(records);
+    } catch (e) {
+      throw DatabaseException('Ошибка создания участников занятия: $e');
+    }
+  }
+
+  /// Добавить гостя (ученика не из группы) в занятие
+  Future<LessonStudent> addGuestToLesson(
+    String lessonId,
+    String studentId,
+  ) async {
+    try {
+      final data = await _client
+          .from('lesson_students')
+          .insert({
+            'lesson_id': lessonId,
+            'student_id': studentId,
+            'attended': true,
+          })
+          .select('*, students(*)')
+          .single();
+
+      return LessonStudent.fromJson(data);
+    } catch (e) {
+      throw DatabaseException('Ошибка добавления участника: $e');
+    }
+  }
+
+  /// Удалить участника из занятия
+  Future<void> removeLessonStudent(String lessonId, String studentId) async {
+    try {
+      await _client
+          .from('lesson_students')
+          .delete()
+          .eq('lesson_id', lessonId)
+          .eq('student_id', studentId);
+    } catch (e) {
+      throw DatabaseException('Ошибка удаления участника: $e');
+    }
+  }
+
+  /// Обновить статус присутствия участника
+  Future<void> updateAttendance(
+    String lessonId,
+    String studentId,
+    bool attended,
+  ) async {
+    try {
+      await _client
+          .from('lesson_students')
+          .update({'attended': attended})
+          .eq('lesson_id', lessonId)
+          .eq('student_id', studentId);
+    } catch (e) {
+      throw DatabaseException('Ошибка обновления присутствия: $e');
+    }
+  }
+
+  /// Установить ID подписки для участника группового занятия
+  /// Вызывается при complete() для сохранения информации о списании
+  Future<void> setLessonStudentSubscriptionId(
+    String lessonId,
+    String studentId,
+    String subscriptionId,
+  ) async {
+    try {
+      await _client
+          .from('lesson_students')
+          .update({'subscription_id': subscriptionId})
+          .eq('lesson_id', lessonId)
+          .eq('student_id', studentId);
+    } catch (e) {
+      // Не критично - продолжаем без ошибки
+      debugPrint('Error setting lesson_student subscription_id: $e');
+    }
+  }
+
+  /// Очистить привязку к подписке для участника группового занятия
+  /// Вызывается при uncomplete() для корректного возврата занятия
+  Future<void> clearLessonStudentSubscriptionId(
+    String lessonId,
+    String studentId,
+  ) async {
+    try {
+      await _client
+          .from('lesson_students')
+          .update({'subscription_id': null})
+          .eq('lesson_id', lessonId)
+          .eq('student_id', studentId);
+    } catch (e) {
+      debugPrint('Error clearing lesson_student subscription_id: $e');
+    }
+  }
+
+  /// Получить ID участников группы (для создания lesson_students)
+  Future<List<String>> getGroupMemberIds(String groupId) async {
+    try {
+      final data = await _client
+          .from('student_group_members')
+          .select('student_id')
+          .eq('group_id', groupId);
+
+      return (data as List)
+          .map((item) => item['student_id'] as String)
+          .toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки участников группы: $e');
     }
   }
 }

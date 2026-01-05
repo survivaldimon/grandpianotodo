@@ -29,6 +29,8 @@ import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/core/widgets/shimmer_loading.dart';
 import 'package:kabinet/features/bookings/models/booking.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
+import 'package:kabinet/features/groups/providers/group_provider.dart';
+import 'package:kabinet/shared/models/student_group.dart';
 
 /// Класс для хранения состояния фильтров расписания
 class ScheduleFilters {
@@ -1555,6 +1557,11 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
               Flexible(
                 child: Row(
                   children: [
+                    // Иконка группы для групповых занятий
+                    if (lesson.isGroupLesson) ...[
+                      Icon(Icons.groups, size: iconSize, color: color),
+                      SizedBox(width: isShort ? 1 : 2),
+                    ],
                     Expanded(
                       child: Text(
                         participant,
@@ -2393,10 +2400,14 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         color: Theme.of(context).colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      // Ограничиваем высоту, чтобы избежать overflow
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
+          // Drag handle (вне скролла)
           Container(
             margin: const EdgeInsets.only(top: 12),
             width: 40,
@@ -2407,17 +2418,19 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
             ),
           ),
 
-          Padding(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 16,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          // Скроллируемое содержимое
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 // Заголовок с аватаром
                 Row(
                   children: [
@@ -2541,9 +2554,28 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                   ),
                 ),
 
+                // Секция участников для групповых занятий
+                if (lesson.isGroupLesson) ...[
+                  const SizedBox(height: 16),
+                  _GroupParticipantsSection(
+                    lesson: lesson,
+                    institutionId: widget.institutionId,
+                    isCompleted: _isCompleted,
+                    isLoading: _isLoading,
+                    hasPrice: hasPrice,
+                    onUpdated: () {
+                      widget.onUpdated();
+                      // Перезагружаем данные занятия
+                      ref.invalidate(lessonsByInstitutionStreamProvider(
+                        InstitutionDateParams(widget.institutionId, lesson.date),
+                      ));
+                    },
+                  ),
+                ],
+
                 const SizedBox(height: 16),
 
-                // Статусы
+                // Статусы (оптимистичное обновление — UI меняется мгновенно)
                 Row(
                   children: [
                     // Проведено
@@ -2553,7 +2585,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                         icon: Icons.check_circle_rounded,
                         isActive: _isCompleted,
                         color: AppColors.success,
-                        isLoading: _isLoading || controllerState.isLoading,
+                        isLoading: _isLoading,
                         onTap: () => _handleStatusChange(completed: !_isCompleted),
                       ),
                     ),
@@ -2565,7 +2597,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                         icon: Icons.cancel_rounded,
                         isActive: _isCancelled,
                         color: AppColors.error,
-                        isLoading: _isLoading || controllerState.isLoading,
+                        isLoading: _isLoading,
                         onTap: () => _handleStatusChange(cancelled: !_isCancelled),
                       ),
                     ),
@@ -2578,7 +2610,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                           icon: Icons.monetization_on_rounded,
                           isActive: _isPaid,
                           color: AppColors.primary,
-                          isLoading: _isLoading || controllerState.isLoading || _isLoadingPayment,
+                          isLoading: _isLoading || _isLoadingPayment,
                           onTap: () {
                             if (_isPaid) {
                               _handleRemovePayment();
@@ -2658,6 +2690,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
               ],
             ),
           ),
+        ), // Flexible
         ],
       ),
     );
@@ -2666,52 +2699,51 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
   Future<void> _handleStatusChange({bool? completed, bool? cancelled}) async {
     if (_isLoading) return;
 
-    setState(() => _isLoading = true);
-
     final controller = ref.read(lessonControllerProvider.notifier);
     final lesson = widget.lesson;
+
+    // Сохраняем текущий статус для отката при ошибке
+    final previousStatus = _currentStatus;
+
+    // Определяем новый статус
+    LessonStatus newStatus;
+    if (completed == true) {
+      newStatus = LessonStatus.completed;
+    } else if (cancelled == true) {
+      newStatus = LessonStatus.cancelled;
+    } else {
+      newStatus = LessonStatus.scheduled;
+    }
+
+    // Оптимистичное обновление — мгновенно меняем UI БЕЗ индикатора загрузки
+    setState(() {
+      _currentStatus = newStatus;
+    });
+
+    // Сохранение в фоне (без блокировки UI)
     bool success = false;
 
     if (completed == true) {
-      // Ставим "Проведено" — снимаем "Отменено"
       success = await controller.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
-      if (success && mounted) {
-        setState(() {
-          _currentStatus = LessonStatus.completed;
-          _isLoading = false;
-        });
-      }
-    } else if (completed == false && _isCompleted) {
-      // Снимаем "Проведено" — возвращаем в "Запланировано"
+    } else if (completed == false && previousStatus == LessonStatus.completed) {
       success = await controller.uncomplete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
-      if (success && mounted) {
-        setState(() {
-          _currentStatus = LessonStatus.scheduled;
-          _isLoading = false;
-        });
-      }
     } else if (cancelled == true) {
-      // Ставим "Отменено" — снимаем "Проведено"
       success = await controller.cancel(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
-      if (success && mounted) {
-        setState(() {
-          _currentStatus = LessonStatus.cancelled;
-          _isLoading = false;
-        });
-      }
-    } else if (cancelled == false && _isCancelled) {
-      // Снимаем "Отменено" — возвращаем в "Запланировано"
+    } else if (cancelled == false && previousStatus == LessonStatus.cancelled) {
       success = await controller.uncomplete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
-      if (success && mounted) {
-        setState(() {
-          _currentStatus = LessonStatus.scheduled;
-          _isLoading = false;
-        });
-      }
     }
 
-    if (!success && mounted) {
-      setState(() => _isLoading = false);
+    if (mounted && !success) {
+      // Откат при ошибке + показываем сообщение
+      setState(() {
+        _currentStatus = previousStatus;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Не удалось обновить статус'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -2900,6 +2932,495 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
   }
 }
 
+/// Секция участников группового занятия
+class _GroupParticipantsSection extends ConsumerStatefulWidget {
+  final Lesson lesson;
+  final String institutionId;
+  final bool isCompleted;
+  final bool isLoading;
+  final bool hasPrice;
+  final VoidCallback onUpdated;
+
+  const _GroupParticipantsSection({
+    required this.lesson,
+    required this.institutionId,
+    required this.isCompleted,
+    required this.isLoading,
+    required this.hasPrice,
+    required this.onUpdated,
+  });
+
+  @override
+  ConsumerState<_GroupParticipantsSection> createState() => _GroupParticipantsSectionState();
+}
+
+class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSection> {
+  Map<String, bool> _attendanceState = {};
+  Map<String, bool> _paymentState = {};
+  bool _isUpdating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Инициализируем состояние присутствия из данных занятия
+    if (widget.lesson.lessonStudents != null) {
+      for (final ls in widget.lesson.lessonStudents!) {
+        _attendanceState[ls.studentId] = ls.attended;
+        // По умолчанию оплата включена для присутствующих (когда занятие ещё не завершено)
+        // или false если занятие уже завершено (оплата уже была обработана)
+        _paymentState[ls.studentId] = !widget.isCompleted && ls.attended;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final participants = widget.lesson.lessonStudents ?? [];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Заголовок
+          Row(
+            children: [
+              Icon(Icons.groups, size: 20, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Text(
+                'Участники',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const Spacer(),
+              // Счётчик присутствия
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_attendanceState.values.where((v) => v).length}/${participants.length}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Список участников
+          if (participants.isEmpty)
+            Text(
+              'Нет участников',
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            )
+          else
+            ...participants.map((ls) => _buildParticipantTile(ls)),
+
+          // Кнопка добавления гостя (только если не завершено)
+          if (!widget.isCompleted) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _isUpdating ? null : _showAddGuestDialog,
+                  icon: const Icon(Icons.person_add, size: 18),
+                  label: const Text('Добавить гостя'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                // Кнопка оплаты (только если есть цена)
+                if (widget.hasPrice && _hasPaymentsToProcess)
+                  ElevatedButton.icon(
+                    onPressed: _isUpdating ? null : _handleGroupPayments,
+                    icon: const Icon(Icons.monetization_on, size: 18),
+                    label: const Text('Оплатить'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParticipantTile(LessonStudent ls) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final studentName = ls.student?.name ?? 'Неизвестный';
+    final attended = _attendanceState[ls.studentId] ?? ls.attended;
+    final shouldPay = _paymentState[ls.studentId] ?? false;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          // Чекбокс присутствия
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: attended,
+              onChanged: widget.isCompleted || _isUpdating
+                  ? null
+                  : (value) => _handleAttendanceChange(ls.studentId, value ?? true),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Имя участника
+          Expanded(
+            child: Text(
+              studentName,
+              style: TextStyle(
+                fontSize: 14,
+                color: attended ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+                decoration: attended ? null : TextDecoration.lineThrough,
+              ),
+            ),
+          ),
+          // Чекбокс оплаты (если есть цена и занятие не завершено)
+          if (widget.hasPrice && !widget.isCompleted) ...[
+            const SizedBox(width: 4),
+            Tooltip(
+              message: 'Оплата',
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: shouldPay,
+                  onChanged: _isUpdating || !attended
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _paymentState[ls.studentId] = value ?? false;
+                          });
+                        },
+                  activeColor: AppColors.primary,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.monetization_on,
+              size: 16,
+              color: shouldPay && attended
+                  ? AppColors.primary
+                  : colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+          ],
+          // Кнопка удаления (только если не завершено и можно удалить)
+          if (!widget.isCompleted)
+            IconButton(
+              icon: Icon(
+                Icons.close,
+                size: 18,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              onPressed: _isUpdating ? null : () => _removeParticipant(ls.studentId, ls.student?.name),
+              tooltip: 'Убрать из занятия',
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              padding: EdgeInsets.zero,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Проверка, есть ли участники для оплаты
+  bool get _hasPaymentsToProcess {
+    for (final entry in _paymentState.entries) {
+      final studentId = entry.key;
+      final shouldPay = entry.value;
+      final attended = _attendanceState[studentId] ?? false;
+      if (shouldPay && attended) return true;
+    }
+    return false;
+  }
+
+  Future<void> _handleAttendanceChange(String studentId, bool attended) async {
+    setState(() {
+      _attendanceState[studentId] = attended;
+      // Автоматически включаем оплату при включении присутствия, выключаем при выключении
+      if (widget.hasPrice) {
+        _paymentState[studentId] = attended;
+      }
+    });
+
+    // Сохраняем в БД
+    final controller = ref.read(lessonControllerProvider.notifier);
+    await controller.updateAttendance(
+      widget.lesson.id,
+      studentId,
+      attended,
+      widget.lesson.roomId,
+      widget.lesson.date,
+      widget.institutionId,
+    );
+  }
+
+  /// Обработка оплаты для выбранных участников
+  Future<void> _handleGroupPayments() async {
+    final price = widget.lesson.lessonType?.defaultPrice;
+    if (price == null || price <= 0) return;
+
+    // Собираем студентов для оплаты
+    final studentsToProcess = <String>[];
+    for (final entry in _paymentState.entries) {
+      final studentId = entry.key;
+      final shouldPay = entry.value;
+      final attended = _attendanceState[studentId] ?? false;
+      if (shouldPay && attended) {
+        studentsToProcess.add(studentId);
+      }
+    }
+
+    if (studentsToProcess.isEmpty) return;
+
+    setState(() => _isUpdating = true);
+
+    try {
+      final paymentController = ref.read(paymentControllerProvider.notifier);
+
+      for (final studentId in studentsToProcess) {
+        await paymentController.create(
+          institutionId: widget.institutionId,
+          studentId: studentId,
+          amount: price,
+          lessonsCount: 1,
+          comment: 'lesson:${widget.lesson.id}|group|$studentId',
+        );
+
+        // Снимаем галочку оплаты после успешной оплаты
+        if (mounted) {
+          setState(() {
+            _paymentState[studentId] = false;
+          });
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Оплата записана: ${studentsToProcess.length} ${_pluralStudents(studentsToProcess.length)}'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка оплаты: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+        widget.onUpdated();
+      }
+    }
+  }
+
+  String _pluralStudents(int count) {
+    if (count % 10 == 1 && count % 100 != 11) return 'ученик';
+    if ([2, 3, 4].contains(count % 10) && ![12, 13, 14].contains(count % 100)) return 'ученика';
+    return 'учеников';
+  }
+
+  Future<void> _removeParticipant(String studentId, String? studentName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Убрать участника?'),
+        content: Text(
+          studentName != null
+              ? 'Убрать $studentName из этого занятия?'
+              : 'Убрать участника из этого занятия?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Убрать'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isUpdating = true);
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+    final success = await controller.removeLessonStudent(
+      widget.lesson.id,
+      studentId,
+      widget.lesson.roomId,
+      widget.lesson.date,
+      widget.institutionId,
+    );
+
+    if (success && mounted) {
+      setState(() {
+        _attendanceState.remove(studentId);
+        _isUpdating = false;
+      });
+      widget.onUpdated();
+    } else if (mounted) {
+      setState(() => _isUpdating = false);
+    }
+  }
+
+  void _showAddGuestDialog() {
+    final studentsAsync = ref.read(studentsProvider(widget.institutionId));
+    final existingIds = widget.lesson.lessonStudents?.map((ls) => ls.studentId).toSet() ?? {};
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Добавить гостя',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: studentsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Ошибка: $e')),
+                  data: (students) {
+                    final availableStudents = students
+                        .where((s) => !existingIds.contains(s.id))
+                        .toList();
+                    if (availableStudents.isEmpty) {
+                      return const Center(
+                        child: Text('Все ученики уже добавлены'),
+                      );
+                    }
+                    return ListView.builder(
+                      controller: scrollController,
+                      itemCount: availableStudents.length,
+                      itemBuilder: (context, index) {
+                        final student = availableStudents[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                            child: const Icon(Icons.person, color: AppColors.primary),
+                          ),
+                          title: Text(student.name),
+                          onTap: () => _addGuest(student.id, student.name),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addGuest(String studentId, String studentName) async {
+    Navigator.pop(context); // Закрываем диалог выбора
+
+    setState(() => _isUpdating = true);
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+    final success = await controller.addGuestToLesson(
+      widget.lesson.id,
+      studentId,
+      widget.lesson.roomId,
+      widget.lesson.date,
+      widget.institutionId,
+    );
+
+    if (success && mounted) {
+      setState(() {
+        _attendanceState[studentId] = true;
+        _isUpdating = false;
+      });
+      widget.onUpdated();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$studentName добавлен как гость'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else if (mounted) {
+      setState(() => _isUpdating = false);
+    }
+  }
+}
+
 /// Строка детальной информации в карточке занятия
 class _DetailRow extends StatelessWidget {
   final IconData icon;
@@ -3025,9 +3546,13 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
   late TimeOfDay _endTime;
   late DateTime _date;
   String? _selectedStudentId;
+  String? _selectedGroupId;
   String? _selectedSubjectId;
   String? _selectedLessonTypeId;
   String? _selectedRoomId;
+
+  /// Является ли занятие групповым (определяется при инициализации и не меняется)
+  bool get _isGroupLesson => widget.lesson.groupId != null;
 
   @override
   void initState() {
@@ -3036,6 +3561,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
     _endTime = widget.lesson.endTime;
     _date = widget.lesson.date;
     _selectedStudentId = widget.lesson.studentId;
+    _selectedGroupId = widget.lesson.groupId;
     _selectedSubjectId = widget.lesson.subjectId;
     _selectedLessonTypeId = widget.lesson.lessonTypeId;
     _selectedRoomId = widget.lesson.roomId;
@@ -3044,6 +3570,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
   @override
   Widget build(BuildContext context) {
     final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+    final groupsAsync = ref.watch(studentGroupsProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsProvider(widget.institutionId));
     final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
     final roomsAsync = ref.watch(roomsProvider(widget.institutionId));
@@ -3100,60 +3627,29 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Время
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () async {
-                      final time = await showIosTimePicker(
-                        context: context,
-                        initialTime: _startTime,
-                        minuteInterval: 5,
-                      );
-                      if (time != null) {
-                        setState(() {
-                          _startTime = time;
-                          final endMinutes = time.hour * 60 + time.minute + 60;
-                          _endTime = TimeOfDay(
-                            hour: endMinutes ~/ 60,
-                            minute: endMinutes % 60,
-                          );
-                        });
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Начало',
-                        prefixIcon: Icon(Icons.access_time),
-                      ),
-                      child: Text(_formatTime(_startTime)),
-                    ),
-                  ),
+            // Время (комбинированный пикер)
+            InkWell(
+              onTap: () async {
+                final range = await showIosTimeRangePicker(
+                  context: context,
+                  initialStartTime: _startTime,
+                  initialEndTime: _endTime,
+                  minuteInterval: 5,
+                );
+                if (range != null) {
+                  setState(() {
+                    _startTime = range.start;
+                    _endTime = range.end;
+                  });
+                }
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Время',
+                  prefixIcon: Icon(Icons.access_time),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: InkWell(
-                    onTap: () async {
-                      final time = await showIosTimePicker(
-                        context: context,
-                        initialTime: _endTime,
-                        minuteInterval: 5,
-                      );
-                      if (time != null) {
-                        setState(() => _endTime = time);
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Конец',
-                        prefixIcon: Icon(Icons.access_time),
-                      ),
-                      child: Text(_formatTime(_endTime)),
-                    ),
-                  ),
-                ),
-              ],
+                child: Text('${_formatTime(_startTime)} – ${_formatTime(_endTime)}'),
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -3181,28 +3677,51 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Ученик
-            studentsAsync.when(
-              loading: () => const CircularProgressIndicator(),
-              error: (e, _) => ErrorView.inline(e),
-              data: (students) {
-                final selectedStudent = students.where((s) => s.id == _selectedStudentId).firstOrNull;
-                return DropdownButtonFormField<String?>(
-                  decoration: const InputDecoration(
-                    labelText: 'Ученик',
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  value: selectedStudent?.id,
-                  items: students.map((s) => DropdownMenuItem<String?>(
-                    value: s.id,
-                    child: Text(s.name),
-                  )).toList(),
-                  onChanged: (studentId) {
-                    setState(() => _selectedStudentId = studentId);
-                  },
-                );
-              },
-            ),
+            // Ученик или Группа (зависит от типа занятия)
+            if (_isGroupLesson)
+              groupsAsync.when(
+                loading: () => const CircularProgressIndicator(),
+                error: (e, _) => ErrorView.inline(e),
+                data: (groups) {
+                  final selectedGroup = groups.where((g) => g.id == _selectedGroupId).firstOrNull;
+                  return DropdownButtonFormField<String?>(
+                    decoration: const InputDecoration(
+                      labelText: 'Группа',
+                      prefixIcon: Icon(Icons.groups),
+                    ),
+                    value: selectedGroup?.id,
+                    items: groups.map((g) => DropdownMenuItem<String?>(
+                      value: g.id,
+                      child: Text(g.name),
+                    )).toList(),
+                    onChanged: (groupId) {
+                      setState(() => _selectedGroupId = groupId);
+                    },
+                  );
+                },
+              )
+            else
+              studentsAsync.when(
+                loading: () => const CircularProgressIndicator(),
+                error: (e, _) => ErrorView.inline(e),
+                data: (students) {
+                  final selectedStudent = students.where((s) => s.id == _selectedStudentId).firstOrNull;
+                  return DropdownButtonFormField<String?>(
+                    decoration: const InputDecoration(
+                      labelText: 'Ученик',
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    value: selectedStudent?.id,
+                    items: students.map((s) => DropdownMenuItem<String?>(
+                      value: s.id,
+                      child: Text(s.name),
+                    )).toList(),
+                    onChanged: (studentId) {
+                      setState(() => _selectedStudentId = studentId);
+                    },
+                  );
+                },
+              ),
             const SizedBox(height: 16),
 
             // Предмет
@@ -3391,7 +3910,8 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
           newDate: _date,
           startTime: _startTime,
           endTime: _endTime,
-          studentId: _selectedStudentId,
+          studentId: _isGroupLesson ? null : _selectedStudentId,
+          groupId: _isGroupLesson ? _selectedGroupId : null,
           subjectId: _selectedSubjectId,
           lessonTypeId: _selectedLessonTypeId,
         );
@@ -3416,7 +3936,8 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
         newDate: _date,
         startTime: _startTime,
         endTime: _endTime,
-        studentId: _selectedStudentId,
+        studentId: _isGroupLesson ? null : _selectedStudentId,
+        groupId: _isGroupLesson ? _selectedGroupId : null,
         subjectId: _selectedSubjectId,
         lessonTypeId: _selectedLessonTypeId,
       );
@@ -5132,6 +5653,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
   LessonType? _selectedLessonType;
   InstitutionMember? _selectedTeacher;
 
+  // Для групповых занятий
+  bool _isGroupLesson = false;
+  StudentGroup? _selectedGroup;
+
   // Для режима бронирования
   Set<String> _selectedRoomIds = {};
   final TextEditingController _descriptionController = TextEditingController();
@@ -5180,6 +5705,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     final subjectsAsync = ref.watch(subjectsProvider(widget.institutionId));
     final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
     final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
+    final groupsAsync = ref.watch(groupsProvider(widget.institutionId));
     final controllerState = ref.watch(lessonControllerProvider);
     final bookingControllerState = ref.watch(bookingControllerProvider);
 
@@ -5396,60 +5922,29 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Время
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () async {
-                      final time = await showIosTimePicker(
-                        context: context,
-                        initialTime: _startTime,
-                        minuteInterval: 5,
-                      );
-                      if (time != null) {
-                        setState(() {
-                          _startTime = time;
-                          final endMinutes = time.hour * 60 + time.minute + 60;
-                          _endTime = TimeOfDay(
-                            hour: endMinutes ~/ 60,
-                            minute: endMinutes % 60,
-                          );
-                        });
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Начало',
-                        prefixIcon: Icon(Icons.access_time),
-                      ),
-                      child: Text(_formatTime(_startTime)),
-                    ),
-                  ),
+            // Время (комбинированный пикер)
+            InkWell(
+              onTap: () async {
+                final range = await showIosTimeRangePicker(
+                  context: context,
+                  initialStartTime: _startTime,
+                  initialEndTime: _endTime,
+                  minuteInterval: 5,
+                );
+                if (range != null) {
+                  setState(() {
+                    _startTime = range.start;
+                    _endTime = range.end;
+                  });
+                }
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Время *',
+                  prefixIcon: Icon(Icons.access_time),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: InkWell(
-                    onTap: () async {
-                      final time = await showIosTimePicker(
-                        context: context,
-                        initialTime: _endTime,
-                        minuteInterval: 5,
-                      );
-                      if (time != null) {
-                        setState(() => _endTime = time);
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Конец',
-                        prefixIcon: Icon(Icons.access_time),
-                      ),
-                      child: Text(_formatTime(_endTime)),
-                    ),
-                  ),
-                ),
-              ],
+                child: Text('${_formatTime(_startTime)} – ${_formatTime(_endTime)}'),
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -5491,68 +5986,164 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
             // ========== Продолжение РЕЖИМА ЗАНЯТИЯ ==========
             if (_mode == _AddFormMode.lesson) ...[
-              // Ученик
-              studentsAsync.when(
-                loading: () => const CircularProgressIndicator(),
-                error: (e, _) => ErrorView.inline(e),
-                data: (students) {
-                  // Находим выбранного студента по ID в текущем списке
-                  // (объекты могут быть разными после перезагрузки)
-                  final currentStudent = _selectedStudent != null
-                      ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
-                      : null;
+              // Переключатель Ученик/Группа
+              Builder(builder: (context) {
+                final groups = groupsAsync.valueOrNull ?? [];
+                // Показываем переключатель только если есть группы
+                if (groups.isEmpty) return const SizedBox.shrink();
+                return Column(
+                  children: [
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                          value: false,
+                          label: Text('Ученик'),
+                          icon: Icon(Icons.person),
+                        ),
+                        ButtonSegment(
+                          value: true,
+                          label: Text('Группа'),
+                          icon: Icon(Icons.groups),
+                        ),
+                      ],
+                      selected: {_isGroupLesson},
+                      onSelectionChanged: (selected) {
+                        setState(() {
+                          _isGroupLesson = selected.first;
+                          // Сбрасываем выбор при переключении
+                          if (_isGroupLesson) {
+                            _selectedStudent = null;
+                          } else {
+                            _selectedGroup = null;
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                );
+              }),
 
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: students.isEmpty
-                            ? InputDecorator(
-                                decoration: const InputDecoration(
-                                  labelText: 'Ученик *',
-                                  prefixIcon: Icon(Icons.person),
+              // Выбор ученика (индивидуальное занятие)
+              if (!_isGroupLesson)
+                studentsAsync.when(
+                  loading: () => const CircularProgressIndicator(),
+                  error: (e, _) => ErrorView.inline(e),
+                  data: (students) {
+                    // Находим выбранного студента по ID в текущем списке
+                    final currentStudent = _selectedStudent != null
+                        ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                        : null;
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: students.isEmpty
+                              ? InputDecorator(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Ученик *',
+                                    prefixIcon: Icon(Icons.person),
+                                  ),
+                                  child: Text(
+                                    'Нет учеников',
+                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                  ),
+                                )
+                              : DropdownButtonFormField<Student?>(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Ученик *',
+                                    prefixIcon: Icon(Icons.person),
+                                  ),
+                                  value: currentStudent,
+                                  items: students.map((s) => DropdownMenuItem<Student?>(
+                                    value: s,
+                                    child: Text(s.name),
+                                  )).toList(),
+                                  onChanged: (student) {
+                                    setState(() => _selectedStudent = student);
+                                    // Автозаполнение типа занятия из привязок ученика
+                                    if (student != null) {
+                                      _autoFillLessonTypeFromStudent(student.id);
+                                    }
+                                  },
                                 ),
-                                child: Text(
-                                  'Нет учеников',
-                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                ),
-                              )
-                            : DropdownButtonFormField<Student?>(
-                                decoration: const InputDecoration(
-                                  labelText: 'Ученик *',
-                                  prefixIcon: Icon(Icons.person),
-                                ),
-                                value: currentStudent,
-                                items: students.map((s) => DropdownMenuItem<Student?>(
-                                  value: s,
-                                  child: Text(s.name),
-                                )).toList(),
-                                onChanged: (student) {
-                                  setState(() => _selectedStudent = student);
-                                  // Автозаполнение типа занятия из привязок ученика
-                                  if (student != null) {
-                                    _autoFillLessonTypeFromStudent(student.id);
-                                  }
-                                },
-                              ),
-                      ),
-                      const SizedBox(width: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: IconButton.filled(
-                          onPressed: () => _showAddStudentDialog(),
-                          icon: const Icon(Icons.add, size: 20),
-                          tooltip: 'Добавить ученика',
-                          style: IconButton.styleFrom(
-                            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                            foregroundColor: AppColors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: IconButton.filled(
+                            onPressed: () => _showAddStudentDialog(),
+                            icon: const Icon(Icons.add, size: 20),
+                            tooltip: 'Добавить ученика',
+                            style: IconButton.styleFrom(
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                              foregroundColor: AppColors.primary,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                      ],
+                    );
+                  },
+                ),
+
+              // Выбор группы (групповое занятие)
+              if (_isGroupLesson)
+                groupsAsync.when(
+                  loading: () => const CircularProgressIndicator(),
+                  error: (e, _) => ErrorView.inline(e),
+                  data: (groups) {
+                    final currentGroup = _selectedGroup != null
+                        ? groups.where((g) => g.id == _selectedGroup!.id).firstOrNull
+                        : null;
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: groups.isEmpty
+                              ? InputDecorator(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Группа *',
+                                    prefixIcon: Icon(Icons.groups),
+                                  ),
+                                  child: Text(
+                                    'Нет групп',
+                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                  ),
+                                )
+                              : DropdownButtonFormField<StudentGroup?>(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Группа *',
+                                    prefixIcon: Icon(Icons.groups),
+                                  ),
+                                  value: currentGroup,
+                                  items: groups.map((g) => DropdownMenuItem<StudentGroup?>(
+                                    value: g,
+                                    child: Text('${g.name} (${g.membersCount} уч.)'),
+                                  )).toList(),
+                                  onChanged: (group) {
+                                    setState(() => _selectedGroup = group);
+                                  },
+                                ),
+                        ),
+                        const SizedBox(width: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: IconButton.filled(
+                            onPressed: () => _showCreateGroupDialog(),
+                            icon: const Icon(Icons.add, size: 20),
+                            tooltip: 'Создать группу',
+                            style: IconButton.styleFrom(
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                              foregroundColor: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               const SizedBox(height: 16),
 
               // Преподаватель (только для владельца/админа)
@@ -5713,7 +6304,9 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
               // Кнопка создания
               ElevatedButton.icon(
-                onPressed: controllerState.isLoading || _selectedStudent == null || _selectedRoom == null
+                onPressed: controllerState.isLoading ||
+                        (_isGroupLesson ? _selectedGroup == null : _selectedStudent == null) ||
+                        _selectedRoom == null
                     ? null
                     : _createLesson,
                 icon: const Icon(Icons.add),
@@ -5778,7 +6371,11 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
   }
 
   Future<void> _createLesson() async {
-    if (_selectedStudent == null || _selectedRoom == null) return;
+    if (_selectedRoom == null) return;
+
+    // Валидация: для индивидуального нужен ученик, для группового — группа
+    if (_isGroupLesson && _selectedGroup == null) return;
+    if (!_isGroupLesson && _selectedStudent == null) return;
 
     // Проверка минимальной длительности (15 минут)
     final startMinutes = _startTime.hour * 60 + _startTime.minute;
@@ -5809,20 +6406,23 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
       date: _selectedDate,
       startTime: _startTime,
       endTime: _endTime,
-      studentId: _selectedStudent!.id,
+      studentId: _isGroupLesson ? null : _selectedStudent!.id,
+      groupId: _isGroupLesson ? _selectedGroup!.id : null,
       subjectId: _selectedSubject?.id,
       lessonTypeId: _selectedLessonType?.id,
     );
 
     if (lesson != null && mounted) {
-      // Автоматически создаём привязки ученик-преподаватель и ученик-предмет
-      _createBindings(teacherId);
+      // Автоматически создаём привязки только для индивидуальных занятий
+      if (!_isGroupLesson) {
+        _createBindings(teacherId);
+      }
 
       widget.onCreated(_selectedDate);
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Занятие создано'),
+        SnackBar(
+          content: Text(_isGroupLesson ? 'Групповое занятие создано' : 'Занятие создано'),
           backgroundColor: Colors.green,
         ),
       );
@@ -5998,6 +6598,67 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             }
           });
         },
+      ),
+    );
+  }
+
+  void _showCreateGroupDialog() {
+    final nameController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Новая группа'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: 'Название группы',
+              hintText: 'Например: Группа вокала',
+            ),
+            autofocus: true,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Введите название';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+
+              final controller = ref.read(groupControllerProvider.notifier);
+              final group = await controller.create(
+                institutionId: widget.institutionId,
+                name: nameController.text.trim(),
+              );
+
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+
+              if (group != null) {
+                ref.invalidate(groupsProvider(widget.institutionId));
+                ref.read(groupsProvider(widget.institutionId).future).then((groups) {
+                  final newGroup = groups.where((g) => g.id == group.id).firstOrNull;
+                  if (mounted) {
+                    setState(() => _selectedGroup = newGroup);
+                  }
+                });
+              }
+            },
+            child: const Text('Создать'),
+          ),
+        ],
       ),
     );
   }

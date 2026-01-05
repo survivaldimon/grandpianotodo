@@ -926,28 +926,31 @@ class LessonStudent {
   final String lessonId;
   final String studentId;
   final bool attended;
-  
+  final String? subscriptionId; // ID подписки, с которой списано занятие
+
   /// Связанный студент (join)
   final Student? student;
-  
+
   const LessonStudent({
     required this.id,
     required this.lessonId,
     required this.studentId,
     this.attended = true,
+    this.subscriptionId,
     this.student,
   });
-  
+
   factory LessonStudent.fromJson(Map<String, dynamic> json) => LessonStudent(
     id: json['id'] as String,
     lessonId: json['lesson_id'] as String,
     studentId: json['student_id'] as String,
     attended: json['attended'] as bool? ?? true,
-    student: json['students'] != null 
-        ? Student.fromJson(json['students'] as Map<String, dynamic>) 
+    subscriptionId: json['subscription_id'] as String?,
+    student: json['students'] != null
+        ? Student.fromJson(json['students'] as Map<String, dynamic>)
         : null,
   );
-  
+
   Map<String, dynamic> toJson() => {
     'lesson_id': lessonId,
     'student_id': studentId,

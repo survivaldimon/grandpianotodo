@@ -1262,7 +1262,7 @@ class _SubscriptionCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         const Text(
-                          'Семейный',
+                          'Групповой',
                           style: TextStyle(
                             color: Colors.purple,
                             fontSize: 12,

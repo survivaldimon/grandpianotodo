@@ -288,6 +288,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     String? comment,
     LessonStatus? status,
     String? studentId,
+    String? groupId,
     String? subjectId,
     String? lessonTypeId,
   }) async {
@@ -316,6 +317,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         endTime: endTime,
         comment: comment,
         studentId: studentId,
+        groupId: groupId,
         subjectId: subjectId,
         lessonTypeId: lessonTypeId,
       );
@@ -341,7 +343,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   Future<bool> complete(String id, String roomId, DateTime date, String institutionId) async {
     state = const AsyncValue.loading();
     try {
-      // Получаем занятие, чтобы узнать studentId
+      // Получаем занятие, чтобы узнать studentId и участников
       final lesson = await _repo.getById(id);
 
       await _repo.complete(id);
@@ -349,6 +351,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       // Списываем занятие с абонемента и привязываем к подписке
       // Ошибка списания НЕ должна влиять на успешное изменение статуса
       if (lesson.studentId != null) {
+        // Индивидуальное занятие
         try {
           final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
 
@@ -363,6 +366,31 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
           // Не критичная ошибка - занятие проведено, но подписка/долг не списаны
           debugPrint('Error deducting subscription/debt: $e');
         }
+      } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+        // Групповое занятие — списываем у каждого присутствовавшего
+        for (final lessonStudent in lesson.lessonStudents!) {
+          if (!lessonStudent.attended) continue; // Пропускаем отсутствующих
+
+          try {
+            final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lessonStudent.studentId);
+
+            if (subscriptionId != null) {
+              // Сохраняем subscription_id в lesson_students для корректного возврата
+              await _repo.setLessonStudentSubscriptionId(
+                id,
+                lessonStudent.studentId,
+                subscriptionId,
+              );
+            } else {
+              // Нет активной подписки — списываем напрямую (уход в долг)
+              await _studentRepo.decrementPrepaidCount(lessonStudent.studentId);
+            }
+          } catch (e) {
+            debugPrint('Error deducting for student ${lessonStudent.studentId}: $e');
+          }
+        }
+        // Инвалидируем группы для обновления баланса в меню
+        _ref.invalidate(studentGroupsProvider(institutionId));
       }
 
       _invalidateForRoom(roomId, date, institutionId: institutionId);
@@ -380,7 +408,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   Future<bool> uncomplete(String id, String roomId, DateTime date, String institutionId) async {
     state = const AsyncValue.loading();
     try {
-      // Получаем занятие, чтобы узнать studentId и subscriptionId
+      // Получаем занятие, чтобы узнать studentId, subscriptionId и участников
       final lesson = await _repo.getById(id);
 
       await _repo.uncomplete(id);
@@ -388,6 +416,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       // Возвращаем занятие на абонемент или уменьшаем долг
       // Ошибка возврата НЕ должна влиять на успешное изменение статуса
       if (lesson.studentId != null) {
+        // Индивидуальное занятие
         try {
           if (lesson.subscriptionId != null) {
             // Было списано с подписки — возвращаем туда
@@ -404,6 +433,32 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
           // Не критичная ошибка - статус изменён, но баланс не возвращён
           debugPrint('Error returning subscription/debt: $e');
         }
+      } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+        // Групповое занятие — возвращаем занятие каждому присутствовавшему
+        for (final lessonStudent in lesson.lessonStudents!) {
+          if (!lessonStudent.attended) continue; // Возвращаем только присутствовавшим
+
+          try {
+            if (lessonStudent.subscriptionId != null) {
+              // Было списано с подписки — возвращаем туда
+              await _subscriptionRepo.returnLesson(
+                lessonStudent.studentId,
+                subscriptionId: lessonStudent.subscriptionId,
+              );
+              await _repo.clearLessonStudentSubscriptionId(
+                id,
+                lessonStudent.studentId,
+              );
+            } else {
+              // Было списано в долг — возвращаем (уменьшаем долг)
+              await _studentRepo.incrementPrepaidCount(lessonStudent.studentId);
+            }
+          } catch (e) {
+            debugPrint('Error returning for student ${lessonStudent.studentId}: $e');
+          }
+        }
+        // Инвалидируем группы для обновления баланса в меню
+        _ref.invalidate(studentGroupsProvider(institutionId));
       }
 
       _invalidateForRoom(roomId, date, institutionId: institutionId);
@@ -564,6 +619,74 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     return lessons.length;
   }
 
+  // ============================================================
+  // МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ УЧАСТНИКАМИ ГРУППОВОГО ЗАНЯТИЯ
+  // ============================================================
+
+  /// Добавить гостя (ученика не из группы) в занятие
+  Future<bool> addGuestToLesson(
+    String lessonId,
+    String studentId,
+    String roomId,
+    DateTime date,
+    String institutionId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.addGuestToLesson(lessonId, studentId);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
+      _ref.invalidate(lessonProvider(lessonId));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Удалить участника из занятия
+  Future<bool> removeLessonStudent(
+    String lessonId,
+    String studentId,
+    String roomId,
+    DateTime date,
+    String institutionId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.removeLessonStudent(lessonId, studentId);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
+      _ref.invalidate(lessonProvider(lessonId));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Обновить статус присутствия участника
+  Future<bool> updateAttendance(
+    String lessonId,
+    String studentId,
+    bool attended,
+    String roomId,
+    DateTime date,
+    String institutionId,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.updateAttendance(lessonId, studentId, attended);
+      _invalidateForRoom(roomId, date, institutionId: institutionId);
+      _ref.invalidate(lessonProvider(lessonId));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
   void _invalidateForRoom(String roomId, DateTime date, {String? institutionId}) {
     _ref.invalidate(lessonsByRoomProvider(RoomDateParams(roomId, date)));
 
@@ -585,4 +708,15 @@ final lessonControllerProvider =
   final repo = ref.watch(lessonRepositoryProvider);
   final subscriptionRepo = ref.watch(subscriptionRepoProvider);
   return LessonController(repo, subscriptionRepo, ref);
+});
+
+// ============================================================
+// ПРОВАЙДЕРЫ ДЛЯ УЧАСТНИКОВ ГРУППОВОГО ЗАНЯТИЯ
+// ============================================================
+
+/// Провайдер участников группового занятия
+final lessonStudentsProvider =
+    FutureProvider.family<List<LessonStudent>, String>((ref, lessonId) async {
+  final repo = ref.watch(lessonRepositoryProvider);
+  return repo.getLessonStudents(lessonId);
 });

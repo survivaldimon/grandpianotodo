@@ -121,12 +121,33 @@ class StudentsListScreen extends ConsumerStatefulWidget {
   ConsumerState<StudentsListScreen> createState() => _StudentsListScreenState();
 }
 
-class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
+class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
+    with SingleTickerProviderStateMixin {
+  // TabController для вкладок Ученики/Группы
+  late TabController _tabController;
+  int _currentTabIndex = 0;
+
   // Расширенные фильтры
   Set<String> _selectedTeacherIds = {};
   Set<String> _selectedSubjectIds = {};
   Set<String> _selectedGroupIds = {};
   int? _inactivityDays; // null = все, 7/14/30/60 дней без занятий
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      setState(() => _currentTabIndex = _tabController.index);
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   bool get _hasAdvancedFilters =>
       _selectedTeacherIds.isNotEmpty ||
@@ -180,169 +201,180 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
         title: const Text(AppStrings.students),
         actions: [
           IconButton(
-            icon: const Icon(Icons.groups),
-            tooltip: 'Группы',
-            onPressed: () => context.push('/institutions/${widget.institutionId}/groups'),
-          ),
-          IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
               // TODO: Search
             },
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Ученики', icon: Icon(Icons.person)),
+            Tab(text: 'Группы', icon: Icon(Icons.groups)),
+          ],
+        ),
       ),
-      floatingActionButton: canAddStudent
-          ? FloatingActionButton(
-              onPressed: () => _showAddStudentDialog(context, ref),
-              child: const Icon(Icons.add),
-            )
-          : null,
-      body: Column(
+      floatingActionButton: _buildFab(canAddStudent),
+      body: TabBarView(
+        controller: _tabController,
         children: [
-          // Основные фильтры (Все/Мои/С долгом/Архив)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                FilterChip(
-                  label: const Text('Все'),
-                  selected: filter == StudentFilter.all,
-                  onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.all,
-                ),
-                if (canManageAllStudents) ...[
-                  const SizedBox(width: 8),
-                  FilterChip(
-                    label: const Text('Мои'),
-                    selected: filter == StudentFilter.myStudents,
-                    onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.myStudents,
-                  ),
-                ],
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('С долгом'),
-                  selected: filter == StudentFilter.withDebt,
-                  onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.withDebt,
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('Архив'),
-                  selected: filter == StudentFilter.archived,
-                  onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.archived,
-                ),
-              ],
-            ),
-          ),
-
-          // Расширенные фильтры (по преподавателю, направлению, группе, активности)
-          if (canManageAllStudents) ...[
-            const Divider(height: 1),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  // Фильтр по преподавателю
-                  _FilterButton(
-                    label: 'Преподаватель',
-                    isActive: _selectedTeacherIds.isNotEmpty,
-                    onPressed: () => _showTeacherFilter(
-                      membersAsync.valueOrNull ?? [],
+          // ========== ВКЛАДКА УЧЕНИКОВ ==========
+          Column(
+            children: [
+              // Основные фильтры (Все/Мои/С долгом/Архив)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    FilterChip(
+                      label: const Text('Все'),
+                      selected: filter == StudentFilter.all,
+                      onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.all,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Фильтр по направлению
-                  _FilterButton(
-                    label: 'Направление',
-                    isActive: _selectedSubjectIds.isNotEmpty,
-                    onPressed: () => _showSubjectFilter(
-                      subjectsAsync.valueOrNull ?? [],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Фильтр по группе
-                  _FilterButton(
-                    label: 'Группа',
-                    isActive: _selectedGroupIds.isNotEmpty,
-                    onPressed: () => _showGroupFilter(
-                      groupsAsync.valueOrNull ?? [],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Фильтр по активности
-                  _FilterButton(
-                    label: 'Активность',
-                    isActive: _inactivityDays != null,
-                    onPressed: () => _showActivityFilter(),
-                  ),
-                  // Кнопка сброса
-                  if (_hasAdvancedFilters) ...[
+                    if (canManageAllStudents) ...[
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: const Text('Мои'),
+                        selected: filter == StudentFilter.myStudents,
+                        onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.myStudents,
+                      ),
+                    ],
                     const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: _resetAdvancedFilters,
-                      child: const Text('Сбросить'),
+                    FilterChip(
+                      label: const Text('С долгом'),
+                      selected: filter == StudentFilter.withDebt,
+                      onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.withDebt,
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Архив'),
+                      selected: filter == StudentFilter.archived,
+                      onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.archived,
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
 
-          // Список учеников (НИКОГДА не показываем ошибку - используем valueOrNull)
-          Expanded(
-            child: Builder(
-              builder: (context) {
-                final students = studentsAsync.valueOrNull;
-
-                // Показываем loading только при первой загрузке (нет данных)
-                if (students == null) {
-                  return const LoadingIndicator();
-                }
-
-                // Всегда показываем данные (даже если фоном идёт обновление или ошибка)
-                // Применяем расширенные фильтры
-                final filteredStudents = _applyAdvancedFilters(
-                  students,
-                  teacherBindings: teacherBindingsAsync.valueOrNull ?? {},
-                  subjectBindings: subjectBindingsAsync.valueOrNull ?? {},
-                  groupBindings: groupBindingsAsync.valueOrNull ?? {},
-                  lastActivityMap: lastActivityAsync.valueOrNull ?? {},
-                );
-
-                if (filteredStudents.isEmpty) {
-                  if (_hasAdvancedFilters) {
-                    return _buildFilteredEmptyState();
-                  }
-                  return _buildEmptyState(context, ref, filter);
-                }
-
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    ref.invalidate(filteredStudentsProvider(
-                      StudentFilterParams(institutionId: widget.institutionId, onlyMyStudents: !canManageAllStudents),
-                    ));
-                    ref.invalidate(_studentTeacherBindingsProvider(widget.institutionId));
-                    ref.invalidate(_studentSubjectBindingsProvider(widget.institutionId));
-                    ref.invalidate(_studentGroupBindingsProvider(widget.institutionId));
-                    ref.invalidate(_studentLastActivityProvider(widget.institutionId));
-                  },
-                  child: ListView.builder(
-                    padding: AppSizes.paddingHorizontalM,
-                    itemCount: filteredStudents.length,
-                    itemBuilder: (context, index) {
-                      final student = filteredStudents[index];
-                      return _StudentCard(
-                        student: student,
-                        onTap: () {
-                          context.go('/institutions/${widget.institutionId}/students/${student.id}');
-                        },
-                      );
-                    },
+              // Расширенные фильтры (по преподавателю, направлению, группе, активности)
+              if (canManageAllStudents) ...[
+                const Divider(height: 1),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      // Фильтр по преподавателю
+                      _FilterButton(
+                        label: 'Преподаватель',
+                        isActive: _selectedTeacherIds.isNotEmpty,
+                        onPressed: () => _showTeacherFilter(
+                          membersAsync.valueOrNull ?? [],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Фильтр по направлению
+                      _FilterButton(
+                        label: 'Направление',
+                        isActive: _selectedSubjectIds.isNotEmpty,
+                        onPressed: () => _showSubjectFilter(
+                          subjectsAsync.valueOrNull ?? [],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Фильтр по группе
+                      _FilterButton(
+                        label: 'Группа',
+                        isActive: _selectedGroupIds.isNotEmpty,
+                        onPressed: () => _showGroupFilter(
+                          groupsAsync.valueOrNull ?? [],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Фильтр по активности
+                      _FilterButton(
+                        label: 'Активность',
+                        isActive: _inactivityDays != null,
+                        onPressed: () => _showActivityFilter(),
+                      ),
+                      // Кнопка сброса
+                      if (_hasAdvancedFilters) ...[
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: _resetAdvancedFilters,
+                          child: const Text('Сбросить'),
+                        ),
+                      ],
+                    ],
                   ),
-                );
-              },
-            ),
+                ),
+              ],
+
+              // Список учеников (НИКОГДА не показываем ошибку - используем valueOrNull)
+              Expanded(
+                child: Builder(
+                  builder: (context) {
+                    final students = studentsAsync.valueOrNull;
+
+                    // Показываем loading только при первой загрузке (нет данных)
+                    if (students == null) {
+                      return const LoadingIndicator();
+                    }
+
+                    // Всегда показываем данные (даже если фоном идёт обновление или ошибка)
+                    // Применяем расширенные фильтры
+                    final filteredStudents = _applyAdvancedFilters(
+                      students,
+                      teacherBindings: teacherBindingsAsync.valueOrNull ?? {},
+                      subjectBindings: subjectBindingsAsync.valueOrNull ?? {},
+                      groupBindings: groupBindingsAsync.valueOrNull ?? {},
+                      lastActivityMap: lastActivityAsync.valueOrNull ?? {},
+                    );
+
+                    if (filteredStudents.isEmpty) {
+                      if (_hasAdvancedFilters) {
+                        return _buildFilteredEmptyState();
+                      }
+                      return _buildEmptyState(context, ref, filter);
+                    }
+
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        ref.invalidate(filteredStudentsProvider(
+                          StudentFilterParams(institutionId: widget.institutionId, onlyMyStudents: !canManageAllStudents),
+                        ));
+                        ref.invalidate(_studentTeacherBindingsProvider(widget.institutionId));
+                        ref.invalidate(_studentSubjectBindingsProvider(widget.institutionId));
+                        ref.invalidate(_studentGroupBindingsProvider(widget.institutionId));
+                        ref.invalidate(_studentLastActivityProvider(widget.institutionId));
+                      },
+                      child: ListView.builder(
+                        padding: AppSizes.paddingHorizontalM,
+                        itemCount: filteredStudents.length,
+                        itemBuilder: (context, index) {
+                          final student = filteredStudents[index];
+                          return _StudentCard(
+                            student: student,
+                            onTap: () {
+                              context.go('/institutions/${widget.institutionId}/students/${student.id}');
+                            },
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          // ========== ВКЛАДКА ГРУПП ==========
+          _GroupsTab(
+            institutionId: widget.institutionId,
+            groups: groupsAsync.valueOrNull ?? [],
+            isLoading: groupsAsync.isLoading && groupsAsync.valueOrNull == null,
+            onRefresh: () => ref.invalidate(groupsProvider(widget.institutionId)),
           ),
         ],
       ),
@@ -814,6 +846,81 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
         institutionId: widget.institutionId,
         canManageAllStudents: canManageAllStudents,
         currentUserId: currentUserId,
+      ),
+    );
+  }
+
+  /// FAB по контексту текущей вкладки
+  Widget? _buildFab(bool canAddStudent) {
+    if (_currentTabIndex == 0) {
+      // Вкладка Ученики
+      if (!canAddStudent) return null;
+      return FloatingActionButton(
+        onPressed: () => _showAddStudentDialog(context, ref),
+        child: const Icon(Icons.add),
+      );
+    } else {
+      // Вкладка Группы
+      return FloatingActionButton(
+        onPressed: () => _showAddGroupDialog(context, ref),
+        child: const Icon(Icons.add),
+      );
+    }
+  }
+
+  /// Диалог создания группы
+  void _showAddGroupDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Новая группа'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: 'Название группы',
+              hintText: 'Например: Группа вокала',
+            ),
+            autofocus: true,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Введите название';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+
+              final controller = ref.read(groupControllerProvider.notifier);
+              final group = await controller.create(
+                institutionId: widget.institutionId,
+                name: nameController.text.trim(),
+              );
+
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+
+              if (group != null && context.mounted) {
+                // Переходим к деталям группы
+                context.push('/institutions/${widget.institutionId}/groups/${group.id}');
+              }
+            },
+            child: const Text('Создать'),
+          ),
+        ],
       ),
     );
   }
@@ -1349,6 +1456,95 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
         ],
       ),
     );
+  }
+}
+
+// ============================================================================
+// ВКЛАДКА ГРУПП
+// ============================================================================
+
+class _GroupsTab extends StatelessWidget {
+  final String institutionId;
+  final List<StudentGroup> groups;
+  final bool isLoading;
+  final VoidCallback onRefresh;
+
+  const _GroupsTab({
+    required this.institutionId,
+    required this.groups,
+    required this.isLoading,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const LoadingIndicator();
+    }
+
+    if (groups.isEmpty) {
+      return const EmptyState(
+        icon: Icons.groups,
+        title: 'Нет групп',
+        subtitle: 'Создайте первую группу учеников',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async => onRefresh(),
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 80),
+        itemCount: groups.length,
+        itemBuilder: (context, index) {
+          final group = groups[index];
+          return _GroupCard(
+            group: group,
+            institutionId: institutionId,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _GroupCard extends StatelessWidget {
+  final StudentGroup group;
+  final String institutionId;
+
+  const _GroupCard({
+    required this.group,
+    required this.institutionId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+          child: const Icon(Icons.groups, color: AppColors.primary),
+        ),
+        title: Text(
+          group.name,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        subtitle: Text(
+          '${group.membersCount} ${_pluralize(group.membersCount, 'ученик', 'ученика', 'учеников')}',
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          context.push('/institutions/$institutionId/groups/${group.id}');
+        },
+      ),
+    );
+  }
+
+  String _pluralize(int count, String one, String few, String many) {
+    if (count % 10 == 1 && count % 100 != 11) return one;
+    if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) return few;
+    return many;
   }
 }
 
