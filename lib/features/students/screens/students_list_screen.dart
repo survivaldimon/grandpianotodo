@@ -1371,8 +1371,8 @@ class _StudentCard extends StatelessWidget {
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: hasDebt
-              ? AppColors.error.withOpacity(0.1)
-              : AppColors.primary.withOpacity(0.1),
+              ? AppColors.error.withValues(alpha: 0.1)
+              : AppColors.primary.withValues(alpha: 0.1),
           child: Icon(
             Icons.person,
             color: hasDebt ? AppColors.error : AppColors.primary,

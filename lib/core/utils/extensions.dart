@@ -28,9 +28,12 @@ extension StringExtension on String {
 extension ColorExtension on Color {
   /// Преобразовать Color в HEX строку
   String toHex({bool withHash = true}) {
-    final hex = '${red.toRadixString(16).padLeft(2, '0')}'
-        '${green.toRadixString(16).padLeft(2, '0')}'
-        '${blue.toRadixString(16).padLeft(2, '0')}';
+    final redInt = (r * 255.0).round() & 0xff;
+    final greenInt = (g * 255.0).round() & 0xff;
+    final blueInt = (b * 255.0).round() & 0xff;
+    final hex = '${redInt.toRadixString(16).padLeft(2, '0')}'
+        '${greenInt.toRadixString(16).padLeft(2, '0')}'
+        '${blueInt.toRadixString(16).padLeft(2, '0')}';
     return withHash ? '#$hex' : hex;
   }
 }

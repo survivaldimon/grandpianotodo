@@ -739,7 +739,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
     final formatter = NumberFormat('#,###', 'ru_RU');
 
     return Card(
-      color: (hasDebt ? AppColors.error : AppColors.primary).withOpacity(0.1),
+      color: (hasDebt ? AppColors.error : AppColors.primary).withValues(alpha: 0.1),
       child: Padding(
         padding: AppSizes.paddingAllL,
         child: Column(
@@ -781,8 +781,8 @@ class _BalanceAndCostCard extends ConsumerWidget {
                     width: 1,
                     height: 60,
                     color: hasDebt
-                        ? AppColors.error.withOpacity(0.3)
-                        : AppColors.primary.withOpacity(0.3),
+                        ? AppColors.error.withValues(alpha: 0.3)
+                        : AppColors.primary.withValues(alpha: 0.3),
                   ),
                   // Средняя стоимость
                   Expanded(
@@ -1163,20 +1163,20 @@ class _SubscriptionCard extends StatelessWidget {
       case SubscriptionStatus.active:
         statusColor = AppColors.success;
         cardColor = subscription.isExpiringSoon
-            ? AppColors.warning.withOpacity(0.1)
-            : AppColors.success.withOpacity(0.1);
+            ? AppColors.warning.withValues(alpha: 0.1)
+            : AppColors.success.withValues(alpha: 0.1);
         break;
       case SubscriptionStatus.frozen:
         statusColor = AppColors.info;
-        cardColor = AppColors.info.withOpacity(0.1);
+        cardColor = AppColors.info.withValues(alpha: 0.1);
         break;
       case SubscriptionStatus.expired:
         statusColor = AppColors.error;
-        cardColor = AppColors.error.withOpacity(0.1);
+        cardColor = AppColors.error.withValues(alpha: 0.1);
         break;
       case SubscriptionStatus.exhausted:
         statusColor = AppColors.textSecondary;
-        cardColor = AppColors.textSecondary.withOpacity(0.1);
+        cardColor = AppColors.textSecondary.withValues(alpha: 0.1);
         break;
     }
 
@@ -1196,7 +1196,7 @@ class _SubscriptionCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.2),
+                    color: statusColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -1214,7 +1214,7 @@ class _SubscriptionCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -1231,7 +1231,7 @@ class _SubscriptionCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.warning.withOpacity(0.2),
+                      color: AppColors.warning.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -1249,7 +1249,7 @@ class _SubscriptionCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withOpacity(0.2),
+                      color: Colors.purple.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
@@ -1339,7 +1339,7 @@ class _SubscriptionCard extends StatelessWidget {
             const SizedBox(height: 8),
             LinearProgressIndicator(
               value: subscription.usagePercent,
-              backgroundColor: statusColor.withOpacity(0.2),
+              backgroundColor: statusColor.withValues(alpha: 0.2),
               valueColor: AlwaysStoppedAnimation(statusColor),
             ),
             // Family members (only for family subscriptions)
@@ -1365,11 +1365,11 @@ class _SubscriptionCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: isCurrentStudent
-                                ? Colors.purple.withOpacity(0.2)
-                                : Colors.grey.withOpacity(0.1),
+                                ? Colors.purple.withValues(alpha: 0.2)
+                                : Colors.grey.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: isCurrentStudent
-                                ? Border.all(color: Colors.purple.withOpacity(0.5))
+                                ? Border.all(color: Colors.purple.withValues(alpha: 0.5))
                                 : null,
                           ),
                           child: Text(
@@ -1401,7 +1401,7 @@ class _SubscriptionCard extends StatelessWidget {
                       label: const Text('Заморозить'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.info,
-                        side: BorderSide(color: AppColors.info.withOpacity(0.5)),
+                        side: BorderSide(color: AppColors.info.withValues(alpha: 0.5)),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
@@ -1423,7 +1423,7 @@ class _SubscriptionCard extends StatelessWidget {
                       label: const Text('Продлить'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
@@ -2254,7 +2254,7 @@ class _SubjectsSection extends ConsumerWidget {
                             : AppColors.primary;
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: color.withOpacity(0.2),
+                            backgroundColor: color.withValues(alpha: 0.2),
                             child: Icon(Icons.book, color: color),
                           ),
                           title: Text(subject.name),
@@ -2375,7 +2375,7 @@ class _LessonTypesSection extends ConsumerWidget {
                     if (lessonType == null) return const SizedBox.shrink();
                     return Chip(
                       avatar: CircleAvatar(
-                        backgroundColor: AppColors.primary.withOpacity(0.2),
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.2),
                         child: Icon(Icons.category, size: 16, color: AppColors.primary),
                       ),
                       label: Text(lessonType.name),
@@ -2454,7 +2454,7 @@ class _LessonTypesSection extends ConsumerWidget {
                         final lessonType = available[index];
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: AppColors.primary.withOpacity(0.2),
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.2),
                             child: Icon(Icons.category, color: AppColors.primary),
                           ),
                           title: Text(lessonType.name),

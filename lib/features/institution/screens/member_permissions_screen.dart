@@ -401,7 +401,8 @@ class _MemberPermissionsScreenState
             ),
             value: _isAdmin,
             onChanged: (v) => setState(() => _isAdmin = v),
-            activeColor: AppColors.primary,
+            activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
+            activeThumbColor: AppColors.primary,
           ),
         ),
         if (_isAdmin)
@@ -480,7 +481,8 @@ class _MemberPermissionsScreenState
         ),
         value: displayValue,
         onChanged: isDisabled ? null : onChanged,
-        activeColor: AppColors.primary,
+        activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
+        activeThumbColor: AppColors.primary,
       ),
     );
   }
