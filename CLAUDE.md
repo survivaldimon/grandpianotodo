@@ -101,6 +101,12 @@
   - Выбор темы в настройках (система/тёмная/светлая)
   - Исправление hardcoded цветов во всех экранах
   - Удаление устаревшего экрана расписания кабинета
+- **`SESSION_2026_01_05_COLOR_PICKER.md`** — унифицированный выбор цветов:
+  - Создан ColorPickerField — единый виджет для выбора цвета
+  - Обновлены экраны типов занятий, предметов, тарифов
+  - FAB для добавления новых элементов
+  - Случайный цвет при создании, редактируемый при изменении
+  - Поддержка цвета для тарифов оплаты
 
 ## Валюта
 
@@ -972,6 +978,68 @@ BoxDecoration(color: Theme.of(context).colorScheme.surface),
 **Файл:** `lib/features/rooms/screens/rooms_screen.dart`
 
 **Примечание:** Экран расписания отдельного кабинета (`schedule_screen.dart`) был удалён как избыточный — основное расписание показывает все кабинеты.
+
+### 39. Унифицированный выбор цветов (ColorPickerField)
+Для всех сущностей с цветами (типы занятий, предметы, тарифы, участники) используется единый компонент выбора цвета.
+
+**Паттерн работы с цветами:**
+- **При создании** — цвет назначается **автоматически случайно** из палитры
+- **При редактировании** — цвет можно изменить через ColorPickerField
+
+**Виджет:** `lib/core/widgets/color_picker_field.dart`
+
+**Палитра из 12 предустановленных цветов:**
+```dart
+const List<String> kPresetColors = [
+  '#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4',
+  '#795548', '#607D8B', '#E91E63', '#009688', '#3F51B5', '#FFEB3B',
+];
+```
+
+**Функции:**
+```dart
+String getRandomPresetColor()           // Случайный цвет из палитры
+Color hexToColor(String hex)            // Hex → Color
+String colorToHex(Color color)          // Color → Hex
+Future<String?> showColorPickerDialog() // Диалог выбора (preset + палитра)
+```
+
+**Использование при создании:**
+```dart
+// В форме создания НЕ показывать выбор цвета
+final newEntity = await controller.create(
+  name: _nameController.text.trim(),
+  color: getRandomPresetColor(), // Автоматический случайный цвет
+);
+```
+
+**Использование при редактировании:**
+```dart
+// В форме редактирования показать ColorPickerField
+ColorPickerField(
+  label: 'Цвет',
+  initialColor: entity.color,
+  onColorChanged: (color) => setState(() => _selectedColor = color),
+)
+```
+
+**UI ColorPickerField:**
+- Ряд из 12 кружков с предустановленными цветами
+- Кнопка "Палитра" для выбора любого цвета через `flutter_colorpicker`
+- Текущий выбранный цвет подсвечен рамкой
+
+**Экраны с поддержкой:**
+- `lib/features/lesson_types/screens/lesson_types_screen.dart`
+- `lib/features/subjects/screens/subjects_screen.dart`
+- `lib/features/payment_plans/screens/payment_plans_screen.dart`
+- `lib/features/institution/screens/members_screen.dart`
+
+**База данных:**
+- Цвет хранится как `TEXT` (hex формат, например: `4CAF50` или `#4CAF50`)
+- Поле `color` в таблицах: `subjects`, `lesson_types`, `payment_plans`
+- Миграция: `supabase/migrations/add_payment_plan_color.sql`
+
+**ВАЖНО:** Quick add диалоги в расписании (добавление ученика/предмета/типа занятия) **НЕ** показывают выбор цвета — используется только `getRandomPresetColor()`.
 
 ## CI/CD
 

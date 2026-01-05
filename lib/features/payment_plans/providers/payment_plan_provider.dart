@@ -35,6 +35,7 @@ class PaymentPlanController extends StateNotifier<AsyncValue<void>> {
     required double price,
     required int lessonsCount,
     int validityDays = 30,
+    String? color,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -44,6 +45,7 @@ class PaymentPlanController extends StateNotifier<AsyncValue<void>> {
         price: price,
         lessonsCount: lessonsCount,
         validityDays: validityDays,
+        color: color,
       );
       _ref.invalidate(paymentPlansProvider(institutionId));
       state = const AsyncValue.data(null);
@@ -62,6 +64,7 @@ class PaymentPlanController extends StateNotifier<AsyncValue<void>> {
     double? price,
     int? lessonsCount,
     int? validityDays,
+    String? color,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -71,6 +74,7 @@ class PaymentPlanController extends StateNotifier<AsyncValue<void>> {
         price: price,
         lessonsCount: lessonsCount,
         validityDays: validityDays,
+        color: color,
       );
       _ref.invalidate(paymentPlansProvider(institutionId));
       _ref.invalidate(paymentPlanProvider(id));

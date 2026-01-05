@@ -1,21 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
+import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/empty_state.dart';
+import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/shared/models/subject.dart';
 
 /// Экран управления предметами
-class SubjectsScreen extends ConsumerWidget {
+class SubjectsScreen extends ConsumerStatefulWidget {
   final String institutionId;
 
   const SubjectsScreen({super.key, required this.institutionId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final subjectsAsync = ref.watch(subjectsListProvider(institutionId));
+  ConsumerState<SubjectsScreen> createState() => _SubjectsScreenState();
+}
+
+class _SubjectsScreenState extends ConsumerState<SubjectsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
+    final subjects = subjectsAsync.valueOrNull ?? [];
+    final hasItems = subjects.isNotEmpty;
 
     // Показать ошибку контроллера
     ref.listen(subjectControllerProvider, (prev, next) {
@@ -32,47 +41,46 @@ class SubjectsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Предметы'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddSheet(context, ref),
-          ),
-        ],
       ),
+      floatingActionButton: hasItems
+          ? FloatingActionButton(
+              onPressed: () => _showAddSheet(context),
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: subjectsAsync.when(
         loading: () => const LoadingIndicator(),
         error: (error, _) => ErrorView.fromException(
           error,
-          onRetry: () => ref.invalidate(subjectsListProvider(institutionId)),
+          onRetry: () => ref.invalidate(subjectsListProvider(widget.institutionId)),
         ),
         data: (subjects) {
           if (subjects.isEmpty) {
             return EmptyState(
-              icon: Icons.music_note,
+              icon: Icons.music_note_outlined,
               title: 'Нет предметов',
               subtitle: 'Добавьте первый предмет',
               action: ElevatedButton.icon(
-                onPressed: () => _showAddSheet(context, ref),
+                onPressed: () => _showAddSheet(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Добавить'),
+                label: const Text('Добавить предмет'),
               ),
             );
           }
 
           return RefreshIndicator(
             onRefresh: () async {
-              ref.invalidate(subjectsListProvider(institutionId));
-              await ref.read(subjectsListProvider(institutionId).future);
+              ref.invalidate(subjectsListProvider(widget.institutionId));
+              await ref.read(subjectsListProvider(widget.institutionId).future);
             },
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: AppSizes.paddingAllM,
               itemCount: subjects.length,
               itemBuilder: (context, index) {
                 final subject = subjects[index];
                 return _SubjectCard(
                   subject: subject,
-                  onEdit: () => _showEditSheet(context, ref, subject),
-                  onDelete: () => _confirmDelete(context, ref, subject),
+                  institutionId: widget.institutionId,
                 );
               },
             ),
@@ -82,59 +90,131 @@ class SubjectsScreen extends ConsumerWidget {
     );
   }
 
-  void _showAddSheet(BuildContext context, WidgetRef ref) {
+  void _showAddSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _SubjectFormSheet(
-        institutionId: institutionId,
-        ref: ref,
+      builder: (context) => _AddSubjectSheet(
+        institutionId: widget.institutionId,
+      ),
+    );
+  }
+}
+
+/// Карточка предмета
+class _SubjectCard extends ConsumerWidget {
+  final Subject subject;
+  final String institutionId;
+
+  const _SubjectCard({
+    required this.subject,
+    required this.institutionId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final color = subject.color != null
+        ? hexToColor(subject.color!)
+        : AppColors.primary;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(AppSizes.radiusM),
+          ),
+          child: Icon(Icons.music_note, color: color),
+        ),
+        title: Text(
+          subject.name,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.more_vert),
+          onPressed: () => _showOptions(context, ref),
+        ),
+        onTap: () => _showEditSheet(context),
       ),
     );
   }
 
-  void _showEditSheet(BuildContext context, WidgetRef ref, Subject subject) {
+  void _showOptions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Редактировать'),
+              onTap: () {
+                Navigator.pop(context);
+                _showEditSheet(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteConfirmation(context, ref);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _SubjectFormSheet(
-        institutionId: institutionId,
-        ref: ref,
+      builder: (dialogContext) => _EditSubjectSheet(
         subject: subject,
+        institutionId: institutionId,
       ),
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, Subject subject) {
+  void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Удалить предмет?'),
         content: Text(
-            'Вы уверены, что хотите удалить "${subject.name}"? Это действие нельзя отменить.'),
+          'Предмет "${subject.name}" будет удалён. Это действие нельзя отменить.',
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Отмена'),
           ),
           TextButton(
             onPressed: () async {
-              final controller =
-                  ref.read(subjectControllerProvider.notifier);
+              Navigator.pop(dialogContext);
+              final controller = ref.read(subjectControllerProvider.notifier);
               final success = await controller.archive(subject.id, institutionId);
-              if (success && context.mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Предмет удален')),
+              if (success) {
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Предмет удалён'),
+                    backgroundColor: AppColors.error,
+                  ),
                 );
               }
             },
-            child: const Text(
-              'Удалить',
-              style: TextStyle(color: Colors.red),
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Удалить'),
           ),
         ],
       ),
@@ -142,49 +222,20 @@ class SubjectsScreen extends ConsumerWidget {
   }
 }
 
-/// BottomSheet форма для создания/редактирования предмета
-class _SubjectFormSheet extends StatefulWidget {
+/// Форма создания нового предмета (без выбора цвета - случайный)
+class _AddSubjectSheet extends ConsumerStatefulWidget {
   final String institutionId;
-  final WidgetRef ref;
-  final Subject? subject;
 
-  const _SubjectFormSheet({
-    required this.institutionId,
-    required this.ref,
-    this.subject,
-  });
+  const _AddSubjectSheet({required this.institutionId});
 
   @override
-  State<_SubjectFormSheet> createState() => _SubjectFormSheetState();
+  ConsumerState<_AddSubjectSheet> createState() => _AddSubjectSheetState();
 }
 
-class _SubjectFormSheetState extends State<_SubjectFormSheet> {
-  late final TextEditingController _nameController;
-  String? _selectedColor;
+class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   bool _isLoading = false;
-
-  bool get _isEditing => widget.subject != null;
-
-  static const _colors = [
-    '#4CAF50', // Green
-    '#2196F3', // Blue
-    '#FF9800', // Orange
-    '#9C27B0', // Purple
-    '#F44336', // Red
-    '#00BCD4', // Cyan
-    '#795548', // Brown
-    '#607D8B', // Blue Grey
-    '#E91E63', // Pink
-    '#009688', // Teal
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.subject?.name ?? '');
-    _selectedColor = widget.subject?.color;
-  }
 
   @override
   void dispose() {
@@ -192,34 +243,31 @@ class _SubjectFormSheetState extends State<_SubjectFormSheet> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _createSubject() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
-    final controller = widget.ref.read(subjectControllerProvider.notifier);
-
-    bool success = false;
-    if (_isEditing) {
-      success = await controller.update(
-        id: widget.subject!.id,
-        institutionId: widget.institutionId,
-        name: _nameController.text.trim(),
-        color: _selectedColor,
-      );
-    } else {
+    try {
+      final controller = ref.read(subjectControllerProvider.notifier);
       final subject = await controller.create(
         institutionId: widget.institutionId,
         name: _nameController.text.trim(),
-        color: _selectedColor,
+        color: getRandomPresetColor(), // Случайный цвет
       );
-      success = subject != null;
-    }
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (success) {
+      if (subject != null && mounted) {
         Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Предмет "${subject.name}" создан'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -229,132 +277,116 @@ class _SubjectFormSheetState extends State<_SubjectFormSheet> {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Индикатор перетаскивания
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
+                // Индикатор
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
+                const SizedBox(height: 20),
 
-                // Заголовок с иконкой
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.music_note,
-                    color: AppColors.primary,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _isEditing ? 'Редактировать предмет' : 'Новый предмет',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                // Заголовок
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: const Icon(
+                        Icons.music_note,
+                        color: AppColors.primary,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Новый предмет',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Введите название предмета',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
 
-                // Поле названия
+                // Название
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название',
+                    labelText: 'Название *',
                     hintText: 'Например: Фортепиано',
                     prefixIcon: const Icon(Icons.edit_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Введите название' : null,
                   textCapitalization: TextCapitalization.sentences,
-                  autofocus: !_isEditing,
+                  validator: (v) => v == null || v.isEmpty ? 'Введите название' : null,
+                  autofocus: true,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
 
-                // Выбор цвета
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Цвет',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: _colors.map((colorHex) {
-                    final color = Color(
-                        int.parse('FF${colorHex.replaceAll('#', '')}', radix: 16));
-                    final isSelected = _selectedColor == colorHex;
-
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedColor = colorHex),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: isSelected
-                              ? Border.all(color: Colors.white, width: 3)
-                              : null,
-                          boxShadow: isSelected
-                              ? [BoxShadow(color: color, blurRadius: 8)]
-                              : null,
-                        ),
-                        child: isSelected
-                            ? const Icon(Icons.check, color: Colors.white, size: 20)
-                            : null,
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 32),
-
-                // Кнопка сохранения
+                // Кнопка
                 SizedBox(
-                  width: double.infinity,
+                  height: 52,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
+                    onPressed: _isLoading ? null : _createSubject,
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: _isLoading
                         ? const SizedBox(
-                            width: 20,
-                            height: 20,
+                            width: 24,
+                            height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(_isEditing ? 'Сохранить' : 'Создать'),
+                        : const Text(
+                            'Создать предмет',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -367,58 +399,197 @@ class _SubjectFormSheetState extends State<_SubjectFormSheet> {
   }
 }
 
-class _SubjectCard extends StatelessWidget {
+/// Форма редактирования предмета (с выбором цвета)
+class _EditSubjectSheet extends ConsumerStatefulWidget {
   final Subject subject;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final String institutionId;
 
-  const _SubjectCard({
+  const _EditSubjectSheet({
     required this.subject,
-    required this.onEdit,
-    required this.onDelete,
+    required this.institutionId,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final color = subject.color != null
-        ? Color(int.parse('FF${subject.color!.replaceAll('#', '')}', radix: 16))
-        : AppColors.primary;
+  ConsumerState<_EditSubjectSheet> createState() => _EditSubjectSheetState();
+}
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.2),
-          child: Icon(Icons.music_note, color: color),
-        ),
-        title: Text(subject.name),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'edit') onEdit();
-            if (value == 'delete') onDelete();
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit),
-                  SizedBox(width: 8),
-                  Text('Редактировать'),
-                ],
-              ),
+class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late String? _selectedColor;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.subject.name);
+    _selectedColor = widget.subject.color;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _updateSubject() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final controller = ref.read(subjectControllerProvider.notifier);
+      final success = await controller.update(
+        id: widget.subject.id,
+        institutionId: widget.institutionId,
+        name: _nameController.text.trim(),
+        color: _selectedColor,
+      );
+
+      if (success && mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Предмет обновлён'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Индикатор
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Заголовок
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.edit,
+                        color: AppColors.primary,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Редактировать предмет',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Измените данные предмета',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+
+                // Название
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Название *',
+                    hintText: 'Например: Фортепиано',
+                    prefixIcon: const Icon(Icons.edit_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                  ),
+                  textCapitalization: TextCapitalization.sentences,
+                  validator: (v) => v == null || v.isEmpty ? 'Введите название' : null,
+                ),
+                const SizedBox(height: 20),
+
+                // Выбор цвета
+                ColorPickerField(
+                  label: 'Цвет',
+                  selectedColor: _selectedColor,
+                  onColorChanged: (color) => setState(() => _selectedColor = color),
+                ),
+                const SizedBox(height: 28),
+
+                // Кнопка
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _updateSubject,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Сохранить',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Удалить', style: TextStyle(color: Colors.red)),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

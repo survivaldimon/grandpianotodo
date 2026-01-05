@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
+import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
@@ -388,53 +388,27 @@ class _MemberTile extends ConsumerWidget {
     }
   }
 
-  void _showColorPickerDialog(BuildContext context, WidgetRef ref, Color? currentColor) {
-    Color selectedColor = currentColor ?? Colors.blue;
+  void _showColorPickerDialog(BuildContext context, WidgetRef ref, Color? currentColor) async {
+    final currentHex = currentColor != null
+        ? colorToHex(currentColor)
+        : null;
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Выберите цвет'),
-          content: SingleChildScrollView(
-            child: ColorPicker(
-              pickerColor: selectedColor,
-              onColorChanged: (color) => setState(() => selectedColor = color),
-              enableAlpha: false,
-              hexInputBar: true,
-              labelTypes: const [],
-              pickerAreaHeightPercent: 0.8,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Отмена'),
-            ),
-            if (currentColor != null)
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(dialogContext);
-                  await _updateMemberColor(context, ref, null);
-                },
-                child: const Text('Сбросить', style: TextStyle(color: AppColors.warning)),
-              ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                // Конвертируем Color в hex string без alpha (6 символов RGB)
-                final r = (selectedColor.r * 255).round().toRadixString(16).padLeft(2, '0');
-                final g = (selectedColor.g * 255).round().toRadixString(16).padLeft(2, '0');
-                final b = (selectedColor.b * 255).round().toRadixString(16).padLeft(2, '0');
-                final hex = '$r$g$b'.toUpperCase();
-                await _updateMemberColor(context, ref, hex);
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
-        ),
-      ),
+    final result = await showColorPickerDialog(
+      context,
+      currentColor: currentHex,
+      showReset: currentColor != null,
     );
+
+    if (result != null && context.mounted) {
+      if (result.isEmpty) {
+        // Сброс цвета
+        await _updateMemberColor(context, ref, null);
+      } else {
+        // Новый цвет (убираем # если есть)
+        final hex = result.replaceAll('#', '').toUpperCase();
+        await _updateMemberColor(context, ref, hex);
+      }
+    }
   }
 
   Future<void> _updateMemberColor(BuildContext context, WidgetRef ref, String? color) async {

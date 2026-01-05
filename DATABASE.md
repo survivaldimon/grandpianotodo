@@ -101,10 +101,10 @@
 │ name                  │◄──────│ payment_plan_id       │
 │ price                 │       │ student_id            │
 │ lessons_count         │       │ amount                │
-│ archived_at           │       │ lessons_count         │
-└───────────────────────┘       │ paid_at               │
-                                │ recorded_by (user_id) │
-                                │ comment               │
+│ validity_days         │       │ lessons_count         │
+│ color                 │       │ paid_at               │
+│ archived_at           │       │ recorded_by (user_id) │
+└───────────────────────┘       │ comment               │
                                 └───────────────────────┘
 ```
 
@@ -403,6 +403,8 @@ CREATE TABLE payment_plans (
   name TEXT NOT NULL,
   price DECIMAL(10, 2) NOT NULL,
   lessons_count INT NOT NULL,
+  validity_days INT DEFAULT 30,
+  color TEXT,  -- Цвет тарифа в hex формате (например: '4CAF50')
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   archived_at TIMESTAMPTZ

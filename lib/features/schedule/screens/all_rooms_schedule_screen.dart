@@ -25,6 +25,7 @@ import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/ios_time_picker.dart';
+import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/features/bookings/models/booking.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 
@@ -3674,22 +3675,22 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Новый кабинет',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             'Заполните данные кабинета',
                             style: TextStyle(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
                             ),
                           ),
@@ -3711,7 +3712,7 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   keyboardType: TextInputType.number,
                   autofocus: true,
@@ -3730,7 +3731,7 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
                 ),
@@ -3876,11 +3877,11 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Новый ученик',
                             style: TextStyle(
                               fontSize: 22,
@@ -3890,7 +3891,7 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                           Text(
                             'Быстрое добавление',
                             style: TextStyle(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
                             ),
                           ),
@@ -3912,7 +3913,7 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.words,
                   validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя ученика' : null,
@@ -3931,7 +3932,7 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   keyboardType: TextInputType.phone,
                 ),
@@ -4008,21 +4009,6 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   bool _isLoading = false;
-  String? _selectedColor;
-
-  // Предустановленные цвета для предметов
-  static const List<String> _subjectColors = [
-    '#6366F1', // Indigo
-    '#8B5CF6', // Violet
-    '#EC4899', // Pink
-    '#EF4444', // Red
-    '#F97316', // Orange
-    '#EAB308', // Yellow
-    '#22C55E', // Green
-    '#14B8A6', // Teal
-    '#06B6D4', // Cyan
-    '#3B82F6', // Blue
-  ];
 
   @override
   void dispose() {
@@ -4040,7 +4026,7 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
       final subject = await controller.create(
         institutionId: widget.institutionId,
         name: _nameController.text.trim(),
-        color: _selectedColor,
+        color: getRandomPresetColor(), // Случайный цвет
       );
 
       if (subject != null && mounted) {
@@ -4107,22 +4093,22 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Новый предмет',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             'Добавьте предмет для занятий',
                             style: TextStyle(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
                             ),
                           ),
@@ -4144,7 +4130,7 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.words,
                   autofocus: true,
@@ -4154,56 +4140,6 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 20),
-
-                // Выбор цвета
-                const Text(
-                  'Цвет предмета',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: _subjectColors.map((colorHex) {
-                    final color = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
-                    final isSelected = _selectedColor == colorHex;
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedColor = isSelected ? null : colorHex;
-                        });
-                      },
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: isSelected
-                              ? Border.all(color: Colors.white, width: 3)
-                              : null,
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: color.withOpacity(0.5),
-                                    blurRadius: 8,
-                                    spreadRadius: 2,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: isSelected
-                            ? const Icon(Icons.check, color: Colors.white, size: 20)
-                            : null,
-                      ),
-                    );
-                  }).toList(),
                 ),
                 const SizedBox(height: 28),
 
@@ -4396,22 +4332,22 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Новый тип занятия',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             'Настройте параметры занятия',
                             style: TextStyle(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
                             ),
                           ),
@@ -4433,7 +4369,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
                   autofocus: true,
@@ -4449,12 +4385,12 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                 // Длительность
                 Row(
                   children: [
-                    const Icon(Icons.timer_outlined, size: 18, color: AppColors.textSecondary),
+                    Icon(Icons.timer_outlined, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(width: 8),
                     Text(
                       'Длительность',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                     ),
                   ],
@@ -4526,7 +4462,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               filled: true,
-                              fillColor: Colors.grey[50],
+                              fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                             ),
                             keyboardType: TextInputType.number,
                             autofocus: true,
@@ -4548,7 +4484,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   keyboardType: TextInputType.number,
                 ),
@@ -5469,7 +5405,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                                 ),
                                 child: Text(
                                   'Нет кабинетов',
-                                  style: TextStyle(color: Colors.grey[600]),
+                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 ),
                               )
                             : DropdownButtonFormField<Room>(
@@ -5513,7 +5449,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
               Text(
                 'Кабинеты',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
               ),
               const SizedBox(height: 8),
@@ -5697,7 +5633,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                                 ),
                                 child: Text(
                                   'Нет учеников',
-                                  style: TextStyle(color: Colors.grey[600]),
+                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 ),
                               )
                             : DropdownButtonFormField<Student?>(

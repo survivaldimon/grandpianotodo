@@ -7,6 +7,7 @@ class PaymentPlan extends BaseModel {
   final double price;
   final int lessonsCount;
   final int validityDays; // Срок действия абонемента в днях
+  final String? color; // Цвет для отображения (hex без #)
 
   const PaymentPlan({
     required super.id,
@@ -18,6 +19,7 @@ class PaymentPlan extends BaseModel {
     required this.price,
     required this.lessonsCount,
     this.validityDays = 30,
+    this.color,
   });
 
   /// Цена за одно занятие
@@ -41,6 +43,7 @@ class PaymentPlan extends BaseModel {
         price: (json['price'] as num).toDouble(),
         lessonsCount: json['lessons_count'] as int,
         validityDays: json['validity_days'] as int? ?? 30,
+        color: json['color'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -49,6 +52,7 @@ class PaymentPlan extends BaseModel {
         'price': price,
         'lessons_count': lessonsCount,
         'validity_days': validityDays,
+        if (color != null) 'color': color,
       };
 
   PaymentPlan copyWith({
@@ -56,6 +60,7 @@ class PaymentPlan extends BaseModel {
     double? price,
     int? lessonsCount,
     int? validityDays,
+    String? color,
   }) =>
       PaymentPlan(
         id: id,
@@ -67,5 +72,6 @@ class PaymentPlan extends BaseModel {
         price: price ?? this.price,
         lessonsCount: lessonsCount ?? this.lessonsCount,
         validityDays: validityDays ?? this.validityDays,
+        color: color ?? this.color,
       );
 }

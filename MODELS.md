@@ -1023,7 +1023,9 @@ class PaymentPlan extends BaseModel {
   final String name;
   final double price;
   final int lessonsCount;
-  
+  final int validityDays;
+  final String? color;  // Цвет тарифа в hex формате (например: '4CAF50')
+
   const PaymentPlan({
     required super.id,
     required super.createdAt,
@@ -1033,38 +1035,46 @@ class PaymentPlan extends BaseModel {
     required this.name,
     required this.price,
     required this.lessonsCount,
+    this.validityDays = 30,
+    this.color,
   });
-  
+
   /// Цена за одно занятие
   double get pricePerLesson => price / lessonsCount;
-  
+
   /// Отображение: "8 занятий — 20 000 ₸"
   String get displayName => '$lessonsCount занятий — ${price.toStringAsFixed(0)} ₸';
-  
+
   factory PaymentPlan.fromJson(Map<String, dynamic> json) => PaymentPlan(
     id: json['id'] as String,
     createdAt: DateTime.parse(json['created_at'] as String),
     updatedAt: DateTime.parse(json['updated_at'] as String),
-    archivedAt: json['archived_at'] != null 
-        ? DateTime.parse(json['archived_at'] as String) 
+    archivedAt: json['archived_at'] != null
+        ? DateTime.parse(json['archived_at'] as String)
         : null,
     institutionId: json['institution_id'] as String,
     name: json['name'] as String,
     price: (json['price'] as num).toDouble(),
     lessonsCount: json['lessons_count'] as int,
+    validityDays: json['validity_days'] as int? ?? 30,
+    color: json['color'] as String?,
   );
-  
+
   Map<String, dynamic> toJson() => {
     'institution_id': institutionId,
     'name': name,
     'price': price,
     'lessons_count': lessonsCount,
+    'validity_days': validityDays,
+    if (color != null) 'color': color,
   };
-  
+
   PaymentPlan copyWith({
     String? name,
     double? price,
     int? lessonsCount,
+    int? validityDays,
+    String? color,
   }) => PaymentPlan(
     id: id,
     createdAt: createdAt,
@@ -1074,6 +1084,8 @@ class PaymentPlan extends BaseModel {
     name: name ?? this.name,
     price: price ?? this.price,
     lessonsCount: lessonsCount ?? this.lessonsCount,
+    validityDays: validityDays ?? this.validityDays,
+    color: color ?? this.color,
   );
 }
 ```

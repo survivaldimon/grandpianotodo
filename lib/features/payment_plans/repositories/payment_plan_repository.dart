@@ -45,17 +45,21 @@ class PaymentPlanRepository {
     required double price,
     required int lessonsCount,
     int validityDays = 30,
+    String? color,
   }) async {
     try {
+      final insertData = <String, dynamic>{
+        'institution_id': institutionId,
+        'name': name,
+        'price': price,
+        'lessons_count': lessonsCount,
+        'validity_days': validityDays,
+      };
+      if (color != null) insertData['color'] = color;
+
       final data = await _client
           .from('payment_plans')
-          .insert({
-            'institution_id': institutionId,
-            'name': name,
-            'price': price,
-            'lessons_count': lessonsCount,
-            'validity_days': validityDays,
-          })
+          .insert(insertData)
           .select()
           .single();
 
@@ -72,6 +76,7 @@ class PaymentPlanRepository {
     double? price,
     int? lessonsCount,
     int? validityDays,
+    String? color,
   }) async {
     try {
       final updates = <String, dynamic>{};
@@ -79,6 +84,7 @@ class PaymentPlanRepository {
       if (price != null) updates['price'] = price;
       if (lessonsCount != null) updates['lessons_count'] = lessonsCount;
       if (validityDays != null) updates['validity_days'] = validityDays;
+      if (color != null) updates['color'] = color;
 
       final data = await _client
           .from('payment_plans')
