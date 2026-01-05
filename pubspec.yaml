@@ -29,6 +29,9 @@ dependencies:
   fpdart: ^1.1.0
   collection: ^1.18.0
 
+  # Network
+  connectivity_plus: ^6.1.0
+
   # UI
   flutter_svg: ^2.0.16
   cached_network_image: ^3.4.1
