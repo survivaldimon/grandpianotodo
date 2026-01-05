@@ -2559,13 +2559,13 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.school, size: 14, color: AppColors.textSecondary),
+                                Icon(Icons.school, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
                                     teacherName,
                                     style: TextStyle(
-                                      color: AppColors.textSecondary,
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                       fontSize: 14,
                                     ),
                                     overflow: TextOverflow.ellipsis,
@@ -2594,9 +2594,9 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                   ),
                   child: Column(
                     children: [
@@ -3083,16 +3083,17 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.textSecondary),
+          Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
           const SizedBox(width: 12),
           Text(
             label,
             style: TextStyle(
-              color: AppColors.textSecondary,
+              color: colorScheme.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
@@ -3100,7 +3101,7 @@ class _DetailRow extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: valueColor ?? AppColors.textPrimary,
+              color: valueColor ?? colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
@@ -3131,16 +3132,17 @@ class _StatusButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: isLoading ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.15) : AppColors.surface,
+          color: isActive ? color.withValues(alpha: 0.15) : colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? color : AppColors.border,
+            color: isActive ? color : colorScheme.outlineVariant,
             width: isActive ? 1.5 : 1,
           ),
         ),
@@ -3150,14 +3152,14 @@ class _StatusButton extends StatelessWidget {
             Icon(
               icon,
               size: 22,
-              color: isActive ? color : AppColors.textSecondary,
+              color: isActive ? color : colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11,
-                color: isActive ? color : AppColors.textSecondary,
+                color: isActive ? color : colorScheme.onSurfaceVariant,
                 fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
               ),
               textAlign: TextAlign.center,
@@ -4832,9 +4834,9 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
           return _buildSection(
             title: 'Ученики',
             icon: Icons.school,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('Нет учеников', style: TextStyle(color: Colors.grey)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text('Нет учеников', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ),
           );
         }
@@ -4987,9 +4989,9 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     required ValueChanged<Set<String>> onChanged,
   }) {
     if (items.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Text('Нет данных', style: TextStyle(color: Colors.grey)),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text('Нет данных', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
       );
     }
 
@@ -6260,7 +6262,7 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
                       Text(
                         booking.roomNames,
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 14,
                         ),
                       ),
@@ -6281,7 +6283,7 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
                 // Time
                 Row(
                   children: [
-                    Icon(Icons.access_time, color: Colors.grey[600], size: 20),
+                    Icon(Icons.access_time, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
                     const SizedBox(width: AppSizes.paddingM),
                     Text(
                       '${_formatTime(booking.startTime)} — ${_formatTime(booking.endTime)}',
@@ -6294,7 +6296,7 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
                 // Creator
                 Row(
                   children: [
-                    Icon(Icons.person_outline, color: Colors.grey[600], size: 20),
+                    Icon(Icons.person_outline, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
                     const SizedBox(width: AppSizes.paddingM),
                     Text(
                       booking.creator?.fullName ?? 'Неизвестный пользователь',
