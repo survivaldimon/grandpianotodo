@@ -593,10 +593,24 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
           ),
           const Divider(height: 1),
 
-          // Lesson list
+          // Lesson list (без мигания при Realtime обновлениях)
           Expanded(
-            child: lessonsAsync.when(
-              data: (lessons) {
+            child: Builder(
+              builder: (context) {
+                final lessons = lessonsAsync.valueOrNull;
+                final error = lessonsAsync.error;
+
+                // Показываем ошибку если есть (и нет закешированных данных)
+                if (error != null && lessons == null) {
+                  return ErrorView.fromException(error);
+                }
+
+                // Показываем loading только при первой загрузке
+                if (lessons == null) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                // Показываем данные (даже если идёт фоновая загрузка)
                 if (lessons.isEmpty) {
                   return Center(
                     child: Text(
@@ -607,6 +621,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                     ),
                   );
                 }
+
                 return ListView.separated(
                   controller: scrollController,
                   itemCount: lessons.length,
@@ -629,8 +644,6 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => ErrorView.fromException(e),
             ),
           ),
 

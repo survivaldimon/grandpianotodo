@@ -48,13 +48,16 @@ class _SubjectsScreenState extends ConsumerState<SubjectsScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: subjectsAsync.when(
-        loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView.fromException(
-          error,
-          onRetry: () => ref.invalidate(subjectsListProvider(widget.institutionId)),
-        ),
-        data: (subjects) {
+      body: Builder(
+        builder: (context) {
+          final subjects = subjectsAsync.valueOrNull;
+
+          // Показываем loading только при первой загрузке
+          if (subjects == null) {
+            return const LoadingIndicator();
+          }
+
+          // Всегда показываем данные (даже если фоном ошибка)
           if (subjects.isEmpty) {
             return EmptyState(
               icon: Icons.music_note_outlined,

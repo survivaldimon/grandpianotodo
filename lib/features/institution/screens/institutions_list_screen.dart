@@ -56,13 +56,16 @@ class _InstitutionsListScreenState extends ConsumerState<InstitutionsListScreen>
           ),
         ],
       ),
-      body: institutionsAsync.when(
-        loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView.fromException(
-          error,
-          onRetry: () => ref.invalidate(myInstitutionsProvider),
-        ),
-        data: (institutions) {
+      body: Builder(
+        builder: (context) {
+          final institutions = institutionsAsync.valueOrNull;
+
+          // Показываем loading только при первой загрузке
+          if (institutions == null) {
+            return const LoadingIndicator();
+          }
+
+          // Всегда показываем данные (даже если фоном ошибка)
           // Автонавигация если только одно заведение (не при явном переходе)
           if (institutions.length == 1 && !_hasAutoNavigated && !widget.skipAutoNav) {
             _hasAutoNavigated = true;
@@ -272,13 +275,16 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
         ),
         const Divider(height: 1),
         Expanded(
-          child: archivedAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => ErrorView.fromException(
-              error,
-              onRetry: () => ref.invalidate(archivedInstitutionsProvider),
-            ),
-            data: (institutions) {
+          child: Builder(
+            builder: (context) {
+              final institutions = archivedAsync.valueOrNull;
+
+              // Показываем loading только при первой загрузке
+              if (institutions == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              // Всегда показываем данные (даже если фоном ошибка)
               if (institutions.isEmpty) {
                 return const Center(
                   child: Column(

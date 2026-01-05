@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/groups/providers/group_provider.dart';
 import 'package:kabinet/shared/models/student_group.dart';
-import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран списка групп
 class GroupsScreen extends ConsumerWidget {
@@ -24,13 +23,16 @@ class GroupsScreen extends ConsumerWidget {
         onPressed: () => _showCreateDialog(context, ref),
         child: const Icon(Icons.add),
       ),
-      body: groupsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorView.fromException(
-          e,
-          onRetry: () => ref.invalidate(groupsProvider(institutionId)),
-        ),
-        data: (groups) {
+      body: Builder(
+        builder: (context) {
+          final groups = groupsAsync.valueOrNull;
+
+          // Показываем loading только при первой загрузке
+          if (groups == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Всегда показываем данные (даже если фоном ошибка)
           if (groups.isEmpty) {
             return Center(
               child: Column(

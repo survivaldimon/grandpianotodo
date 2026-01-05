@@ -49,13 +49,16 @@ class _PaymentPlansScreenState extends ConsumerState<PaymentPlansScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: plansAsync.when(
-        loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView.fromException(
-          error,
-          onRetry: () => ref.invalidate(paymentPlansProvider(widget.institutionId)),
-        ),
-        data: (plans) {
+      body: Builder(
+        builder: (context) {
+          final plans = plansAsync.valueOrNull;
+
+          // Показываем loading только при первой загрузке
+          if (plans == null) {
+            return const LoadingIndicator();
+          }
+
+          // Всегда показываем данные (даже если фоном ошибка)
           if (plans.isEmpty) {
             return EmptyState(
               icon: Icons.credit_card_outlined,

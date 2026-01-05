@@ -946,7 +946,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               ),
             ),
           const SizedBox(height: 16),
-          // Payments list
+          // Payments list (НИКОГДА не показываем ошибку - используем valueOrNull)
           Expanded(
             child: !canViewAnyPayments
                 ? const Center(
@@ -962,88 +962,111 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                       ],
                     ),
                   )
-                : paymentsAsync.when(
-                    loading: () => const LoadingIndicator(),
-                    error: (error, _) => ErrorView.fromException(
-                      error,
-                      onRetry: () => ref.invalidate(paymentsStreamByPeriodProvider(periodParams)),
-                    ),
-                    data: (payments) {
-                      // Если нужна фильтрация по своим ученикам, ждём загрузки myStudentIds
-                      if (!canViewAllPayments && myStudentIdsAsync.isLoading) {
+                : Builder(
+                    builder: (context) {
+                      final payments = paymentsAsync.valueOrNull;
+
+                      // Показываем loading только при первой загрузке (нет данных)
+                      if (payments == null) {
                         return const LoadingIndicator();
                       }
 
-                      // Получаем связи для фильтрации
-                      final subjectBindings = subjectBindingsAsync.valueOrNull ?? {};
-                      final teacherBindings = teacherBindingsAsync.valueOrNull ?? {};
-                      final myStudentIds = myStudentIdsAsync.valueOrNull ?? {};
-
-                      // Сначала фильтруем по правам доступа
-                      List<Payment> accessFilteredPayments = payments;
-                      if (!canViewAllPayments) {
-                        accessFilteredPayments = payments.where((p) {
-                          if (myStudentIds.contains(p.studentId)) return true;
-                          if (p.subscription?.members != null) {
-                            return p.subscription!.members!.any(
-                              (m) => myStudentIds.contains(m.studentId),
-                            );
-                          }
-                          return false;
-                        }).toList();
-                      }
-
-                      // Затем применяем UI фильтры
-                      final filteredPayments = _applyFilters(
-                        accessFilteredPayments,
-                        subjectBindings: subjectBindings,
-                        teacherBindings: teacherBindings,
-                      );
-
-                      if (accessFilteredPayments.isEmpty) {
-                        return Center(
-                          child: Text(
-                            canViewAllPayments
-                                ? 'Нет оплат за этот период'
-                                : 'Нет оплат ваших учеников за этот период',
-                            style: const TextStyle(color: AppColors.textSecondary),
-                          ),
-                        );
-                      }
-
-                      if (filteredPayments.isEmpty && _hasActiveFilters) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.filter_list_off, size: 48, color: Colors.grey[400]),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Нет оплат по заданным фильтрам',
-                                style: TextStyle(color: AppColors.textSecondary),
-                              ),
-                              const SizedBox(height: 8),
-                              TextButton(
-                                onPressed: _resetFilters,
-                                child: const Text('Сбросить фильтры'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      return RefreshIndicator(
-                        onRefresh: () async {
-                          ref.invalidate(paymentsStreamByPeriodProvider(periodParams));
-                          ref.invalidate(myStudentIdsProvider(widget.institutionId));
-                        },
-                        child: _buildPaymentsList(filteredPayments, myStudentIds, periodParams),
+                      // Всегда показываем данные (даже если фоном идёт обновление или ошибка)
+                      return _buildPaymentsContent(
+                        payments: payments,
+                        canViewAllPayments: canViewAllPayments,
+                        myStudentIdsAsync: myStudentIdsAsync,
+                        subjectBindingsAsync: subjectBindingsAsync,
+                        teacherBindingsAsync: teacherBindingsAsync,
+                        periodParams: periodParams,
+                        institutionId: widget.institutionId,
                       );
                     },
                   ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPaymentsContent({
+    required List<Payment> payments,
+    required bool canViewAllPayments,
+    required AsyncValue<Set<String>> myStudentIdsAsync,
+    required AsyncValue<Map<String, Set<String>>> subjectBindingsAsync,
+    required AsyncValue<Map<String, Set<String>>> teacherBindingsAsync,
+    required PeriodParams periodParams,
+    required String institutionId,
+  }) {
+    // Если нужна фильтрация по своим ученикам, ждём загрузки myStudentIds
+    if (!canViewAllPayments && myStudentIdsAsync.isLoading) {
+      return const LoadingIndicator();
+    }
+
+    // Получаем связи для фильтрации
+    final subjectBindings = subjectBindingsAsync.valueOrNull ?? {};
+    final teacherBindings = teacherBindingsAsync.valueOrNull ?? {};
+    final myStudentIds = myStudentIdsAsync.valueOrNull ?? {};
+
+    // Сначала фильтруем по правам доступа
+    List<Payment> accessFilteredPayments = payments;
+    if (!canViewAllPayments) {
+      accessFilteredPayments = payments.where((p) {
+        if (myStudentIds.contains(p.studentId)) return true;
+        if (p.subscription?.members != null) {
+          return p.subscription!.members!.any(
+            (m) => myStudentIds.contains(m.studentId),
+          );
+        }
+        return false;
+      }).toList();
+    }
+
+    // Затем применяем UI фильтры
+    final filteredPayments = _applyFilters(
+      accessFilteredPayments,
+      subjectBindings: subjectBindings,
+      teacherBindings: teacherBindings,
+    );
+
+    if (accessFilteredPayments.isEmpty) {
+      return Center(
+        child: Text(
+          canViewAllPayments
+              ? 'Нет оплат за этот период'
+              : 'Нет оплат ваших учеников за этот период',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    if (filteredPayments.isEmpty && _hasActiveFilters) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.filter_list_off, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            const Text(
+              'Нет оплат по заданным фильтрам',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _resetFilters,
+              child: const Text('Сбросить фильтры'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(paymentsStreamByPeriodProvider(periodParams));
+        ref.invalidate(myStudentIdsProvider(institutionId));
+      },
+      child: _buildPaymentsList(filteredPayments, myStudentIds, periodParams),
     );
   }
 

@@ -5,7 +5,6 @@ import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
-import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/empty_state.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
 import 'package:kabinet/shared/models/room.dart';
@@ -56,13 +55,16 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: roomsAsync.when(
-        loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView.fromException(
-          error,
-          onRetry: () => ref.invalidate(roomsProvider(widget.institutionId)),
-        ),
-        data: (rooms) {
+      body: Builder(
+        builder: (context) {
+          final rooms = roomsAsync.valueOrNull;
+
+          // Показываем loading только при первой загрузке
+          if (rooms == null) {
+            return const LoadingIndicator();
+          }
+
+          // Всегда показываем данные (даже если фоном ошибка)
           if (rooms.isEmpty) {
             return EmptyState(
               icon: Icons.door_front_door_outlined,

@@ -30,17 +30,13 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Профиль'),
       ),
-      body: profileAsync.when(
-        loading: () => const LoadingIndicator(),
-        error: (error, _) => ErrorView.fromException(
-          error,
-          onRetry: () => ref.invalidate(currentProfileProvider),
-        ),
-        data: (profile) {
+      body: Builder(
+        builder: (context) {
+          final profile = profileAsync.valueOrNull;
+
+          // Loading только при первой загрузке
           if (profile == null) {
-            return const Center(
-              child: Text('Профиль не найден'),
-            );
+            return const LoadingIndicator();
           }
 
           return ListView(
