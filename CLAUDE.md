@@ -101,6 +101,11 @@
   - Выбор темы в настройках (система/тёмная/светлая)
   - Исправление hardcoded цветов во всех экранах
   - Удаление устаревшего экрана расписания кабинета
+- **`SESSION_2026_01_05_SHIMMER_PRELOAD.md`** — shimmer-анимация и предзагрузка:
+  - Shimmer-скелетон для загрузки расписания (как в Instagram)
+  - Предзагрузка соседних дат (±3 дня) для мгновенного переключения
+  - Realtime обновления для предзагруженных дат
+  - Пустая сетка без фейковых занятий
 
 ## Валюта
 
@@ -972,6 +977,60 @@ BoxDecoration(color: Theme.of(context).colorScheme.surface),
 **Файл:** `lib/features/rooms/screens/rooms_screen.dart`
 
 **Примечание:** Экран расписания отдельного кабинета (`schedule_screen.dart`) был удалён как избыточный — основное расписание показывает все кабинеты.
+
+### 39. Shimmer-анимация загрузки и предзагрузка дат
+Расписание использует shimmer-скелетон для индикации загрузки и предзагружает соседние даты.
+
+**Shimmer-анимация:**
+```dart
+// Показывается вместо CircularProgressIndicator
+if (rooms == null || (lessonsAsync.isLoading && lessons == null)) {
+  return ScheduleSkeletonLoader(
+    roomCount: rooms?.length.clamp(1, 5) ?? 3,
+    startHour: workStartHour,
+    endHour: workEndHour,
+  );
+}
+```
+
+**Компоненты shimmer:**
+- `ShimmerLoading` — базовый виджет с мерцающим градиентом
+- `ShimmerBlock` — блок-заполнитель
+- `ScheduleSkeletonLoader` — скелетон дневного режима (пустая сетка)
+- `WeekScheduleSkeletonLoader` — скелетон недельного режима (пустая сетка)
+
+**Предзагрузка соседних дат (±3 дня):**
+```dart
+void _preloadAdjacentDates() {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    for (int i = -3; i <= 3; i++) {
+      if (i == 0) continue; // Текущая дата через watch
+
+      final adjacentDate = _selectedDate.add(Duration(days: i));
+      final params = InstitutionDateParams(widget.institutionId, adjacentDate);
+
+      // Фоновая загрузка без rebuild
+      ref.read(lessonsByInstitutionStreamProvider(params).future).catchError((_) => <Lesson>[]);
+      ref.read(bookingsByInstitutionDateProvider(params).future).catchError((_) => <Booking>[]);
+    }
+  });
+}
+```
+
+**Когда вызывается:**
+- При первом входе на экран (`initState`)
+- При нажатии "Сегодня"
+- При выборе даты через селектор или календарь
+
+**Преимущества:**
+- Мгновенное переключение между датами (данные в кеше)
+- Realtime обновления для предзагруженных дат (StreamProvider подписан)
+- Не блокирует UI (addPostFrameCallback + ref.read)
+- Оптимальный диапазон ±3 дня (баланс скорость/трафик)
+
+**Файлы:**
+- `lib/core/widgets/shimmer_loading.dart` — shimmer-компоненты
+- `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — интеграция
 
 ## CI/CD
 
