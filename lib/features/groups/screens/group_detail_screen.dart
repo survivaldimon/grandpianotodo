@@ -116,7 +116,7 @@ class _GroupDetailContent extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       group.comment!,
-                      style: TextStyle(color: AppColors.textSecondary),
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
                 ],
@@ -147,18 +147,18 @@ class _GroupDetailContent extends ConsumerWidget {
 
           // Список участников
           if (members.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(32),
+            const Padding(
+              padding: EdgeInsets.all(32),
               child: Center(
                 child: Column(
                   children: [
                     Icon(Icons.people_outline, size: 48, color: AppColors.textTertiary),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     Text(
                       'Нет участников',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
                       'Добавьте учеников в группу',
                       style: TextStyle(color: AppColors.textTertiary, fontSize: 12),

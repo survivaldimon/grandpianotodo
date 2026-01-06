@@ -435,7 +435,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         const Text('Начало', style: TextStyle(fontWeight: FontWeight.w500)),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<int>(
-                          value: startHour,
+                          initialValue: startHour,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
                             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -469,7 +469,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         const Text('Конец', style: TextStyle(fontWeight: FontWeight.w500)),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<int>(
-                          value: endHour,
+                          initialValue: endHour,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
                             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -530,38 +530,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Тема оформления'),
         contentPadding: const EdgeInsets.only(top: 16),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<ThemeMode>(
-              title: const Text('Как в системе'),
-              subtitle: const Text('Автоматически'),
-              value: ThemeMode.system,
-              groupValue: currentMode,
-              onChanged: (mode) {
-                ref.read(themeModeProvider.notifier).setThemeMode(mode!);
-                Navigator.pop(ctx);
-              },
-            ),
-            RadioListTile<ThemeMode>(
-              title: const Text('Тёмная'),
-              value: ThemeMode.dark,
-              groupValue: currentMode,
-              onChanged: (mode) {
-                ref.read(themeModeProvider.notifier).setThemeMode(mode!);
-                Navigator.pop(ctx);
-              },
-            ),
-            RadioListTile<ThemeMode>(
-              title: const Text('Светлая'),
-              value: ThemeMode.light,
-              groupValue: currentMode,
-              onChanged: (mode) {
-                ref.read(themeModeProvider.notifier).setThemeMode(mode!);
-                Navigator.pop(ctx);
-              },
-            ),
-          ],
+        content: RadioGroup<ThemeMode>(
+          groupValue: currentMode,
+          onChanged: (mode) {
+            ref.read(themeModeProvider.notifier).setThemeMode(mode!);
+            Navigator.pop(ctx);
+          },
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<ThemeMode>(
+                title: Text('Как в системе'),
+                subtitle: Text('Автоматически'),
+                value: ThemeMode.system,
+              ),
+              RadioListTile<ThemeMode>(
+                title: Text('Тёмная'),
+                value: ThemeMode.dark,
+              ),
+              RadioListTile<ThemeMode>(
+                title: Text('Светлая'),
+                value: ThemeMode.light,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(

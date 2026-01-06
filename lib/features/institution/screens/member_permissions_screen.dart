@@ -163,11 +163,11 @@ class _MemberPermissionsScreenState
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(color: AppColors.primary),
                               ),
-                              child: Row(
+                              child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.admin_panel_settings, size: 16, color: AppColors.primary),
-                                  const SizedBox(width: 4),
+                                  SizedBox(width: 4),
                                   Text(
                                     'Админ',
                                     style: TextStyle(
@@ -415,10 +415,10 @@ class _MemberPermissionsScreenState
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
               ),
-              child: Row(
+              child: const Row(
                 children: [
                   Icon(Icons.info_outline, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Все права ниже автоматически включены для администратора',
@@ -517,8 +517,8 @@ class _MemberPermissionsScreenState
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             'Предметы, которые ведёт преподаватель',
             style: TextStyle(
@@ -539,15 +539,15 @@ class _MemberPermissionsScreenState
           ),
           data: (teacherSubjects) {
             if (teacherSubjects.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              return const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(16),
                     child: Row(
                       children: [
                         Icon(Icons.info_outline, color: AppColors.textSecondary),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'Направления не указаны.\nДобавьте предметы, которые ведёт преподаватель.',
@@ -616,7 +616,7 @@ class _MemberPermissionsScreenState
                 const SizedBox(height: 8),
                 Text(
                   'Выберите предмет для $_memberName',
-                  style: TextStyle(color: AppColors.textSecondary),
+                  style: const TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 16),
                 allSubjectsAsync.when(

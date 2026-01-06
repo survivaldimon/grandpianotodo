@@ -1030,7 +1030,7 @@ class _LessonStatsCard extends ConsumerWidget {
                         ),
                         child: Column(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.check_circle,
                               color: AppColors.success,
                               size: 28,
@@ -1064,7 +1064,7 @@ class _LessonStatsCard extends ConsumerWidget {
                         ),
                         child: Column(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.cancel,
                               color: AppColors.error,
                               size: 28,
@@ -1337,7 +1337,7 @@ class _SubscriptionCard extends StatelessWidget {
                       color: AppColors.warning.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(
+                    child: const Text(
                       'Скоро истекает',
                       style: TextStyle(
                         color: AppColors.warning,
@@ -1355,16 +1355,16 @@ class _SubscriptionCard extends StatelessWidget {
                       color: Colors.purple.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.family_restroom,
                           size: 14,
                           color: Colors.purple,
                         ),
-                        const SizedBox(width: 4),
-                        const Text(
+                        SizedBox(width: 4),
+                        Text(
                           'Групповой',
                           style: TextStyle(
                             color: Colors.purple,
@@ -1500,7 +1500,7 @@ class _SubscriptionCard extends StatelessWidget {
                   if (status == SubscriptionStatus.active && onFreeze != null)
                     OutlinedButton.icon(
                       onPressed: onFreeze,
-                      icon: Icon(Icons.ac_unit, size: 18, color: AppColors.info),
+                      icon: const Icon(Icons.ac_unit, size: 18, color: AppColors.info),
                       label: const Text('Заморозить'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.info,
@@ -1522,7 +1522,7 @@ class _SubscriptionCard extends StatelessWidget {
                   if ((status == SubscriptionStatus.active || status == SubscriptionStatus.expired) && onExtend != null)
                     OutlinedButton.icon(
                       onPressed: onExtend,
-                      icon: Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
+                      icon: const Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
                       label: const Text('Продлить'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
@@ -1766,7 +1766,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_today, color: AppColors.primary),
+                        const Icon(Icons.calendar_today, color: AppColors.primary),
                         const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1813,7 +1813,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                         filled: true,
                         fillColor: Colors.grey[50],
                       ),
-                      value: currentPlan,
+                      initialValue: currentPlan,
                       items: [
                         const DropdownMenuItem<PaymentPlan?>(
                           value: null,
@@ -2446,7 +2446,7 @@ class _LessonTypesSection extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.category, color: AppColors.primary),
+                const Icon(Icons.category, color: AppColors.primary),
                 const SizedBox(width: 8),
                 const Text(
                   'Типы занятий',
@@ -2479,7 +2479,7 @@ class _LessonTypesSection extends ConsumerWidget {
                     return Chip(
                       avatar: CircleAvatar(
                         backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-                        child: Icon(Icons.category, size: 16, color: AppColors.primary),
+                        child: const Icon(Icons.category, size: 16, color: AppColors.primary),
                       ),
                       label: Text(lessonType.name),
                       deleteIcon: canEdit ? const Icon(Icons.close, size: 18) : null,
@@ -2558,7 +2558,7 @@ class _LessonTypesSection extends ConsumerWidget {
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-                            child: Icon(Icons.category, color: AppColors.primary),
+                            child: const Icon(Icons.category, color: AppColors.primary),
                           ),
                           title: Text(lessonType.name),
                           onTap: () async {

@@ -129,9 +129,9 @@ class ScheduleSkeletonLoader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hourHeight = 60.0;
-    final roomWidth = 120.0;
-    final timeColumnWidth = 50.0;
+    const hourHeight = 60.0;
+    const roomWidth = 120.0;
+    const timeColumnWidth = 50.0;
     final hours = endHour - startHour;
 
     return ShimmerLoading(
@@ -150,7 +150,7 @@ class ScheduleSkeletonLoader extends StatelessWidget {
                       height: hourHeight,
                       alignment: Alignment.topCenter,
                       padding: const EdgeInsets.only(top: 4),
-                      child: ShimmerBlock(
+                      child: const ShimmerBlock(
                         width: 35,
                         height: 16,
                         borderRadius: 4,
@@ -174,7 +174,7 @@ class ScheduleSkeletonLoader extends StatelessWidget {
                           Container(
                             height: 48,
                             padding: const EdgeInsets.all(8),
-                            child: ShimmerBlock(
+                            child: const ShimmerBlock(
                               width: 80,
                               height: 32,
                               borderRadius: 8,
@@ -240,9 +240,9 @@ class WeekScheduleSkeletonLoader extends StatelessWidget {
               children: [
                 const SizedBox(width: 50), // Time column
                 ...List.generate(dayCount, (index) {
-                  return Expanded(
+                  return const Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.all(4),
+                      padding: EdgeInsets.all(4),
                       child: ShimmerBlock(height: 40, borderRadius: 8),
                     ),
                   );
@@ -265,7 +265,7 @@ class WeekScheduleSkeletonLoader extends StatelessWidget {
                           height: 60,
                           alignment: Alignment.topCenter,
                           padding: const EdgeInsets.only(top: 4),
-                          child: ShimmerBlock(
+                          child: const ShimmerBlock(
                             width: 35,
                             height: 16,
                             borderRadius: 4,

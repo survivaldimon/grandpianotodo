@@ -125,6 +125,10 @@
   - Кнопка "Оплатить" для групповых занятий
   - Исправление двойного списания при повторном "Проведено"
   - **ВНИМАНИЕ:** Много недочётов и багов, требуется доработка
+- **`SESSION_2026_01_06_STUDENT_PICKER.md`** — улучшение выбора ученика:
+  - Замена Dropdown на кастомный BottomSheet
+  - Кнопка "Показать всех" расширяет список без закрытия
+  - Первые 10 учеников видны сразу, остальные по кнопке
 - **`SESSION_2026_01_06_TEACHER_ONBOARDING.md`** — онбординг преподавателя:
   - Экран онбординга при присоединении по коду (PageView: цвет + направления)
   - Баннер на Dashboard если онбординг не завершён
@@ -1068,7 +1072,6 @@ BoxDecoration(color: Theme.of(context).colorScheme.surface),
 
 **Примечание:** Экран расписания отдельного кабинета (`schedule_screen.dart`) был удалён как избыточный — основное расписание показывает все кабинеты.
 
-<<<<<<< HEAD
 ### 39. Унифицированный выбор цветов (ColorPickerField)
 Для всех сущностей с цветами (типы занятий, предметы, тарифы, участники) используется единый компонент выбора цвета.
 
@@ -1185,7 +1188,53 @@ void _preloadAdjacentDates() {
 - `lib/core/widgets/shimmer_loading.dart` — shimmer-компоненты
 - `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — интеграция
 
-### 41. Онбординг преподавателя
+### 41. Выбор ученика в форме занятия (StudentPickerSheet)
+Кастомный BottomSheet для выбора ученика с возможностью показать всех без закрытия.
+
+**Проблема:** Стандартный Dropdown закрывался при нажатии "Показать всех", требуя повторного открытия.
+
+**Решение:** Виджет `_StudentPickerSheet` с локальным состоянием.
+
+**Логика отображения:**
+- Показывает первых 10 учеников (свои первыми, потом остальные)
+- Если учеников > 10 — кнопка "Показать всех (N)" внизу списка
+- При нажатии — список расширяется **без закрытия** sheet
+- После раскрытия — кнопка "Скрыть"
+- При выборе ученика — sheet закрывается
+
+**Использование:**
+```dart
+InkWell(
+  onTap: () => _showStudentPickerSheet(
+    context: context,
+    myStudents: myStudents,
+    otherStudents: otherStudents,
+    allStudents: allStudents,
+    currentStudent: currentStudent,
+  ),
+  child: InputDecorator(
+    decoration: InputDecoration(
+      labelText: 'Ученик *',
+      suffixIcon: Icon(Icons.arrow_drop_down),
+    ),
+    child: Text(currentStudent?.name ?? 'Выберите ученика'),
+  ),
+)
+```
+
+**Константа порога:**
+```dart
+static const int _initialVisibleCount = 10;
+```
+
+**Визуальное оформление:**
+- Свои ученики: обычный цвет (`onSurface`)
+- Остальные: приглушённый (`onSurfaceVariant`)
+- Выбранный: жирный текст + галочка + primaryContainer фон аватара
+
+**Файл:** `lib/features/schedule/screens/all_rooms_schedule_screen.dart`
+
+### 42. Онбординг преподавателя
 При присоединении к заведению по коду приглашения преподавателю показывается онбординг.
 
 **Два шага онбординга:**

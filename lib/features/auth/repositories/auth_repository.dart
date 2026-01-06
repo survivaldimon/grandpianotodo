@@ -118,7 +118,7 @@ class AuthRepository {
     String? avatarUrl,
   }) async {
     final user = currentUser;
-    if (user == null) throw AuthAppException('Пользователь не авторизован');
+    if (user == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final data = await _client

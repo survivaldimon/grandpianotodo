@@ -315,10 +315,15 @@ class BookingRepository {
   }
 
   /// Стрим бронирований по заведению и дате (realtime)
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<List<Booking>> watchByInstitutionAndDate(
     String institutionId,
     DateTime date,
   ) async* {
+    // 1. Сразу выдаём текущие данные
+    yield await getByInstitutionAndDate(institutionId, date);
+
+    // 2. Подписываемся на изменения
     await for (final _ in _client
         .from('bookings')
         .stream(primaryKey: ['id'])

@@ -326,6 +326,7 @@ class StudentRepository {
 
   /// Стрим учеников (realtime)
   /// Слушаем изменения в students И subscriptions (для обновления баланса)
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<List<Student>> watchByInstitution(String institutionId) {
     final controller = StreamController<List<Student>>.broadcast();
     StreamSubscription? studentsSubscription;
@@ -345,13 +346,16 @@ class StudentRepository {
       }
     }
 
-    // Слушаем students
+    // 1. Сразу загружаем начальные данные
+    loadAndEmit();
+
+    // 2. Слушаем students
     studentsSubscription = _client
         .from('students')
         .stream(primaryKey: ['id'])
         .listen((_) => loadAndEmit());
 
-    // Слушаем subscriptions (для обновления баланса при списании занятий)
+    // 3. Слушаем subscriptions (для обновления баланса при списании занятий)
     subscriptionsSubscription = _client
         .from('subscriptions')
         .stream(primaryKey: ['id'])

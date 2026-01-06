@@ -124,7 +124,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 icon: Icons.event_note,
                 onTap: () => context.go('/institutions/${widget.institutionId}/schedule'),
               ),
-              loading: () => _DashboardCard(
+              loading: () => const _DashboardCard(
                 title: 'Занятия сегодня',
                 trailing: '...',
                 icon: Icons.event_note,
@@ -145,7 +145,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
               // Показываем loading только при первой загрузке (когда данных ещё нет)
               if (lessons == null) {
-                return _DashboardCard(
+                return const _DashboardCard(
                   title: AppStrings.unmarkedLessons,
                   trailing: '...',
                   icon: Icons.pending_actions,
@@ -179,7 +179,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               data: (lessons) {
                 final nextLesson = _getNextLesson(lessons, today);
                 if (nextLesson == null) {
-                  return _DashboardCard(
+                  return const _DashboardCard(
                     title: 'Ближайшее занятие',
                     subtitle: 'Нет запланированных занятий',
                     icon: Icons.schedule,
@@ -195,13 +195,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   },
                 );
               },
-              loading: () => _DashboardCard(
+              loading: () => const _DashboardCard(
                 title: 'Ближайшее занятие',
                 subtitle: 'Загрузка...',
                 icon: Icons.schedule,
                 onTap: null,
               ),
-              error: (_, __) => _DashboardCard(
+              error: (_, __) => const _DashboardCard(
                 title: 'Ближайшее занятие',
                 subtitle: 'Ошибка загрузки',
                 icon: Icons.schedule,
@@ -228,7 +228,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   },
                 );
               },
-              loading: () => _DashboardCard(
+              loading: () => const _DashboardCard(
                 title: 'Должники',
                 trailing: '...',
                 icon: Icons.warning_amber,
@@ -257,7 +257,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 iconColor: AppColors.success,
                 onTap: () => context.go('/institutions/${widget.institutionId}/payments'),
               ),
-              loading: () => _DashboardCard(
+              loading: () => const _DashboardCard(
                 title: 'Сегодня оплачено',
                 trailing: '...',
                 icon: Icons.payments,

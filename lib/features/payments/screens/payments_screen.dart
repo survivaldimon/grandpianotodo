@@ -2700,14 +2700,14 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                                 valueColor: AlwaysStoppedAnimation(Colors.white),
                                               ),
                                             )
-                                          : Row(
+                                          : const Row(
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
-                                                const Icon(Icons.check),
-                                                const SizedBox(width: 8),
+                                                Icon(Icons.check),
+                                                SizedBox(width: 8),
                                                 Text(
                                                   'Сохранить изменения',
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.bold,
                                                   ),

@@ -18,6 +18,7 @@ dependencies:
 
   # Backend
   supabase_flutter: ^2.8.3
+  realtime_client: ^2.3.0
 
   # Navigation
   go_router: ^14.6.2

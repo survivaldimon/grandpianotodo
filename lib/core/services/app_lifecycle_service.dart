@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
+import 'package:kabinet/core/services/connection_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Сервис управления жизненным циклом приложения
@@ -17,20 +18,19 @@ class AppLifecycleService with WidgetsBindingObserver {
 
   AppLifecycleService._();
 
-  WidgetRef? _ref;
   String? _currentInstitutionId;
   DateTime? _pausedAt;
   bool _isInitialized = false;
 
-  /// Время в фоне, после которого нужно обновить данные (30 секунд)
+  /// Время в фоне, после которого нужно обновить сессию (30 секунд)
   static const _refreshThreshold = Duration(seconds: 30);
 
   /// Инициализация сервиса
+  /// ref сохранён для обратной совместимости с существующим API
   void initialize(WidgetRef ref) {
     if (_isInitialized) return;
 
     WidgetsBinding.instance.addObserver(this);
-    _ref = ref;
     _isInitialized = true;
     debugPrint('[AppLifecycle] Initialized');
   }
@@ -43,7 +43,6 @@ class AppLifecycleService with WidgetsBindingObserver {
   /// Освобождение ресурсов
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _ref = null;
     _isInitialized = false;
     _instance = null;
     debugPrint('[AppLifecycle] Disposed');
@@ -71,26 +70,26 @@ class AppLifecycleService with WidgetsBindingObserver {
   }
 
   /// Обработка возврата из фона
+  /// ВАЖНО: ВСЕГДА переподключаем Realtime при возврате из фона
+  /// Это гарантирует что WebSocket соединение работает корректно
   Future<void> _handleResume() async {
     final pausedAt = _pausedAt;
     _pausedAt = null;
 
-    // Проверяем, было ли приложение в фоне достаточно долго
-    final wasInBackgroundLongEnough = pausedAt != null &&
-        DateTime.now().difference(pausedAt) > _refreshThreshold;
+    debugPrint('[AppLifecycle] App resumed, reconnecting Realtime...');
 
-    if (!wasInBackgroundLongEnough) {
-      debugPrint('[AppLifecycle] Was in background < ${_refreshThreshold.inSeconds}s, skipping refresh');
-      return;
+    // 1. ВСЕГДА переподключаем Realtime при возврате из фона
+    // Это закрывает старые "зависшие" WebSocket соединения и создаёт новые
+    await ConnectionManager.instance.reconnectRealtime();
+
+    // 2. Опционально обновляем сессию если в фоне достаточно долго
+    if (pausedAt != null) {
+      final timeInBackground = DateTime.now().difference(pausedAt);
+      if (timeInBackground > _refreshThreshold) {
+        debugPrint('[AppLifecycle] Was in background ${timeInBackground.inSeconds}s, refreshing session...');
+        await _refreshSupabaseSession();
+      }
     }
-
-    debugPrint('[AppLifecycle] Was in background > ${_refreshThreshold.inSeconds}s, refreshing...');
-
-    // 1. Обновляем сессию Supabase
-    await _refreshSupabaseSession();
-
-    // 2. Инвалидируем ключевые провайдеры
-    _invalidateProviders();
   }
 
   /// Обновление сессии Supabase
@@ -125,42 +124,6 @@ class AppLifecycleService with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('[AppLifecycle] Error refreshing session: $e');
     }
-  }
-
-  /// Инвалидация ключевых провайдеров
-  void _invalidateProviders() {
-    final ref = _ref;
-    final institutionId = _currentInstitutionId;
-
-    if (ref == null) {
-      debugPrint('[AppLifecycle] No ref available for invalidation');
-      return;
-    }
-
-    debugPrint('[AppLifecycle] Invalidating providers for institution: $institutionId');
-
-    // Используем отложенную инвалидацию чтобы не блокировать UI
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _doInvalidate(ref, institutionId);
-    });
-  }
-
-  void _doInvalidate(WidgetRef ref, String? institutionId) {
-    // Импортируем провайдеры динамически через invalidate
-    // Это работает потому что invalidate принимает ProviderOrFamily
-
-    if (institutionId != null) {
-      // Инвалидируем провайдеры, зависящие от institutionId
-      // Используем строковые ключи для избежания циклических импортов
-      _invalidateInstitutionProviders(ref, institutionId);
-    }
-
-    debugPrint('[AppLifecycle] Providers invalidated');
-  }
-
-  void _invalidateInstitutionProviders(WidgetRef ref, String institutionId) {
-    // Этот метод будет вызван из MainShell с доступом к провайдерам
-    _onRefreshNeeded?.call(institutionId);
   }
 
   /// Callback для уведомления о необходимости обновить данные

@@ -35,7 +35,7 @@ class ProfileController extends StateNotifier<AsyncValue<void>> {
 
     if (userId == null) {
       state = AsyncValue.error(
-        AuthAppException('Пользователь не авторизован'),
+        const AuthAppException('Пользователь не авторизован'),
         StackTrace.current,
       );
       return false;

@@ -59,7 +59,7 @@ class PaymentRepository {
     DateTime? paidAt,
     String? comment,
   }) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final data = await _client
@@ -94,7 +94,7 @@ class PaymentRepository {
     String paymentMethod = 'cash',
     String? comment,
   }) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final data = await _client
@@ -162,7 +162,13 @@ class PaymentRepository {
 
   /// Стрим оплат (realtime)
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
+  /// Это предотвращает бесконечную загрузку при возврате из фона
   Stream<List<Payment>> watchByInstitution(String institutionId) async* {
+    // 1. Сразу выдаём текущие данные (без ожидания Realtime)
+    yield await getByInstitution(institutionId);
+
+    // 2. Подписываемся на изменения
     await for (final _ in _client.from('payments').stream(primaryKey: ['id'])) {
       // При любом изменении загружаем актуальные данные
       final payments = await getByInstitution(institutionId);
@@ -270,7 +276,7 @@ class PaymentRepository {
     String? paymentMethod,
     String? comment,
   }) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final updates = <String, dynamic>{};
@@ -295,7 +301,7 @@ class PaymentRepository {
   /// Удалить оплату
   /// Баланс ученика возвращается автоматически триггером в БД
   Future<void> delete(String paymentId) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       await _client.from('payments').delete().eq('id', paymentId);
@@ -322,7 +328,7 @@ class PaymentRepository {
 
   /// Удалить оплату по ID занятия
   Future<bool> deleteByLessonId(String lessonId) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       await _client

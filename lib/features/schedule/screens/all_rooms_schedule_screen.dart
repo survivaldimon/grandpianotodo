@@ -1154,7 +1154,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
           child: Row(
             children: [
               // Пустое место над временной шкалой
-              SizedBox(width: AppSizes.timeGridWidth),
+              const SizedBox(width: AppSizes.timeGridWidth),
               // Заголовки кабинетов (кликабельные для фильтрации)
               Expanded(
                 child: shouldExpandColumns
@@ -1178,7 +1178,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                         width: 0.5,
                                       ),
                                       bottom: widget.selectedRoomId == rooms[index].id
-                                          ? BorderSide(color: AppColors.primary, width: 2)
+                                          ? const BorderSide(color: AppColors.primary, width: 2)
                                           : BorderSide.none,
                                     ),
                                   ),
@@ -1231,7 +1231,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                                           width: 0.5,
                                         ),
                                         bottom: widget.selectedRoomId == widget.rooms[index].id
-                                            ? BorderSide(color: AppColors.primary, width: 2)
+                                            ? const BorderSide(color: AppColors.primary, width: 2)
                                             : BorderSide.none,
                                       ),
                                     ),
@@ -2545,7 +2545,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                         ),
                       // Повторяющееся
                       if (lesson.isRepeating)
-                        _DetailRow(
+                        const _DetailRow(
                           icon: Icons.repeat_rounded,
                           label: 'Повтор',
                           value: 'Да',
@@ -2955,8 +2955,8 @@ class _GroupParticipantsSection extends ConsumerStatefulWidget {
 }
 
 class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSection> {
-  Map<String, bool> _attendanceState = {};
-  Map<String, bool> _paymentState = {};
+  final Map<String, bool> _attendanceState = {};
+  final Map<String, bool> _paymentState = {};
   bool _isUpdating = false;
 
   @override
@@ -3664,7 +3664,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                     labelText: 'Кабинет',
                     prefixIcon: Icon(Icons.door_front_door),
                   ),
-                  value: selectedRoom?.id,
+                  initialValue: selectedRoom?.id,
                   items: rooms.map((r) => DropdownMenuItem<String>(
                     value: r.id,
                     child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
@@ -3689,7 +3689,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                       labelText: 'Группа',
                       prefixIcon: Icon(Icons.groups),
                     ),
-                    value: selectedGroup?.id,
+                    initialValue: selectedGroup?.id,
                     items: groups.map((g) => DropdownMenuItem<String?>(
                       value: g.id,
                       child: Text(g.name),
@@ -3711,7 +3711,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                       labelText: 'Ученик',
                       prefixIcon: Icon(Icons.person),
                     ),
-                    value: selectedStudent?.id,
+                    initialValue: selectedStudent?.id,
                     items: students.map((s) => DropdownMenuItem<String?>(
                       value: s.id,
                       child: Text(s.name),
@@ -3735,7 +3735,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                     labelText: 'Предмет',
                     prefixIcon: Icon(Icons.music_note),
                   ),
-                  value: _selectedSubjectId,
+                  initialValue: _selectedSubjectId,
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
@@ -3765,7 +3765,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                     labelText: 'Тип занятия',
                     prefixIcon: Icon(Icons.category),
                   ),
-                  value: _selectedLessonTypeId,
+                  initialValue: _selectedLessonTypeId,
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
@@ -4175,6 +4175,177 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Выбор ученика с возможностью показать всех без закрытия
+class _StudentPickerSheet extends StatefulWidget {
+  final List<Student> myStudents;
+  final List<Student> otherStudents;
+  final Student? currentStudent;
+  final void Function(Student student) onStudentSelected;
+
+  const _StudentPickerSheet({
+    required this.myStudents,
+    required this.otherStudents,
+    required this.currentStudent,
+    required this.onStudentSelected,
+  });
+
+  @override
+  State<_StudentPickerSheet> createState() => _StudentPickerSheetState();
+}
+
+class _StudentPickerSheetState extends State<_StudentPickerSheet> {
+  static const int _initialVisibleCount = 10;
+  bool _showAllStudents = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // Объединяем всех учеников: свои первыми, потом остальные
+    final allStudents = [...widget.myStudents, ...widget.otherStudents];
+    final totalCount = allStudents.length;
+    final hasHiddenStudents = totalCount > _initialVisibleCount;
+    final hiddenCount = totalCount - _initialVisibleCount;
+
+    // Определяем какие ученики показывать
+    final visibleStudents = _showAllStudents
+        ? allStudents
+        : allStudents.take(_initialVisibleCount).toList();
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Заголовок
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Выберите ученика',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
+          const Divider(height: 1),
+          // Список учеников
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                // Ученики
+                ...visibleStudents.map((student) {
+                  final isOther = !widget.myStudents.contains(student);
+                  return _buildStudentTile(student, isOther);
+                }),
+                // Кнопка "Показать всех" (если есть скрытые)
+                if (hasHiddenStudents && !_showAllStudents)
+                  InkWell(
+                    onTap: () => setState(() => _showAllStudents = true),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.expand_more,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Показать всех ($hiddenCount)',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // Кнопка "Скрыть" (если раскрыто)
+                if (hasHiddenStudents && _showAllStudents)
+                  InkWell(
+                    onTap: () => setState(() => _showAllStudents = false),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.expand_less,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Скрыть',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudentTile(Student student, bool isOther) {
+    final isSelected = widget.currentStudent?.id == student.id;
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: isSelected
+            ? Theme.of(context).colorScheme.primaryContainer
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
+        child: Icon(
+          Icons.person,
+          size: 20,
+          color: isSelected
+              ? Theme.of(context).colorScheme.onPrimaryContainer
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+      title: Text(
+        student.name,
+        style: TextStyle(
+          color: isOther
+              ? Theme.of(context).colorScheme.onSurfaceVariant
+              : Theme.of(context).colorScheme.onSurface,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+          : null,
+      onTap: () {
+        widget.onStudentSelected(student);
+        Navigator.of(context).pop();
+      },
     );
   }
 }
@@ -5828,7 +5999,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                                   labelText: 'Кабинет *',
                                   prefixIcon: Icon(Icons.door_front_door),
                                 ),
-                                value: _selectedRoom,
+                                initialValue: _selectedRoom,
                                 items: rooms.map((r) => DropdownMenuItem<Room>(
                                   value: r,
                                   child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
@@ -5894,8 +6065,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 }).toList(),
               ),
               if (_selectedRoomIds.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
                   child: Text(
                     'Выберите хотя бы один кабинет',
                     style: TextStyle(
@@ -6035,66 +6206,87 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
               // Выбор ученика (индивидуальное занятие)
               if (!_isGroupLesson)
-                studentsAsync.when(
-                  loading: () => const CircularProgressIndicator(),
-                  error: (e, _) => ErrorView.inline(e),
-                  data: (students) {
-                    // Находим выбранного студента по ID в текущем списке
-                    final currentStudent = _selectedStudent != null
-                        ? students.where((s) => s.id == _selectedStudent!.id).firstOrNull
-                        : null;
+                Builder(builder: (context) {
+                  final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+                  final myStudentIdsAsync = currentUserId != null
+                      ? ref.watch(teacherStudentIdsProvider(
+                          TeacherStudentsParams(currentUserId, widget.institutionId),
+                        ))
+                      : const AsyncValue<List<String>>.data([]);
 
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: students.isEmpty
-                              ? InputDecorator(
-                                  decoration: const InputDecoration(
-                                    labelText: 'Ученик *',
-                                    prefixIcon: Icon(Icons.person),
+                  return studentsAsync.when(
+                    loading: () => const CircularProgressIndicator(),
+                    error: (e, _) => ErrorView.inline(e),
+                    data: (allStudents) {
+                      final myStudentIds = myStudentIdsAsync.valueOrNull ?? [];
+
+                      // Разделяем на своих и остальных
+                      final myStudents = allStudents.where((s) => myStudentIds.contains(s.id)).toList();
+                      final otherStudents = allStudents.where((s) => !myStudentIds.contains(s.id)).toList();
+
+                      // Находим выбранного студента по ID в текущем списке
+                      final currentStudent = _selectedStudent != null
+                          ? allStudents.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                          : null;
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: allStudents.isEmpty
+                                ? InputDecorator(
+                                    decoration: const InputDecoration(
+                                      labelText: 'Ученик *',
+                                      prefixIcon: Icon(Icons.person),
+                                    ),
+                                    child: Text(
+                                      'Нет учеников',
+                                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                    ),
+                                  )
+                                : InkWell(
+                                    onTap: () => _showStudentPickerSheet(
+                                      context: context,
+                                      myStudents: myStudents,
+                                      otherStudents: otherStudents,
+                                      allStudents: allStudents,
+                                      currentStudent: currentStudent,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: InputDecorator(
+                                      decoration: InputDecoration(
+                                        labelText: 'Ученик *',
+                                        prefixIcon: const Icon(Icons.person),
+                                        suffixIcon: const Icon(Icons.arrow_drop_down),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      child: Text(
+                                        currentStudent?.name ?? 'Выберите ученика',
+                                        style: currentStudent != null
+                                            ? null
+                                            : TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                      ),
+                                    ),
                                   ),
-                                  child: Text(
-                                    'Нет учеников',
-                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                  ),
-                                )
-                              : DropdownButtonFormField<Student?>(
-                                  decoration: const InputDecoration(
-                                    labelText: 'Ученик *',
-                                    prefixIcon: Icon(Icons.person),
-                                  ),
-                                  value: currentStudent,
-                                  items: students.map((s) => DropdownMenuItem<Student?>(
-                                    value: s,
-                                    child: Text(s.name),
-                                  )).toList(),
-                                  onChanged: (student) {
-                                    setState(() => _selectedStudent = student);
-                                    // Автозаполнение типа занятия из привязок ученика
-                                    if (student != null) {
-                                      _autoFillLessonTypeFromStudent(student.id);
-                                    }
-                                  },
-                                ),
-                        ),
-                        const SizedBox(width: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: IconButton.filled(
-                            onPressed: () => _showAddStudentDialog(),
-                            icon: const Icon(Icons.add, size: 20),
-                            tooltip: 'Добавить ученика',
-                            style: IconButton.styleFrom(
-                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                              foregroundColor: AppColors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: IconButton.filled(
+                              onPressed: () => _showAddStudentDialog(),
+                              icon: const Icon(Icons.add, size: 20),
+                              tooltip: 'Добавить ученика',
+                              style: IconButton.styleFrom(
+                                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                foregroundColor: AppColors.primary,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                        ],
+                      );
+                    },
+                  );
+                }),
 
               // Выбор группы (групповое занятие)
               if (_isGroupLesson)
@@ -6126,7 +6318,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                                     labelText: 'Группа *',
                                     prefixIcon: Icon(Icons.groups),
                                   ),
-                                  value: currentGroup,
+                                  initialValue: currentGroup,
                                   items: groups.map((g) => DropdownMenuItem<StudentGroup?>(
                                     value: g,
                                     child: Text('${g.name} (${g.membersCount} уч.)'),
@@ -6167,6 +6359,11 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
                 _selectedTeacher ??= activeMembers.where((m) => m.userId == currentUserId).firstOrNull;
 
+                // Находим текущего преподавателя в списке по userId (объекты могут пересоздаваться)
+                final currentTeacher = _selectedTeacher != null
+                    ? activeMembers.where((m) => m.userId == _selectedTeacher!.userId).firstOrNull
+                    : null;
+
                 // Проверяем права: только владелец или админ может выбирать преподавателя
                 final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
                 final institution = institutionAsync.valueOrNull;
@@ -6185,7 +6382,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                     labelText: 'Преподаватель',
                     prefixIcon: Icon(Icons.school),
                   ),
-                  value: _selectedTeacher,
+                  initialValue: currentTeacher,
                   items: activeMembers.map((m) => DropdownMenuItem<InstitutionMember?>(
                     value: m,
                     child: Text(m.profile?.fullName ?? 'Без имени'),
@@ -6217,7 +6414,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           labelText: 'Предмет',
                           prefixIcon: Icon(Icons.music_note),
                         ),
-                        value: _selectedSubject,
+                        initialValue: _selectedSubject,
                         items: [
                           const DropdownMenuItem<Subject?>(
                             value: null,
@@ -6266,7 +6463,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           labelText: 'Тип занятия',
                           prefixIcon: Icon(Icons.category),
                         ),
-                        value: _selectedLessonType,
+                        initialValue: _selectedLessonType,
                         items: [
                           const DropdownMenuItem<LessonType?>(
                             value: null,
@@ -6849,6 +7046,30 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     );
   }
 
+  void _showStudentPickerSheet({
+    required BuildContext context,
+    required List<Student> myStudents,
+    required List<Student> otherStudents,
+    required List<Student> allStudents,
+    required Student? currentStudent,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _StudentPickerSheet(
+        myStudents: myStudents,
+        otherStudents: otherStudents,
+        currentStudent: currentStudent,
+        onStudentSelected: (student) {
+          setState(() => _selectedStudent = student);
+          // Автозаполнение типа занятия из привязок ученика
+          _autoFillLessonTypeFromStudent(student.id);
+        },
+      ),
+    );
+  }
+
   void _showAddStudentDialog() {
     showModalBottomSheet(
       context: context,
@@ -7327,8 +7548,8 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                     controlAffinity: ListTileControlAffinity.leading,
                   )),
                   if (_selectedRoomIds.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
                       child: Text(
                         'Выберите минимум один кабинет',
                         style: TextStyle(
