@@ -52,6 +52,7 @@ final membersProvider =
 
 /// StreamProvider для realtime обновлений участников
 /// Подписывается на изменения и автоматически загружает профили
+/// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
 final membersStreamProvider =
     StreamProvider.family<List<InstitutionMember>, String>((ref, institutionId) {
   final client = SupabaseConfig.client;
@@ -59,13 +60,8 @@ final membersStreamProvider =
   // Создаём контроллер для стрима с профилями
   final controller = StreamController<List<InstitutionMember>>();
 
-  // Подписываемся на realtime изменения
-  final subscription = client
-      .from('institution_members')
-      .stream(primaryKey: ['id'])
-      .eq('institution_id', institutionId)
-      .listen((data) async {
-    // При каждом изменении загружаем данные с профилями
+  // Функция загрузки и эмита данных
+  Future<void> loadAndEmit() async {
     try {
       final membersWithProfiles = await _loadMembersWithProfiles(institutionId);
       if (!controller.isClosed) {
@@ -78,7 +74,17 @@ final membersStreamProvider =
         controller.addError(e);
       }
     }
-  });
+  }
+
+  // 1. Сразу загружаем начальные данные
+  loadAndEmit();
+
+  // 2. Подписываемся на realtime изменения
+  final subscription = client
+      .from('institution_members')
+      .stream(primaryKey: ['id'])
+      .eq('institution_id', institutionId)
+      .listen((_) => loadAndEmit());
 
   ref.onDispose(() {
     subscription.cancel();

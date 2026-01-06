@@ -38,9 +38,9 @@ class GroupsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.groups, size: 64, color: AppColors.textTertiary),
+                  const Icon(Icons.groups, size: 64, color: AppColors.textTertiary),
                   const SizedBox(height: 16),
-                  Text(
+                  const Text(
                     'Нет групп',
                     style: TextStyle(
                       fontSize: 18,
@@ -48,7 +48,7 @@ class GroupsScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  const Text(
                     'Создайте первую группу учеников',
                     style: TextStyle(color: AppColors.textTertiary),
                   ),
@@ -171,7 +171,7 @@ class _GroupTile extends ConsumerWidget {
       title: Text(group.name),
       subtitle: Text(
         '${group.membersCount} ${_pluralize(group.membersCount, 'ученик', 'ученика', 'учеников')}',
-        style: TextStyle(color: AppColors.textSecondary),
+        style: const TextStyle(color: AppColors.textSecondary),
       ),
       trailing: const Icon(Icons.chevron_right),
       onTap: () {

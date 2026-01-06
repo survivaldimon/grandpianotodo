@@ -70,7 +70,7 @@ class LessonRepository {
 
   /// Получить занятия преподавателя за день
   Future<List<Lesson>> getMyLessonsForDate(DateTime date) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final dateStr = date.toIso8601String().split('T').first;
@@ -137,7 +137,7 @@ class LessonRepository {
     String? comment,
     String? repeatGroupId,
   }) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final data = await _client
@@ -191,8 +191,8 @@ class LessonRepository {
     required TimeOfDay endTime,
     String? comment,
   }) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
-    if (dates.isEmpty) throw ValidationException('Список дат пуст');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
+    if (dates.isEmpty) throw const ValidationException('Список дат пуст');
 
     try {
       // Генерируем общий ID для серии
@@ -671,7 +671,12 @@ class LessonRepository {
 
   /// Стрим занятий кабинета (realtime)
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<List<Lesson>> watchByRoom(String roomId, DateTime date) async* {
+    // 1. Сразу выдаём текущие данные
+    yield await getByRoomAndDate(roomId, date);
+
+    // 2. Подписываемся на изменения
     await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
       final lessons = await getByRoomAndDate(roomId, date);
       yield lessons;
@@ -682,7 +687,12 @@ class LessonRepository {
   /// При любом изменении загружает полные данные с joins
   /// Примечание: слушаем ВСЕ изменения в таблице без фильтра,
   /// т.к. Supabase Realtime не отправляет DELETE события с фильтром корректно
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<List<Lesson>> watchByInstitution(String institutionId, DateTime date) async* {
+    // 1. Сразу выдаём текущие данные
+    yield await getByInstitutionAndDate(institutionId, date);
+
+    // 2. Подписываемся на изменения
     await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
       final lessons = await getByInstitutionAndDate(institutionId, date);
       yield lessons;
@@ -692,11 +702,20 @@ class LessonRepository {
   /// Стрим неотмеченных занятий (realtime)
   /// Для owner/admin возвращает все, для teacher - только его занятия
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<List<Lesson>> watchUnmarkedLessons({
     required String institutionId,
     required bool isAdminOrOwner,
     String? teacherId,
   }) async* {
+    // 1. Сразу выдаём текущие данные
+    yield await getUnmarkedLessons(
+      institutionId: institutionId,
+      isAdminOrOwner: isAdminOrOwner,
+      teacherId: teacherId,
+    );
+
+    // 2. Подписываемся на изменения
     await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
       final lessons = await getUnmarkedLessons(
         institutionId: institutionId,

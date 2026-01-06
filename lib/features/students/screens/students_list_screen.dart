@@ -711,50 +711,37 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
               ),
               const Divider(height: 1),
               // Опции
-              RadioListTile<int?>(
-                value: null,
+              RadioGroup<int?>(
                 groupValue: _inactivityDays,
                 onChanged: (value) {
                   setState(() => _inactivityDays = value);
                   setSheetState(() {});
                 },
-                title: const Text('Все'),
-              ),
-              RadioListTile<int?>(
-                value: 7,
-                groupValue: _inactivityDays,
-                onChanged: (value) {
-                  setState(() => _inactivityDays = value);
-                  setSheetState(() {});
-                },
-                title: const Text('Нет занятий 7+ дней'),
-              ),
-              RadioListTile<int?>(
-                value: 14,
-                groupValue: _inactivityDays,
-                onChanged: (value) {
-                  setState(() => _inactivityDays = value);
-                  setSheetState(() {});
-                },
-                title: const Text('Нет занятий 14+ дней'),
-              ),
-              RadioListTile<int?>(
-                value: 30,
-                groupValue: _inactivityDays,
-                onChanged: (value) {
-                  setState(() => _inactivityDays = value);
-                  setSheetState(() {});
-                },
-                title: const Text('Нет занятий 30+ дней'),
-              ),
-              RadioListTile<int?>(
-                value: 60,
-                groupValue: _inactivityDays,
-                onChanged: (value) {
-                  setState(() => _inactivityDays = value);
-                  setSheetState(() {});
-                },
-                title: const Text('Нет занятий 60+ дней'),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile<int?>(
+                      value: null,
+                      title: Text('Все'),
+                    ),
+                    RadioListTile<int?>(
+                      value: 7,
+                      title: Text('Нет занятий 7+ дней'),
+                    ),
+                    RadioListTile<int?>(
+                      value: 14,
+                      title: Text('Нет занятий 14+ дней'),
+                    ),
+                    RadioListTile<int?>(
+                      value: 30,
+                      title: Text('Нет занятий 30+ дней'),
+                    ),
+                    RadioListTile<int?>(
+                      value: 60,
+                      title: Text('Нет занятий 60+ дней'),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 8),
             ],
@@ -1258,7 +1245,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     }
 
                     return DropdownButtonFormField<InstitutionMember>(
-                      value: _selectedTeacher,
+                      initialValue: _selectedTeacher,
                       decoration: InputDecoration(
                         labelText: 'Преподаватель',
                         prefixIcon: const Icon(Icons.school_outlined),
@@ -1297,7 +1284,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     final activeSubjects = subjects.where((s) => s.archivedAt == null).toList();
 
                     return DropdownButtonFormField<Subject>(
-                      value: _selectedSubject,
+                      initialValue: _selectedSubject,
                       decoration: InputDecoration(
                         labelText: 'Направление',
                         prefixIcon: const Icon(Icons.category_outlined),

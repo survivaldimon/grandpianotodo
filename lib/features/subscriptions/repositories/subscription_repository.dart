@@ -305,7 +305,7 @@ class SubscriptionRepository {
       final current = await getById(subscriptionId);
 
       if (!current.isFrozen || current.frozenUntil == null) {
-        throw DatabaseException('Подписка не заморожена');
+        throw const DatabaseException('Подписка не заморожена');
       }
 
       // Вычисляем сколько дней была заморожена
@@ -366,7 +366,12 @@ class SubscriptionRepository {
 
   /// Стрим подписок студента (realtime)
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<List<Subscription>> watchByStudent(String studentId) async* {
+    // 1. Сразу выдаём текущие данные
+    yield await getByStudent(studentId);
+
+    // 2. Подписываемся на изменения
     await for (final _ in _client.from('subscriptions').stream(primaryKey: ['id'])) {
       // При любом изменении загружаем актуальные данные
       final subscriptions = await getByStudent(studentId);
@@ -494,7 +499,7 @@ class SubscriptionRepository {
   }) async {
     try {
       if (studentIds.length < 2) {
-        throw DatabaseException('Семейный абонемент требует минимум 2 ученика');
+        throw const DatabaseException('Семейный абонемент требует минимум 2 ученика');
       }
 
       // Создаём подписку с is_family = true
@@ -662,7 +667,7 @@ class SubscriptionRepository {
       // Проверяем что останется минимум 2 участника
       final members = await getFamilyMembers(subscriptionId);
       if (members.length <= 2) {
-        throw DatabaseException('В семейном абонементе должно быть минимум 2 участника');
+        throw const DatabaseException('В семейном абонементе должно быть минимум 2 участника');
       }
 
       await _client
@@ -676,8 +681,12 @@ class SubscriptionRepository {
   }
 
   /// Стрим подписок студента включая семейные (realtime)
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<List<Subscription>> watchByStudentIncludingFamily(String studentId) async* {
-    // Слушаем изменения в обеих таблицах
+    // 1. Сразу выдаём текущие данные
+    yield await getByStudentIncludingFamily(studentId);
+
+    // 2. Подписываемся на изменения в обеих таблицах
     await for (final _ in _client.from('subscriptions').stream(primaryKey: ['id'])) {
       final subscriptions = await getByStudentIncludingFamily(studentId);
       yield subscriptions;

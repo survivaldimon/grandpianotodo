@@ -3,6 +3,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
+import 'package:realtime_client/realtime_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Состояние соединения приложения
 /// Используем AppConnectionState чтобы избежать конфликта с Flutter ConnectionState
@@ -172,6 +174,14 @@ class ConnectionManager {
     _healthCheckTimer?.cancel();
     _healthCheckTimer = Timer.periodic(_healthCheckInterval, (_) async {
       if (_currentState == AppConnectionState.connected) {
+        // Проверяем состояние Realtime WebSocket
+        if (!_isRealtimeConnected()) {
+          debugPrint('[ConnectionManager] Health check: Realtime disconnected, reconnecting...');
+          await reconnectRealtime();
+          return;
+        }
+
+        // Проверяем доступность сервера
         final available = await _checkServerAvailability();
         if (!available) {
           _updateState(AppConnectionState.serverUnavailable);
@@ -220,8 +230,8 @@ class ConnectionManager {
     // Обновляем сессию Supabase
     _refreshSupabaseSession();
 
-    // Вызываем callback для переподключения
-    _onReconnectNeeded?.call();
+    // Явно переподключаем Realtime WebSocket (закрывает старые каналы и вызывает callback)
+    reconnectRealtime();
   }
 
   /// Обновление сессии Supabase
@@ -234,6 +244,43 @@ class ConnectionManager {
       }
     } catch (e) {
       debugPrint('[ConnectionManager] Session refresh failed: $e');
+    }
+  }
+
+  /// Проверка состояния Realtime соединения
+  bool _isRealtimeConnected() {
+    try {
+      final connState = SupabaseConfig.client.realtime.connState;
+      return connState == SocketStates.open;
+    } catch (e) {
+      debugPrint('[ConnectionManager] Error checking Realtime state: $e');
+      return false;
+    }
+  }
+
+  /// Принудительное переподключение Realtime WebSocket
+  /// Вызывается при возврате из фона и при восстановлении сети
+  Future<void> reconnectRealtime() async {
+    debugPrint('[ConnectionManager] Reconnecting Realtime WebSocket...');
+
+    try {
+      final client = SupabaseConfig.client;
+
+      // 1. Удаляем все существующие каналы (закрывает WebSocket соединения)
+      await client.removeAllChannels();
+      debugPrint('[ConnectionManager] All Realtime channels removed');
+
+      // 2. Небольшая задержка для очистки соединений
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // 3. Вызываем callback для пересоздания подписок через Riverpod
+      _onReconnectNeeded?.call();
+
+      debugPrint('[ConnectionManager] Realtime reconnect complete');
+    } catch (e) {
+      debugPrint('[ConnectionManager] Realtime reconnect error: $e');
+      // Всё равно вызываем callback чтобы обновить данные
+      _onReconnectNeeded?.call();
     }
   }
 

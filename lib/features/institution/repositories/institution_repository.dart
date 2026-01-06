@@ -12,7 +12,7 @@ class InstitutionRepository {
 
   /// Получить список заведений пользователя
   Future<List<Institution>> getMyInstitutions() async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final data = await _client
@@ -46,7 +46,12 @@ class InstitutionRepository {
   }
 
   /// Стрим заведения по ID (realtime)
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<Institution> watchById(String id) async* {
+    // 1. Сразу выдаём текущие данные
+    yield await getById(id);
+
+    // 2. Подписываемся на изменения
     await for (final _ in _client
         .from('institutions')
         .stream(primaryKey: ['id'])
@@ -57,7 +62,7 @@ class InstitutionRepository {
 
   /// Создать заведение
   Future<Institution> create(String name) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final data = await _client
@@ -116,7 +121,7 @@ class InstitutionRepository {
 
   /// Присоединиться к заведению по коду
   Future<Institution> joinByCode(String code) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       // Найти заведение по коду
@@ -128,7 +133,7 @@ class InstitutionRepository {
           .maybeSingle();
 
       if (institutionData == null) {
-        throw ValidationException('Заведение с таким кодом не найдено');
+        throw const ValidationException('Заведение с таким кодом не найдено');
       }
 
       final institution = Institution.fromJson(institutionData);
@@ -142,7 +147,7 @@ class InstitutionRepository {
           .maybeSingle();
 
       if (existingMember != null) {
-        throw ValidationException('Вы уже состоите в этом заведении');
+        throw const ValidationException('Вы уже состоите в этом заведении');
       }
 
       // Добавить как участника с базовыми правами
@@ -201,12 +206,17 @@ class InstitutionRepository {
 
   /// Стрим моего членства в заведении (realtime)
   /// Обновляется автоматически при изменении прав
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<InstitutionMember?> watchMyMembership(String institutionId) async* {
     if (_userId == null) {
       yield null;
       return;
     }
 
+    // 1. Сразу выдаём текущие данные
+    yield await getMyMembership(institutionId);
+
+    // 2. Подписываемся на изменения
     await for (final data in _client
         .from('institution_members')
         .stream(primaryKey: ['id'])
@@ -307,13 +317,13 @@ class InstitutionRepository {
 
   /// Архивировать заведение
   Future<void> archive(String id) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       // Проверить, что текущий пользователь - владелец
       final institution = await getById(id);
       if (institution.ownerId != _userId) {
-        throw ValidationException('Только владелец может удалить заведение');
+        throw const ValidationException('Только владелец может удалить заведение');
       }
 
       await _client
@@ -329,13 +339,13 @@ class InstitutionRepository {
 
   /// Покинуть заведение (для не-владельца)
   Future<void> leave(String institutionId) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       // Проверить, что пользователь не владелец
       final institution = await getById(institutionId);
       if (institution.ownerId == _userId) {
-        throw ValidationException('Владелец не может покинуть заведение. Удалите его или передайте права.');
+        throw const ValidationException('Владелец не может покинуть заведение. Удалите его или передайте права.');
       }
 
       await _client
@@ -352,7 +362,7 @@ class InstitutionRepository {
 
   /// Получить архивированные заведения пользователя
   Future<List<Institution>> getArchivedInstitutions() async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final data = await _client
@@ -371,7 +381,7 @@ class InstitutionRepository {
 
   /// Восстановить заведение из архива
   Future<void> restore(String id) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       // Проверить, что текущий пользователь - владелец
@@ -383,7 +393,7 @@ class InstitutionRepository {
 
       final institution = Institution.fromJson(data);
       if (institution.ownerId != _userId) {
-        throw ValidationException('Только владелец может восстановить заведение');
+        throw const ValidationException('Только владелец может восстановить заведение');
       }
 
       await _client
@@ -400,7 +410,7 @@ class InstitutionRepository {
   /// Передать права владельца другому участнику
   /// Использует RPC функцию с SECURITY DEFINER для обхода RLS
   Future<void> transferOwnership(String institutionId, String newOwnerUserId) async {
-    if (_userId == null) throw AuthAppException('Пользователь не авторизован');
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
 
     try {
       await _client.rpc('transfer_institution_ownership', params: {
@@ -410,11 +420,11 @@ class InstitutionRepository {
     } on PostgrestException catch (e) {
       // Преобразуем ошибки PostgreSQL в понятные пользователю
       if (e.message.contains('Только владелец')) {
-        throw ValidationException('Только владелец может передать права');
+        throw const ValidationException('Только владелец может передать права');
       } else if (e.message.contains('не является участником')) {
-        throw ValidationException('Пользователь не является участником заведения');
+        throw const ValidationException('Пользователь не является участником заведения');
       } else if (e.message.contains('не найдено')) {
-        throw ValidationException('Заведение не найдено');
+        throw const ValidationException('Заведение не найдено');
       }
       throw DatabaseException('Ошибка передачи прав владельца: $e');
     } catch (e) {

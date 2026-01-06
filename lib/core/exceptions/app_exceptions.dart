@@ -16,8 +16,7 @@ abstract class AppException implements Exception {
 
 /// Ошибка сети
 class NetworkException extends AppException {
-  const NetworkException([String message = AppStrings.networkError])
-      : super(message);
+  const NetworkException([super.message = AppStrings.networkError]);
 }
 
 /// Ошибка базы данных
@@ -59,14 +58,12 @@ class ValidationException extends AppException {
 
 /// Ошибка прав доступа
 class PermissionException extends AppException {
-  const PermissionException([String message = 'Недостаточно прав'])
-      : super(message);
+  const PermissionException([super.message = 'Недостаточно прав']);
 }
 
 /// Неизвестная ошибка
 class UnknownException extends AppException {
-  const UnknownException([String message = AppStrings.unknownError])
-      : super(message);
+  const UnknownException([super.message = AppStrings.unknownError]);
 
   @override
   String get userMessage => AppStrings.unknownError;

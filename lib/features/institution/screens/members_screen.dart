@@ -299,12 +299,12 @@ class _MemberTile extends ConsumerWidget {
                   ),
                 // Передача владения - только для владельца
                 if (isViewerOwner && canEditThisMember)
-                  PopupMenuItem(
+                  const PopupMenuItem(
                     value: 'transfer',
                     child: Row(
                       children: [
                         Icon(Icons.swap_horiz, size: 20, color: AppColors.warning),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         Text('Передать владение', style: TextStyle(color: AppColors.warning)),
                       ],
                     ),
@@ -494,9 +494,9 @@ class _MemberTile extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Вы собираетесь передать права владельца пользователю:',
-              style: const TextStyle(fontSize: 14),
+              style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
             Container(

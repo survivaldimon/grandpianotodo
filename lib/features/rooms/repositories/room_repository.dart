@@ -15,8 +15,8 @@ class RoomRepository {
           .select()
           .eq('institution_id', institutionId)
           .isFilter('archived_at', null)
-          .order('sort_order')
-          .order('name');
+          .order('sort_order', ascending: true)
+          .order('created_at', ascending: true);
 
       return (data as List).map((item) => Room.fromJson(item)).toList();
     } catch (e) {
@@ -44,16 +44,26 @@ class RoomRepository {
     required String institutionId,
     required String name,
     String? number,
-    int sortOrder = 0,
   }) async {
     try {
+      // Получаем максимальный sort_order для заведения
+      final maxSortOrder = await _client
+          .from('rooms')
+          .select('sort_order')
+          .eq('institution_id', institutionId)
+          .order('sort_order', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      final nextSortOrder = (maxSortOrder?['sort_order'] as int? ?? -1) + 1;
+
       final data = await _client
           .from('rooms')
           .insert({
             'institution_id': institutionId,
             'name': name,
             'number': number,
-            'sort_order': sortOrder,
+            'sort_order': nextSortOrder,
           })
           .select()
           .single();
@@ -124,16 +134,34 @@ class RoomRepository {
   }
 
   /// Стрим кабинетов (realtime)
-  Stream<List<Room>> watchByInstitution(String institutionId) {
-    return _client
+  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
+  Stream<List<Room>> watchByInstitution(String institutionId) async* {
+    // 1. Сразу выдаём текущие данные (отсортированные через getByInstitution)
+    yield await getByInstitution(institutionId);
+
+    // 2. Подписываемся на изменения
+    // ВАЖНО: Пропускаем первое событие (initial snapshot), т.к. уже выдали данные выше
+    bool isFirstEvent = true;
+    await for (final data in _client
         .from('rooms')
         .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)
-        .order('sort_order')
-        .map((data) => data
-            .where((item) => item['archived_at'] == null)
-            .map((item) => Room.fromJson(item))
-            .toList());
+        .eq('institution_id', institutionId)) {
+      if (isFirstEvent) {
+        isFirstEvent = false;
+        continue; // Пропускаем initial snapshot - данные уже загружены
+      }
+      // Фильтруем архивированные, парсим и СОРТИРУЕМ по дате создания
+      final rooms = data
+          .where((item) => item['archived_at'] == null)
+          .map((item) => Room.fromJson(item))
+          .toList()
+        ..sort((a, b) {
+          final sortCompare = a.sortOrder.compareTo(b.sortOrder);
+          if (sortCompare != 0) return sortCompare;
+          return a.createdAt.compareTo(b.createdAt);
+        });
+      yield rooms;
+    }
   }
 
   /// Изменить порядок кабинетов

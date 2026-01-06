@@ -367,7 +367,7 @@ class _GeneralTab extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // Занятия
-          _SectionTitle(title: 'Занятия'),
+          const _SectionTitle(title: 'Занятия'),
           _StatsGrid(
             items: [
               _StatItem(
@@ -399,7 +399,7 @@ class _GeneralTab extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // Финансы
-          _SectionTitle(title: 'Финансы'),
+          const _SectionTitle(title: 'Финансы'),
           Builder(
             builder: (context) {
               // Рассчитываем среднюю стоимость: точную (из subscription_id) или приблизительную
@@ -489,7 +489,7 @@ class _GeneralTab extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // Загруженность
-          _SectionTitle(title: 'Загруженность'),
+          const _SectionTitle(title: 'Загруженность'),
           _StatsGrid(
             items: [
               _StatItem(
@@ -510,7 +510,7 @@ class _GeneralTab extends ConsumerWidget {
           // Способы оплаты (если есть оплаты)
           if (stats.cashCount > 0 || stats.cardCount > 0) ...[
             const SizedBox(height: 24),
-            _SectionTitle(title: 'Способы оплаты'),
+            const _SectionTitle(title: 'Способы оплаты'),
             _StatsGrid(
               items: [
                 _StatItem(

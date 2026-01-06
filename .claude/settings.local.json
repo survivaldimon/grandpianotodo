@@ -48,7 +48,9 @@
       "Bash(/mnt/c/flutter/bin/flutter.bat analyze:*)",
       "Bash(findstr:*)",
       "Bash(xargs:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(/mnt/r/flutter/bin/flutter:*)"
     ]
   }
 }
