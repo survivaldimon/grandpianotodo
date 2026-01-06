@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
@@ -19,6 +20,7 @@ import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/subject.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/models/student_group.dart';
+import 'package:kabinet/features/students/widgets/merge_students_dialog.dart';
 
 // ============================================================================
 // ЛОКАЛЬНЫЕ ПРОВАЙДЕРЫ СВЯЗЕЙ ДЛЯ ФИЛЬТРАЦИИ
@@ -127,6 +129,10 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
   late TabController _tabController;
   int _currentTabIndex = 0;
 
+  // Режим множественного выбора для объединения
+  bool _isSelectionMode = false;
+  Set<String> _selectedStudentIds = {};
+
   // Расширенные фильтры
   Set<String> _selectedTeacherIds = {};
   Set<String> _selectedSubjectIds = {};
@@ -164,6 +170,56 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
     });
   }
 
+  void _enterSelectionMode(String studentId) {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedStudentIds = {studentId};
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedStudentIds = {};
+    });
+  }
+
+  void _toggleStudentSelection(String studentId) {
+    setState(() {
+      if (_selectedStudentIds.contains(studentId)) {
+        _selectedStudentIds.remove(studentId);
+        if (_selectedStudentIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedStudentIds.add(studentId);
+      }
+    });
+  }
+
+  Future<void> _mergeSelectedStudents(List<Student> allStudents) async {
+    final selectedStudents = allStudents
+        .where((s) => _selectedStudentIds.contains(s.id))
+        .toList();
+
+    if (selectedStudents.length < 2) return;
+
+    final newStudent = await MergeStudentsDialog.show(
+      context,
+      students: selectedStudents,
+      institutionId: widget.institutionId,
+      onMerged: () {
+        ref.invalidate(studentsProvider(widget.institutionId));
+      },
+    );
+
+    if (newStudent != null && mounted) {
+      _exitSelectionMode();
+      context.go('/institutions/${widget.institutionId}/students/${newStudent.id}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Проверяем права
@@ -198,25 +254,45 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.students),
+        leading: _isSelectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _exitSelectionMode,
+              )
+            : null,
+        title: _isSelectionMode
+            ? Text('Выбрано: ${_selectedStudentIds.length}')
+            : const Text(AppStrings.students),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: Search
-            },
-          ),
+          if (!_isSelectionMode)
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                // TODO: Search
+              },
+            ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Ученики', icon: Icon(Icons.person)),
-            Tab(text: 'Группы', icon: Icon(Icons.groups)),
-          ],
-        ),
+        bottom: _isSelectionMode
+            ? null
+            : TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'Ученики', icon: Icon(Icons.person)),
+                  Tab(text: 'Группы', icon: Icon(Icons.groups)),
+                ],
+              ),
       ),
-      floatingActionButton: _buildFab(canAddStudent),
-      body: TabBarView(
+      floatingActionButton: _buildFab(canAddStudent, studentsAsync.valueOrNull ?? []),
+      body: _isSelectionMode
+          ? _buildStudentsList(
+              studentsAsync,
+              teacherBindingsAsync,
+              subjectBindingsAsync,
+              groupBindingsAsync,
+              lastActivityAsync,
+              canManageAllStudents,
+            )
+          : TabBarView(
         controller: _tabController,
         children: [
           // ========== ВКЛАДКА УЧЕНИКОВ ==========
@@ -354,10 +430,22 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                         itemCount: filteredStudents.length,
                         itemBuilder: (context, index) {
                           final student = filteredStudents[index];
+                          final isSelected = _selectedStudentIds.contains(student.id);
                           return _StudentCard(
                             student: student,
+                            isSelectionMode: _isSelectionMode,
+                            isSelected: isSelected,
                             onTap: () {
-                              context.go('/institutions/${widget.institutionId}/students/${student.id}');
+                              if (_isSelectionMode) {
+                                _toggleStudentSelection(student.id);
+                              } else {
+                                context.go('/institutions/${widget.institutionId}/students/${student.id}');
+                              }
+                            },
+                            onLongPress: () {
+                              if (!_isSelectionMode && !student.isArchived) {
+                                _enterSelectionMode(student.id);
+                              }
                             },
                           );
                         },
@@ -850,8 +938,72 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
     );
   }
 
+  /// Список учеников для режима выбора
+  Widget _buildStudentsList(
+    AsyncValue<List<Student>> studentsAsync,
+    AsyncValue<Map<String, Set<String>>> teacherBindingsAsync,
+    AsyncValue<Map<String, Set<String>>> subjectBindingsAsync,
+    AsyncValue<Map<String, Set<String>>> groupBindingsAsync,
+    AsyncValue<Map<String, DateTime?>> lastActivityAsync,
+    bool canManageAllStudents,
+  ) {
+    final students = studentsAsync.valueOrNull;
+    if (students == null) {
+      return const LoadingIndicator();
+    }
+
+    final filteredStudents = _applyAdvancedFilters(
+      students,
+      teacherBindings: teacherBindingsAsync.valueOrNull ?? {},
+      subjectBindings: subjectBindingsAsync.valueOrNull ?? {},
+      groupBindings: groupBindingsAsync.valueOrNull ?? {},
+      lastActivityMap: lastActivityAsync.valueOrNull ?? {},
+    );
+
+    // Исключаем архивированных в режиме выбора
+    final selectableStudents = filteredStudents
+        .where((s) => s.archivedAt == null)
+        .toList();
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(filteredStudentsProvider(
+          StudentFilterParams(
+              institutionId: widget.institutionId,
+              onlyMyStudents: !canManageAllStudents),
+        ));
+      },
+      child: ListView.builder(
+        padding: AppSizes.paddingHorizontalM,
+        itemCount: selectableStudents.length,
+        itemBuilder: (context, index) {
+          final student = selectableStudents[index];
+          final isSelected = _selectedStudentIds.contains(student.id);
+          return _StudentCard(
+            student: student,
+            isSelectionMode: true,
+            isSelected: isSelected,
+            onTap: () => _toggleStudentSelection(student.id),
+            onLongPress: null,
+          );
+        },
+      ),
+    );
+  }
+
   /// FAB по контексту текущей вкладки
-  Widget? _buildFab(bool canAddStudent) {
+  Widget? _buildFab(bool canAddStudent, List<Student> allStudents) {
+    // В режиме выбора — кнопка объединения
+    if (_isSelectionMode) {
+      final canMerge = _selectedStudentIds.length >= 2;
+      return FloatingActionButton.extended(
+        onPressed: canMerge ? () => _mergeSelectedStudents(allStudents) : null,
+        backgroundColor: canMerge ? AppColors.primary : Theme.of(context).disabledColor,
+        icon: const Icon(Icons.merge),
+        label: Text('Объединить (${_selectedStudentIds.length})'),
+      );
+    }
+
     if (_currentTabIndex == 0) {
       // Вкладка Ученики
       if (!canAddStudent) return null;
@@ -1007,6 +1159,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _commentController = TextEditingController();
+  final _legacyBalanceController = TextEditingController();
 
   InstitutionMember? _selectedTeacher;
   Subject? _selectedSubject;
@@ -1019,6 +1172,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     _nameController.dispose();
     _phoneController.dispose();
     _commentController.dispose();
+    _legacyBalanceController.dispose();
     super.dispose();
   }
 
@@ -1029,11 +1183,13 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
     try {
       final controller = ref.read(studentControllerProvider.notifier);
+      final legacyBalance = int.tryParse(_legacyBalanceController.text.trim()) ?? 0;
       final student = await controller.create(
         institutionId: widget.institutionId,
         name: _nameController.text.trim(),
         phone: _phoneController.text.isEmpty ? null : _phoneController.text.trim(),
         comment: _commentController.text.isEmpty ? null : _commentController.text.trim(),
+        legacyBalance: legacyBalance,
       );
 
       if (student != null) {
@@ -1352,6 +1508,27 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                   ),
                   maxLines: 2,
                 ),
+                const SizedBox(height: 16),
+
+                // Остаток занятий (для переносимых учеников)
+                TextFormField(
+                  controller: _legacyBalanceController,
+                  decoration: InputDecoration(
+                    labelText: 'Остаток занятий',
+                    hintText: 'При переносе из другой школы',
+                    prefixIcon: const Icon(Icons.sync_alt_outlined),
+                    suffixText: 'занятий',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                    helperText: 'Списывается первым, не влияет на доход',
+                    helperMaxLines: 2,
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
                 const SizedBox(height: 28),
 
                 // Кнопки
@@ -1555,8 +1732,17 @@ class _GroupCard extends StatelessWidget {
 class _StudentCard extends StatelessWidget {
   final Student student;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final bool isSelectionMode;
+  final bool isSelected;
 
-  const _StudentCard({required this.student, required this.onTap});
+  const _StudentCard({
+    required this.student,
+    required this.onTap,
+    this.onLongPress,
+    this.isSelectionMode = false,
+    this.isSelected = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1564,35 +1750,80 @@ class _StudentCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: hasDebt
-              ? AppColors.error.withValues(alpha: 0.1)
-              : AppColors.primary.withValues(alpha: 0.1),
-          child: Icon(
-            Icons.person,
-            color: hasDebt ? AppColors.error : AppColors.primary,
+      color: isSelected
+          ? AppColors.primary.withValues(alpha: 0.1)
+          : null,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              // Чекбокс в режиме выбора
+              if (isSelectionMode) ...[
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (_) => onTap(),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              // Аватар
+              CircleAvatar(
+                backgroundColor: hasDebt
+                    ? AppColors.error.withValues(alpha: 0.1)
+                    : AppColors.primary.withValues(alpha: 0.1),
+                child: Icon(
+                  Icons.person,
+                  color: hasDebt ? AppColors.error : AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Информация
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      student.name,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          hasDebt ? Icons.warning_amber : Icons.school,
+                          size: 14,
+                          color: hasDebt
+                              ? AppColors.error
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${student.balance} занятий',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: hasDebt
+                                ? AppColors.error
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Стрелка только если не режим выбора
+              if (!isSelectionMode) const Icon(Icons.chevron_right),
+            ],
           ),
         ),
-        title: Text(student.name),
-        subtitle: Row(
-          children: [
-            Icon(
-              hasDebt ? Icons.warning_amber : Icons.school,
-              size: 14,
-              color: hasDebt ? AppColors.error : Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '${student.balance} занятий',
-              style: TextStyle(
-                color: hasDebt ? AppColors.error : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
       ),
     );
   }

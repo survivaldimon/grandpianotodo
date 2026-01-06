@@ -870,19 +870,40 @@ class StatisticsRepository {
   }
 
   /// Получить статистику занятий ученика (проведено/отменено)
+  /// Учитывает как индивидуальные занятия, так и групповые
   Future<({int completed, int cancelled})> getStudentLessonStats({
     required String studentId,
   }) async {
     try {
-      final data = await _client
+      // 1. Индивидуальные занятия (student_id в lessons)
+      final individualData = await _client
           .from('lessons')
           .select('status')
           .eq('student_id', studentId)
           .isFilter('archived_at', null);
 
-      final lessons = data as List;
-      final completed = lessons.where((l) => l['status'] == 'completed').length;
-      final cancelled = lessons.where((l) => l['status'] == 'cancelled').length;
+      final individualLessons = individualData as List;
+      int completed = individualLessons.where((l) => l['status'] == 'completed').length;
+      int cancelled = individualLessons.where((l) => l['status'] == 'cancelled').length;
+
+      // 2. Групповые занятия (через lesson_students)
+      final groupData = await _client
+          .from('lesson_students')
+          .select('attended, lessons(status, archived_at)')
+          .eq('student_id', studentId);
+
+      final groupLessons = groupData as List;
+      for (final ls in groupLessons) {
+        final lesson = ls['lessons'];
+        if (lesson == null || lesson['archived_at'] != null) continue;
+
+        final status = lesson['status'] as String?;
+        if (status == 'completed') {
+          completed++;
+        } else if (status == 'cancelled') {
+          cancelled++;
+        }
+      }
 
       return (completed: completed, cancelled: cancelled);
     } catch (e) {
@@ -951,6 +972,19 @@ class StatisticsRepository {
         ..sort((a, b) => b.completedCount.compareTo(a.completedCount));
     } catch (e) {
       throw DatabaseException('Ошибка загрузки статистики учеников: $e');
+    }
+  }
+
+  /// Realtime стрим статистики занятий ученика (проведено/отменено)
+  /// Обновляется при любых изменениях в таблице lessons
+  Stream<({int completed, int cancelled})> watchStudentLessonStats({
+    required String studentId,
+  }) async* {
+    // Подписываемся на изменения в таблице lessons
+    await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
+      // При любом изменении пересчитываем статистику
+      final stats = await getStudentLessonStats(studentId: studentId);
+      yield stats;
     }
   }
 }

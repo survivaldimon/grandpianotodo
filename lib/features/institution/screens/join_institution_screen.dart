@@ -47,7 +47,8 @@ class _JoinInstitutionScreenState extends ConsumerState<JoinInstitutionScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      context.go('/institutions/${institution.id}/dashboard');
+      // Редирект на онбординг (выбор цвета и направлений)
+      context.go('/institutions/${institution.id}/onboarding');
     }
   }
 

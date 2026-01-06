@@ -28,26 +28,30 @@ class StudentRepository {
 
       final data = await query.order('name');
 
-      // 2. Загружаем балансы из VIEW (учитывает семейные подписки)
+      // 2. Загружаем балансы из VIEW (учитывает семейные подписки и legacy_balance)
       final balancesData = await _client
           .from('student_subscription_summary')
-          .select('student_id, active_balance')
+          .select('student_id, active_balance, legacy_balance')
           .eq('institution_id', institutionId);
 
       // Создаём map для быстрого поиска баланса
-      final balanceMap = <String, int>{};
+      final balanceMap = <String, Map<String, int>>{};
       for (final b in balancesData as List) {
-        balanceMap[b['student_id'] as String] = (b['active_balance'] as num?)?.toInt() ?? 0;
+        balanceMap[b['student_id'] as String] = {
+          'active_balance': (b['active_balance'] as num?)?.toInt() ?? 0,
+          'legacy_balance': (b['legacy_balance'] as num?)?.toInt() ?? 0,
+        };
       }
 
       // 3. Объединяем данные
       return (data as List).map((item) {
         final studentId = item['id'] as String;
-        final activeBalance = balanceMap[studentId] ?? 0;
+        final balances = balanceMap[studentId];
 
         // Подменяем prepaid_lessons_count на актуальный баланс из VIEW
         final studentData = Map<String, dynamic>.from(item);
-        studentData['prepaid_lessons_count'] = activeBalance;
+        studentData['prepaid_lessons_count'] = balances?['active_balance'] ?? 0;
+        studentData['legacy_balance'] = balances?['legacy_balance'] ?? 0;
 
         return Student.fromJson(studentData);
       }).toList();
@@ -66,18 +70,20 @@ class StudentRepository {
           .eq('id', id)
           .single();
 
-      // 2. Загружаем баланс из VIEW (учитывает семейные подписки)
+      // 2. Загружаем баланс из VIEW (учитывает семейные подписки и legacy_balance)
       final balanceData = await _client
           .from('student_subscription_summary')
-          .select('active_balance')
+          .select('active_balance, legacy_balance')
           .eq('student_id', id)
           .maybeSingle();
 
       final activeBalance = (balanceData?['active_balance'] as num?)?.toInt() ?? 0;
+      final legacyBalance = (balanceData?['legacy_balance'] as num?)?.toInt() ?? 0;
 
-      // 3. Подменяем prepaid_lessons_count
+      // 3. Подменяем prepaid_lessons_count и legacy_balance
       final studentData = Map<String, dynamic>.from(data);
       studentData['prepaid_lessons_count'] = activeBalance;
+      studentData['legacy_balance'] = legacyBalance;
 
       return Student.fromJson(studentData);
     } catch (e) {
@@ -91,16 +97,24 @@ class StudentRepository {
     required String name,
     String? phone,
     String? comment,
+    int legacyBalance = 0,
   }) async {
     try {
+      final insertData = <String, dynamic>{
+        'institution_id': institutionId,
+        'name': name,
+        'phone': phone,
+        'comment': comment,
+      };
+
+      // Добавляем legacy_balance только если он > 0
+      if (legacyBalance > 0) {
+        insertData['legacy_balance'] = legacyBalance;
+      }
+
       final data = await _client
           .from('students')
-          .insert({
-            'institution_id': institutionId,
-            'name': name,
-            'phone': phone,
-            'comment': comment,
-          })
+          .insert(insertData)
           .select()
           .single();
 
@@ -116,12 +130,14 @@ class StudentRepository {
     String? name,
     String? phone,
     String? comment,
+    int? legacyBalance,
   }) async {
     try {
       final updates = <String, dynamic>{};
       if (name != null) updates['name'] = name;
       if (phone != null) updates['phone'] = phone;
       if (comment != null) updates['comment'] = comment;
+      if (legacyBalance != null) updates['legacy_balance'] = legacyBalance;
 
       final data = await _client
           .from('students')
@@ -216,6 +232,77 @@ class StudentRepository {
       } catch (e2) {
         throw DatabaseException('Ошибка возврата занятия: $e2');
       }
+    }
+  }
+
+  /// Списать занятие из остатка (legacy_balance)
+  /// Используется для переносимых учеников — списывается в первую очередь
+  Future<void> decrementLegacyBalance(String id) async {
+    try {
+      final data = await _client
+          .from('students')
+          .select('legacy_balance')
+          .eq('id', id)
+          .single();
+      final currentCount = (data['legacy_balance'] as num?)?.toInt() ?? 0;
+
+      if (currentCount > 0) {
+        await _client
+            .from('students')
+            .update({'legacy_balance': currentCount - 1})
+            .eq('id', id);
+      }
+    } catch (e) {
+      throw DatabaseException('Ошибка списания из остатка: $e');
+    }
+  }
+
+  /// Вернуть занятие в остаток (legacy_balance)
+  /// Используется при отмене занятия, списанного из остатка
+  Future<void> incrementLegacyBalance(String id) async {
+    try {
+      final data = await _client
+          .from('students')
+          .select('legacy_balance')
+          .eq('id', id)
+          .single();
+      final currentCount = (data['legacy_balance'] as num?)?.toInt() ?? 0;
+
+      await _client
+          .from('students')
+          .update({'legacy_balance': currentCount + 1})
+          .eq('id', id);
+    } catch (e) {
+      throw DatabaseException('Ошибка возврата в остаток: $e');
+    }
+  }
+
+  /// Получить текущий legacy_balance ученика
+  Future<int> getLegacyBalance(String id) async {
+    try {
+      final data = await _client
+          .from('students')
+          .select('legacy_balance')
+          .eq('id', id)
+          .single();
+      return (data['legacy_balance'] as num?)?.toInt() ?? 0;
+    } catch (e) {
+      throw DatabaseException('Ошибка получения остатка: $e');
+    }
+  }
+
+  /// Получить имена учеников по списку ID
+  /// Используется для отображения объединённых учеников
+  Future<List<String>> getNamesByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    try {
+      final data = await _client
+          .from('students')
+          .select('name')
+          .inFilter('id', ids);
+      return (data as List).map((e) => e['name'] as String).toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки имён учеников: $e');
     }
   }
 
@@ -357,6 +444,35 @@ class StudentRepository {
           .eq('student_id', studentId);
     } catch (e) {
       throw DatabaseException('Ошибка удаления из группы: $e');
+    }
+  }
+
+  /// Объединить несколько учеников в одного нового
+  /// Создаёт новую карточку, переносит все данные, архивирует исходных
+  Future<Student> mergeStudents({
+    required List<String> sourceIds,
+    required String institutionId,
+    required String newName,
+    String? newPhone,
+    String? newComment,
+  }) async {
+    try {
+      if (sourceIds.length < 2) {
+        throw DatabaseException('Нужно минимум 2 ученика для объединения');
+      }
+
+      final result = await _client.rpc('merge_students', params: {
+        'p_source_ids': sourceIds,
+        'p_institution_id': institutionId,
+        'p_new_name': newName,
+        'p_new_phone': newPhone,
+        'p_new_comment': newComment,
+      });
+
+      final newStudentId = result as String;
+      return getById(newStudentId);
+    } catch (e) {
+      throw DatabaseException('Ошибка объединения учеников: $e');
     }
   }
 }

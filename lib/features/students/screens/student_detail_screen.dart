@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
@@ -23,6 +24,7 @@ import 'package:kabinet/shared/models/payment_plan.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/subscription.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kabinet/features/students/widgets/merge_students_dialog.dart';
 
 /// Экран профиля ученика
 class StudentDetailScreen extends ConsumerWidget {
@@ -90,7 +92,7 @@ class StudentDetailScreen extends ConsumerWidget {
                     _showEditStudentDialog(context, ref, student);
                   },
                 ),
-              if (canArchive)
+              if (canArchive || canEditStudent)
                 PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'archive') {
@@ -99,41 +101,57 @@ class StudentDetailScreen extends ConsumerWidget {
                       _confirmRestore(context, ref, student);
                     } else if (value == 'delete') {
                       _confirmDeleteCompletely(context, ref, student);
+                    } else if (value == 'merge') {
+                      _showMergeWithDialog(context, ref, student);
                     }
                   },
                   itemBuilder: (context) => [
-                    if (student.isArchived) ...[
+                    // Объединить с... (только для неархивированных)
+                    if (!student.isArchived && canEditStudent)
                       const PopupMenuItem(
-                        value: 'restore',
+                        value: 'merge',
                         child: Row(
                           children: [
-                            Icon(Icons.unarchive, color: Colors.green),
+                            Icon(Icons.merge, color: AppColors.primary),
                             SizedBox(width: 8),
-                            Text('Разархивировать', style: TextStyle(color: Colors.green)),
+                            Text('Объединить с...'),
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_forever, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Удалить навсегда', style: TextStyle(color: Colors.red)),
-                          ],
+                    if (canArchive) ...[
+                      if (student.isArchived) ...[
+                        const PopupMenuItem(
+                          value: 'restore',
+                          child: Row(
+                            children: [
+                              Icon(Icons.unarchive, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text('Разархивировать', style: TextStyle(color: Colors.green)),
+                            ],
+                          ),
                         ),
-                      ),
-                    ] else
-                      const PopupMenuItem(
-                        value: 'archive',
-                        child: Row(
-                          children: [
-                            Icon(Icons.archive, color: Colors.orange),
-                            SizedBox(width: 8),
-                            Text('Архивировать', style: TextStyle(color: Colors.orange)),
-                          ],
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_forever, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Удалить навсегда', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
                         ),
-                      ),
+                      ] else
+                        const PopupMenuItem(
+                          value: 'archive',
+                          child: Row(
+                            children: [
+                              Icon(Icons.archive, color: Colors.orange),
+                              SizedBox(width: 8),
+                              Text('Архивировать', style: TextStyle(color: Colors.orange)),
+                            ],
+                          ),
+                        ),
+                    ],
                   ],
                 ),
             ],
@@ -143,6 +161,7 @@ class StudentDetailScreen extends ConsumerWidget {
               ref.invalidate(studentProvider(studentId));
               ref.invalidate(studentPaymentsProvider(studentId));
               ref.invalidate(allSubscriptionsStreamProvider(studentId));
+              ref.invalidate(studentLessonStatsProvider(studentId));
             },
             child: ListView(
               padding: AppSizes.paddingAllM,
@@ -184,6 +203,11 @@ class StudentDetailScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                ],
+                // Секция объединённых учеников (если есть)
+                if (student.isMerged) ...[
+                  _MergedStudentsCard(mergedFrom: student.mergedFrom!),
                   const SizedBox(height: 16),
                 ],
                 // Contact info
@@ -332,6 +356,9 @@ class StudentDetailScreen extends ConsumerWidget {
     final nameController = TextEditingController(text: student.name);
     final phoneController = TextEditingController(text: student.phone ?? '');
     final commentController = TextEditingController(text: student.comment ?? '');
+    final legacyBalanceController = TextEditingController(
+      text: student.legacyBalance > 0 ? student.legacyBalance.toString() : '',
+    );
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -361,6 +388,20 @@ class StudentDetailScreen extends ConsumerWidget {
                   decoration: const InputDecoration(labelText: 'Комментарий'),
                   maxLines: 3,
                 ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: legacyBalanceController,
+                  decoration: InputDecoration(
+                    labelText: 'Остаток занятий',
+                    hintText: 'При переносе из другой школы',
+                    prefixIcon: const Icon(Icons.sync_alt_outlined),
+                    suffixText: 'занятий',
+                    helperText: 'Списывается первым, не влияет на доход',
+                    helperMaxLines: 2,
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
               ],
             ),
           ),
@@ -374,12 +415,14 @@ class StudentDetailScreen extends ConsumerWidget {
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 final controller = ref.read(studentControllerProvider.notifier);
+                final legacyBalance = int.tryParse(legacyBalanceController.text.trim());
                 final success = await controller.update(
                   studentId,
                   institutionId: institutionId,
                   name: nameController.text.trim(),
                   phone: phoneController.text.isEmpty ? null : phoneController.text.trim(),
                   comment: commentController.text.isEmpty ? null : commentController.text.trim(),
+                  legacyBalance: legacyBalance,
                 );
                 if (success && context.mounted) {
                   Navigator.pop(context);
@@ -560,6 +603,35 @@ class StudentDetailScreen extends ConsumerWidget {
           ref.invalidate(studentProvider(studentId));
           ref.invalidate(studentPaymentsProvider(studentId));
           ref.invalidate(subscriptionsStreamProvider(studentId));
+        },
+      ),
+    );
+  }
+
+  /// Показать диалог выбора учеников для объединения
+  void _showMergeWithDialog(BuildContext context, WidgetRef ref, Student currentStudent) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (bottomSheetContext) => _SelectStudentsForMergeSheet(
+        institutionId: institutionId,
+        currentStudent: currentStudent,
+        onStudentsSelected: (selectedStudents) async {
+          Navigator.pop(bottomSheetContext);
+          // Показываем диалог объединения
+          final newStudent = await MergeStudentsDialog.show(
+            context,
+            students: [currentStudent, ...selectedStudents],
+            institutionId: institutionId,
+            onMerged: () {
+              ref.invalidate(studentsProvider(institutionId));
+            },
+          );
+          // Если создан новый ученик — переходим к нему
+          if (newStudent != null && context.mounted) {
+            context.go('/institutions/$institutionId/students/${newStudent.id}');
+          }
         },
       ),
     );
@@ -772,6 +844,37 @@ class _BalanceAndCostCard extends ConsumerWidget {
                               color: AppColors.textSecondary,
                             ),
                       ),
+                      // Разбивка баланса если есть legacy
+                      if (student.hasLegacyBalance) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'из абонементов: ${student.subscriptionBalance}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.sync_alt,
+                              size: 12,
+                              color: AppColors.warning,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'из остатка: ${student.legacyBalance}',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.warning,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -882,7 +985,7 @@ class _LessonStatsCard extends ConsumerWidget {
 
     return statsAsync.when(
       loading: () => Card(
-        color: Colors.grey[100],
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         child: const Padding(
           padding: EdgeInsets.all(16),
           child: Center(
@@ -2510,6 +2613,313 @@ class _LessonTypesSection extends ConsumerWidget {
               }
             },
             child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Sheet для выбора учеников для объединения
+class _SelectStudentsForMergeSheet extends ConsumerStatefulWidget {
+  final String institutionId;
+  final Student currentStudent;
+  final void Function(List<Student>) onStudentsSelected;
+
+  const _SelectStudentsForMergeSheet({
+    required this.institutionId,
+    required this.currentStudent,
+    required this.onStudentsSelected,
+  });
+
+  @override
+  ConsumerState<_SelectStudentsForMergeSheet> createState() =>
+      _SelectStudentsForMergeSheetState();
+}
+
+class _SelectStudentsForMergeSheetState
+    extends ConsumerState<_SelectStudentsForMergeSheet> {
+  final Set<String> _selectedIds = {};
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+    final theme = Theme.of(context);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // Title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Icon(Icons.merge, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Объединить с...',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Выберите учеников для объединения с "${widget.currentStudent.name}"',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+
+            // Search
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Поиск учеников...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerLow,
+                ),
+                onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
+              ),
+            ),
+
+            // Student list
+            Expanded(
+              child: studentsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => ErrorView.inline(e),
+                data: (students) {
+                  // Фильтруем: исключаем текущего ученика и архивированных
+                  var filtered = students
+                      .where((s) =>
+                          s.id != widget.currentStudent.id && s.archivedAt == null)
+                      .toList();
+
+                  // Поиск
+                  if (_searchQuery.isNotEmpty) {
+                    filtered = filtered
+                        .where((s) => s.name.toLowerCase().contains(_searchQuery))
+                        .toList();
+                  }
+
+                  if (filtered.isEmpty) {
+                    return const Center(
+                      child: Text('Нет учеников для объединения'),
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: scrollController,
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final student = filtered[index];
+                      final isSelected = _selectedIds.contains(student.id);
+
+                      return CheckboxListTile(
+                        value: isSelected,
+                        onChanged: (value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedIds.add(student.id);
+                            } else {
+                              _selectedIds.remove(student.id);
+                            }
+                          });
+                        },
+                        secondary: CircleAvatar(
+                          backgroundColor: theme.colorScheme.primaryContainer,
+                          child: Text(
+                            student.name.isNotEmpty
+                                ? student.name[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              color: theme.colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        title: Text(student.name),
+                        subtitle: Row(
+                          children: [
+                            Text(
+                              'Баланс: ${student.balance}',
+                              style: TextStyle(
+                                color: student.hasDebt
+                                    ? AppColors.error
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            if (student.phone != null) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                '• ${student.phone}',
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+
+            // Actions
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Отмена'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton.icon(
+                        onPressed: _selectedIds.isEmpty
+                            ? null
+                            : () {
+                                final selectedStudents = ref
+                                    .read(studentsProvider(widget.institutionId))
+                                    .valueOrNull
+                                    ?.where((s) => _selectedIds.contains(s.id))
+                                    .toList() ?? [];
+                                widget.onStudentsSelected(selectedStudents);
+                              },
+                        icon: const Icon(Icons.arrow_forward),
+                        label: Text(
+                          _selectedIds.isEmpty
+                              ? 'Выберите учеников'
+                              : 'Далее (${_selectedIds.length})',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Карточка с именами объединённых учеников
+class _MergedStudentsCard extends ConsumerWidget {
+  final List<String> mergedFrom;
+
+  const _MergedStudentsCard({required this.mergedFrom});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final namesAsync = ref.watch(mergedStudentNamesProvider(mergedFrom));
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.merge, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Групповая карточка',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          namesAsync.when(
+            loading: () => const SizedBox(
+              height: 24,
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            error: (_, __) => Text(
+              'Не удалось загрузить имена',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+            data: (names) => Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: names.map((name) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  name,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              )).toList(),
+            ),
           ),
         ],
       ),

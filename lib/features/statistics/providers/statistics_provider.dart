@@ -182,11 +182,12 @@ final studentAvgCostProvider =
   return repo.getStudentAvgLessonCost(studentId: studentId);
 });
 
-/// Провайдер статистики занятий ученика (проведено/отменено)
+/// Провайдер статистики занятий ученика (проведено/отменено) — Realtime
+/// Обновляется автоматически при изменении занятий у всех пользователей
 final studentLessonStatsProvider =
-    FutureProvider.family<({int completed, int cancelled}), String>((ref, studentId) async {
+    StreamProvider.family<({int completed, int cancelled}), String>((ref, studentId) {
   final repo = ref.watch(statisticsRepositoryProvider);
-  return repo.getStudentLessonStats(studentId: studentId);
+  return repo.watchStudentLessonStats(studentId: studentId);
 });
 
 /// Провайдер статистики занятий всех учеников заведения

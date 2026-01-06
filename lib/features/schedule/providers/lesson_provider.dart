@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/schedule/repositories/lesson_repository.dart';
+import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/students/repositories/student_repository.dart';
 import 'package:kabinet/features/subscriptions/repositories/subscription_repository.dart';
@@ -346,57 +347,110 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       // Получаем занятие, чтобы узнать studentId и участников
       final lesson = await _repo.getById(id);
 
+      // Занятие уже было списано если статус completed ИЛИ cancelled
+      // При переключении cancelled → completed НЕ списываем повторно
+      final alreadyDeducted = lesson.status == LessonStatus.completed ||
+                              lesson.status == LessonStatus.cancelled;
+
+      // Защита от повторного списания: если занятие уже проведено — не списываем
+      if (lesson.status == LessonStatus.completed) {
+        _invalidateForRoom(roomId, date, institutionId: institutionId);
+        _ref.invalidate(lessonProvider(id));
+        // Инвалидируем статистику даже при раннем возврате
+        if (lesson.studentId != null) {
+          _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+        } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+          for (final ls in lesson.lessonStudents!) {
+            _ref.invalidate(studentLessonStatsProvider(ls.studentId));
+          }
+        }
+        state = const AsyncValue.data(null);
+        return true;
+      }
+
       await _repo.complete(id);
 
-      // Списываем занятие с абонемента и привязываем к подписке
-      // Ошибка списания НЕ должна влиять на успешное изменение статуса
-      if (lesson.studentId != null) {
-        // Индивидуальное занятие
-        try {
-          final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
-
-          if (subscriptionId != null) {
-            // Привязываем занятие к подписке для расчёта стоимости
-            await _repo.setSubscriptionId(id, subscriptionId);
-          } else {
-            // Нет активной подписки — списываем напрямую (уход в долг)
-            await _studentRepo.decrementPrepaidCount(lesson.studentId!);
-          }
-        } catch (e) {
-          // Не критичная ошибка - занятие проведено, но подписка/долг не списаны
-          debugPrint('Error deducting subscription/debt: $e');
-        }
-      } else if (lesson.groupId != null && lesson.lessonStudents != null) {
-        // Групповое занятие — списываем у каждого присутствовавшего
-        for (final lessonStudent in lesson.lessonStudents!) {
-          if (!lessonStudent.attended) continue; // Пропускаем отсутствующих
-
+      // Списываем занятие ТОЛЬКО если статус БЫЛ scheduled (ещё не списано)
+      // При переключении cancelled → completed уже было списано при cancel()
+      if (!alreadyDeducted) {
+        // Списываем занятие с абонемента и привязываем к подписке
+        // Ошибка списания НЕ должна влиять на успешное изменение статуса
+        if (lesson.studentId != null) {
+          // Индивидуальное занятие
           try {
-            final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lessonStudent.studentId);
+            // Приоритет списания: 1) legacy_balance, 2) subscription, 3) долг
+            final student = await _studentRepo.getById(lesson.studentId!);
 
-            if (subscriptionId != null) {
-              // Сохраняем subscription_id в lesson_students для корректного возврата
-              await _repo.setLessonStudentSubscriptionId(
-                id,
-                lessonStudent.studentId,
-                subscriptionId,
-              );
+            if (student.legacyBalance > 0) {
+              // Списываем из остатка (legacy_balance) в первую очередь
+              await _studentRepo.decrementLegacyBalance(lesson.studentId!);
+              // subscriptionId остаётся null — не привязано к подписке
             } else {
-              // Нет активной подписки — списываем напрямую (уход в долг)
-              await _studentRepo.decrementPrepaidCount(lessonStudent.studentId);
+              // Пробуем списать с подписки
+              final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
+
+              if (subscriptionId != null) {
+                // Привязываем занятие к подписке для расчёта стоимости
+                await _repo.setSubscriptionId(id, subscriptionId);
+              } else {
+                // Нет активной подписки — списываем напрямую (уход в долг)
+                await _studentRepo.decrementPrepaidCount(lesson.studentId!);
+              }
             }
           } catch (e) {
-            debugPrint('Error deducting for student ${lessonStudent.studentId}: $e');
+            // Не критичная ошибка - занятие проведено, но подписка/долг не списаны
           }
+        } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+          // Групповое занятие — списываем у каждого присутствовавшего
+          for (final lessonStudent in lesson.lessonStudents!) {
+            if (!lessonStudent.attended) continue;
+
+            try {
+              // Приоритет списания: 1) legacy_balance, 2) subscription, 3) долг
+              final student = await _studentRepo.getById(lessonStudent.studentId);
+
+              if (student.legacyBalance > 0) {
+                // Списываем из остатка (legacy_balance) в первую очередь
+                await _studentRepo.decrementLegacyBalance(lessonStudent.studentId);
+                // subscriptionId остаётся null — не привязано к подписке
+              } else {
+                final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lessonStudent.studentId);
+
+                if (subscriptionId != null) {
+                  // Сохраняем subscription_id в lesson_students для корректного возврата
+                  await _repo.setLessonStudentSubscriptionId(
+                    id,
+                    lessonStudent.studentId,
+                    subscriptionId,
+                  );
+                } else {
+                  // Нет активной подписки — списываем напрямую (уход в долг)
+                  await _studentRepo.decrementPrepaidCount(lessonStudent.studentId);
+                }
+              }
+            } catch (e) {
+              // Пропускаем ошибку для конкретного студента
+            }
+          }
+          // Инвалидируем группы для обновления баланса в меню
+          _ref.invalidate(studentGroupsProvider(institutionId));
         }
-        // Инвалидируем группы для обновления баланса в меню
-        _ref.invalidate(studentGroupsProvider(institutionId));
       }
 
       _invalidateForRoom(roomId, date, institutionId: institutionId);
       _ref.invalidate(lessonProvider(id));
       // Гибридный Realtime: обновляем список учеников для актуального баланса
       _ref.invalidate(studentsProvider(institutionId));
+
+      // Инвалидируем статистику занятий ученика (проведено/отменено)
+      if (lesson.studentId != null) {
+        _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+      } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+        for (final ls in lesson.lessonStudents!) {
+          _ref.invalidate(studentLessonStatsProvider(ls.studentId));
+        }
+      }
+
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -411,6 +465,15 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       // Получаем занятие, чтобы узнать studentId, subscriptionId и участников
       final lesson = await _repo.getById(id);
 
+      // Если уже scheduled — ничего не делаем
+      if (lesson.status == LessonStatus.scheduled) {
+        _invalidateForRoom(roomId, date, institutionId: institutionId);
+        _ref.invalidate(lessonProvider(id));
+        state = const AsyncValue.data(null);
+        return true;
+      }
+
+      // Было cancelled или completed — меняем статус И возвращаем занятие на абонемент
       await _repo.uncomplete(id);
 
       // Возвращаем занятие на абонемент или уменьшаем долг
@@ -434,9 +497,15 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
           debugPrint('Error returning subscription/debt: $e');
         }
       } else if (lesson.groupId != null && lesson.lessonStudents != null) {
-        // Групповое занятие — возвращаем занятие каждому присутствовавшему
+        // Групповое занятие — возвращаем занятие участникам
+        // Если было completed — только присутствовавшим
+        // Если было cancelled — всем участникам (т.к. списывали со всех)
+        final wasCancelled = lesson.status == LessonStatus.cancelled;
+
         for (final lessonStudent in lesson.lessonStudents!) {
-          if (!lessonStudent.attended) continue; // Возвращаем только присутствовавшим
+          // Для completed возвращаем только присутствовавшим
+          // Для cancelled возвращаем всем
+          if (!wasCancelled && !lessonStudent.attended) continue;
 
           try {
             if (lessonStudent.subscriptionId != null) {
@@ -465,6 +534,16 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       _ref.invalidate(lessonProvider(id));
       // Гибридный Realtime: обновляем список учеников для актуального баланса
       _ref.invalidate(studentsProvider(institutionId));
+
+      // Инвалидируем статистику занятий ученика (проведено/отменено)
+      if (lesson.studentId != null) {
+        _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+      } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+        for (final ls in lesson.lessonStudents!) {
+          _ref.invalidate(studentLessonStatsProvider(ls.studentId));
+        }
+      }
+
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -476,11 +555,104 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   Future<bool> cancel(String id, String roomId, DateTime date, String institutionId) async {
     state = const AsyncValue.loading();
     try {
+      final lesson = await _repo.getById(id);
+
+      // Занятие уже было списано если статус completed ИЛИ cancelled
+      // При переключении completed → cancelled НЕ списываем повторно
+      final alreadyDeducted = lesson.status == LessonStatus.completed ||
+                              lesson.status == LessonStatus.cancelled;
+
+      // Защита от повторного списания: если занятие уже отменено — не списываем
+      if (lesson.status == LessonStatus.cancelled) {
+        _invalidateForRoom(roomId, date, institutionId: institutionId);
+        _ref.invalidate(lessonProvider(id));
+        // Инвалидируем статистику даже при раннем возврате
+        if (lesson.studentId != null) {
+          _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+        } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+          for (final ls in lesson.lessonStudents!) {
+            _ref.invalidate(studentLessonStatsProvider(ls.studentId));
+          }
+        }
+        state = const AsyncValue.data(null);
+        return true;
+      }
+
       await _repo.cancel(id);
-      // При отмене занятие НЕ списывается с абонемента
-      // (занятие не было проведено)
+
+      // Списываем занятие ТОЛЬКО если статус БЫЛ scheduled (ещё не списано)
+      // При переключении completed → cancelled уже было списано при complete()
+      if (!alreadyDeducted) {
+        if (lesson.studentId != null) {
+          // Индивидуальное занятие
+          try {
+            // Приоритет списания: 1) legacy_balance, 2) subscription, 3) долг
+            final student = await _studentRepo.getById(lesson.studentId!);
+
+            if (student.legacyBalance > 0) {
+              // Списываем из остатка (legacy_balance) в первую очередь
+              await _studentRepo.decrementLegacyBalance(lesson.studentId!);
+              // subscriptionId остаётся null — не привязано к подписке
+            } else {
+              final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
+
+              if (subscriptionId != null) {
+                // Привязываем занятие к подписке для корректного возврата
+                await _repo.setSubscriptionId(id, subscriptionId);
+              } else {
+                // Нет активной подписки — списываем напрямую (уход в долг)
+                await _studentRepo.decrementPrepaidCount(lesson.studentId!);
+              }
+            }
+          } catch (e) {
+            // Не критичная ошибка
+          }
+        } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+          // Групповое занятие — списываем у каждого участника
+          for (final lessonStudent in lesson.lessonStudents!) {
+            // Для отменённых занятий списываем у ВСЕХ участников (не только attended)
+            try {
+              // Приоритет списания: 1) legacy_balance, 2) subscription, 3) долг
+              final student = await _studentRepo.getById(lessonStudent.studentId);
+
+              if (student.legacyBalance > 0) {
+                // Списываем из остатка (legacy_balance) в первую очередь
+                await _studentRepo.decrementLegacyBalance(lessonStudent.studentId);
+                // subscriptionId остаётся null
+              } else {
+                final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lessonStudent.studentId);
+
+                if (subscriptionId != null) {
+                  await _repo.setLessonStudentSubscriptionId(
+                    id,
+                    lessonStudent.studentId,
+                    subscriptionId,
+                  );
+                } else {
+                  await _studentRepo.decrementPrepaidCount(lessonStudent.studentId);
+                }
+              }
+            } catch (e) {
+              // Пропускаем ошибку для конкретного студента
+            }
+          }
+          _ref.invalidate(studentGroupsProvider(institutionId));
+        }
+      }
+
       _invalidateForRoom(roomId, date, institutionId: institutionId);
       _ref.invalidate(lessonProvider(id));
+      _ref.invalidate(studentsProvider(institutionId));
+
+      // Инвалидируем статистику занятий ученика
+      if (lesson.studentId != null) {
+        _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+      } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+        for (final ls in lesson.lessonStudents!) {
+          _ref.invalidate(studentLessonStatsProvider(ls.studentId));
+        }
+      }
+
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -690,9 +862,14 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   void _invalidateForRoom(String roomId, DateTime date, {String? institutionId}) {
     _ref.invalidate(lessonsByRoomProvider(RoomDateParams(roomId, date)));
 
-    // Инвалидируем недельный провайдер для realtime обновления
+    // Гибридный Realtime: инвалидируем провайдеры для надёжного обновления
     if (institutionId != null) {
-      // Вычисляем начало недели для даты
+      // Дневной режим
+      _ref.invalidate(lessonsByInstitutionStreamProvider(
+        InstitutionDateParams(institutionId, date),
+      ));
+
+      // Недельный режим
       final weekStart = date.subtract(Duration(days: date.weekday - 1));
       final normalizedWeekStart = DateTime(weekStart.year, weekStart.month, weekStart.day);
       _ref.invalidate(lessonsByInstitutionWeekProvider(

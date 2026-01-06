@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
@@ -203,16 +204,40 @@ class SubscriptionRepository {
     }
   }
 
-  /// Внутренний метод для списания занятия
+  /// Внутренний метод для списания занятия (атомарный UPDATE)
   Future<Subscription> _deductFromSubscription(Subscription subscription) async {
-    final updated = await _client
-        .from('subscriptions')
-        .update({'lessons_remaining': subscription.lessonsRemaining - 1})
-        .eq('id', subscription.id)
-        .select('*')
-        .single();
+    debugPrint('[DEDUCT] Starting deduction from subscription ${subscription.id}');
+    debugPrint('[DEDUCT] BEFORE: lessons_remaining = ${subscription.lessonsRemaining}');
 
-    return Subscription.fromJson(updated);
+    // Используем RPC для атомарного обновления: lessons_remaining = lessons_remaining - 1
+    // Это предотвращает race conditions при одновременных запросах
+    try {
+      final updated = await _client.rpc(
+        'deduct_subscription_lesson',
+        params: {'p_subscription_id': subscription.id},
+      );
+
+      if (updated == null) {
+        throw DatabaseException('Подписка не найдена');
+      }
+
+      final result = Subscription.fromJson(updated as Map<String, dynamic>);
+      debugPrint('[DEDUCT] RPC SUCCESS: lessons_remaining = ${result.lessonsRemaining}');
+      return result;
+    } catch (e) {
+      // Fallback на прямой UPDATE если функция не существует
+      debugPrint('[DEDUCT] RPC failed, using fallback: $e');
+      final updated = await _client
+          .from('subscriptions')
+          .update({'lessons_remaining': subscription.lessonsRemaining - 1})
+          .eq('id', subscription.id)
+          .select('*')
+          .single();
+
+      final result = Subscription.fromJson(updated);
+      debugPrint('[DEDUCT] FALLBACK: lessons_remaining = ${result.lessonsRemaining}');
+      return result;
+    }
   }
 
   /// Списать занятие и вернуть ID подписки для привязки к занятию

@@ -267,10 +267,15 @@ class InstitutionRepository {
   /// Обновить цвет участника
   Future<void> updateMemberColor(String memberId, String? color) async {
     try {
-      await _client
+      final result = await _client
           .from('institution_members')
           .update({'color': color})
-          .eq('id', memberId);
+          .eq('id', memberId)
+          .select();
+
+      if ((result as List).isEmpty) {
+        throw DatabaseException('Не удалось обновить цвет (RLS или запись не найдена)');
+      }
     } catch (e) {
       throw DatabaseException('Ошибка обновления цвета: $e');
     }

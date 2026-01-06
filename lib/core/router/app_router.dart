@@ -25,6 +25,7 @@ import 'package:kabinet/features/lesson_types/screens/lesson_types_screen.dart';
 import 'package:kabinet/features/payment_plans/screens/payment_plans_screen.dart';
 import 'package:kabinet/features/subjects/screens/subjects_screen.dart';
 import 'package:kabinet/features/profile/screens/profile_screen.dart';
+import 'package:kabinet/features/institution/screens/teacher_onboarding_screen.dart';
 
 /// Провайдер роутера
 final routerProvider = Provider<GoRouter>((ref) {
@@ -94,6 +95,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/join/:code',
         builder: (context, state) => JoinInstitutionScreen(
           code: state.pathParameters['code'],
+        ),
+      ),
+
+      // Teacher Onboarding (вне ShellRoute — полноэкранный flow)
+      GoRoute(
+        path: '/institutions/:institutionId/onboarding',
+        builder: (context, state) => TeacherOnboardingScreen(
+          institutionId: state.pathParameters['institutionId']!,
         ),
       ),
 

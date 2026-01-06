@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
+import 'package:kabinet/features/institution/providers/institution_provider.dart';
+import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
 import 'package:kabinet/features/institution/repositories/institution_repository.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 
@@ -99,8 +101,12 @@ class MemberController extends StateNotifier<AsyncValue<void>> {
   Future<bool> updateColor(String memberId, String institutionId, String? color) async {
     state = const AsyncValue.loading();
     try {
-      await _repo.updateMemberColor(memberId, color);
+      // Убираем # если есть (в базе хранится без #)
+      final cleanColor = color?.replaceAll('#', '').toUpperCase();
+      await _repo.updateMemberColor(memberId, cleanColor);
       _ref.invalidate(membersProvider(institutionId));
+      _ref.invalidate(membersStreamProvider(institutionId));
+      _ref.invalidate(myMembershipProvider(institutionId));
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -114,4 +120,36 @@ class MemberController extends StateNotifier<AsyncValue<void>> {
 final memberControllerProvider =
     StateNotifierProvider<MemberController, AsyncValue<void>>((ref) {
   return MemberController(InstitutionRepository(), ref);
+});
+
+/// Провайдер проверки необходимости онбординга
+/// Возвращает true если преподавателю нужно заполнить цвет или направления
+/// Возвращает false пока данные загружаются (чтобы баннер не мелькал)
+final needsOnboardingProvider = Provider.family<bool, String>((ref, institutionId) {
+  final membershipAsync = ref.watch(myMembershipProvider(institutionId));
+  final membership = membershipAsync.valueOrNull;
+
+  // Пока membership загружается — не показываем баннер
+  if (membership == null) return false;
+
+  // Владельцу онбординг не нужен
+  final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+  final institution = ref.watch(currentInstitutionProvider(institutionId)).valueOrNull;
+  final isOwner = institution != null && institution.ownerId == currentUserId;
+  if (isOwner) return false;
+
+  // Проверяем наличие цвета
+  final hasColor = membership.color != null && membership.color!.isNotEmpty;
+
+  // Проверяем наличие направлений (предметов)
+  final subjectsAsync = ref.watch(teacherSubjectsProvider(
+    TeacherSubjectsParams(userId: membership.userId, institutionId: institutionId),
+  ));
+
+  // Пока subjects загружаются — не показываем баннер (избегаем мелькания)
+  if (subjectsAsync.isLoading && !subjectsAsync.hasValue) return false;
+
+  final hasSubjects = (subjectsAsync.valueOrNull?.length ?? 0) > 0;
+
+  return !hasColor || !hasSubjects;
 });

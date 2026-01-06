@@ -125,6 +125,12 @@
   - Кнопка "Оплатить" для групповых занятий
   - Исправление двойного списания при повторном "Проведено"
   - **ВНИМАНИЕ:** Много недочётов и багов, требуется доработка
+- **`SESSION_2026_01_06_TEACHER_ONBOARDING.md`** — онбординг преподавателя:
+  - Экран онбординга при присоединении по коду (PageView: цвет + направления)
+  - Баннер на Dashboard если онбординг не завершён
+  - Редактирование направлений в настройках участника
+  - Исправление RLS для обновления цвета
+  - Realtime обновления для institution_members
 
 ## Валюта
 
@@ -1178,6 +1184,63 @@ void _preloadAdjacentDates() {
 **Файлы:**
 - `lib/core/widgets/shimmer_loading.dart` — shimmer-компоненты
 - `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — интеграция
+
+### 41. Онбординг преподавателя
+При присоединении к заведению по коду приглашения преподавателю показывается онбординг.
+
+**Два шага онбординга:**
+1. **Выбор цвета** — для отображения занятий в расписании
+2. **Выбор направлений** — чекбоксы с предметами заведения (множественный выбор)
+
+**Особенности:**
+- Каждый шаг можно пропустить кнопкой "Пропустить"
+- Сохраняются только изменения (не дублируются существующие данные)
+- Владельцу онбординг не показывается
+
+**Баннер на Dashboard:**
+Если преподаватель не заполнил цвет или направления — показывается баннер:
+```dart
+// Проверка необходимости онбординга
+final needsOnboardingProvider = Provider.family<bool, String>((ref, institutionId) {
+  final membership = ref.watch(myMembershipProvider(institutionId)).valueOrNull;
+  if (membership == null) return false;  // Не мелькать пока грузится
+
+  // Владельцу онбординг не нужен
+  final isOwner = institution.ownerId == currentUserId;
+  if (isOwner) return false;
+
+  final hasColor = membership.color != null && membership.color!.isNotEmpty;
+  final hasSubjects = (teacherSubjects.valueOrNull?.length ?? 0) > 0;
+
+  return !hasColor || !hasSubjects;
+});
+```
+
+**Редактирование направлений в настройках:**
+Участники → меню (⋮) → "Направления" — позволяет изменить привязанные предметы.
+
+**Хранение цвета:**
+- В базе хранится **без `#`** (например `3F51B5`)
+- При сохранении очищается: `color?.replaceAll('#', '').toUpperCase()`
+
+**Файлы:**
+- `lib/features/institution/screens/teacher_onboarding_screen.dart` — экран онбординга
+- `lib/features/institution/screens/members_screen.dart` — диалог направлений
+- `lib/features/institution/providers/member_provider.dart` — `needsOnboardingProvider`
+- `lib/features/dashboard/screens/dashboard_screen.dart` — баннер онбординга
+
+**RLS политика (выполнить в Supabase):**
+```sql
+-- Разрешить участникам обновлять свой цвет
+CREATE POLICY "Members can update own color"
+ON institution_members
+FOR UPDATE
+USING (user_id = auth.uid())
+WITH CHECK (user_id = auth.uid());
+
+-- Realtime для обновлений цвета/направлений
+ALTER PUBLICATION supabase_realtime ADD TABLE institution_members;
+```
 
 ## CI/CD
 

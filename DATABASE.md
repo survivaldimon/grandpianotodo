@@ -623,6 +623,29 @@ CREATE POLICY "Admins can update institution"
   USING (has_permission(id, 'manage_institution') OR owner_id = auth.uid());
 ```
 
+### Политики для institution_members
+
+```sql
+-- Чтение: члены заведения
+CREATE POLICY "Members can view members"
+  ON institution_members FOR SELECT
+  USING (is_member_of(institution_id));
+
+-- Обновление своей записи (цвет, направления)
+CREATE POLICY "Members can update own color"
+  ON institution_members FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- Обновление других: владелец или админ
+CREATE POLICY "Admins can update members"
+  ON institution_members FOR UPDATE
+  USING (
+    has_permission(institution_id, 'manage_members') OR
+    EXISTS (SELECT 1 FROM institutions WHERE id = institution_id AND owner_id = auth.uid())
+  );
+```
+
 ### Политики для rooms
 
 ```sql
@@ -756,40 +779,14 @@ CREATE TRIGGER log_lesson_changes_trigger
 
 ### Списание предоплаченных занятий
 
-```sql
-CREATE OR REPLACE FUNCTION handle_lesson_completion()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- При завершении или отмене занятия списываем предоплату
-  IF NEW.status IN ('completed', 'cancelled') AND OLD.status = 'scheduled' THEN
-    -- Для индивидуального занятия
-    IF NEW.student_id IS NOT NULL THEN
-      UPDATE students
-      SET prepaid_lessons_count = prepaid_lessons_count - 1
-      WHERE id = NEW.student_id;
-    END IF;
-
-    -- Для группового занятия — списываем у всех присутствовавших
-    IF NEW.group_id IS NOT NULL THEN
-      UPDATE students
-      SET prepaid_lessons_count = prepaid_lessons_count - 1
-      WHERE id IN (
-        SELECT student_id FROM lesson_students
-        WHERE lesson_id = NEW.id AND attended = TRUE
-      );
-    END IF;
-  END IF;
-  
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER handle_lesson_completion_trigger
-  AFTER UPDATE ON lessons
-  FOR EACH ROW
-  WHEN (OLD.status IS DISTINCT FROM NEW.status)
-  EXECUTE FUNCTION handle_lesson_completion();
-```
+> **УДАЛЕНО (2026-01-06):** Триггер `handle_lesson_completion_trigger` удалён, так как вызывал двойное списание.
+> Списание теперь управляется из `LessonController.complete()` в Dart коде, который:
+> - Сначала проверяет наличие активной подписки
+> - Списывает с подписки (lessons_remaining) или из prepaid_lessons_count
+> - Сохраняет subscription_id для расчёта стоимости занятия
+> - Корректно обрабатывает групповые занятия с проверкой attended
+>
+> Миграция: `supabase/migrations/remove_lesson_completion_trigger.sql`
 
 ### Добавление предоплаченных занятий при оплате
 

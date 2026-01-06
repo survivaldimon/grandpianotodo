@@ -5661,6 +5661,15 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
   Set<String> _selectedRoomIds = {};
   final TextEditingController _descriptionController = TextEditingController();
 
+  // Для повторяющихся занятий
+  RepeatType _repeatType = RepeatType.none;
+  int _repeatCount = 4;
+  final Set<int> _selectedWeekdays = {};
+  List<DateTime> _customDates = [];
+  List<DateTime> _previewDates = [];
+  List<DateTime> _conflictDates = [];
+  bool _isCheckingConflicts = false;
+
   @override
   void initState() {
     super.initState();
@@ -6300,6 +6309,172 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 );
               },
             ),
+              const SizedBox(height: 16),
+
+              // Повторяющиеся занятия
+              Card(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Dropdown выбора типа повтора
+                      DropdownButtonFormField<RepeatType>(
+                        decoration: InputDecoration(
+                          labelText: 'Повтор',
+                          prefixIcon: const Icon(Icons.repeat),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          isDense: true,
+                        ),
+                        value: _repeatType,
+                        items: RepeatType.values
+                            .map((type) => DropdownMenuItem(
+                                  value: type,
+                                  child: Text(type.label),
+                                ))
+                            .toList(),
+                        onChanged: (type) {
+                          setState(() {
+                            _repeatType = type ?? RepeatType.none;
+                            _previewDates = [];
+                            _conflictDates = [];
+                          });
+                          if (type != RepeatType.none && _selectedRoom != null) {
+                            _updatePreview();
+                          }
+                        },
+                      ),
+
+                      // Количество занятий (для daily, weekly, weekdays)
+                      if (_repeatType != RepeatType.none &&
+                          _repeatType != RepeatType.custom) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Количество занятий:',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: _repeatCount > 2
+                                  ? () {
+                                      setState(() => _repeatCount--);
+                                      _updatePreview();
+                                    }
+                                  : null,
+                              icon: const Icon(Icons.remove_circle_outline),
+                            ),
+                            Text(
+                              '$_repeatCount',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            IconButton(
+                              onPressed: _repeatCount < 52
+                                  ? () {
+                                      setState(() => _repeatCount++);
+                                      _updatePreview();
+                                    }
+                                  : null,
+                              icon: const Icon(Icons.add_circle_outline),
+                            ),
+                          ],
+                        ),
+                      ],
+
+                      // Выбор дней недели (для weekdays)
+                      if (_repeatType == RepeatType.weekdays) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final day in [
+                              (1, 'Пн'),
+                              (2, 'Вт'),
+                              (3, 'Ср'),
+                              (4, 'Чт'),
+                              (5, 'Пт'),
+                              (6, 'Сб'),
+                              (7, 'Вс')
+                            ])
+                              FilterChip(
+                                label: Text(day.$2),
+                                selected: _selectedWeekdays.contains(day.$1),
+                                onSelected: (selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _selectedWeekdays.add(day.$1);
+                                    } else {
+                                      _selectedWeekdays.remove(day.$1);
+                                    }
+                                  });
+                                  if (_selectedWeekdays.isNotEmpty) {
+                                    _updatePreview();
+                                  }
+                                },
+                              ),
+                          ],
+                        ),
+                      ],
+
+                      // Кнопка выбора дат (custom)
+                      if (_repeatType == RepeatType.custom) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: _showMultiDatePicker,
+                          icon: const Icon(Icons.calendar_month),
+                          label: Text(_customDates.isEmpty
+                              ? 'Выбрать даты в календаре'
+                              : 'Выбрано: ${_customDates.length} дат'),
+                        ),
+                      ],
+
+                      // Превью дат
+                      if (_previewDates.length > 1) ...[
+                        const SizedBox(height: 12),
+                        if (_isCheckingConflicts)
+                          Row(
+                            children: [
+                              const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Проверка конфликтов...',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.outline,
+                                    ),
+                              ),
+                            ],
+                          )
+                        else ...[
+                          Text(
+                            'Будет создано ${_previewDates.length} занятий',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
+                          ),
+                          if (_conflictDates.isNotEmpty)
+                            Text(
+                              'Конфликты: ${_conflictDates.length} (будут пропущены)',
+                              style: TextStyle(
+                                color: AppColors.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
 
               // Кнопка создания
@@ -6310,7 +6485,9 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                     ? null
                     : _createLesson,
                 icon: const Icon(Icons.add),
-                label: const Text('Создать занятие'),
+                label: Text(_repeatType != RepeatType.none
+                    ? 'Создать ${_previewDates.length > 1 ? _previewDates.length : _repeatCount} занятий'
+                    : 'Создать занятие'),
               ),
 
               if (controllerState.isLoading)
@@ -6370,6 +6547,91 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     }
   }
 
+  /// Генерирует список дат для повторяющихся занятий
+  List<DateTime> _generateDates() {
+    final dates = <DateTime>[_selectedDate];
+
+    switch (_repeatType) {
+      case RepeatType.none:
+        return dates;
+
+      case RepeatType.daily:
+        for (int i = 1; i < _repeatCount; i++) {
+          dates.add(_selectedDate.add(Duration(days: i)));
+        }
+        return dates;
+
+      case RepeatType.weekly:
+        for (int i = 1; i < _repeatCount; i++) {
+          dates.add(_selectedDate.add(Duration(days: i * 7)));
+        }
+        return dates;
+
+      case RepeatType.weekdays:
+        if (_selectedWeekdays.isEmpty) return dates;
+        var currentDate = _selectedDate;
+        int added = 1;
+        while (added < _repeatCount) {
+          currentDate = currentDate.add(const Duration(days: 1));
+          if (_selectedWeekdays.contains(currentDate.weekday)) {
+            dates.add(currentDate);
+            added++;
+          }
+          // Защита от бесконечного цикла
+          if (currentDate.difference(_selectedDate).inDays > 365) break;
+        }
+        return dates;
+
+      case RepeatType.custom:
+        return [_selectedDate, ..._customDates];
+    }
+  }
+
+  /// Обновляет превью дат и проверяет конфликты
+  Future<void> _updatePreview() async {
+    if (_selectedRoom == null) return;
+
+    final dates = _generateDates();
+    setState(() {
+      _previewDates = dates;
+      _isCheckingConflicts = true;
+    });
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+    final conflicts = await controller.checkConflictsForDates(
+      roomId: _selectedRoom!.id,
+      dates: dates,
+      startTime: _startTime,
+      endTime: _endTime,
+    );
+
+    if (mounted) {
+      setState(() {
+        _conflictDates = conflicts;
+        _isCheckingConflicts = false;
+      });
+    }
+  }
+
+  /// Показывает диалог выбора нескольких дат
+  Future<void> _showMultiDatePicker() async {
+    final result = await showDialog<Set<DateTime>>(
+      context: context,
+      builder: (context) => _MultiDatePickerDialog(
+        selectedDates: _customDates.toSet(),
+        firstDate: _selectedDate,
+        lastDate: _selectedDate.add(const Duration(days: 365)),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _customDates = result.toList()..sort();
+      });
+      _updatePreview();
+    }
+  }
+
   Future<void> _createLesson() async {
     if (_selectedRoom == null) return;
 
@@ -6399,33 +6661,89 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
     final controller = ref.read(lessonControllerProvider.notifier);
 
-    final lesson = await controller.create(
-      institutionId: widget.institutionId,
-      roomId: _selectedRoom!.id,
-      teacherId: teacherId,
-      date: _selectedDate,
-      startTime: _startTime,
-      endTime: _endTime,
-      studentId: _isGroupLesson ? null : _selectedStudent!.id,
-      groupId: _isGroupLesson ? _selectedGroup!.id : null,
-      subjectId: _selectedSubject?.id,
-      lessonTypeId: _selectedLessonType?.id,
-    );
+    // Если включён повтор — создаём серию занятий
+    if (_repeatType != RepeatType.none) {
+      // Генерируем список дат и фильтруем конфликтные
+      final allDates = _generateDates();
+      final validDates = allDates
+          .where((d) => !_conflictDates.any((c) =>
+              c.year == d.year && c.month == d.month && c.day == d.day))
+          .toList();
 
-    if (lesson != null && mounted) {
-      // Автоматически создаём привязки только для индивидуальных занятий
-      if (!_isGroupLesson) {
-        _createBindings(teacherId);
+      if (validDates.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Все даты заняты'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
       }
 
-      widget.onCreated(_selectedDate);
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isGroupLesson ? 'Групповое занятие создано' : 'Занятие создано'),
-          backgroundColor: Colors.green,
-        ),
+      final lessons = await controller.createSeries(
+        institutionId: widget.institutionId,
+        roomId: _selectedRoom!.id,
+        teacherId: teacherId,
+        dates: validDates,
+        startTime: _startTime,
+        endTime: _endTime,
+        studentId: _isGroupLesson ? null : _selectedStudent!.id,
+        groupId: _isGroupLesson ? _selectedGroup!.id : null,
+        subjectId: _selectedSubject?.id,
+        lessonTypeId: _selectedLessonType?.id,
       );
+
+      if (lessons != null && lessons.isNotEmpty && mounted) {
+        // Автоматически создаём привязки только для индивидуальных занятий
+        if (!_isGroupLesson) {
+          _createBindings(teacherId);
+        }
+
+        widget.onCreated(_selectedDate);
+        Navigator.pop(context);
+
+        final skipped = allDates.length - validDates.length;
+        final message = skipped > 0
+            ? 'Создано ${lessons.length} занятий (пропущено: $skipped)'
+            : 'Создано ${lessons.length} занятий';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      // Создаём одно занятие
+      final lesson = await controller.create(
+        institutionId: widget.institutionId,
+        roomId: _selectedRoom!.id,
+        teacherId: teacherId,
+        date: _selectedDate,
+        startTime: _startTime,
+        endTime: _endTime,
+        studentId: _isGroupLesson ? null : _selectedStudent!.id,
+        groupId: _isGroupLesson ? _selectedGroup!.id : null,
+        subjectId: _selectedSubject?.id,
+        lessonTypeId: _selectedLessonType?.id,
+      );
+
+      if (lesson != null && mounted) {
+        // Автоматически создаём привязки только для индивидуальных занятий
+        if (!_isGroupLesson) {
+          _createBindings(teacherId);
+        }
+
+        widget.onCreated(_selectedDate);
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isGroupLesson ? 'Групповое занятие создано' : 'Занятие создано'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 

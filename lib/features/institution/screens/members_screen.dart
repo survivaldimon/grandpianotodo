@@ -6,6 +6,8 @@ import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
+import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
+import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
 
@@ -240,6 +242,9 @@ class _MemberTile extends ConsumerWidget {
                   case 'color':
                     _showColorPickerDialog(context, ref, memberColor);
                     break;
+                  case 'subjects':
+                    _showSubjectsDialog(context, ref);
+                    break;
                   case 'edit':
                     _showEditRoleDialog(context, ref);
                     break;
@@ -272,6 +277,18 @@ class _MemberTile extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         const Text('Изменить цвет'),
+                      ],
+                    ),
+                  ),
+                // Направления — себе или админ/владелец любому
+                if (canChangeColor)
+                  const PopupMenuItem(
+                    value: 'subjects',
+                    child: Row(
+                      children: [
+                        Icon(Icons.school, size: 20),
+                        SizedBox(width: 8),
+                        Text('Направления'),
                       ],
                     ),
                   ),
@@ -411,6 +428,18 @@ class _MemberTile extends ConsumerWidget {
         await _updateMemberColor(context, ref, hex);
       }
     }
+  }
+
+  void _showSubjectsDialog(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _SubjectsSelectionSheet(
+        member: member,
+        institutionId: institutionId,
+      ),
+    );
   }
 
   Future<void> _updateMemberColor(BuildContext context, WidgetRef ref, String? color) async {
@@ -597,6 +626,233 @@ class _MemberTile extends ConsumerWidget {
           ),
         );
       }
+    }
+  }
+}
+
+/// Диалог выбора направлений (предметов) для участника
+class _SubjectsSelectionSheet extends ConsumerStatefulWidget {
+  final InstitutionMember member;
+  final String institutionId;
+
+  const _SubjectsSelectionSheet({
+    required this.member,
+    required this.institutionId,
+  });
+
+  @override
+  ConsumerState<_SubjectsSelectionSheet> createState() => _SubjectsSelectionSheetState();
+}
+
+class _SubjectsSelectionSheetState extends ConsumerState<_SubjectsSelectionSheet> {
+  final Set<String> _selectedSubjectIds = {};
+  final Set<String> _initialSubjectIds = {};
+  bool _initialized = false;
+  bool _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
+    final teacherSubjectsAsync = ref.watch(teacherSubjectsProvider(
+      TeacherSubjectsParams(userId: widget.member.userId, institutionId: widget.institutionId),
+    ));
+
+    // Инициализация выбранных направлений
+    if (!_initialized && teacherSubjectsAsync.hasValue) {
+      final teacherSubjects = teacherSubjectsAsync.value!;
+      for (final ts in teacherSubjects) {
+        _selectedSubjectIds.add(ts.subjectId);
+        _initialSubjectIds.add(ts.subjectId);
+      }
+      _initialized = true;
+    }
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.school),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Направления',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        widget.member.profile?.fullName ?? 'Участник',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_isSaving)
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  TextButton(
+                    onPressed: _hasChanges ? _save : null,
+                    child: const Text('Сохранить'),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Subjects list
+          Flexible(
+            child: subjectsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Ошибка: $e')),
+              data: (subjects) {
+                if (subjects.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 48,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Нет доступных направлений',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: subjects.length,
+                  itemBuilder: (context, index) {
+                    final subject = subjects[index];
+                    final isSelected = _selectedSubjectIds.contains(subject.id);
+
+                    Color? subjectColor;
+                    if (subject.color != null) {
+                      subjectColor = hexToColor(subject.color!);
+                    }
+
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedSubjectIds.add(subject.id);
+                          } else {
+                            _selectedSubjectIds.remove(subject.id);
+                          }
+                        });
+                      },
+                      secondary: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: subjectColor?.withValues(alpha: 0.2) ??
+                              theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.music_note,
+                          color: subjectColor ?? theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      title: Text(subject.name),
+                      controlAffinity: ListTileControlAffinity.trailing,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          // Bottom padding
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
+        ],
+      ),
+    );
+  }
+
+  bool get _hasChanges {
+    if (_selectedSubjectIds.length != _initialSubjectIds.length) return true;
+    return !_selectedSubjectIds.containsAll(_initialSubjectIds);
+  }
+
+  Future<void> _save() async {
+    setState(() => _isSaving = true);
+
+    final controller = ref.read(teacherSubjectsControllerProvider.notifier);
+    final toAdd = _selectedSubjectIds.difference(_initialSubjectIds);
+    final toRemove = _initialSubjectIds.difference(_selectedSubjectIds);
+
+    // Добавляем новые
+    for (final subjectId in toAdd) {
+      await controller.addSubject(
+        userId: widget.member.userId,
+        subjectId: subjectId,
+        institutionId: widget.institutionId,
+      );
+    }
+
+    // Удаляем убранные
+    for (final subjectId in toRemove) {
+      await controller.removeSubject(
+        userId: widget.member.userId,
+        subjectId: subjectId,
+        institutionId: widget.institutionId,
+      );
+    }
+
+    setState(() => _isSaving = false);
+
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Направления обновлены'),
+          backgroundColor: AppColors.success,
+        ),
+      );
     }
   }
 }

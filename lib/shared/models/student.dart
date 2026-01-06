@@ -8,6 +8,13 @@ class Student extends BaseModel {
   final String? comment;
   final int prepaidLessonsCount;
 
+  /// Остаток занятий из другой школы (при переносе ученика)
+  /// Списывается в первую очередь, не влияет на статистику доходов
+  final int legacyBalance;
+
+  /// ID учеников, из которых была создана эта карточка при объединении
+  final List<String>? mergedFrom;
+
   const Student({
     required super.id,
     required super.createdAt,
@@ -18,13 +25,24 @@ class Student extends BaseModel {
     this.phone,
     this.comment,
     this.prepaidLessonsCount = 0,
+    this.legacyBalance = 0,
+    this.mergedFrom,
   });
 
-  /// Баланс занятий (алиас для prepaidLessonsCount)
+  /// Общий баланс занятий (алиас для prepaidLessonsCount)
   int get balance => prepaidLessonsCount;
+
+  /// Баланс только из абонементов (без legacy)
+  int get subscriptionBalance => prepaidLessonsCount - legacyBalance;
 
   /// Есть ли долг (отрицательный баланс)
   bool get hasDebt => prepaidLessonsCount < 0;
+
+  /// Есть ли остаток из другой школы
+  bool get hasLegacyBalance => legacyBalance > 0;
+
+  /// Это групповая карточка (объединённая из нескольких учеников)
+  bool get isMerged => mergedFrom != null && mergedFrom!.isNotEmpty;
 
   /// Количество занятий для отображения (с учётом знака)
   String get prepaidDisplay => prepaidLessonsCount >= 0
@@ -43,6 +61,10 @@ class Student extends BaseModel {
         phone: json['phone'] as String?,
         comment: json['comment'] as String?,
         prepaidLessonsCount: json['prepaid_lessons_count'] as int? ?? 0,
+        legacyBalance: json['legacy_balance'] as int? ?? 0,
+        mergedFrom: (json['merged_from'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -50,6 +72,7 @@ class Student extends BaseModel {
         'name': name,
         'phone': phone,
         'comment': comment,
+        'legacy_balance': legacyBalance,
       };
 
   Student copyWith({
@@ -57,6 +80,8 @@ class Student extends BaseModel {
     String? phone,
     String? comment,
     int? prepaidLessonsCount,
+    int? legacyBalance,
+    List<String>? mergedFrom,
   }) =>
       Student(
         id: id,
@@ -68,5 +93,7 @@ class Student extends BaseModel {
         phone: phone ?? this.phone,
         comment: comment ?? this.comment,
         prepaidLessonsCount: prepaidLessonsCount ?? this.prepaidLessonsCount,
+        legacyBalance: legacyBalance ?? this.legacyBalance,
+        mergedFrom: mergedFrom ?? this.mergedFrom,
       );
 }

@@ -1157,6 +1157,10 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
   bool _isFamilyMode = false;
   String _paymentMethod = 'card'; // Способ оплаты: 'cash' или 'card'
 
+  // Объединение учеников в групповую карточку
+  bool _shouldMergeStudents = false;
+  final _mergedNameController = TextEditingController();
+
   // Для FAB прокрутки вниз
   bool _showScrollDownFab = true;
   ScrollController? _currentScrollController;
@@ -1192,6 +1196,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
     _validityController.dispose();
     _discountController.dispose();
     _commentController.dispose();
+    _mergedNameController.dispose();
     super.dispose();
   }
 
@@ -1279,18 +1284,53 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
     Payment? payment;
 
     if (_isFamilyMode) {
-      // Групповой абонемент
-      payment = await controller.createFamilyPayment(
-        institutionId: widget.institutionId,
-        studentIds: _selectedFamilyStudents.map((s) => s.id).toList(),
-        paymentPlanId: _selectedPlan?.id,
-        amount: double.parse(_amountController.text),
-        lessonsCount: int.parse(_lessonsController.text),
-        paymentMethod: _paymentMethod,
-        validityDays: int.parse(_validityController.text),
-        paidAt: _selectedDate,
-        comment: comment.isEmpty ? null : comment,
-      );
+      if (_shouldMergeStudents) {
+        // Сначала объединяем учеников в групповую карточку
+        final studentController = ref.read(studentControllerProvider.notifier);
+        final mergedStudent = await studentController.mergeStudents(
+          sourceIds: _selectedFamilyStudents.map((s) => s.id).toList(),
+          institutionId: widget.institutionId,
+          newName: _mergedNameController.text.trim(),
+        );
+
+        if (mergedStudent == null) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Ошибка при объединении учеников'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        // Создаём обычную оплату для объединённого ученика
+        payment = await controller.create(
+          institutionId: widget.institutionId,
+          studentId: mergedStudent.id,
+          paymentPlanId: _selectedPlan?.id,
+          amount: double.parse(_amountController.text),
+          lessonsCount: int.parse(_lessonsController.text),
+          paymentMethod: _paymentMethod,
+          paidAt: _selectedDate,
+          comment: comment.isEmpty ? null : comment,
+        );
+      } else {
+        // Групповой абонемент без объединения
+        payment = await controller.createFamilyPayment(
+          institutionId: widget.institutionId,
+          studentIds: _selectedFamilyStudents.map((s) => s.id).toList(),
+          paymentPlanId: _selectedPlan?.id,
+          amount: double.parse(_amountController.text),
+          lessonsCount: int.parse(_lessonsController.text),
+          paymentMethod: _paymentMethod,
+          validityDays: int.parse(_validityController.text),
+          paidAt: _selectedDate,
+          comment: comment.isEmpty ? null : comment,
+        );
+      }
     } else {
       // Обычная оплата
       payment = await controller.create(
@@ -1310,11 +1350,17 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
       if (payment != null) {
         widget.onSuccess();
         Navigator.pop(context);
+        String message;
+        if (_isFamilyMode && _shouldMergeStudents) {
+          message = 'Карточка объединена и оплата добавлена';
+        } else if (_isFamilyMode) {
+          message = 'Групповой абонемент добавлен';
+        } else {
+          message = 'Оплата добавлена';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isFamilyMode
-                ? 'Групповой абонемент добавлен'
-                : 'Оплата добавлена'),
+            content: Text(message),
             backgroundColor: Colors.green,
           ),
         );
@@ -1596,6 +1642,70 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                 ],
                               ),
                             ),
+                          // Опция объединения в групповую карточку
+                          if (_selectedFamilyStudents.length >= 2) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: _shouldMergeStudents
+                                    ? AppColors.primary.withValues(alpha: 0.05)
+                                    : Theme.of(context).colorScheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(12),
+                                border: _shouldMergeStudents
+                                    ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
+                                    : null,
+                              ),
+                              child: CheckboxListTile(
+                                value: _shouldMergeStudents,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _shouldMergeStudents = value ?? false;
+                                    if (_shouldMergeStudents && _mergedNameController.text.isEmpty) {
+                                      // Предзаполняем имя
+                                      final names = _selectedFamilyStudents.map((s) => s.name).toList();
+                                      if (names.length == 2) {
+                                        _mergedNameController.text = '${names[0]} и ${names[1]}';
+                                      } else {
+                                        _mergedNameController.text = names.first;
+                                      }
+                                    }
+                                  });
+                                },
+                                title: const Text('Объединить в одну карточку'),
+                                subtitle: const Text(
+                                  'Создаст групповую карточку учеников',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                secondary: Icon(
+                                  Icons.merge,
+                                  color: _shouldMergeStudents ? AppColors.primary : Colors.grey,
+                                ),
+                                controlAffinity: ListTileControlAffinity.trailing,
+                                dense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                              ),
+                            ),
+                            if (_shouldMergeStudents) ...[
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _mergedNameController,
+                                decoration: InputDecoration(
+                                  labelText: 'Имя групповой карточки',
+                                  hintText: 'Например: Семья Петровых',
+                                  prefixIcon: const Icon(Icons.badge_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                                ),
+                                validator: _shouldMergeStudents
+                                    ? (v) => v == null || v.isEmpty ? 'Введите имя' : null
+                                    : null,
+                                textCapitalization: TextCapitalization.words,
+                              ),
+                            ],
+                          ],
                         ],
                       );
                     } else {

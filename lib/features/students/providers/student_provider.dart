@@ -145,6 +145,7 @@ class StudentController extends StateNotifier<AsyncValue<void>> {
     required String name,
     String? phone,
     String? comment,
+    int legacyBalance = 0,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -153,6 +154,7 @@ class StudentController extends StateNotifier<AsyncValue<void>> {
         name: name,
         phone: phone,
         comment: comment,
+        legacyBalance: legacyBalance,
       );
 
       // Автоматически привязываем созданного ученика к текущему пользователю
@@ -183,10 +185,11 @@ class StudentController extends StateNotifier<AsyncValue<void>> {
     String? name,
     String? phone,
     String? comment,
+    int? legacyBalance,
   }) async {
     state = const AsyncValue.loading();
     try {
-      await _repo.update(id, name: name, phone: phone, comment: comment);
+      await _repo.update(id, name: name, phone: phone, comment: comment, legacyBalance: legacyBalance);
       _ref.invalidate(studentsProvider(institutionId));
       _ref.invalidate(studentProvider(id));
       state = const AsyncValue.data(null);
@@ -263,6 +266,41 @@ class StudentController extends StateNotifier<AsyncValue<void>> {
       _ref.invalidate(studentGroupsProvider(institutionId));
       state = const AsyncValue.data(null);
       return group;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
+  /// Объединить несколько учеников в одного нового
+  /// Создаёт новую карточку, переносит все данные, архивирует исходных
+  Future<Student?> mergeStudents({
+    required List<String> sourceIds,
+    required String institutionId,
+    required String newName,
+    String? newPhone,
+    String? newComment,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final student = await _repo.mergeStudents(
+        sourceIds: sourceIds,
+        institutionId: institutionId,
+        newName: newName,
+        newPhone: newPhone,
+        newComment: newComment,
+      );
+
+      // Инвалидируем всё что связано с учениками
+      _ref.invalidate(studentsProvider(institutionId));
+      _ref.invalidate(studentGroupsProvider(institutionId));
+      for (final id in sourceIds) {
+        _ref.invalidate(studentProvider(id));
+      }
+      _ref.invalidate(studentProvider(student.id));
+
+      state = const AsyncValue.data(null);
+      return student;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       return null;
@@ -345,4 +383,13 @@ final myStudentIdsProvider =
   );
 
   return ids.toSet();
+});
+
+/// Провайдер имён учеников по списку ID
+/// Используется для отображения объединённых учеников как chips
+final mergedStudentNamesProvider =
+    FutureProvider.family<List<String>, List<String>>((ref, ids) async {
+  if (ids.isEmpty) return [];
+  final repo = ref.watch(studentRepositoryProvider);
+  return repo.getNamesByIds(ids);
 });

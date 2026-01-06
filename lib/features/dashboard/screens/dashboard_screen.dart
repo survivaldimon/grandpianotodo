@@ -14,6 +14,7 @@ import 'package:kabinet/features/subscriptions/providers/subscription_provider.d
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/subscription.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
+import 'package:kabinet/features/institution/providers/member_provider.dart';
 
 /// Главный экран (Dashboard)
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -69,6 +70,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final expiringSubscriptionsAsync = ref.watch(
       expiringSubscriptionsProvider(ExpiringSubscriptionsParams(widget.institutionId, days: 7)),
     );
+    final needsOnboarding = ref.watch(needsOnboardingProvider(widget.institutionId));
 
     return Scaffold(
       appBar: AppBar(
@@ -105,6 +107,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
+
+            // Баннер онбординга (если не заполнены цвет или направления)
+            if (needsOnboarding) ...[
+              _OnboardingBanner(
+                onTap: () => context.go('/institutions/${widget.institutionId}/onboarding'),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // Занятия сегодня
             lessonsAsync.when(
@@ -912,6 +922,96 @@ class _LessonCheckbox extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Баннер для незавершённого онбординга
+class _OnboardingBanner extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _OnboardingBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, Color(0xFF1976D2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.person_add,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Завершите настройку профиля',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Выберите цвет и направления',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Заполнить',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
