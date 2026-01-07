@@ -135,6 +135,11 @@
   - Редактирование направлений в настройках участника
   - Исправление RLS для обновления цвета
   - Realtime обновления для institution_members
+- **`SESSION_2026_01_07_SHEET_NESTED_SCROLL.md`** — улучшение UX шторки создания занятия:
+  - Nested scroll — контент скроллится до верха прежде чем шторка начнёт закрываться
+  - Двухэтапное закрытие после скролла контента
+  - Исправление конфликта Navigator.pop() с go_router
+  - Паттерн DraggableScrollableController + NotificationListener
 
 ## Валюта
 
@@ -809,33 +814,124 @@ SegmentedButton<String>(
 - Синхронизация скролла контента с размером sheet
 - Drag handle отдельно от скроллируемого контента
 
-**Паттерн:**
+**Паттерн с nested scroll:**
 ```dart
 return DraggableScrollableSheet(
+  controller: _sheetController,  // Для двухэтапного закрытия
   initialChildSize: 0.9,
-  minChildSize: 0.5,
-  maxChildSize: 0.95,
+  minChildSize: 0.3,
+  maxChildSize: 0.93,
   expand: false,
+  snap: true,
+  snapSizes: const [0.9],
+  snapAnimationDuration: const Duration(milliseconds: 300),
   builder: (context, scrollController) => Container(
-    child: Column(
-      children: [
-        // Drag handle (вне скролла)
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Center(child: /* handle widget */),
-        ),
-        // Скроллируемый контент
-        Expanded(
-          child: ListView(
-            controller: scrollController, // Важно!
-            children: [/* форма */],
-          ),
-        ),
-      ],
+    child: NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        // Отслеживание скролла контента
+        if (notification is ScrollUpdateNotification) {
+          if (notification.metrics.pixels > 10) {
+            _wasScrolled = true;
+          }
+        }
+        return false;
+      },
+      child: ListView(
+        controller: scrollController,
+        primary: false,  // ВАЖНО для nested scroll!
+        physics: const ClampingScrollPhysics(),  // Без bounce
+        children: [
+          // Drag handle
+          Center(child: Container(width: 40, height: 4, /* ... */)),
+          // Форма
+        ],
+      ),
     ),
   ),
 );
 ```
+
+### 30a. Двухэтапное закрытие DraggableScrollableSheet (ВАЖНО!)
+Когда пользователь скроллит контент и достигает верха, случайный свайп вниз не должен закрывать шторку.
+
+**Проблема:** После скролла контента вверх, малейший свайп вниз закрывает шторку.
+
+**Решение:** Двухэтапное закрытие с учётом состояния скролла.
+
+**Логика:**
+```
+[Не скроллили контент] → свайп вниз → закрывается СРАЗУ
+[Скроллили контент] → достигли верха → свайп 1 → snap обратно к 90%
+                                      → свайп 2 → закрывается
+```
+
+**Реализация:**
+```dart
+class _SheetState extends State<_Sheet> {
+  final _sheetController = DraggableScrollableController();
+  bool _wasScrolled = false;      // Был ли скролл контента
+  bool _readyToClose = false;     // Готов к закрытию после первого свайпа
+  Timer? _closeResetTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _sheetController.addListener(_onSheetSizeChanged);
+  }
+
+  void _onSheetSizeChanged() {
+    // Срабатывает на 88% — минимальное движение перед snap
+    if (_sheetController.size < 0.88 && _sheetController.size > 0.35) {
+      if (_wasScrolled && !_readyToClose) {
+        // Скроллили + первый свайп → мгновенный snap обратно
+        _sheetController.animateTo(0.9,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+        _readyToClose = true;
+        _startCloseResetTimer();
+      }
+      // Иначе — позволяем закрыться естественно
+    }
+  }
+
+  void _startCloseResetTimer() {
+    _closeResetTimer?.cancel();
+    _closeResetTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _readyToClose = false;
+          _wasScrolled = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sheetController.removeListener(_onSheetSizeChanged);
+    _sheetController.dispose();
+    _closeResetTimer?.cancel();
+    super.dispose();
+  }
+}
+```
+
+**КРИТИЧНО — НЕ использовать Navigator.pop():**
+```dart
+// ❌ НЕПРАВИЛЬНО — вызывает конфликт с go_router!
+Navigator.of(context).pop();
+
+// ✅ ПРАВИЛЬНО — позволить закрыться естественно
+// Просто не вызывать animateTo() — sheet закроется сам
+```
+
+**Почему нельзя Navigator.pop():**
+- Вызывается во время анимации DraggableScrollableController
+- Конфликтует с go_router → "You have popped the last page"
+- Вызывает чёрный экран и "deactivated widget" ошибки
+
+**Файл-пример:** `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — `_QuickAddLessonSheet`
 
 ### 31. FAB прокрутки вниз в формах
 Для длинных форм добавляется FAB со стрелкой вниз для быстрой прокрутки к кнопке отправки.

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
@@ -134,8 +135,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           // Rooms (настройки кабинетов - для редактирования из Настроек)
           GoRoute(
             path: '/institutions/:institutionId/rooms',
-            builder: (context, state) => RoomsScreen(
-              institutionId: state.pathParameters['institutionId']!,
+            pageBuilder: (context, state) => CupertinoPage(
+              child: RoomsScreen(
+                institutionId: state.pathParameters['institutionId']!,
+              ),
             ),
           ),
 
@@ -148,9 +151,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: ':studentId',
-                builder: (context, state) => StudentDetailScreen(
-                  studentId: state.pathParameters['studentId']!,
-                  institutionId: state.pathParameters['institutionId']!,
+                pageBuilder: (context, state) => CupertinoPage(
+                  child: StudentDetailScreen(
+                    studentId: state.pathParameters['studentId']!,
+                    institutionId: state.pathParameters['institutionId']!,
+                  ),
                 ),
               ),
             ],
@@ -175,71 +180,89 @@ final routerProvider = Provider<GoRouter>((ref) {
           // Members
           GoRoute(
             path: '/institutions/:institutionId/members',
-            builder: (context, state) => MembersScreen(
-              institutionId: state.pathParameters['institutionId']!,
+            pageBuilder: (context, state) => CupertinoPage(
+              child: MembersScreen(
+                institutionId: state.pathParameters['institutionId']!,
+              ),
             ),
           ),
 
           // Member Permissions
           GoRoute(
             path: '/institutions/:institutionId/members/:memberId/permissions',
-            builder: (context, state) => MemberPermissionsScreen(
-              institutionId: state.pathParameters['institutionId']!,
-              memberId: state.pathParameters['memberId']!,
+            pageBuilder: (context, state) => CupertinoPage(
+              child: MemberPermissionsScreen(
+                institutionId: state.pathParameters['institutionId']!,
+                memberId: state.pathParameters['memberId']!,
+              ),
             ),
           ),
 
           // Groups
           GoRoute(
             path: '/institutions/:institutionId/groups',
-            builder: (context, state) => GroupsScreen(
-              institutionId: state.pathParameters['institutionId']!,
+            pageBuilder: (context, state) => CupertinoPage(
+              child: GroupsScreen(
+                institutionId: state.pathParameters['institutionId']!,
+              ),
             ),
           ),
           GoRoute(
             path: '/institutions/:institutionId/groups/:groupId',
-            builder: (context, state) => GroupDetailScreen(
-              institutionId: state.pathParameters['institutionId']!,
-              groupId: state.pathParameters['groupId']!,
+            pageBuilder: (context, state) => CupertinoPage(
+              child: GroupDetailScreen(
+                institutionId: state.pathParameters['institutionId']!,
+                groupId: state.pathParameters['groupId']!,
+              ),
             ),
           ),
 
           // Statistics
           GoRoute(
             path: '/institutions/:institutionId/statistics',
-            builder: (context, state) => StatisticsScreen(
-              institutionId: state.pathParameters['institutionId']!,
+            pageBuilder: (context, state) => CupertinoPage(
+              child: StatisticsScreen(
+                institutionId: state.pathParameters['institutionId']!,
+              ),
             ),
           ),
 
           // Lesson Types
           GoRoute(
             path: '/institutions/:institutionId/lesson-types',
-            builder: (context, state) => LessonTypesScreen(
-              institutionId: state.pathParameters['institutionId']!,
+            pageBuilder: (context, state) => CupertinoPage(
+              child: LessonTypesScreen(
+                institutionId: state.pathParameters['institutionId']!,
+              ),
             ),
           ),
 
           // Payment Plans
           GoRoute(
             path: '/institutions/:institutionId/payment-plans',
-            builder: (context, state) => PaymentPlansScreen(
-              institutionId: state.pathParameters['institutionId']!,
+            pageBuilder: (context, state) => CupertinoPage(
+              child: PaymentPlansScreen(
+                institutionId: state.pathParameters['institutionId']!,
+              ),
             ),
           ),
 
           // Subjects
           GoRoute(
             path: '/institutions/:institutionId/subjects',
-            builder: (context, state) => SubjectsScreen(
-              institutionId: state.pathParameters['institutionId']!,
+            pageBuilder: (context, state) => CupertinoPage(
+              child: SubjectsScreen(
+                institutionId: state.pathParameters['institutionId']!,
+              ),
             ),
           ),
 
           // Profile
           GoRoute(
             path: '/institutions/:institutionId/profile',
-            builder: (context, state) => const ProfileScreen(),
+            pageBuilder: (context, state) => const CupertinoPage(
+              child: ProfileScreen(),
+            ),
           ),
         ],
       ),
