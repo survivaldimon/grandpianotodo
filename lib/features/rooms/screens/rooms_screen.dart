@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
@@ -20,7 +21,7 @@ class RoomsScreen extends ConsumerStatefulWidget {
 }
 
 class _RoomsScreenState extends ConsumerState<RoomsScreen> {
-  bool _isEditMode = false;
+  List<Room>? _localRooms; // Локальный список для сохранения порядка между операциями
 
   @override
   Widget build(BuildContext context) {
@@ -31,25 +32,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.rooms),
-        actions: [
-          if (!_isEditMode && hasRooms)
-            IconButton(
-              icon: const Icon(Icons.reorder),
-              tooltip: 'Изменить порядок',
-              onPressed: () {
-                setState(() => _isEditMode = true);
-              },
-            ),
-          if (_isEditMode)
-            TextButton(
-              onPressed: () {
-                setState(() => _isEditMode = false);
-              },
-              child: const Text('Готово'),
-            ),
-        ],
       ),
-      floatingActionButton: !_isEditMode && hasRooms
+      floatingActionButton: hasRooms
           ? FloatingActionButton(
               onPressed: () => _showAddRoomDialog(context, ref),
               child: const Icon(Icons.add),
@@ -80,84 +64,187 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
           return RefreshIndicator(
             onRefresh: () async {
               ref.invalidate(roomsProvider(widget.institutionId));
+              _localRooms = null; // Сбрасываем локальный список при refresh
               await ref.read(roomsProvider(widget.institutionId).future);
             },
-            child: _isEditMode
-                ? _buildReorderableList(rooms)
-                : _buildNormalList(rooms),
+            child: _buildRoomsList(_localRooms ?? rooms),
           );
         },
       ),
     );
   }
 
-  Widget _buildNormalList(List<Room> rooms) {
-    return ListView.builder(
+  Widget _buildRoomsList(List<Room> rooms) {
+    return ReorderableListView.builder(
       padding: AppSizes.paddingAllM,
       itemCount: rooms.length,
+      buildDefaultDragHandles: false,
+      onReorder: (oldIndex, newIndex) {
+        if (newIndex > oldIndex) {
+          newIndex -= 1;
+        }
+        if (oldIndex == newIndex) return;
+
+        final newRooms = List<Room>.from(rooms);
+        final room = newRooms.removeAt(oldIndex);
+        newRooms.insert(newIndex, room);
+
+        // Обновляем данные синхронно
+        setState(() {
+          _localRooms = newRooms;
+        });
+
+        // Сохраняем в БД
+        ref.read(roomControllerProvider.notifier).reorder(
+              newRooms,
+              widget.institutionId,
+            );
+      },
       itemBuilder: (context, index) {
         final room = rooms[index];
-        return _RoomCard(
-          room: room,
-          institutionId: widget.institutionId,
+
+        return Slidable(
+          key: ValueKey(room.id),
+          endActionPane: ActionPane(
+            motion: const BehindMotion(),
+            extentRatio: 0.4,
+            children: [
+              SlidableAction(
+                onPressed: (_) => _showEditDialog(context, room),
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                icon: Icons.edit,
+                label: 'Изменить',
+              ),
+              SlidableAction(
+                onPressed: (_) => _showDeleteConfirmation(context, room),
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                icon: Icons.delete,
+                label: 'Удалить',
+              ),
+            ],
+          ),
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              onTap: () => _showEditDialog(context, room),
+              leading: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                ),
+                child: const Icon(
+                  Icons.door_front_door,
+                  color: AppColors.primary,
+                ),
+              ),
+              title: Text(room.number != null ? 'Кабинет ${room.number}' : room.name),
+              subtitle: room.number != null ? Text(room.name) : null,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.more_vert),
+                    onPressed: () => _showOptions(context, room),
+                  ),
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Icon(
+                        Icons.drag_handle,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
   }
 
-  Widget _buildReorderableList(List<Room> rooms) {
-    return ListView.builder(
-      padding: AppSizes.paddingAllM,
-      itemCount: rooms.length,
-      itemBuilder: (context, index) {
-        final room = rooms[index];
-        final isFirst = index == 0;
-        final isLast = index == rooms.length - 1;
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: const Icon(Icons.drag_handle, color: AppColors.textTertiary),
-            title: Text(room.number != null ? 'Кабинет ${room.number}' : room.name),
-            subtitle: room.number != null ? Text(room.name) : null,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    Icons.arrow_upward,
-                    color: isFirst ? AppColors.textTertiary : AppColors.primary,
-                  ),
-                  onPressed: isFirst
-                      ? null
-                      : () async {
-                          await ref.read(roomControllerProvider.notifier).moveUp(
-                                room,
-                                rooms,
-                                widget.institutionId,
-                              );
-                        },
-                ),
-                IconButton(
-                  icon: Icon(
-                    Icons.arrow_downward,
-                    color: isLast ? AppColors.textTertiary : AppColors.primary,
-                  ),
-                  onPressed: isLast
-                      ? null
-                      : () async {
-                          await ref.read(roomControllerProvider.notifier).moveDown(
-                                room,
-                                rooms,
-                                widget.institutionId,
-                              );
-                        },
-                ),
-              ],
+  void _showOptions(BuildContext context, Room room) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Редактировать'),
+              onTap: () {
+                Navigator.pop(context);
+                _showEditDialog(context, room);
+              },
             ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteConfirmation(context, room);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(BuildContext context, Room room) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (dialogContext) => _EditRoomSheet(
+        room: room,
+        institutionId: widget.institutionId,
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, Room room) {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Удалить кабинет?'),
+        content: Text(
+          'Кабинет "${room.number != null ? "№${room.number} ${room.name}" : room.name}" '
+          'будет удалён. Это действие нельзя отменить.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
           ),
-        );
-      },
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final controller = ref.read(roomControllerProvider.notifier);
+              final success = await controller.delete(room.id, widget.institutionId);
+              if (success) {
+                _localRooms = null; // Сбрасываем локальный список
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Кабинет удалён'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -368,122 +455,6 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _RoomCard extends ConsumerWidget {
-  final Room room;
-  final String institutionId;
-
-  const _RoomCard({
-    required this.room,
-    required this.institutionId,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(AppSizes.radiusM),
-          ),
-          child: const Icon(
-            Icons.door_front_door,
-            color: AppColors.primary,
-          ),
-        ),
-        title: Text(room.number != null ? 'Кабинет ${room.number}' : room.name),
-        subtitle: room.number != null ? Text(room.name) : null,
-        trailing: IconButton(
-          icon: const Icon(Icons.more_vert),
-          onPressed: () => _showOptions(context, ref),
-        ),
-        onTap: () => _showEditDialog(context, ref),
-      ),
-    );
-  }
-
-  void _showOptions(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Редактировать'),
-              onTap: () {
-                Navigator.pop(context);
-                _showEditDialog(context, ref);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Удалить', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _showDeleteConfirmation(context, ref);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showEditDialog(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (dialogContext) => _EditRoomSheet(
-        room: room,
-        institutionId: institutionId,
-      ),
-    );
-  }
-
-  void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить кабинет?'),
-        content: Text(
-          'Кабинет "${room.number != null ? "№${room.number} ${room.name}" : room.name}" '
-          'будет удалён. Это действие нельзя отменить.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              final controller = ref.read(roomControllerProvider.notifier);
-              final success = await controller.delete(room.id, institutionId);
-              if (success) {
-                scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Кабинет удалён'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
-          ),
-        ],
       ),
     );
   }

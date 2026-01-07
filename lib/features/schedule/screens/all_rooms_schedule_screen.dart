@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
@@ -4626,21 +4628,15 @@ class _StudentPickerSheet extends StatefulWidget {
 }
 
 class _StudentPickerSheetState extends State<_StudentPickerSheet> {
-  static const int _initialVisibleCount = 10;
   bool _showAllStudents = false;
 
   @override
   Widget build(BuildContext context) {
-    // Объединяем всех учеников: свои первыми, потом остальные
-    final allStudents = [...widget.myStudents, ...widget.otherStudents];
-    final totalCount = allStudents.length;
-    final hasHiddenStudents = totalCount > _initialVisibleCount;
-    final hiddenCount = totalCount - _initialVisibleCount;
+    final hasMyStudents = widget.myStudents.isNotEmpty;
+    final hasOtherStudents = widget.otherStudents.isNotEmpty;
 
-    // Определяем какие ученики показывать
-    final visibleStudents = _showAllStudents
-        ? allStudents
-        : allStudents.take(_initialVisibleCount).toList();
+    // Показываем кнопку "Показать всех" если есть остальные и список не раскрыт
+    final showExpandButton = hasOtherStudents && !_showAllStudents;
 
     return Container(
       constraints: BoxConstraints(
@@ -4679,13 +4675,23 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
             child: ListView(
               shrinkWrap: true,
               children: [
-                // Ученики
-                ...visibleStudents.map((student) {
-                  final isOther = !widget.myStudents.contains(student);
-                  return _buildStudentTile(student, isOther);
-                }),
-                // Кнопка "Показать всех" (если есть скрытые)
-                if (hasHiddenStudents && !_showAllStudents)
+                // Если нет своих учеников — показываем сообщение
+                if (!hasMyStudents && !_showAllStudents)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                    child: Text(
+                      'У вас нет своих учеников',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                // Свои ученики (если есть)
+                if (hasMyStudents)
+                  ...widget.myStudents.map((student) => _buildStudentTile(student, false)),
+                // Кнопка "Показать всех" (если есть остальные ученики и список не раскрыт)
+                if (showExpandButton)
                   InkWell(
                     onTap: () => setState(() => _showAllStudents = true),
                     child: Padding(
@@ -4699,7 +4705,7 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Показать всех ($hiddenCount)',
+                            'Показать всех (${widget.otherStudents.length})',
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w500,
@@ -4709,8 +4715,32 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
                       ),
                     ),
                   ),
-                // Кнопка "Скрыть" (если раскрыто)
-                if (hasHiddenStudents && _showAllStudents)
+                // Остальные ученики (если раскрыто)
+                if (_showAllStudents && widget.otherStudents.isNotEmpty) ...[
+                  // Разделитель с текстом (только если есть свои ученики)
+                  if (hasMyStudents)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'Остальные ученики',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
+                        ],
+                      ),
+                    ),
+                  // Остальные ученики
+                  ...widget.otherStudents.map((student) => _buildStudentTile(student, true)),
+                  // Кнопка "Скрыть"
                   InkWell(
                     onTap: () => setState(() => _showAllStudents = false),
                     child: Padding(
@@ -4734,6 +4764,7 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
                       ),
                     ),
                   ),
+                ],
                 const SizedBox(height: 16),
               ],
             ),
@@ -6270,6 +6301,12 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
   List<DateTime> _conflictDates = [];
   bool _isCheckingConflicts = false;
 
+  // Для двухэтапного закрытия шторки
+  final _sheetController = DraggableScrollableController();
+  bool _wasScrolled = false;
+  bool _readyToClose = false;
+  Timer? _closeResetTimer;
+
   @override
   void initState() {
     super.initState();
@@ -6300,10 +6337,46 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
       _startTime = TimeOfDay(hour: now.hour, minute: 0);
       _endTime = TimeOfDay(hour: now.hour + 1, minute: 0);
     }
+
+    // Слушатель для двухэтапного закрытия
+    _sheetController.addListener(_onSheetSizeChanged);
+  }
+
+  void _onSheetSizeChanged() {
+    // Если шторка начала опускаться ниже 88% — сразу snap обратно
+    // Это предотвращает видимое "дёргание" шторки вниз
+    if (_sheetController.size < 0.88 && _sheetController.size > 0.35) {
+      if (_wasScrolled && !_readyToClose) {
+        // Скроллили контент + первый свайп → snap обратно мгновенно
+        _sheetController.animateTo(
+          0.9,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+        _readyToClose = true;
+        _startCloseResetTimer();
+      }
+      // Если не скроллили ИЛИ уже readyToClose → позволяем закрыться естественно
+    }
+  }
+
+  void _startCloseResetTimer() {
+    _closeResetTimer?.cancel();
+    _closeResetTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _readyToClose = false;
+          _wasScrolled = false;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _sheetController.removeListener(_onSheetSizeChanged);
+    _sheetController.dispose();
+    _closeResetTimer?.cancel();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -6344,36 +6417,54 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
       }
     });
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Заголовок
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    _mode == _AddFormMode.lesson ? 'Новое занятие' : 'Бронирование',
-                    style: Theme.of(context).textTheme.titleLarge,
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: 0.9,
+      minChildSize: 0.3,
+      maxChildSize: 0.93,
+      expand: false,
+      snap: true,
+      snapSizes: const [0.9],
+      snapAnimationDuration: const Duration(milliseconds: 300),
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification is ScrollUpdateNotification) {
+              // Если контент скроллится (не на нуле)
+              if (notification.metrics.pixels > 10) {
+                _wasScrolled = true;
+              }
+            }
+            return false;
+          },
+          child: ListView(
+            controller: scrollController,
+            primary: false,
+            physics: const ClampingScrollPhysics(),
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            ),
+            children: [
+            // Drag handle
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-
             // Переключатель режима: Занятие / Бронь
             SegmentedButton<_AddFormMode>(
               segments: const [
@@ -6636,18 +6727,14 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
               // Выбор ученика (индивидуальное занятие)
               if (!_isGroupLesson)
                 Builder(builder: (context) {
-                  final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
-                  final myStudentIdsAsync = currentUserId != null
-                      ? ref.watch(teacherStudentIdsProvider(
-                          TeacherStudentsParams(currentUserId, widget.institutionId),
-                        ))
-                      : const AsyncValue<List<String>>.data([]);
+                  // Используем myStudentIdsProvider для консистентности с экраном учеников
+                  final myStudentIdsAsync = ref.watch(myStudentIdsProvider(widget.institutionId));
 
                   return studentsAsync.when(
                     loading: () => const CircularProgressIndicator(),
                     error: (e, _) => ErrorView.inline(e),
                     data: (allStudents) {
-                      final myStudentIds = myStudentIdsAsync.valueOrNull ?? [];
+                      final myStudentIds = myStudentIdsAsync.valueOrNull ?? <String>{};
 
                       // Разделяем на своих и остальных
                       final myStudents = allStudents.where((s) => myStudentIds.contains(s.id)).toList();
@@ -7168,12 +7255,13 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                   child: Center(child: CircularProgressIndicator()),
                 ),
 
-              const SizedBox(height: 8),
-            ], // конец if (_mode == _AddFormMode.lesson)
+            const SizedBox(height: 8),
+          ], // конец if (_mode == _AddFormMode.lesson)
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   /// Создание бронирования
