@@ -380,11 +380,13 @@ class LessonRepository {
 
   /// Проверить конфликты для списка дат
   /// Возвращает список дат с конфликтами
+  /// [studentId] - если передан, разрешает занятие поверх своего постоянного слота
   Future<List<DateTime>> checkConflictsForDates({
     required String roomId,
     required List<DateTime> dates,
     required TimeOfDay startTime,
     required TimeOfDay endTime,
+    String? studentId,
   }) async {
     final conflictDates = <DateTime>[];
 
@@ -394,6 +396,7 @@ class LessonRepository {
         date: date,
         startTime: startTime,
         endTime: endTime,
+        studentId: studentId,
       );
       if (hasConflict) {
         conflictDates.add(date);
@@ -558,7 +561,8 @@ class LessonRepository {
     }
   }
 
-  /// Проверить конфликт времени (с занятиями и бронями)
+  /// Проверить конфликт времени (с занятиями, бронями и постоянными слотами)
+  /// [studentId] - если передан, разрешает занятие поверх своего постоянного слота
   Future<bool> hasTimeConflict({
     required String roomId,
     required DateTime date,
@@ -566,6 +570,7 @@ class LessonRepository {
     required TimeOfDay endTime,
     String? excludeLessonId,
     String? excludeBookingId,
+    String? studentId,
   }) async {
     try {
       final dateStr = date.toIso8601String().split('T').first;
@@ -604,10 +609,116 @@ class LessonRepository {
       }
 
       final bookingData = await bookingQuery;
-      return (bookingData as List).isNotEmpty;
+      if ((bookingData as List).isNotEmpty) return true;
+
+      // 3. Проверяем конфликт с постоянными слотами (student_schedules)
+      final hasScheduleConflict = await _checkScheduleSlotConflict(
+        roomId: roomId,
+        date: date,
+        startTime: startTime,
+        endTime: endTime,
+        allowStudentId: studentId,
+      );
+      if (hasScheduleConflict) return true;
+
+      return false;
     } catch (e) {
       throw DatabaseException('Ошибка проверки конфликта: $e');
     }
+  }
+
+  /// Проверить конфликт с постоянными слотами расписания
+  /// Возвращает true если есть конфликт
+  Future<bool> _checkScheduleSlotConflict({
+    required String roomId,
+    required DateTime date,
+    required TimeOfDay startTime,
+    required TimeOfDay endTime,
+    String? allowStudentId,
+  }) async {
+    final dayOfWeek = date.weekday;
+    final startMinutes = startTime.hour * 60 + startTime.minute;
+    final endMinutes = endTime.hour * 60 + endTime.minute;
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+
+    // Получаем активные слоты для этого дня недели
+    // Фильтрацию по кабинету и времени делаем на клиенте из-за replacement_room_id
+    final slotsData = await _client
+        .from('student_schedules')
+        .select('''
+          id, student_id, room_id, day_of_week, start_time, end_time,
+          is_active, is_paused, pause_until,
+          replacement_room_id, replacement_until,
+          valid_from, valid_until,
+          schedule_exceptions(exception_date)
+        ''')
+        .eq('day_of_week', dayOfWeek)
+        .eq('is_active', true);
+
+    for (final slot in slotsData as List) {
+      // Пропускаем слот своего ученика (можно создать занятие поверх своего слота)
+      if (allowStudentId != null && slot['student_id'] == allowStudentId) {
+        continue;
+      }
+
+      // Определяем актуальный кабинет слота на эту дату
+      String effectiveRoomId = slot['room_id'];
+      if (slot['replacement_room_id'] != null && slot['replacement_until'] != null) {
+        final replacementUntil = DateTime.parse(slot['replacement_until']);
+        if (!normalizedDate.isAfter(replacementUntil)) {
+          effectiveRoomId = slot['replacement_room_id'];
+        }
+      }
+
+      // Пропускаем если кабинет не совпадает
+      if (effectiveRoomId != roomId) continue;
+
+      // Проверяем паузу
+      if (slot['is_paused'] == true) {
+        if (slot['pause_until'] == null) continue; // Бессрочная пауза
+        final pauseUntil = DateTime.parse(slot['pause_until']);
+        if (!normalizedDate.isAfter(pauseUntil)) continue; // Ещё на паузе
+      }
+
+      // Проверяем период действия
+      if (slot['valid_from'] != null) {
+        final validFrom = DateTime.parse(slot['valid_from']);
+        if (normalizedDate.isBefore(validFrom)) continue;
+      }
+      if (slot['valid_until'] != null) {
+        final validUntil = DateTime.parse(slot['valid_until']);
+        if (normalizedDate.isAfter(validUntil)) continue;
+      }
+
+      // Проверяем исключения
+      final exceptions = slot['schedule_exceptions'] as List?;
+      if (exceptions != null) {
+        bool hasException = false;
+        for (final exc in exceptions) {
+          final excDate = DateTime.parse(exc['exception_date']);
+          if (excDate.year == normalizedDate.year &&
+              excDate.month == normalizedDate.month &&
+              excDate.day == normalizedDate.day) {
+            hasException = true;
+            break;
+          }
+        }
+        if (hasException) continue;
+      }
+
+      // Проверяем пересечение времени
+      final slotStartParts = (slot['start_time'] as String).split(':');
+      final slotEndParts = (slot['end_time'] as String).split(':');
+      final slotStartMinutes = int.parse(slotStartParts[0]) * 60 + int.parse(slotStartParts[1]);
+      final slotEndMinutes = int.parse(slotEndParts[0]) * 60 + int.parse(slotEndParts[1]);
+
+      // Пересечение: start < other_end AND end > other_start
+      if (startMinutes < slotEndMinutes && endMinutes > slotStartMinutes) {
+        return true; // Есть конфликт
+      }
+    }
+
+    return false;
   }
 
   /// Получить неотмеченные занятия (прошедшие, но без статуса)
@@ -873,4 +984,373 @@ class LessonRepository {
       throw DatabaseException('Ошибка загрузки участников группы: $e');
     }
   }
+
+  // ============================================================
+  // BULK-ОПЕРАЦИИ для массового управления занятиями
+  // ============================================================
+
+  /// Получить все будущие занятия преподавателя
+  /// Возвращает занятия с датой >= сегодня и статусом scheduled
+  Future<List<Lesson>> getFutureLessonsForTeacher(
+    String teacherId,
+    String institutionId,
+  ) async {
+    try {
+      final todayStr = DateTime.now().toIso8601String().split('T').first;
+
+      final data = await _client
+          .from('lessons')
+          .select('''
+            *,
+            rooms(*),
+            subjects(*),
+            lesson_types(*),
+            students(*),
+            student_groups(*),
+            lesson_students(*, students(*))
+          ''')
+          .eq('teacher_id', teacherId)
+          .eq('institution_id', institutionId)
+          .gte('date', todayStr)
+          .eq('status', 'scheduled')
+          .isFilter('archived_at', null)
+          .order('date')
+          .order('start_time');
+
+      return (data as List).map((item) => Lesson.fromJson(item)).toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки будущих занятий преподавателя: $e');
+    }
+  }
+
+  /// Получить все будущие занятия ученика
+  /// Возвращает занятия с датой >= сегодня и статусом scheduled
+  Future<List<Lesson>> getFutureLessonsForStudent(String studentId) async {
+    try {
+      final todayStr = DateTime.now().toIso8601String().split('T').first;
+
+      // Получаем индивидуальные занятия
+      final individualData = await _client
+          .from('lessons')
+          .select('''
+            *,
+            rooms(*),
+            subjects(*),
+            lesson_types(*),
+            students(*),
+            student_groups(*),
+            lesson_students(*, students(*))
+          ''')
+          .eq('student_id', studentId)
+          .gte('date', todayStr)
+          .eq('status', 'scheduled')
+          .isFilter('archived_at', null)
+          .order('date')
+          .order('start_time');
+
+      // Получаем групповые занятия (через lesson_students)
+      final groupLessonsIds = await _client
+          .from('lesson_students')
+          .select('lesson_id')
+          .eq('student_id', studentId);
+
+      final groupIds = (groupLessonsIds as List).map((item) => item['lesson_id'] as String).toList();
+
+      List<Lesson> groupLessons = [];
+      if (groupIds.isNotEmpty) {
+        final groupData = await _client
+            .from('lessons')
+            .select('''
+              *,
+              rooms(*),
+              subjects(*),
+              lesson_types(*),
+              students(*),
+              student_groups(*),
+              lesson_students(*, students(*))
+            ''')
+            .inFilter('id', groupIds)
+            .gte('date', todayStr)
+            .eq('status', 'scheduled')
+            .isFilter('archived_at', null)
+            .order('date')
+            .order('start_time');
+
+        groupLessons = (groupData as List).map((item) => Lesson.fromJson(item)).toList();
+      }
+
+      // Объединяем и сортируем
+      final allLessons = [
+        ...(individualData as List).map((item) => Lesson.fromJson(item)),
+        ...groupLessons,
+      ];
+
+      // Убираем дубликаты (если есть)
+      final uniqueIds = <String>{};
+      return allLessons.where((l) => uniqueIds.add(l.id)).toList()
+        ..sort((a, b) {
+          final dateCompare = a.date.compareTo(b.date);
+          if (dateCompare != 0) return dateCompare;
+          final aMinutes = a.startTime.hour * 60 + a.startTime.minute;
+          final bMinutes = b.startTime.hour * 60 + b.startTime.minute;
+          return aMinutes.compareTo(bMinutes);
+        });
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки будущих занятий ученика: $e');
+    }
+  }
+
+  /// Удалить все будущие занятия преподавателя
+  /// Возвращает количество удалённых занятий
+  Future<int> deleteFutureLessonsForTeacher(
+    String teacherId,
+    String institutionId,
+  ) async {
+    try {
+      final todayStr = DateTime.now().toIso8601String().split('T').first;
+
+      // Получаем ID занятий для удаления
+      final lessonIds = await _client
+          .from('lessons')
+          .select('id')
+          .eq('teacher_id', teacherId)
+          .eq('institution_id', institutionId)
+          .gte('date', todayStr)
+          .eq('status', 'scheduled')
+          .isFilter('archived_at', null);
+
+      final ids = (lessonIds as List).map((item) => item['id'] as String).toList();
+      if (ids.isEmpty) return 0;
+
+      // Удаляем связанные данные
+      for (final id in ids) {
+        await _client.from('lesson_students').delete().eq('lesson_id', id);
+        await _client.from('lesson_history').delete().eq('lesson_id', id);
+      }
+
+      // Удаляем сами занятия
+      await _client
+          .from('lessons')
+          .delete()
+          .inFilter('id', ids);
+
+      return ids.length;
+    } catch (e) {
+      throw DatabaseException('Ошибка удаления будущих занятий преподавателя: $e');
+    }
+  }
+
+  /// Удалить все будущие занятия ученика
+  /// Возвращает количество удалённых занятий
+  Future<int> deleteFutureLessonsForStudent(String studentId) async {
+    try {
+      final todayStr = DateTime.now().toIso8601String().split('T').first;
+
+      // Получаем ID индивидуальных занятий
+      final individualIds = await _client
+          .from('lessons')
+          .select('id')
+          .eq('student_id', studentId)
+          .gte('date', todayStr)
+          .eq('status', 'scheduled')
+          .isFilter('archived_at', null);
+
+      final ids = (individualIds as List).map((item) => item['id'] as String).toList();
+      if (ids.isEmpty) return 0;
+
+      // Удаляем связанные данные
+      for (final id in ids) {
+        await _client.from('lesson_students').delete().eq('lesson_id', id);
+        await _client.from('lesson_history').delete().eq('lesson_id', id);
+      }
+
+      // Удаляем сами занятия
+      await _client
+          .from('lessons')
+          .delete()
+          .inFilter('id', ids);
+
+      return ids.length;
+    } catch (e) {
+      throw DatabaseException('Ошибка удаления будущих занятий ученика: $e');
+    }
+  }
+
+  /// Проверить конфликты для переназначения занятий другому преподавателю
+  /// Возвращает список занятий с конфликтами и описанием проблемы
+  Future<List<LessonConflict>> checkReassignmentConflicts(
+    List<Lesson> lessons,
+    String newTeacherId,
+  ) async {
+    if (lessons.isEmpty) return [];
+
+    final conflicts = <LessonConflict>[];
+
+    for (final lesson in lessons) {
+      // Проверяем, не занят ли новый преподаватель в это время
+      final dateStr = lesson.date.toIso8601String().split('T').first;
+      final startStr = '${lesson.startTime.hour.toString().padLeft(2, '0')}:${lesson.startTime.minute.toString().padLeft(2, '0')}';
+      final endStr = '${lesson.endTime.hour.toString().padLeft(2, '0')}:${lesson.endTime.minute.toString().padLeft(2, '0')}';
+
+      try {
+        // Проверка занятости преподавателя
+        final teacherConflicts = await _client
+            .from('lessons')
+            .select('id')
+            .eq('teacher_id', newTeacherId)
+            .eq('date', dateStr)
+            .isFilter('archived_at', null)
+            .neq('id', lesson.id)
+            .or('start_time.lt.$endStr,end_time.gt.$startStr')
+            .limit(1);
+
+        if ((teacherConflicts as List).isNotEmpty) {
+          conflicts.add(LessonConflict(
+            lesson: lesson,
+            type: ConflictType.teacherBusy,
+            description: 'Преподаватель занят в это время',
+          ));
+          continue;
+        }
+
+        // Проверка брони кабинета (если бронь перекрывает время занятия)
+        final bookingConflicts = await _client
+            .from('bookings')
+            .select('id, booking_rooms!inner(room_id)')
+            .eq('date', dateStr)
+            .eq('booking_rooms.room_id', lesson.roomId)
+            .or('start_time.lt.$endStr,end_time.gt.$startStr')
+            .limit(1);
+
+        if ((bookingConflicts as List).isNotEmpty) {
+          conflicts.add(LessonConflict(
+            lesson: lesson,
+            type: ConflictType.bookingConflict,
+            description: 'Кабинет забронирован в это время',
+          ));
+        }
+      } catch (e) {
+        // При ошибке проверки добавляем как конфликт
+        conflicts.add(LessonConflict(
+          lesson: lesson,
+          type: ConflictType.unknown,
+          description: 'Ошибка проверки: $e',
+        ));
+      }
+    }
+
+    return conflicts;
+  }
+
+  /// Переназначить занятия другому преподавателю
+  /// Возвращает список переназначенных занятий
+  Future<List<Lesson>> reassignLessons(
+    List<String> lessonIds,
+    String newTeacherId,
+  ) async {
+    if (lessonIds.isEmpty) return [];
+    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
+
+    try {
+      // Обновляем teacher_id для всех занятий
+      await _client
+          .from('lessons')
+          .update({
+            'teacher_id': newTeacherId,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .inFilter('id', lessonIds);
+
+      // Создаём записи в истории для каждого занятия
+      for (final lessonId in lessonIds) {
+        await _client.from('lesson_history').insert({
+          'lesson_id': lessonId,
+          'changed_by': _userId,
+          'change_type': 'reassigned',
+          'new_values': {'teacher_id': newTeacherId},
+        });
+      }
+
+      // Возвращаем обновлённые занятия
+      final data = await _client
+          .from('lessons')
+          .select('''
+            *,
+            rooms(*),
+            subjects(*),
+            lesson_types(*),
+            students(*),
+            student_groups(*),
+            lesson_students(*, students(*))
+          ''')
+          .inFilter('id', lessonIds);
+
+      return (data as List).map((item) => Lesson.fromJson(item)).toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка переназначения занятий: $e');
+    }
+  }
+
+  /// Получить количество будущих занятий преподавателя
+  Future<int> countFutureLessonsForTeacher(
+    String teacherId,
+    String institutionId,
+  ) async {
+    try {
+      final todayStr = DateTime.now().toIso8601String().split('T').first;
+
+      final result = await _client
+          .from('lessons')
+          .select('id')
+          .eq('teacher_id', teacherId)
+          .eq('institution_id', institutionId)
+          .gte('date', todayStr)
+          .eq('status', 'scheduled')
+          .isFilter('archived_at', null);
+
+      return (result as List).length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Получить количество будущих занятий ученика
+  Future<int> countFutureLessonsForStudent(String studentId) async {
+    try {
+      final todayStr = DateTime.now().toIso8601String().split('T').first;
+
+      final result = await _client
+          .from('lessons')
+          .select('id')
+          .eq('student_id', studentId)
+          .gte('date', todayStr)
+          .eq('status', 'scheduled')
+          .isFilter('archived_at', null);
+
+      return (result as List).length;
+    } catch (e) {
+      return 0;
+    }
+  }
+}
+
+/// Тип конфликта при переназначении
+enum ConflictType {
+  teacherBusy,      // Преподаватель занят
+  roomBusy,         // Кабинет занят другим занятием
+  bookingConflict,  // Кабинет забронирован
+  unknown,          // Неизвестная ошибка
+}
+
+/// Конфликт при переназначении занятия
+class LessonConflict {
+  final Lesson lesson;
+  final ConflictType type;
+  final String description;
+
+  const LessonConflict({
+    required this.lesson,
+    required this.type,
+    required this.description,
+  });
 }

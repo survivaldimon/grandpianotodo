@@ -18,6 +18,11 @@ import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
 import 'package:kabinet/shared/models/lesson_type.dart';
+import 'package:kabinet/features/student_schedules/providers/student_schedule_provider.dart';
+import 'package:kabinet/features/student_schedules/repositories/student_schedule_repository.dart';
+import 'package:kabinet/shared/models/student_schedule.dart';
+import 'package:kabinet/features/rooms/providers/room_provider.dart';
+import 'package:kabinet/core/widgets/ios_time_picker.dart';
 import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/shared/models/payment.dart';
 import 'package:kabinet/shared/models/payment_plan.dart';
@@ -25,6 +30,10 @@ import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/subscription.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/features/students/widgets/merge_students_dialog.dart';
+import 'package:kabinet/features/schedule/repositories/lesson_repository.dart';
+import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
+import 'package:kabinet/shared/models/lesson.dart';
+import 'package:kabinet/shared/models/institution_member.dart';
 
 /// Экран профиля ученика
 class StudentDetailScreen extends ConsumerWidget {
@@ -257,6 +266,9 @@ class StudentDetailScreen extends ConsumerWidget {
                   hasDebt: hasDebt,
                   studentId: studentId,
                   onAddPayment: canEditStudent ? () => _showAddPaymentDialog(context, ref) : null,
+                  onManageLessons: canEditStudent && !student.isArchived
+                      ? () => _showBulkLessonActionsSheet(context, ref, student)
+                      : null,
                   showAvgCost: hasFullAccess, // Только владелец/админ видит среднюю стоимость
                 ),
                 const SizedBox(height: 16),
@@ -296,6 +308,14 @@ class StudentDetailScreen extends ConsumerWidget {
                       )).toList(),
                     );
                   },
+                ),
+                const SizedBox(height: 24),
+
+                // Schedule slots section
+                _ScheduleSlotsSection(
+                  studentId: studentId,
+                  institutionId: institutionId,
+                  canEdit: canEditStudent,
                 ),
                 const SizedBox(height: 24),
 
@@ -435,6 +455,22 @@ class StudentDetailScreen extends ConsumerWidget {
             child: const Text('Сохранить'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showBulkLessonActionsSheet(BuildContext context, WidgetRef ref, Student student) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _BulkLessonActionsSheet(
+        student: student,
+        institutionId: institutionId,
+        onCompleted: () {
+          // Инвалидируем провайдеры после операций
+          ref.invalidate(studentProvider(studentId));
+          ref.invalidate(studentLessonStatsProvider(studentId));
+        },
       ),
     );
   }
@@ -795,6 +831,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
   final bool hasDebt;
   final String studentId;
   final VoidCallback? onAddPayment;
+  final VoidCallback? onManageLessons;
   final bool showAvgCost;
 
   const _BalanceAndCostCard({
@@ -802,6 +839,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
     required this.hasDebt,
     required this.studentId,
     this.onAddPayment,
+    this.onManageLessons,
     this.showAvgCost = true,
   });
 
@@ -957,13 +995,30 @@ class _BalanceAndCostCard extends ConsumerWidget {
                 ], // if (showAvgCost)
               ],
             ),
-            if (onAddPayment != null) ...[
+            if (onAddPayment != null || onManageLessons != null) ...[
               const SizedBox(height: 16),
-              // Кнопка добавить оплату
-              ElevatedButton.icon(
-                onPressed: onAddPayment,
-                icon: const Icon(Icons.add),
-                label: const Text(AppStrings.addPayment),
+              // Кнопки управления и оплаты
+              Row(
+                children: [
+                  if (onManageLessons != null)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onManageLessons,
+                        icon: const Icon(Icons.event_note),
+                        label: const Text('Управление'),
+                      ),
+                    ),
+                  if (onManageLessons != null && onAddPayment != null)
+                    const SizedBox(width: 8),
+                  if (onAddPayment != null)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: onAddPayment,
+                        icon: const Icon(Icons.add),
+                        label: const Text(AppStrings.addPayment),
+                      ),
+                    ),
+                ],
               ),
             ],
           ],
@@ -2922,6 +2977,2341 @@ class _MergedStudentsCard extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Секция постоянного расписания ученика
+class _ScheduleSlotsSection extends ConsumerWidget {
+  final String studentId;
+  final String institutionId;
+  final bool canEdit;
+
+  const _ScheduleSlotsSection({
+    required this.studentId,
+    required this.institutionId,
+    this.canEdit = true,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeSchedules = ref.watch(activeStudentSchedulesProvider(studentId));
+    final inactiveSchedules = ref.watch(inactiveStudentSchedulesProvider(studentId));
+    final schedulesAsync = ref.watch(studentSchedulesStreamProvider(studentId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Постоянное расписание',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            if (canEdit)
+              IconButton(
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: () => _showAddScheduleSlotSheet(context, ref),
+                tooltip: 'Добавить слот',
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Loading state
+        schedulesAsync.when(
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (e, _) => Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Ошибка загрузки: $e',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          ),
+          data: (_) {
+            if (activeSchedules.isEmpty && inactiveSchedules.isEmpty) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.event_repeat,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Нет постоянного расписания',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Active schedules
+                ...activeSchedules.map((schedule) => _ScheduleSlotCard(
+                  schedule: schedule,
+                  institutionId: institutionId,
+                  canEdit: canEdit,
+                )),
+
+                // Inactive schedules in ExpansionTile
+                if (inactiveSchedules.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text(
+                      'Архив (${inactiveSchedules.length})',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    children: inactiveSchedules.map((schedule) => _ScheduleSlotCard(
+                      schedule: schedule,
+                      institutionId: institutionId,
+                      canEdit: canEdit,
+                      isInactive: true,
+                    )).toList(),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  void _showAddScheduleSlotSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => _AddScheduleSlotSheet(
+        studentId: studentId,
+        institutionId: institutionId,
+      ),
+    );
+  }
+}
+
+/// Карточка слота расписания
+class _ScheduleSlotCard extends ConsumerWidget {
+  final StudentSchedule schedule;
+  final String institutionId;
+  final bool canEdit;
+  final bool isInactive;
+
+  const _ScheduleSlotCard({
+    required this.schedule,
+    required this.institutionId,
+    this.canEdit = true,
+    this.isInactive = false,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    // Используем цвет темы (цвет преподавателя хранится в InstitutionMember, не в Profile)
+    final teacherColor = theme.colorScheme.primary;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: isInactive ? theme.colorScheme.surfaceContainerHighest : null,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: canEdit ? () => _showSlotOptionsSheet(context, ref) : null,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Day indicator
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isInactive
+                      ? theme.colorScheme.surfaceContainerHigh
+                      : teacherColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      schedule.dayName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: isInactive
+                            ? theme.colorScheme.onSurfaceVariant
+                            : teacherColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Main info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Time
+                    Text(
+                      schedule.timeRange,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isInactive
+                            ? theme.colorScheme.onSurfaceVariant
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+
+                    // Room
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.meeting_room,
+                          size: 14,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            schedule.room?.name ?? 'Кабинет',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Replacement indicator
+                        if (schedule.hasReplacement) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '→ ${schedule.replacementRoom?.name ?? 'Замена'}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: Colors.orange.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+
+                    // Teacher
+                    if (schedule.teacher != null) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              schedule.teacher!.fullName,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // Status indicators
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (schedule.isPaused)
+                    Tooltip(
+                      message: schedule.pauseUntil != null
+                          ? 'Пауза до ${DateFormat('dd.MM').format(schedule.pauseUntil!)}'
+                          : 'На паузе',
+                      child: Icon(
+                        Icons.pause_circle,
+                        size: 20,
+                        color: Colors.orange.shade600,
+                      ),
+                    )
+                  else if (isInactive)
+                    const Icon(
+                      Icons.archive,
+                      size: 20,
+                      color: AppColors.textSecondary,
+                    )
+                  else
+                    Icon(
+                      Icons.repeat,
+                      size: 20,
+                      color: teacherColor,
+                    ),
+                  if (canEdit)
+                    Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSlotOptionsSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          schedule.dayName,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${schedule.dayNameFull}, ${schedule.timeRange}',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          Text(
+                            schedule.room?.name ?? 'Кабинет',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+
+              // Actions
+              if (!isInactive) ...[
+                // Pause/Resume
+                if (schedule.isPaused)
+                  ListTile(
+                    leading: const Icon(Icons.play_arrow, color: Colors.green),
+                    title: const Text('Возобновить'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _resumeSchedule(context, ref);
+                    },
+                  )
+                else
+                  ListTile(
+                    leading: Icon(Icons.pause, color: Colors.orange.shade600),
+                    title: const Text('Приостановить'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _showPauseDialog(context, ref);
+                    },
+                  ),
+
+                // Replacement room
+                if (schedule.hasReplacement)
+                  ListTile(
+                    leading: const Icon(Icons.undo, color: AppColors.primary),
+                    title: const Text('Снять замену кабинета'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _clearReplacement(context, ref);
+                    },
+                  )
+                else
+                  ListTile(
+                    leading: const Icon(Icons.swap_horiz, color: AppColors.primary),
+                    title: const Text('Временная замена кабинета'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _showReplacementDialog(context, ref);
+                    },
+                  ),
+
+                // Deactivate
+                ListTile(
+                  leading: const Icon(Icons.archive, color: Colors.orange),
+                  title: const Text('Деактивировать'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _deactivateSchedule(context, ref);
+                  },
+                ),
+              ] else ...[
+                // Reactivate
+                ListTile(
+                  leading: const Icon(Icons.unarchive, color: Colors.green),
+                  title: const Text('Активировать'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _reactivateSchedule(context, ref);
+                  },
+                ),
+              ],
+
+              // Delete
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _deleteSchedule(context, ref);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _resumeSchedule(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(studentScheduleControllerProvider.notifier);
+    final success = await controller.resume(
+      schedule.id,
+      institutionId,
+      schedule.studentId,
+    );
+    if (success && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Расписание возобновлено')),
+      );
+    }
+  }
+
+  void _showPauseDialog(BuildContext context, WidgetRef ref) {
+    DateTime? pauseUntil;
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Приостановить расписание'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('До какой даты приостановить?'),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now().add(const Duration(days: 7)),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (picked != null) {
+                    setState(() => pauseUntil = picked);
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Дата возобновления',
+                    suffixIcon: Icon(Icons.calendar_today),
+                  ),
+                  child: Text(
+                    pauseUntil != null
+                        ? DateFormat('dd.MM.yyyy').format(pauseUntil!)
+                        : 'Выберите дату',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Отмена'),
+            ),
+            ElevatedButton(
+              onPressed: pauseUntil == null
+                  ? null
+                  : () async {
+                      Navigator.pop(dialogContext);
+                      final controller = ref.read(studentScheduleControllerProvider.notifier);
+                      final success = await controller.pause(
+                        schedule.id,
+                        pauseUntil!,
+                        institutionId,
+                        schedule.studentId,
+                      );
+                      if (success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Расписание приостановлено до ${DateFormat('dd.MM.yyyy').format(pauseUntil!)}',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+              child: const Text('Приостановить'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _clearReplacement(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(studentScheduleControllerProvider.notifier);
+    final success = await controller.clearReplacement(
+      schedule.id,
+      institutionId,
+      schedule.studentId,
+    );
+    if (success && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Замена кабинета снята')),
+      );
+    }
+  }
+
+  void _showReplacementDialog(BuildContext context, WidgetRef ref) {
+    String? selectedRoomId;
+    DateTime? replacementUntil;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) {
+          final roomsAsync = ref.watch(roomsStreamProvider(institutionId));
+
+          return AlertDialog(
+            title: const Text('Временная замена кабинета'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Room dropdown
+                roomsAsync.when(
+                  loading: () => const CircularProgressIndicator(),
+                  error: (e, _) => Text('Ошибка: $e'),
+                  data: (rooms) => DropdownButtonFormField<String>(
+                    value: selectedRoomId,
+                    decoration: const InputDecoration(labelText: 'Новый кабинет'),
+                    items: rooms
+                        .where((r) => r.id != schedule.roomId)
+                        .map((r) => DropdownMenuItem(
+                              value: r.id,
+                              child: Text(r.name),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() => selectedRoomId = v),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Date picker
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 7)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) {
+                      setState(() => replacementUntil = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'До какой даты',
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    child: Text(
+                      replacementUntil != null
+                          ? DateFormat('dd.MM.yyyy').format(replacementUntil!)
+                          : 'Выберите дату',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Отмена'),
+              ),
+              ElevatedButton(
+                onPressed: selectedRoomId == null || replacementUntil == null
+                    ? null
+                    : () async {
+                        Navigator.pop(dialogContext);
+                        final controller = ref.read(studentScheduleControllerProvider.notifier);
+                        final success = await controller.setReplacement(
+                          schedule.id,
+                          selectedRoomId!,
+                          replacementUntil!,
+                          institutionId,
+                          schedule.studentId,
+                        );
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Замена кабинета установлена')),
+                          );
+                        }
+                      },
+                child: const Text('Применить'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _deactivateSchedule(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Деактивировать расписание?'),
+        content: const Text(
+          'Слот будет перемещён в архив. Вы сможете активировать его позже.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Деактивировать'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final controller = ref.read(studentScheduleControllerProvider.notifier);
+      final success = await controller.deactivate(
+        schedule.id,
+        institutionId,
+        schedule.studentId,
+      );
+      if (success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Расписание деактивировано')),
+        );
+      }
+    }
+  }
+
+  void _reactivateSchedule(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(studentScheduleControllerProvider.notifier);
+    final success = await controller.reactivate(
+      schedule.id,
+      institutionId,
+      schedule.studentId,
+    );
+    if (success && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Расписание активировано')),
+      );
+    }
+  }
+
+  void _deleteSchedule(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить расписание?'),
+        content: const Text(
+          'Этот слот будет удалён навсегда. Это действие нельзя отменить.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final controller = ref.read(studentScheduleControllerProvider.notifier);
+      final success = await controller.delete(
+        schedule.id,
+        institutionId,
+        schedule.studentId,
+      );
+      if (success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Расписание удалено')),
+        );
+      }
+    }
+  }
+}
+
+/// Форма добавления нового слота расписания
+class _AddScheduleSlotSheet extends ConsumerStatefulWidget {
+  final String studentId;
+  final String institutionId;
+
+  const _AddScheduleSlotSheet({
+    required this.studentId,
+    required this.institutionId,
+  });
+
+  @override
+  ConsumerState<_AddScheduleSlotSheet> createState() => _AddScheduleSlotSheetState();
+}
+
+class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
+  final _formKey = GlobalKey<FormState>();
+
+  // Выбранные дни недели (для batch создания)
+  final Set<int> _selectedDays = {};
+
+  // Время для каждого дня
+  final Map<int, TimeOfDay> _startTimes = {};
+  final Map<int, TimeOfDay> _endTimes = {};
+
+  String? _selectedRoomId;
+  String? _selectedTeacherId;
+  String? _selectedSubjectId;
+  String? _selectedLessonTypeId;
+
+  bool _isSubmitting = false;
+  bool _bindingsLoaded = false;
+
+  // Проверка конфликтов
+  bool _isCheckingConflicts = false;
+  final Set<int> _conflictingDays = {}; // Дни с конфликтами
+
+  static const _defaultStartTime = TimeOfDay(hour: 14, minute: 0);
+  static const _defaultEndTime = TimeOfDay(hour: 15, minute: 0);
+
+  @override
+  void initState() {
+    super.initState();
+    // Отложенная загрузка привязок ученика для автозаполнения
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadStudentBindings();
+    });
+  }
+
+  /// Загружает привязки ученика и автозаполняет поля
+  Future<void> _loadStudentBindings() async {
+    if (_bindingsLoaded) return;
+
+    // Преподаватели ученика
+    final teachersAsync = ref.read(studentTeachersProvider(widget.studentId));
+    final teachers = teachersAsync.valueOrNull ?? [];
+    if (teachers.length == 1 && _selectedTeacherId == null) {
+      setState(() => _selectedTeacherId = teachers.first.userId);
+    }
+
+    // Предметы ученика
+    final subjectsAsync = ref.read(studentSubjectsProvider(widget.studentId));
+    final subjects = subjectsAsync.valueOrNull ?? [];
+    if (subjects.length == 1 && _selectedSubjectId == null) {
+      setState(() => _selectedSubjectId = subjects.first.subjectId);
+    }
+
+    // Типы занятий ученика
+    final lessonTypesAsync = ref.read(studentLessonTypesProvider(widget.studentId));
+    final lessonTypes = lessonTypesAsync.valueOrNull ?? [];
+    if (lessonTypes.length == 1 && _selectedLessonTypeId == null) {
+      setState(() => _selectedLessonTypeId = lessonTypes.first.lessonTypeId);
+    }
+
+    _bindingsLoaded = true;
+  }
+
+  /// Проверяет конфликты для всех выбранных дней
+  /// Проверяет: 1) другие постоянные расписания, 2) ВСЕ будущие занятия
+  Future<void> _checkConflicts() async {
+    if (_selectedRoomId == null || _selectedDays.isEmpty) {
+      setState(() {
+        _conflictingDays.clear();
+        _isCheckingConflicts = false;
+      });
+      return;
+    }
+
+    setState(() => _isCheckingConflicts = true);
+
+    final repo = ref.read(studentScheduleRepositoryProvider);
+    final newConflicts = <int>{};
+
+    for (final day in _selectedDays) {
+      final startTime = _startTimes[day] ?? _defaultStartTime;
+      final endTime = _endTimes[day] ?? _defaultEndTime;
+
+      // 1. Проверяем конфликт с другими постоянными расписаниями
+      final hasScheduleConflict = await repo.hasScheduleConflict(
+        roomId: _selectedRoomId!,
+        dayOfWeek: day,
+        startTime: startTime,
+        endTime: endTime,
+      );
+
+      if (hasScheduleConflict) {
+        newConflicts.add(day);
+        continue; // Уже конфликт — не нужно проверять занятия
+      }
+
+      // 2. Проверяем конфликт с ВСЕМИ будущими занятиями для этого дня недели
+      final hasLessonConflict = await repo.hasLessonConflictForDayOfWeek(
+        roomId: _selectedRoomId!,
+        dayOfWeek: day,
+        startTime: startTime,
+        endTime: endTime,
+        studentId: widget.studentId, // Исключаем занятия этого ученика
+      );
+
+      if (hasLessonConflict) {
+        newConflicts.add(day);
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _conflictingDays.clear();
+        _conflictingDays.addAll(newConflicts);
+        _isCheckingConflicts = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final roomsAsync = ref.watch(roomsStreamProvider(widget.institutionId));
+    final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
+    final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
+    final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
+    final currentUserId = ref.watch(currentUserIdProvider);
+
+    // Привязки ученика для автозаполнения
+    final studentTeachersAsync = ref.watch(studentTeachersProvider(widget.studentId));
+    final studentSubjectsAsync = ref.watch(studentSubjectsProvider(widget.studentId));
+    final studentLessonTypesAsync = ref.watch(studentLessonTypesProvider(widget.studentId));
+
+    final studentTeachers = studentTeachersAsync.valueOrNull ?? [];
+    final studentSubjects = studentSubjectsAsync.valueOrNull ?? [];
+    final studentLessonTypes = studentLessonTypesAsync.valueOrNull ?? [];
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Title
+              Text(
+                'Добавить постоянное расписание',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Выберите дни недели и время занятий',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Days of week selection
+              Text(
+                'Дни недели',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              _buildDaysSelector(),
+              const SizedBox(height: 16),
+
+              // Time for each selected day
+              if (_selectedDays.isNotEmpty) ...[
+                Text(
+                  'Время занятий',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                ..._buildDayTimeRows(),
+                const SizedBox(height: 16),
+              ],
+
+              // Room dropdown
+              roomsAsync.when(
+                loading: () => const LinearProgressIndicator(),
+                error: (e, _) => Text('Ошибка: $e'),
+                data: (rooms) => DropdownButtonFormField<String>(
+                  value: _selectedRoomId,
+                  decoration: const InputDecoration(
+                    labelText: 'Кабинет *',
+                    prefixIcon: Icon(Icons.meeting_room),
+                  ),
+                  items: rooms
+                      .map((r) => DropdownMenuItem(value: r.id, child: Text(r.name)))
+                      .toList(),
+                  onChanged: (v) {
+                    setState(() => _selectedRoomId = v);
+                    _checkConflicts();
+                  },
+                  validator: (v) => v == null ? 'Выберите кабинет' : null,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Teacher dropdown (приоритет привязанным преподавателям)
+              membersAsync.when(
+                loading: () => const LinearProgressIndicator(),
+                error: (e, _) => Text('Ошибка: $e'),
+                data: (members) {
+                  // Если преподаватель не выбран
+                  if (_selectedTeacherId == null && members.isNotEmpty) {
+                    // Сначала пробуем привязанного преподавателя
+                    if (studentTeachers.length == 1) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && _selectedTeacherId == null) {
+                          setState(() => _selectedTeacherId = studentTeachers.first.userId);
+                        }
+                      });
+                    } else {
+                      // Иначе текущего пользователя
+                      final currentMember = members.firstWhere(
+                        (m) => m.userId == currentUserId,
+                        orElse: () => members.first,
+                      );
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && _selectedTeacherId == null) {
+                          setState(() => _selectedTeacherId = currentMember.userId);
+                        }
+                      });
+                    }
+                  }
+
+                  // Сортируем: сначала привязанные преподаватели
+                  final bindingUserIds = studentTeachers.map((t) => t.userId).toSet();
+                  final sortedMembers = [...members]..sort((a, b) {
+                    final aIsBound = bindingUserIds.contains(a.userId) ? 0 : 1;
+                    final bIsBound = bindingUserIds.contains(b.userId) ? 0 : 1;
+                    return aIsBound.compareTo(bIsBound);
+                  });
+
+                  return DropdownButtonFormField<String>(
+                    value: _selectedTeacherId,
+                    decoration: const InputDecoration(
+                      labelText: 'Преподаватель *',
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    items: sortedMembers
+                        .map((m) => DropdownMenuItem(
+                              value: m.userId,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (bindingUserIds.contains(m.userId))
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Icon(
+                                        Icons.star,
+                                        size: 16,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                    ),
+                                  Flexible(
+                                    child: Text(
+                                      m.profile?.fullName ?? 'Преподаватель',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedTeacherId = v),
+                    validator: (v) => v == null ? 'Выберите преподавателя' : null,
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Subject dropdown (приоритет привязанным предметам)
+              subjectsAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (subjects) {
+                  if (subjects.isEmpty) return const SizedBox.shrink();
+
+                  // Автоматически выбираем если один привязанный предмет
+                  if (_selectedSubjectId == null && studentSubjects.length == 1) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && _selectedSubjectId == null) {
+                        setState(() => _selectedSubjectId = studentSubjects.first.subjectId);
+                      }
+                    });
+                  }
+
+                  // Сортируем: сначала привязанные предметы
+                  final bindingSubjectIds = studentSubjects.map((s) => s.subjectId).toSet();
+                  final sortedSubjects = [...subjects]..sort((a, b) {
+                    final aIsBound = bindingSubjectIds.contains(a.id) ? 0 : 1;
+                    final bIsBound = bindingSubjectIds.contains(b.id) ? 0 : 1;
+                    return aIsBound.compareTo(bIsBound);
+                  });
+
+                  return DropdownButtonFormField<String>(
+                    value: _selectedSubjectId,
+                    decoration: const InputDecoration(
+                      labelText: 'Предмет (опционально)',
+                      prefixIcon: Icon(Icons.book),
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Не указано')),
+                      ...sortedSubjects.map((s) => DropdownMenuItem(
+                        value: s.id,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (bindingSubjectIds.contains(s.id))
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Icon(
+                                  Icons.star,
+                                  size: 16,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            Flexible(
+                              child: Text(s.name, overflow: TextOverflow.ellipsis),
+                            ),
+                          ],
+                        ),
+                      )),
+                    ],
+                    onChanged: (v) => setState(() => _selectedSubjectId = v),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Lesson type dropdown (приоритет привязанным типам)
+              lessonTypesAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (types) {
+                  if (types.isEmpty) return const SizedBox.shrink();
+
+                  // Автоматически выбираем если один привязанный тип
+                  if (_selectedLessonTypeId == null && studentLessonTypes.length == 1) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && _selectedLessonTypeId == null) {
+                        setState(() => _selectedLessonTypeId = studentLessonTypes.first.lessonTypeId);
+                      }
+                    });
+                  }
+
+                  // Сортируем: сначала привязанные типы
+                  final bindingTypeIds = studentLessonTypes.map((t) => t.lessonTypeId).toSet();
+                  final sortedTypes = [...types]..sort((a, b) {
+                    final aIsBound = bindingTypeIds.contains(a.id) ? 0 : 1;
+                    final bIsBound = bindingTypeIds.contains(b.id) ? 0 : 1;
+                    return aIsBound.compareTo(bIsBound);
+                  });
+
+                  return DropdownButtonFormField<String>(
+                    value: _selectedLessonTypeId,
+                    decoration: const InputDecoration(
+                      labelText: 'Тип занятия (опционально)',
+                      prefixIcon: Icon(Icons.category),
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Не указано')),
+                      ...sortedTypes.map((t) => DropdownMenuItem(
+                        value: t.id,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (bindingTypeIds.contains(t.id))
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Icon(
+                                  Icons.star,
+                                  size: 16,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            Flexible(
+                              child: Text(t.name, overflow: TextOverflow.ellipsis),
+                            ),
+                          ],
+                        ),
+                      )),
+                    ],
+                    onChanged: (v) => setState(() => _selectedLessonTypeId = v),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Статус проверки конфликтов
+              if (_isCheckingConflicts)
+                Row(
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Проверка конфликтов...',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                )
+              else if (_conflictingDays.isNotEmpty)
+                Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Конфликты: ${_conflictingDays.length} (измените время)',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 16),
+
+              // Submit button
+              ElevatedButton.icon(
+                onPressed: _selectedDays.isEmpty ||
+                        _isSubmitting ||
+                        _isCheckingConflicts ||
+                        _conflictingDays.isNotEmpty
+                    ? null
+                    : _submit,
+                icon: _isSubmitting || _isCheckingConflicts
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add),
+                label: Text(
+                  _isCheckingConflicts
+                      ? 'Проверка...'
+                      : _conflictingDays.isNotEmpty
+                          ? 'Есть конфликты'
+                          : _selectedDays.length > 1
+                              ? 'Создать ${_selectedDays.length} слотов'
+                              : 'Создать слот',
+                ),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDaysSelector() {
+    const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: List.generate(7, (index) {
+        final dayNumber = index + 1; // 1-7
+        final isSelected = _selectedDays.contains(dayNumber);
+
+        return FilterChip(
+          label: Text(days[index]),
+          selected: isSelected,
+          onSelected: (selected) {
+            setState(() {
+              if (selected) {
+                _selectedDays.add(dayNumber);
+                _startTimes[dayNumber] = _defaultStartTime;
+                _endTimes[dayNumber] = _defaultEndTime;
+              } else {
+                _selectedDays.remove(dayNumber);
+                _startTimes.remove(dayNumber);
+                _endTimes.remove(dayNumber);
+                _conflictingDays.remove(dayNumber);
+              }
+            });
+            _checkConflicts();
+          },
+        );
+      }),
+    );
+  }
+
+  List<Widget> _buildDayTimeRows() {
+    final sortedDays = _selectedDays.toList()..sort();
+    return sortedDays.map((day) => _buildDayTimeRow(day)).toList();
+  }
+
+  Widget _buildDayTimeRow(int dayNumber) {
+    const days = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    final startTime = _startTimes[dayNumber] ?? _defaultStartTime;
+    final endTime = _endTimes[dayNumber] ?? _defaultEndTime;
+    final hasConflict = _conflictingDays.contains(dayNumber);
+
+    // Расчёт длительности
+    final startMinutes = startTime.hour * 60 + startTime.minute;
+    final endMinutes = endTime.hour * 60 + endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
+    final durationText = durationMinutes > 0
+        ? (durationMinutes >= 60
+            ? '${durationMinutes ~/ 60} ч${durationMinutes % 60 > 0 ? ' ${durationMinutes % 60} мин' : ''}'
+            : '$durationMinutes мин')
+        : 'Некорректно';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: hasConflict
+          ? Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3)
+          : null,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _pickTimeRange(dayNumber),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Day label
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: hasConflict
+                      ? Theme.of(context).colorScheme.errorContainer
+                      : Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(
+                    days[dayNumber],
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: hasConflict
+                          ? Theme.of(context).colorScheme.onErrorContainer
+                          : Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Time range
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_formatTime(startTime)} — ${_formatTime(endTime)}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasConflict ? 'Конфликт! Время занято' : durationText,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: hasConflict
+                            ? Theme.of(context).colorScheme.error
+                            : (durationMinutes > 0
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.error),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Conflict or Edit icon
+              Icon(
+                hasConflict ? Icons.warning_amber_rounded : Icons.edit_outlined,
+                color: hasConflict
+                    ? Theme.of(context).colorScheme.error
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Открывает iOS-style пикер диапазона времени
+  Future<void> _pickTimeRange(int dayNumber) async {
+    final currentStart = _startTimes[dayNumber] ?? _defaultStartTime;
+    final currentEnd = _endTimes[dayNumber] ?? _defaultEndTime;
+
+    final result = await showIosTimeRangePicker(
+      context: context,
+      initialStartTime: currentStart,
+      initialEndTime: currentEnd,
+      minuteInterval: 5,
+      minHour: 6,
+      maxHour: 23,
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _startTimes[dayNumber] = result.start;
+        _endTimes[dayNumber] = result.end;
+      });
+      _checkConflicts();
+    }
+  }
+
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedDays.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Выберите хотя бы один день недели')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final controller = ref.read(studentScheduleControllerProvider.notifier);
+
+      if (_selectedDays.length == 1) {
+        // Single slot
+        final day = _selectedDays.first;
+        await controller.create(
+          institutionId: widget.institutionId,
+          studentId: widget.studentId,
+          teacherId: _selectedTeacherId!,
+          roomId: _selectedRoomId!,
+          subjectId: _selectedSubjectId,
+          lessonTypeId: _selectedLessonTypeId,
+          dayOfWeek: day,
+          startTime: _startTimes[day]!,
+          endTime: _endTimes[day]!,
+        );
+      } else {
+        // Multiple slots (batch)
+        final slots = _selectedDays.map((day) => DayTimeSlot(
+          dayOfWeek: day,
+          startTime: _startTimes[day]!,
+          endTime: _endTimes[day]!,
+        )).toList();
+
+        await controller.createBatch(
+          institutionId: widget.institutionId,
+          studentId: widget.studentId,
+          teacherId: _selectedTeacherId!,
+          roomId: _selectedRoomId!,
+          subjectId: _selectedSubjectId,
+          lessonTypeId: _selectedLessonTypeId,
+          slots: slots,
+        );
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _selectedDays.length == 1
+                  ? 'Слот расписания создан'
+                  : 'Создано ${_selectedDays.length} слотов расписания',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+}
+
+/// BottomSheet для массового управления занятиями ученика
+class _BulkLessonActionsSheet extends ConsumerStatefulWidget {
+  final Student student;
+  final String institutionId;
+  final VoidCallback onCompleted;
+
+  const _BulkLessonActionsSheet({
+    required this.student,
+    required this.institutionId,
+    required this.onCompleted,
+  });
+
+  @override
+  ConsumerState<_BulkLessonActionsSheet> createState() => _BulkLessonActionsSheetState();
+}
+
+class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet> {
+  List<Lesson>? _futureLessons;
+  List<StudentSchedule>? _scheduleSlots;
+  bool _isLoading = true;
+  bool _isProcessing = false;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final lessonRepo = ref.read(lessonRepositoryProvider);
+      final scheduleRepo = ref.read(studentScheduleRepositoryProvider);
+
+      // Загружаем параллельно
+      final results = await Future.wait([
+        lessonRepo.getFutureLessonsForStudent(widget.student.id),
+        scheduleRepo.getByStudent(widget.student.id),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _futureLessons = results[0] as List<Lesson>;
+          _scheduleSlots = (results[1] as List<StudentSchedule>)
+              .where((s) => s.isActive)
+              .toList();
+          _isLoading = false;
+          _loadError = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading data for ${widget.student.id}: $e');
+      if (mounted) {
+        setState(() {
+          _futureLessons = [];
+          _scheduleSlots = [];
+          _isLoading = false;
+          _loadError = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteFutureLessons() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить все занятия?'),
+        content: Text(
+          'Вы уверены, что хотите удалить ${_futureLessons!.length} будущих занятий "${widget.student.name}"?\n\n'
+          'Баланс абонементов не изменится.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final repo = ref.read(lessonRepositoryProvider);
+      final count = await repo.deleteFutureLessonsForStudent(widget.student.id);
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onCompleted();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Удалено $count занятий')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  Future<void> _showReassignDialog() async {
+    // Получаем список преподавателей
+    final members = ref.read(membersProvider(widget.institutionId)).valueOrNull ?? [];
+    final teachers = members.where((m) => m.userId != null).toList();
+
+    if (teachers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Нет доступных преподавателей')),
+      );
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _ReassignTeacherSheet(
+        teachers: teachers,
+        lessons: _futureLessons!,
+        institutionId: widget.institutionId,
+        onReassigned: () {
+          Navigator.pop(context); // Закрываем sheet выбора
+          Navigator.pop(context); // Закрываем основной sheet
+          widget.onCompleted();
+        },
+      ),
+    );
+  }
+
+  Future<void> _showReassignSlotsDialog() async {
+    // Получаем список преподавателей
+    final members = ref.read(membersProvider(widget.institutionId)).valueOrNull ?? [];
+    final teachers = members.where((m) => m.userId != null).toList();
+
+    if (teachers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Нет доступных преподавателей')),
+      );
+      return;
+    }
+
+    final selectedTeacherId = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Выберите преподавателя',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            ...teachers.map((member) => ListTile(
+              leading: CircleAvatar(
+                backgroundColor: member.color != null
+                    ? Color(int.parse('FF${member.color}', radix: 16))
+                    : AppColors.primary,
+                child: Text(
+                  member.profile?.fullName.substring(0, 1).toUpperCase() ?? '?',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+              title: Text(member.profile?.fullName ?? 'Без имени'),
+              onTap: () => Navigator.pop(context, member.userId),
+            )),
+          ],
+        ),
+      ),
+    );
+
+    if (selectedTeacherId == null) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final controller = ref.read(studentScheduleControllerProvider.notifier);
+      final scheduleIds = _scheduleSlots!.map((s) => s.id).toList();
+
+      await controller.reassignTeacher(
+        scheduleIds,
+        selectedTeacherId,
+        widget.institutionId,
+        [widget.student.id],
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onCompleted();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Переназначено ${scheduleIds.length} слотов')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  Future<void> _pauseAllSlots() async {
+    // Выбираем дату до которой приостановить
+    final pauseUntil = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 7)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Приостановить до',
+    );
+
+    if (pauseUntil == null) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final controller = ref.read(studentScheduleControllerProvider.notifier);
+
+      for (final slot in _scheduleSlots!) {
+        await controller.pause(
+          slot.id,
+          pauseUntil,
+          widget.institutionId,
+          widget.student.id,
+        );
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onCompleted();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Приостановлено ${_scheduleSlots!.length} слотов')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  Future<void> _deactivateAllSlots() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Деактивировать расписание?'),
+        content: Text(
+          'Деактивировать ${_scheduleSlots!.length} слотов постоянного расписания?\n\n'
+          'Слоты останутся в архиве и могут быть восстановлены.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            child: const Text('Деактивировать'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final controller = ref.read(studentScheduleControllerProvider.notifier);
+
+      for (final slot in _scheduleSlots!) {
+        await controller.deactivate(
+          slot.id,
+          widget.institutionId,
+          widget.student.id,
+        );
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onCompleted();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Деактивировано ${_scheduleSlots!.length} слотов')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Заголовок
+              Text(
+                'Управление занятиями',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                widget.student.name,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Статистика
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (_loadError != null)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Ошибка загрузки: $_loadError',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_futureLessons!.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text('Нет запланированных занятий'),
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.event_note,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Найдено ${_futureLessons!.length} будущих занятий',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Кнопки действий
+                if (_isProcessing)
+                  const Center(child: CircularProgressIndicator())
+                else ...[
+                  // Переназначить преподавателя
+                  ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: AppColors.primary,
+                      child: Icon(Icons.swap_horiz, color: Colors.white),
+                    ),
+                    title: const Text('Переназначить преподавателя'),
+                    subtitle: const Text('Выбрать нового преподавателя для всех занятий'),
+                    onTap: _showReassignDialog,
+                  ),
+                  const Divider(),
+
+                  // Удалить все занятия
+                  ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Colors.red,
+                      child: Icon(Icons.delete_sweep, color: Colors.white),
+                    ),
+                    title: const Text(
+                      'Удалить все занятия',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    subtitle: const Text('Баланс абонементов не изменится'),
+                    onTap: _deleteFutureLessons,
+                  ),
+                ],
+              ],
+
+              // Секция постоянного расписания
+              if (_scheduleSlots != null && _scheduleSlots!.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 16),
+
+                // Заголовок секции
+                Row(
+                  children: [
+                    Icon(
+                      Icons.repeat,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Постоянное расписание',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Инфо о слотах
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_month,
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${_scheduleSlots!.length} ${_scheduleSlots!.length == 1 ? 'слот' : _scheduleSlots!.length < 5 ? 'слота' : 'слотов'}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _scheduleSlots!.map((s) => '${s.dayName} ${s.timeRange}').join(', '),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Кнопки действий для слотов
+                if (!_isProcessing) ...[
+                  // Переназначить преподавателя
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.secondary,
+                      child: const Icon(Icons.swap_horiz, color: Colors.white),
+                    ),
+                    title: const Text('Переназначить преподавателя'),
+                    subtitle: const Text('Для всех слотов расписания'),
+                    onTap: _showReassignSlotsDialog,
+                  ),
+                  const Divider(),
+
+                  // Приостановить все
+                  ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: AppColors.warning,
+                      child: Icon(Icons.pause, color: Colors.white),
+                    ),
+                    title: const Text(
+                      'Приостановить',
+                      style: TextStyle(color: AppColors.warning),
+                    ),
+                    subtitle: const Text('Временно приостановить все слоты'),
+                    onTap: _pauseAllSlots,
+                  ),
+                  const Divider(),
+
+                  // Деактивировать все
+                  ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Colors.orange,
+                      child: Icon(Icons.archive, color: Colors.white),
+                    ),
+                    title: const Text(
+                      'Деактивировать',
+                      style: TextStyle(color: Colors.orange),
+                    ),
+                    subtitle: const Text('Отключить постоянное расписание'),
+                    onTap: _deactivateAllSlots,
+                  ),
+                ],
+              ],
+
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// BottomSheet для выбора нового преподавателя
+class _ReassignTeacherSheet extends ConsumerStatefulWidget {
+  final List<InstitutionMember> teachers;
+  final List<Lesson> lessons;
+  final String institutionId;
+  final VoidCallback onReassigned;
+
+  const _ReassignTeacherSheet({
+    required this.teachers,
+    required this.lessons,
+    required this.institutionId,
+    required this.onReassigned,
+  });
+
+  @override
+  ConsumerState<_ReassignTeacherSheet> createState() => _ReassignTeacherSheetState();
+}
+
+class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
+  String? _selectedTeacherId;
+  List<LessonConflict>? _conflicts;
+  bool _isChecking = false;
+  bool _isReassigning = false;
+
+  Future<void> _checkConflicts() async {
+    if (_selectedTeacherId == null) return;
+
+    setState(() {
+      _isChecking = true;
+      _conflicts = null;
+    });
+
+    try {
+      final repo = ref.read(lessonRepositoryProvider);
+      final conflicts = await repo.checkReassignmentConflicts(
+        widget.lessons,
+        _selectedTeacherId!,
+      );
+
+      if (mounted) {
+        setState(() {
+          _conflicts = conflicts;
+          _isChecking = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _conflicts = [];
+          _isChecking = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка проверки: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _reassignLessons() async {
+    if (_selectedTeacherId == null) return;
+
+    setState(() => _isReassigning = true);
+
+    try {
+      final repo = ref.read(lessonRepositoryProvider);
+
+      // Фильтруем занятия без конфликтов
+      final conflictIds = _conflicts?.map((c) => c.lesson.id).toSet() ?? {};
+      final lessonsToReassign = widget.lessons
+          .where((l) => !conflictIds.contains(l.id))
+          .map((l) => l.id)
+          .toList();
+
+      if (lessonsToReassign.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Нет занятий для переназначения')),
+        );
+        setState(() => _isReassigning = false);
+        return;
+      }
+
+      await repo.reassignLessons(lessonsToReassign, _selectedTeacherId!);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Переназначено ${lessonsToReassign.length} занятий')),
+        );
+        widget.onReassigned();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        setState(() => _isReassigning = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final conflictCount = _conflicts?.length ?? 0;
+    final canReassign = _conflicts != null && (widget.lessons.length - conflictCount) > 0;
+
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Text(
+                'Переназначить преподавателя',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+
+              // Выбор преподавателя
+              DropdownButtonFormField<String>(
+                value: _selectedTeacherId,
+                decoration: const InputDecoration(
+                  labelText: 'Новый преподаватель',
+                  border: OutlineInputBorder(),
+                ),
+                items: widget.teachers
+                    .where((m) => m.userId != null)
+                    .map((member) {
+                      return DropdownMenuItem(
+                        value: member.userId!,
+                        child: Text(member.profile?.fullName ?? 'Неизвестный'),
+                      );
+                    })
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedTeacherId = value;
+                    _conflicts = null;
+                  });
+                  if (value != null) {
+                    _checkConflicts();
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Результаты проверки конфликтов
+              if (_isChecking)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_conflicts != null) ...[
+                if (_conflicts!.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.green),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Все ${widget.lessons.length} занятий можно переназначить',
+                          style: const TextStyle(color: Colors.green),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.warning, color: Colors.orange),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Найдено $conflictCount конфликтов',
+                                style: const TextStyle(
+                                  color: Colors.orange,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Можно переназначить: ${widget.lessons.length - conflictCount} занятий',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Список конфликтов (первые 5)
+                  ...(_conflicts!.take(5).map((conflict) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.close, size: 16, color: Colors.red),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${DateFormat('d MMM', 'ru').format(conflict.lesson.date)}, '
+                            '${conflict.lesson.startTime.hour}:${conflict.lesson.startTime.minute.toString().padLeft(2, '0')} — '
+                            '${conflict.description}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ))),
+                  if (_conflicts!.length > 5)
+                    Text(
+                      '...и ещё ${_conflicts!.length - 5} конфликтов',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 16),
+
+                // Кнопка переназначения
+                if (_isReassigning)
+                  const Center(child: CircularProgressIndicator())
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: canReassign ? _reassignLessons : null,
+                      child: Text(
+                        conflictCount > 0
+                            ? 'Переназначить ${widget.lessons.length - conflictCount} занятий'
+                            : 'Переназначить все занятия',
+                      ),
+                    ),
+                  ),
+              ],
+
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
       ),
     );
   }
