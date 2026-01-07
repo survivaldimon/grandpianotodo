@@ -174,6 +174,75 @@ Future<void> _checkConflicts() async {
 
 ---
 
+### 4. Исправление редактирования повторяющихся занятий
+
+**Проблема:** При редактировании повторяющегося занятия из сетки расписания нельзя было применить изменения (кабинет, ученик, предмет, тип занятия) ко всем последующим занятиям серии. Диалог "Это и последующие" показывался **только при изменении времени**, а при выборе этой опции передавалось **только время**.
+
+**Решение:**
+
+#### 1. Расширение репозитория (`lesson_repository.dart`):
+```dart
+/// Обновить поля для последующих занятий серии
+/// Поддерживает: время, кабинет, ученик, предмет, тип занятия
+Future<void> updateFollowingLessons(
+  String repeatGroupId,
+  DateTime fromDate, {
+  TimeOfDay? startTime,
+  TimeOfDay? endTime,
+  String? roomId,       // ← НОВОЕ
+  String? studentId,    // ← НОВОЕ
+  String? subjectId,    // ← НОВОЕ
+  String? lessonTypeId, // ← НОВОЕ
+}) async { ... }
+```
+
+#### 2. Расширение контроллера (`lesson_provider.dart`):
+```dart
+/// Обновить поля для последующих занятий серии
+Future<bool> updateFollowing(
+  String repeatGroupId,
+  DateTime fromDate,
+  String originalRoomId,
+  String institutionId, {
+  TimeOfDay? startTime,
+  TimeOfDay? endTime,
+  String? roomId,
+  String? studentId,
+  String? subjectId,
+  String? lessonTypeId,
+}) async { ... }
+```
+
+#### 3. Обновление UI (`all_rooms_schedule_screen.dart`):
+- Диалог "Только это / Это и последующие" показывается при **любом изменении** (не только при изменении времени)
+- При выборе "Это и последующие" передаются **все изменённые поля**
+- Дата меняется только для одного занятия (иначе нарушится периодичность серии)
+
+**Логика определения изменений:**
+```dart
+final timeChanged = _startTime != lesson.startTime || _endTime != lesson.endTime;
+final roomChanged = _selectedRoomId != lesson.roomId;
+final studentChanged = !_isGroupLesson && _selectedStudentId != lesson.studentId;
+final subjectChanged = _selectedSubjectId != lesson.subjectId;
+final lessonTypeChanged = _selectedLessonTypeId != lesson.lessonTypeId;
+
+final hasSeriesChanges = timeChanged || roomChanged || studentChanged ||
+    subjectChanged || lessonTypeChanged;
+
+if (lesson.isRepeating && hasSeriesChanges) {
+  // Показываем диалог "Только это / Это и последующие"
+}
+```
+
+**Изменённые файлы:**
+| Файл | Изменения |
+|------|-----------|
+| `lib/features/schedule/repositories/lesson_repository.dart` | Расширен `updateFollowingLessons()` |
+| `lib/features/schedule/providers/lesson_provider.dart` | Расширен `updateFollowing()` |
+| `lib/features/schedule/screens/all_rooms_schedule_screen.dart` | Обновлена логика `_saveChanges()` |
+
+---
+
 ## Связанные задачи из плана
 
 Из файла плана `/home/bigslainy/.claude/plans/cozy-conjuring-comet.md`:

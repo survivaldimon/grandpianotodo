@@ -3069,11 +3069,18 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                                 showModalBottomSheet(
                                   context: context,
                                   isScrollControlled: true,
-                                  builder: (ctx) => _EditLessonSheet(
-                                    lesson: lesson,
-                                    institutionId: widget.institutionId,
-                                    onUpdated: widget.onUpdated,
-                                  ),
+                                  useSafeArea: lesson.isRepeating,
+                                  builder: (ctx) => lesson.isRepeating
+                                      ? _EditSeriesSheet(
+                                          lesson: lesson,
+                                          institutionId: widget.institutionId,
+                                          onUpdated: widget.onUpdated,
+                                        )
+                                      : _EditLessonSheet(
+                                          lesson: lesson,
+                                          institutionId: widget.institutionId,
+                                          onUpdated: widget.onUpdated,
+                                        ),
                                 );
                               },
                         icon: const Icon(Icons.edit_rounded, size: 18),
@@ -3995,6 +4002,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
     _selectedSubjectId = widget.lesson.subjectId;
     _selectedLessonTypeId = widget.lesson.lessonTypeId;
     _selectedRoomId = widget.lesson.roomId;
+
   }
 
   @override
@@ -4088,14 +4096,13 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               loading: () => const SizedBox.shrink(),
               error: (e, _) => const SizedBox.shrink(),
               data: (rooms) {
-                final selectedRoom = rooms.where((r) => r.id == _selectedRoomId).firstOrNull;
-                return DropdownButtonFormField<String>(
+                return DropdownButtonFormField<String?>(
                   decoration: const InputDecoration(
                     labelText: 'Кабинет',
                     prefixIcon: Icon(Icons.door_front_door),
                   ),
-                  initialValue: selectedRoom?.id,
-                  items: rooms.map((r) => DropdownMenuItem<String>(
+                  value: _selectedRoomId,
+                  items: rooms.map((r) => DropdownMenuItem<String?>(
                     value: r.id,
                     child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
                   )).toList(),
@@ -4113,13 +4120,12 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 loading: () => const CircularProgressIndicator(),
                 error: (e, _) => ErrorView.inline(e),
                 data: (groups) {
-                  final selectedGroup = groups.where((g) => g.id == _selectedGroupId).firstOrNull;
                   return DropdownButtonFormField<String?>(
                     decoration: const InputDecoration(
                       labelText: 'Группа',
                       prefixIcon: Icon(Icons.groups),
                     ),
-                    initialValue: selectedGroup?.id,
+                    value: _selectedGroupId,
                     items: groups.map((g) => DropdownMenuItem<String?>(
                       value: g.id,
                       child: Text(g.name),
@@ -4135,13 +4141,12 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 loading: () => const CircularProgressIndicator(),
                 error: (e, _) => ErrorView.inline(e),
                 data: (students) {
-                  final selectedStudent = students.where((s) => s.id == _selectedStudentId).firstOrNull;
                   return DropdownButtonFormField<String?>(
                     decoration: const InputDecoration(
                       labelText: 'Ученик',
                       prefixIcon: Icon(Icons.person),
                     ),
-                    initialValue: selectedStudent?.id,
+                    value: _selectedStudentId,
                     items: students.map((s) => DropdownMenuItem<String?>(
                       value: s.id,
                       child: Text(s.name),
@@ -4165,7 +4170,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                     labelText: 'Предмет',
                     prefixIcon: Icon(Icons.music_note),
                   ),
-                  initialValue: _selectedSubjectId,
+                  value: _selectedSubjectId,
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
@@ -4195,7 +4200,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                     labelText: 'Тип занятия',
                     prefixIcon: Icon(Icons.category),
                   ),
-                  initialValue: _selectedLessonTypeId,
+                  value: _selectedLessonTypeId,
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
@@ -4277,111 +4282,50 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
     final controller = ref.read(lessonControllerProvider.notifier);
     final lesson = widget.lesson;
 
-    // Проверяем, изменилось ли время
+    // Проверяем, изменилось ли хоть одно поле
     final timeChanged = _startTime != lesson.startTime || _endTime != lesson.endTime;
+    final roomChanged = _selectedRoomId != lesson.roomId;
+    final studentChanged = !_isGroupLesson && _selectedStudentId != lesson.studentId;
+    final subjectChanged = _selectedSubjectId != lesson.subjectId;
+    final lessonTypeChanged = _selectedLessonTypeId != lesson.lessonTypeId;
+    final dateChanged = _date.year != lesson.date.year ||
+        _date.month != lesson.date.month ||
+        _date.day != lesson.date.day;
 
-    // Если занятие повторяющееся и время изменилось - спрашиваем
-    if (lesson.isRepeating && timeChanged) {
-      final followingCount = await controller.getFollowingCount(
-        lesson.repeatGroupId!,
-        lesson.date,
-      );
+    final hasAnyChange = timeChanged || roomChanged || studentChanged ||
+        subjectChanged || lessonTypeChanged || dateChanged;
 
-      if (!mounted) return;
+    // Если ничего не изменилось — просто закрываем
+    if (!hasAnyChange) {
+      Navigator.pop(context);
+      return;
+    }
 
-      final result = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Изменить время'),
-          content: Text(
-            'Это занятие является частью серии.\n\n'
-            'Всего последующих занятий: $followingCount\n\n'
-            'Применить изменение времени к последующим занятиям?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, 'cancel'),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, 'this'),
-              child: const Text('Только это'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, 'following'),
-              child: const Text('Это и последующие'),
-            ),
-          ],
+    // Обновление занятия (для повторяющихся используется _EditSeriesSheet напрямую)
+    final success = await controller.update(
+      lesson.id,
+      roomId: lesson.roomId,
+      date: lesson.date,
+      institutionId: widget.institutionId,
+      newRoomId: _selectedRoomId,
+      newDate: _date,
+      startTime: _startTime,
+      endTime: _endTime,
+      studentId: _isGroupLesson ? null : _selectedStudentId,
+      groupId: _isGroupLesson ? _selectedGroupId : null,
+      subjectId: _selectedSubjectId,
+      lessonTypeId: _selectedLessonTypeId,
+    );
+
+    if (success && mounted) {
+      widget.onUpdated();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Занятие обновлено'),
+          backgroundColor: Colors.green,
         ),
       );
-
-      if (result == null || result == 'cancel') return;
-
-      bool success;
-      String message;
-
-      if (result == 'following') {
-        success = await controller.updateFollowing(
-          lesson.repeatGroupId!,
-          lesson.date,
-          lesson.roomId,
-          widget.institutionId,
-          startTime: _startTime,
-          endTime: _endTime,
-        );
-        message = 'Обновлено $followingCount занятий';
-      } else {
-        success = await controller.update(
-          lesson.id,
-          roomId: lesson.roomId,
-          date: lesson.date,
-          institutionId: widget.institutionId,
-          newRoomId: _selectedRoomId,
-          newDate: _date,
-          startTime: _startTime,
-          endTime: _endTime,
-          studentId: _isGroupLesson ? null : _selectedStudentId,
-          groupId: _isGroupLesson ? _selectedGroupId : null,
-          subjectId: _selectedSubjectId,
-          lessonTypeId: _selectedLessonTypeId,
-        );
-        message = 'Занятие обновлено';
-      }
-
-      if (success && mounted) {
-        widget.onUpdated();
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.green),
-        );
-      }
-    } else {
-      // Обычное обновление
-      final success = await controller.update(
-        lesson.id,
-        roomId: lesson.roomId,
-        date: lesson.date,
-        institutionId: widget.institutionId,
-        newRoomId: _selectedRoomId,
-        newDate: _date,
-        startTime: _startTime,
-        endTime: _endTime,
-        studentId: _isGroupLesson ? null : _selectedStudentId,
-        groupId: _isGroupLesson ? _selectedGroupId : null,
-        subjectId: _selectedSubjectId,
-        lessonTypeId: _selectedLessonTypeId,
-      );
-
-      if (success && mounted) {
-        widget.onUpdated();
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Занятие обновлено'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
     }
   }
 
@@ -4404,6 +4348,17 @@ enum RepeatType {
 
   final String label;
   const RepeatType(this.label);
+}
+
+/// Область редактирования серии занятий
+enum EditScope {
+  thisOnly('Только это занятие'),
+  thisAndFollowing('Это и последующие'),
+  all('Все занятия серии'),
+  selected('Выбранные');
+
+  final String label;
+  const EditScope(this.label);
 }
 
 /// Быстрое добавление кабинета из формы занятия
@@ -8937,5 +8892,1188 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+}
+
+// ============================================================
+// РЕДАКТИРОВАНИЕ СЕРИИ ПОВТОРЯЮЩИХСЯ ЗАНЯТИЙ
+// ============================================================
+
+/// Форма редактирования серии повторяющихся занятий
+class _EditSeriesSheet extends ConsumerStatefulWidget {
+  final Lesson lesson;
+  final String institutionId;
+  final VoidCallback onUpdated;
+
+  const _EditSeriesSheet({
+    required this.lesson,
+    required this.institutionId,
+    required this.onUpdated,
+  });
+
+  @override
+  ConsumerState<_EditSeriesSheet> createState() => _EditSeriesSheetState();
+}
+
+class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
+  // Занятия серии
+  List<Lesson> _seriesLessons = [];
+  bool _isLoadingSeries = true;
+
+  // Выбор области изменений
+  EditScope _editScope = EditScope.thisAndFollowing;
+  Set<String> _selectedLessonIds = {};
+
+  // Фильтр по дням недели (1=Пн ... 7=Вс)
+  Set<int> _selectedWeekdays = {};
+  // Лимит количества занятий (0 = без лимита)
+  int _quantityLimit = 0;
+
+  // Редактируемые параметры (null = не изменять)
+  TimeOfDay? _newStartTime;
+  TimeOfDay? _newEndTime;
+  String? _newRoomId;
+  String? _newStudentId;
+  String? _newSubjectId;
+  String? _newLessonTypeId;
+
+  // Конфликты
+  List<String> _conflictLessonIds = [];
+  bool _isCheckingConflicts = false;
+  bool _isSaving = false;
+
+  // Текущий месяц для мини-календаря
+  late DateTime _calendarMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    _calendarMonth = DateTime(widget.lesson.date.year, widget.lesson.date.month);
+    _loadSeriesLessons();
+  }
+
+  Future<void> _loadSeriesLessons() async {
+    final repo = ref.read(lessonRepositoryProvider);
+    try {
+      final lessons = await repo.getSeriesLessons(widget.lesson.repeatGroupId!);
+      lessons.sort((a, b) => a.date.compareTo(b.date));
+
+      setState(() {
+        _seriesLessons = lessons;
+        _isLoadingSeries = false;
+        _updateSelectedLessons();
+      });
+    } catch (e) {
+      setState(() => _isLoadingSeries = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка загрузки серии: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  void _updateSelectedLessons() {
+    List<Lesson> filtered;
+
+    switch (_editScope) {
+      case EditScope.thisOnly:
+        _selectedLessonIds = {widget.lesson.id};
+        return;
+      case EditScope.thisAndFollowing:
+        filtered = _seriesLessons
+            .where((l) => !l.date.isBefore(widget.lesson.date))
+            .toList();
+        break;
+      case EditScope.all:
+        filtered = List.from(_seriesLessons);
+        break;
+      case EditScope.selected:
+        // При ручном выборе не перезаписываем
+        return;
+    }
+
+    // Фильтр по дням недели
+    if (_selectedWeekdays.isNotEmpty) {
+      filtered = filtered.where((l) => _selectedWeekdays.contains(l.date.weekday)).toList();
+    }
+
+    // Лимит количества
+    if (_quantityLimit > 0 && filtered.length > _quantityLimit) {
+      filtered = filtered.take(_quantityLimit).toList();
+    }
+
+    _selectedLessonIds = filtered.map((l) => l.id).toSet();
+  }
+
+  List<Lesson> get _lessonsToEdit {
+    return _seriesLessons.where((l) => _selectedLessonIds.contains(l.id)).toList();
+  }
+
+  bool get _hasChanges {
+    return _newStartTime != null ||
+        _newEndTime != null ||
+        _newRoomId != null ||
+        _newStudentId != null ||
+        _newSubjectId != null ||
+        _newLessonTypeId != null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final roomsAsync = ref.watch(roomsProvider(widget.institutionId));
+    final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+    final subjectsAsync = ref.watch(subjectsProvider(widget.institutionId));
+    final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Drag handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Редактировать серию',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+
+            // Content
+            Expanded(
+              child: _isLoadingSeries
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        // Область изменений
+                        _buildScopeSelector(),
+                        const SizedBox(height: 16),
+
+                        // Фильтр по дням недели и количеству
+                        if (_editScope != EditScope.thisOnly) ...[
+                          _buildWeekdaysFilter(),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // Мини-календарь
+                        _buildMiniCalendar(),
+                        const SizedBox(height: 16),
+
+                        // Список занятий
+                        _buildLessonsList(),
+                        const SizedBox(height: 24),
+
+                        // Секция изменений
+                        _buildChangesSection(
+                          roomsAsync: roomsAsync,
+                          studentsAsync: studentsAsync,
+                          subjectsAsync: subjectsAsync,
+                          lessonTypesAsync: lessonTypesAsync,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Превью
+                        _buildPreview(),
+                        const SizedBox(height: 24),
+
+                        // Кнопка применения
+                        ElevatedButton.icon(
+                          onPressed: _hasChanges && _selectedLessonIds.isNotEmpty && !_isSaving
+                              ? _applyChanges
+                              : null,
+                          icon: _isSaving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.check),
+                          label: Text(_isSaving ? 'Сохранение...' : 'Применить изменения'),
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScopeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Область изменений',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<EditScope>(
+          value: _editScope,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.select_all),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            isDense: true,
+          ),
+          items: EditScope.values.map((scope) {
+            return DropdownMenuItem(
+              value: scope,
+              child: Text(scope.label),
+            );
+          }).toList(),
+          onChanged: (scope) {
+            if (scope != null) {
+              setState(() {
+                _editScope = scope;
+                _updateSelectedLessons();
+              });
+              _checkConflicts();
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWeekdaysFilter() {
+    // Определяем какие дни недели есть в серии
+    final weekdaysInSeries = <int>{};
+    for (final lesson in _seriesLessons) {
+      weekdaysInSeries.add(lesson.date.weekday);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Дни недели
+        Text(
+          'По дням недели',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final day in [
+              (1, 'Пн'),
+              (2, 'Вт'),
+              (3, 'Ср'),
+              (4, 'Чт'),
+              (5, 'Пт'),
+              (6, 'Сб'),
+              (7, 'Вс'),
+            ])
+              FilterChip(
+                label: Text(day.$2),
+                selected: _selectedWeekdays.contains(day.$1),
+                // Показываем только те дни, которые есть в серии
+                backgroundColor: weekdaysInSeries.contains(day.$1)
+                    ? null
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                onSelected: weekdaysInSeries.contains(day.$1)
+                    ? (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedWeekdays.add(day.$1);
+                          } else {
+                            _selectedWeekdays.remove(day.$1);
+                          }
+                          _updateSelectedLessons();
+                        });
+                        _checkConflicts();
+                      }
+                    : null,
+              ),
+          ],
+        ),
+
+        // Количество занятий
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Text(
+              'Количество занятий:',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                _quantityLimit > 0 ? '$_quantityLimit' : 'Все',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Слайдер для выбора количества
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            showValueIndicator: ShowValueIndicator.onlyForContinuous,
+          ),
+          child: Slider(
+            value: _quantityLimit.toDouble(),
+            min: 0,
+            max: 52,
+            divisions: 52,
+            label: _quantityLimit > 0 ? '$_quantityLimit' : 'Все',
+            onChanged: (value) {
+              setState(() => _quantityLimit = value.round());
+              _updateSelectedLessons();
+              _checkConflicts();
+            },
+          ),
+        ),
+        // Быстрые кнопки
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            for (final count in [0, 4, 8, 12, 24])
+              ActionChip(
+                label: Text(count == 0 ? 'Все' : '$count'),
+                backgroundColor: _quantityLimit == count
+                    ? Theme.of(context).colorScheme.primaryContainer
+                    : null,
+                onPressed: () {
+                  setState(() => _quantityLimit = count);
+                  _updateSelectedLessons();
+                  _checkConflicts();
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniCalendar() {
+    // Находим месяцы, в которых есть занятия серии
+    final months = <DateTime>{};
+    for (final lesson in _seriesLessons) {
+      months.add(DateTime(lesson.date.year, lesson.date.month));
+    }
+    final sortedMonths = months.toList()..sort();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Навигация по месяцам
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chevron_left),
+              onPressed: () {
+                final idx = sortedMonths.indexOf(_calendarMonth);
+                if (idx > 0) {
+                  setState(() => _calendarMonth = sortedMonths[idx - 1]);
+                }
+              },
+            ),
+            Text(
+              _formatMonth(_calendarMonth),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            IconButton(
+              icon: const Icon(Icons.chevron_right),
+              onPressed: () {
+                final idx = sortedMonths.indexOf(_calendarMonth);
+                if (idx < sortedMonths.length - 1) {
+                  setState(() => _calendarMonth = sortedMonths[idx + 1]);
+                }
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Дни недели
+        Row(
+          children: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+              .map((d) => Expanded(
+                    child: Center(
+                      child: Text(
+                        d,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 4),
+        // Календарная сетка
+        _buildCalendarGrid(),
+      ],
+    );
+  }
+
+  Widget _buildCalendarGrid() {
+    final firstDay = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final lastDay = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
+    final startWeekday = firstDay.weekday; // 1 = Пн
+    final daysInMonth = lastDay.day;
+
+    final today = DateTime.now();
+    final seriesDates = _seriesLessons.map((l) => l.date).toSet();
+    final selectedDates = _lessonsToEdit.map((l) => l.date).toSet();
+
+    final rows = <Widget>[];
+    var currentRow = <Widget>[];
+
+    // Пустые ячейки до первого дня месяца
+    for (var i = 1; i < startWeekday; i++) {
+      currentRow.add(const Expanded(child: SizedBox(height: 36)));
+    }
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      final date = DateTime(_calendarMonth.year, _calendarMonth.month, day);
+      final isSeriesDate = seriesDates.any((d) =>
+          d.year == date.year && d.month == date.month && d.day == date.day);
+      final isSelected = selectedDates.any((d) =>
+          d.year == date.year && d.month == date.month && d.day == date.day);
+      final isToday = date.year == today.year &&
+          date.month == today.month &&
+          date.day == today.day;
+      final isPast = date.isBefore(DateTime(today.year, today.month, today.day));
+      final isCurrent = date.year == widget.lesson.date.year &&
+          date.month == widget.lesson.date.month &&
+          date.day == widget.lesson.date.day;
+
+      currentRow.add(
+        Expanded(
+          child: GestureDetector(
+            onTap: isSeriesDate && _editScope == EditScope.selected
+                ? () => _toggleDateSelection(date)
+                : null,
+            child: Container(
+              height: 36,
+              margin: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primary
+                    : isSeriesDate
+                        ? Theme.of(context).colorScheme.primaryContainer.withOpacity(isPast ? 0.3 : 1)
+                        : null,
+                borderRadius: BorderRadius.circular(8),
+                border: isCurrent
+                    ? Border.all(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      )
+                    : isToday
+                        ? Border.all(
+                            color: Theme.of(context).colorScheme.outline,
+                            width: 1,
+                          )
+                        : null,
+              ),
+              child: Center(
+                child: Text(
+                  '$day',
+                  style: TextStyle(
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : isSeriesDate
+                            ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(isPast ? 0.5 : 1)
+                            : Theme.of(context).colorScheme.onSurface.withOpacity(isPast ? 0.3 : 1),
+                    fontWeight: isCurrent ? FontWeight.bold : null,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      if (currentRow.length == 7) {
+        rows.add(Row(children: currentRow));
+        currentRow = [];
+      }
+    }
+
+    // Дополняем последнюю строку
+    while (currentRow.isNotEmpty && currentRow.length < 7) {
+      currentRow.add(const Expanded(child: SizedBox(height: 36)));
+    }
+    if (currentRow.isNotEmpty) {
+      rows.add(Row(children: currentRow));
+    }
+
+    return Column(children: rows);
+  }
+
+  void _toggleDateSelection(DateTime date) {
+    final lesson = _seriesLessons.firstWhere(
+      (l) => l.date.year == date.year && l.date.month == date.month && l.date.day == date.day,
+    );
+    setState(() {
+      if (_selectedLessonIds.contains(lesson.id)) {
+        _selectedLessonIds.remove(lesson.id);
+      } else {
+        _selectedLessonIds.add(lesson.id);
+      }
+    });
+    _checkConflicts();
+  }
+
+  Widget _buildLessonsList() {
+    final today = DateTime.now();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Занятия серии (${_seriesLessons.length})',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            Text(
+              'Выбрано: ${_selectedLessonIds.length}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          constraints: const BoxConstraints(maxHeight: 200),
+          decoration: BoxDecoration(
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: _seriesLessons.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final lesson = _seriesLessons[index];
+              final isSelected = _selectedLessonIds.contains(lesson.id);
+              final isCurrent = lesson.id == widget.lesson.id;
+              final isPast = lesson.date.isBefore(DateTime(today.year, today.month, today.day));
+              final hasConflict = _conflictLessonIds.contains(lesson.id);
+
+              return CheckboxListTile(
+                value: isSelected,
+                onChanged: _editScope == EditScope.selected
+                    ? (v) {
+                        setState(() {
+                          if (v == true) {
+                            _selectedLessonIds.add(lesson.id);
+                          } else {
+                            _selectedLessonIds.remove(lesson.id);
+                          }
+                        });
+                        _checkConflicts();
+                      }
+                    : null,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                title: Text(
+                  AppDateUtils.formatDayMonth(lesson.date),
+                  style: TextStyle(
+                    fontWeight: isCurrent ? FontWeight.bold : null,
+                    color: hasConflict
+                        ? AppColors.error
+                        : isPast
+                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                            : null,
+                  ),
+                ),
+                subtitle: Text(
+                  '${_formatTime(lesson.startTime)} – ${_formatTime(lesson.endTime)}',
+                  style: TextStyle(
+                    color: isPast ? Theme.of(context).colorScheme.outline : null,
+                  ),
+                ),
+                secondary: isCurrent
+                    ? Icon(Icons.arrow_forward, color: Theme.of(context).colorScheme.primary, size: 20)
+                    : hasConflict
+                        ? const Icon(Icons.warning, color: AppColors.error, size: 20)
+                        : null,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChangesSection({
+    required AsyncValue<List<Room>> roomsAsync,
+    required AsyncValue<List<Student>> studentsAsync,
+    required AsyncValue<List<Subject>> subjectsAsync,
+    required AsyncValue<List<LessonType>> lessonTypesAsync,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Изменения',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 12),
+
+        // Время
+        _buildChangeRow(
+          label: 'Время',
+          currentValue: '${_formatTime(widget.lesson.startTime)} – ${_formatTime(widget.lesson.endTime)}',
+          newValue: _newStartTime != null && _newEndTime != null
+              ? '${_formatTime(_newStartTime!)} – ${_formatTime(_newEndTime!)}'
+              : null,
+          onTap: () => _pickTimeRange(),
+          onClear: () => setState(() {
+            _newStartTime = null;
+            _newEndTime = null;
+            _checkConflicts();
+          }),
+        ),
+
+        // Кабинет
+        roomsAsync.when(
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (rooms) {
+            final currentRoom = rooms.where((r) => r.id == widget.lesson.roomId).firstOrNull;
+            final newRoom = _newRoomId != null
+                ? rooms.where((r) => r.id == _newRoomId).firstOrNull
+                : null;
+
+            return _buildChangeRow(
+              label: 'Кабинет',
+              currentValue: currentRoom?.name ?? 'Не выбран',
+              newValue: newRoom?.name,
+              onTap: () => _showRoomPicker(rooms),
+              onClear: () => setState(() {
+                _newRoomId = null;
+                _checkConflicts();
+              }),
+            );
+          },
+        ),
+
+        // Ученик (только для индивидуальных занятий)
+        if (widget.lesson.studentId != null)
+          studentsAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (students) {
+              final currentStudent = students.where((s) => s.id == widget.lesson.studentId).firstOrNull;
+              final newStudent = _newStudentId != null
+                  ? students.where((s) => s.id == _newStudentId).firstOrNull
+                  : null;
+
+              return _buildChangeRow(
+                label: 'Ученик',
+                currentValue: currentStudent?.name ?? 'Не выбран',
+                newValue: newStudent?.name,
+                onTap: () => _showStudentPicker(students),
+                onClear: () => setState(() => _newStudentId = null),
+              );
+            },
+          ),
+
+        // Предмет
+        subjectsAsync.when(
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (subjects) {
+            final currentSubject = subjects.where((s) => s.id == widget.lesson.subjectId).firstOrNull;
+            final newSubject = _newSubjectId != null
+                ? subjects.where((s) => s.id == _newSubjectId).firstOrNull
+                : null;
+
+            return _buildChangeRow(
+              label: 'Предмет',
+              currentValue: currentSubject?.name ?? 'Не выбран',
+              newValue: newSubject?.name,
+              onTap: () => _showSubjectPicker(subjects),
+              onClear: () => setState(() => _newSubjectId = null),
+            );
+          },
+        ),
+
+        // Тип занятия
+        lessonTypesAsync.when(
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (lessonTypes) {
+            final currentType = lessonTypes.where((t) => t.id == widget.lesson.lessonTypeId).firstOrNull;
+            final newType = _newLessonTypeId != null
+                ? lessonTypes.where((t) => t.id == _newLessonTypeId).firstOrNull
+                : null;
+
+            return _buildChangeRow(
+              label: 'Тип занятия',
+              currentValue: currentType?.name ?? 'Не выбран',
+              newValue: newType?.name,
+              onTap: () => _showLessonTypePicker(lessonTypes),
+              onClear: () => setState(() => _newLessonTypeId = null),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChangeRow({
+    required String label,
+    required String currentValue,
+    String? newValue,
+    required VoidCallback onTap,
+    required VoidCallback onClear,
+  }) {
+    final hasChange = newValue != null;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: hasChange
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outlineVariant,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            color: hasChange
+                ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+                : null,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (hasChange)
+                      Row(
+                        children: [
+                          Text(
+                            currentValue,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  decoration: TextDecoration.lineThrough,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward, size: 16),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              newValue,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Text(
+                        currentValue,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                  ],
+                ),
+              ),
+              if (hasChange)
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: onClear,
+                  visualDensity: VisualDensity.compact,
+                )
+              else
+                Icon(
+                  Icons.edit,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreview() {
+    final lessonsToEdit = _lessonsToEdit;
+    final conflictCount = _conflictLessonIds.where((id) => _selectedLessonIds.contains(id)).length;
+    final validCount = lessonsToEdit.length - conflictCount;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_isCheckingConflicts)
+            Row(
+              children: [
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Проверка конфликтов...',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            )
+          else ...[
+            Text(
+              'Будет изменено: $validCount занятий',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            if (conflictCount > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Конфликты: $conflictCount (будут пропущены)',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.error,
+                    ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickTimeRange() async {
+    final range = await showIosTimeRangePicker(
+      context: context,
+      initialStartTime: _newStartTime ?? widget.lesson.startTime,
+      initialEndTime: _newEndTime ?? widget.lesson.endTime,
+      minuteInterval: 5,
+    );
+
+    if (range != null) {
+      setState(() {
+        _newStartTime = range.start;
+        _newEndTime = range.end;
+      });
+      _checkConflicts();
+    }
+  }
+
+  void _showRoomPicker(List<Room> rooms) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => ListView.builder(
+        itemCount: rooms.length,
+        itemBuilder: (_, index) {
+          final room = rooms[index];
+          final isSelected = room.id == _newRoomId;
+          final isCurrent = room.id == widget.lesson.roomId;
+
+          return ListTile(
+            title: Text(room.name),
+            trailing: isSelected
+                ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                : isCurrent
+                    ? Text('текущий', style: Theme.of(context).textTheme.bodySmall)
+                    : null,
+            onTap: () {
+              Navigator.pop(ctx);
+              if (room.id != widget.lesson.roomId) {
+                setState(() => _newRoomId = room.id);
+                _checkConflicts();
+              }
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  void _showStudentPicker(List<Student> students) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => ListView.builder(
+        itemCount: students.length,
+        itemBuilder: (_, index) {
+          final student = students[index];
+          final isSelected = student.id == _newStudentId;
+          final isCurrent = student.id == widget.lesson.studentId;
+
+          return ListTile(
+            title: Text(student.name),
+            trailing: isSelected
+                ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                : isCurrent
+                    ? Text('текущий', style: Theme.of(context).textTheme.bodySmall)
+                    : null,
+            onTap: () {
+              Navigator.pop(ctx);
+              if (student.id != widget.lesson.studentId) {
+                setState(() => _newStudentId = student.id);
+              }
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  void _showSubjectPicker(List<Subject> subjects) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => ListView.builder(
+        itemCount: subjects.length + 1,
+        itemBuilder: (_, index) {
+          if (index == 0) {
+            return ListTile(
+              title: const Text('Не выбран'),
+              trailing: _newSubjectId == '' ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary) : null,
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() => _newSubjectId = '');
+              },
+            );
+          }
+          final subject = subjects[index - 1];
+          final isSelected = subject.id == _newSubjectId;
+          final isCurrent = subject.id == widget.lesson.subjectId;
+
+          return ListTile(
+            title: Text(subject.name),
+            trailing: isSelected
+                ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                : isCurrent
+                    ? Text('текущий', style: Theme.of(context).textTheme.bodySmall)
+                    : null,
+            onTap: () {
+              Navigator.pop(ctx);
+              if (subject.id != widget.lesson.subjectId) {
+                setState(() => _newSubjectId = subject.id);
+              }
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  void _showLessonTypePicker(List<LessonType> lessonTypes) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => ListView.builder(
+        itemCount: lessonTypes.length + 1,
+        itemBuilder: (_, index) {
+          if (index == 0) {
+            return ListTile(
+              title: const Text('Не выбран'),
+              trailing: _newLessonTypeId == '' ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary) : null,
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() => _newLessonTypeId = '');
+              },
+            );
+          }
+          final lessonType = lessonTypes[index - 1];
+          final isSelected = lessonType.id == _newLessonTypeId;
+          final isCurrent = lessonType.id == widget.lesson.lessonTypeId;
+
+          return ListTile(
+            title: Text(lessonType.name),
+            trailing: isSelected
+                ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                : isCurrent
+                    ? Text('текущий', style: Theme.of(context).textTheme.bodySmall)
+                    : null,
+            onTap: () {
+              Navigator.pop(ctx);
+              if (lessonType.id != widget.lesson.lessonTypeId) {
+                setState(() => _newLessonTypeId = lessonType.id);
+              }
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _checkConflicts() async {
+    if (!_hasChanges || _selectedLessonIds.isEmpty) {
+      setState(() => _conflictLessonIds = []);
+      return;
+    }
+
+    // Проверяем конфликты только если изменились время или кабинет
+    if (_newStartTime == null && _newEndTime == null && _newRoomId == null) {
+      setState(() => _conflictLessonIds = []);
+      return;
+    }
+
+    setState(() => _isCheckingConflicts = true);
+
+    final repo = ref.read(lessonRepositoryProvider);
+    final conflicts = <String>[];
+
+    for (final lesson in _lessonsToEdit) {
+      try {
+        final hasConflict = await repo.hasTimeConflict(
+          roomId: _newRoomId ?? lesson.roomId,
+          date: lesson.date,
+          startTime: _newStartTime ?? lesson.startTime,
+          endTime: _newEndTime ?? lesson.endTime,
+          excludeLessonId: lesson.id,
+        );
+
+        if (hasConflict) {
+          conflicts.add(lesson.id);
+        }
+      } catch (e) {
+        // Игнорируем ошибки проверки отдельных занятий
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _conflictLessonIds = conflicts;
+        _isCheckingConflicts = false;
+      });
+    }
+  }
+
+  Future<void> _applyChanges() async {
+    // Фильтруем занятия с конфликтами
+    final lessonsToUpdate = _lessonsToEdit
+        .where((l) => !_conflictLessonIds.contains(l.id))
+        .toList();
+
+    if (lessonsToUpdate.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Нет занятий для обновления (все имеют конфликты)'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final controller = ref.read(lessonControllerProvider.notifier);
+      final lessonIds = lessonsToUpdate.map((l) => l.id).toList();
+
+      await controller.updateSelected(
+        lessonIds,
+        widget.institutionId,
+        startTime: _newStartTime,
+        endTime: _newEndTime,
+        roomId: _newRoomId,
+        studentId: _newStudentId,
+        subjectId: _newSubjectId == '' ? null : _newSubjectId,
+        lessonTypeId: _newLessonTypeId == '' ? null : _newLessonTypeId,
+      );
+
+      if (mounted) {
+        widget.onUpdated();
+        Navigator.pop(context);
+
+        final skipped = _lessonsToEdit.length - lessonsToUpdate.length;
+        final message = skipped > 0
+            ? 'Обновлено ${lessonsToUpdate.length} занятий (пропущено: $skipped)'
+            : 'Обновлено ${lessonsToUpdate.length} занятий';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatMonth(DateTime date) {
+    const months = [
+      '', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+      'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+    ];
+    return '${months[date.month]} ${date.year}';
   }
 }

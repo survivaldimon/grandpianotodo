@@ -759,14 +759,19 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  /// Обновить время для последующих занятий серии
+  /// Обновить поля для последующих занятий серии
+  /// Поддерживает: время, кабинет, ученик, предмет, тип занятия
   Future<bool> updateFollowing(
     String repeatGroupId,
     DateTime fromDate,
-    String roomId,
+    String originalRoomId,
     String institutionId, {
     TimeOfDay? startTime,
     TimeOfDay? endTime,
+    String? roomId,
+    String? studentId,
+    String? subjectId,
+    String? lessonTypeId,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -775,8 +780,16 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         fromDate,
         startTime: startTime,
         endTime: endTime,
+        roomId: roomId,
+        studentId: studentId,
+        subjectId: subjectId,
+        lessonTypeId: lessonTypeId,
       );
-      _invalidateForRoom(roomId, fromDate, institutionId: institutionId);
+      // Инвалидируем и старый и новый кабинет (если менялся)
+      _invalidateForRoom(originalRoomId, fromDate, institutionId: institutionId);
+      if (roomId != null && roomId != originalRoomId) {
+        _invalidateForRoom(roomId, fromDate, institutionId: institutionId);
+      }
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -789,6 +802,51 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   Future<int> getFollowingCount(String repeatGroupId, DateTime fromDate) async {
     final lessons = await _repo.getFollowingLessons(repeatGroupId, fromDate);
     return lessons.length;
+  }
+
+  /// Обновить выбранные занятия по списку ID
+  /// Поддерживает: время, кабинет, ученик, предмет, тип занятия
+  Future<bool> updateSelected(
+    List<String> lessonIds,
+    String institutionId, {
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? roomId,
+    String? studentId,
+    String? subjectId,
+    String? lessonTypeId,
+  }) async {
+    if (lessonIds.isEmpty) {
+      return true;
+    }
+
+    state = const AsyncValue.loading();
+    try {
+      await _repo.updateSelectedLessons(
+        lessonIds,
+        startTime: startTime,
+        endTime: endTime,
+        roomId: roomId,
+        studentId: studentId,
+        subjectId: subjectId,
+        lessonTypeId: lessonTypeId,
+      );
+
+      // Инвалидируем все дневные провайдеры для заведения (за 30 дней вперёд и назад)
+      final now = DateTime.now();
+      for (int i = -30; i <= 30; i++) {
+        final date = now.add(Duration(days: i));
+        _ref.invalidate(lessonsByInstitutionStreamProvider(
+          InstitutionDateParams(institutionId, date),
+        ));
+      }
+
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
   }
 
   // ============================================================

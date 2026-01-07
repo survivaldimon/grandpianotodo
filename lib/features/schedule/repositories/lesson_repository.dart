@@ -347,12 +347,17 @@ class LessonRepository {
     }
   }
 
-  /// Обновить время для последующих занятий серии
+  /// Обновить поля для последующих занятий серии
+  /// Поддерживает: время, кабинет, ученик, предмет, тип занятия
   Future<void> updateFollowingLessons(
     String repeatGroupId,
     DateTime fromDate, {
     TimeOfDay? startTime,
     TimeOfDay? endTime,
+    String? roomId,
+    String? studentId,
+    String? subjectId,
+    String? lessonTypeId,
   }) async {
     try {
       final dateStr = fromDate.toIso8601String().split('T').first;
@@ -363,6 +368,18 @@ class LessonRepository {
       }
       if (endTime != null) {
         updates['end_time'] = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+      }
+      if (roomId != null) {
+        updates['room_id'] = roomId;
+      }
+      if (studentId != null) {
+        updates['student_id'] = studentId;
+      }
+      if (subjectId != null) {
+        updates['subject_id'] = subjectId;
+      }
+      if (lessonTypeId != null) {
+        updates['lesson_type_id'] = lessonTypeId;
       }
 
       if (updates.isEmpty) return;
@@ -375,6 +392,52 @@ class LessonRepository {
           .isFilter('archived_at', null);
     } catch (e) {
       throw DatabaseException('Ошибка обновления серии занятий: $e');
+    }
+  }
+
+  /// Обновить выбранные занятия по списку ID
+  /// Поддерживает: время, кабинет, ученик, предмет, тип занятия
+  Future<void> updateSelectedLessons(
+    List<String> lessonIds, {
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? roomId,
+    String? studentId,
+    String? subjectId,
+    String? lessonTypeId,
+  }) async {
+    if (lessonIds.isEmpty) return;
+
+    try {
+      final updates = <String, dynamic>{};
+
+      if (startTime != null) {
+        updates['start_time'] = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+      }
+      if (endTime != null) {
+        updates['end_time'] = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+      }
+      if (roomId != null) {
+        updates['room_id'] = roomId;
+      }
+      if (studentId != null) {
+        updates['student_id'] = studentId;
+      }
+      if (subjectId != null) {
+        updates['subject_id'] = subjectId;
+      }
+      if (lessonTypeId != null) {
+        updates['lesson_type_id'] = lessonTypeId;
+      }
+
+      if (updates.isEmpty) return;
+
+      await _client
+          .from('lessons')
+          .update(updates)
+          .inFilter('id', lessonIds);
+    } catch (e) {
+      throw DatabaseException('Ошибка обновления занятий: $e');
     }
   }
 
