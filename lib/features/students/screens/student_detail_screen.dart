@@ -3000,13 +3000,12 @@ class _ScheduleSlotsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeSchedules = ref.watch(activeStudentSchedulesProvider(studentId));
-    final inactiveSchedules = ref.watch(inactiveStudentSchedulesProvider(studentId));
-    final schedulesAsync = ref.watch(studentSchedulesProvider(studentId));
-
-    // Паттерн valueOrNull для resilient UI
-    final schedules = schedulesAsync.valueOrNull;
-    final isLoading = schedulesAsync.isLoading && schedules == null;
+    final params = StudentScheduleParams(studentId, institutionId);
+    final activeSchedules = ref.watch(activeStudentSchedulesProvider(params));
+    final inactiveSchedules = ref.watch(inactiveStudentSchedulesProvider(params));
+    // Проверяем loading через основной stream заведения
+    final institutionSchedulesAsync = ref.watch(institutionSchedulesStreamProvider(institutionId));
+    final isLoading = institutionSchedulesAsync.isLoading && institutionSchedulesAsync.valueOrNull == null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3036,7 +3035,7 @@ class _ScheduleSlotsSection extends ConsumerWidget {
               child: CircularProgressIndicator(),
             ),
           )
-        else if (schedules != null) ...[
+        else ...[
           Builder(builder: (_) {
             if (activeSchedules.isEmpty && inactiveSchedules.isEmpty) {
               return Card(

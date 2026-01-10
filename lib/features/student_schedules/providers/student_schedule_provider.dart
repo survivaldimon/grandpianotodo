@@ -62,9 +62,47 @@ final schedulesForDateProvider =
   );
 });
 
-/// Провайдер слотов ученика (FutureProvider вместо Stream для экономии каналов)
-/// Realtime не критичен — данные редко меняются, инвалидация в контроллере
+/// Параметры для слотов ученика (нужен institutionId для realtime через общий канал)
+class StudentScheduleParams {
+  final String studentId;
+  final String institutionId;
+
+  const StudentScheduleParams(this.studentId, this.institutionId);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StudentScheduleParams &&
+          other.studentId == studentId &&
+          other.institutionId == institutionId;
+
+  @override
+  int get hashCode => Object.hash(studentId, institutionId);
+}
+
+/// Провайдер слотов ученика (использует общий канал заведения для экономии)
+/// Realtime работает через institutionSchedulesStreamProvider + фильтрация
 final studentSchedulesProvider =
+    Provider.family<List<StudentSchedule>, StudentScheduleParams>((ref, params) {
+  final allSchedulesAsync = ref.watch(institutionSchedulesStreamProvider(params.institutionId));
+
+  return allSchedulesAsync.maybeWhen(
+    data: (schedules) => schedules
+        .where((s) => s.studentId == params.studentId)
+        .toList()
+      ..sort((a, b) {
+        final dayCompare = a.dayOfWeek.compareTo(b.dayOfWeek);
+        if (dayCompare != 0) return dayCompare;
+        final aMinutes = a.startTime.hour * 60 + a.startTime.minute;
+        final bMinutes = b.startTime.hour * 60 + b.startTime.minute;
+        return aMinutes.compareTo(bMinutes);
+      }),
+    orElse: () => [],
+  );
+});
+
+/// Провайдер слотов ученика по ID (fallback без realtime, для совместимости)
+final studentSchedulesByIdProvider =
     FutureProvider.family<List<StudentSchedule>, String>((ref, studentId) async {
   final repo = ref.watch(studentScheduleRepositoryProvider);
   return repo.getByStudent(studentId);
@@ -72,36 +110,28 @@ final studentSchedulesProvider =
 
 /// Провайдер активных слотов ученика
 final activeStudentSchedulesProvider =
-    Provider.family<List<StudentSchedule>, String>((ref, studentId) {
-  final schedulesAsync = ref.watch(studentSchedulesProvider(studentId));
+    Provider.family<List<StudentSchedule>, StudentScheduleParams>((ref, params) {
+  final schedules = ref.watch(studentSchedulesProvider(params));
 
-  return schedulesAsync.maybeWhen(
-    data: (schedules) {
-      return schedules
-          .where((s) => s.isActive)
-          .toList()
-        ..sort((a, b) {
-          // Сначала по дню недели, потом по времени
-          final dayCompare = a.dayOfWeek.compareTo(b.dayOfWeek);
-          if (dayCompare != 0) return dayCompare;
-          final aMinutes = a.startTime.hour * 60 + a.startTime.minute;
-          final bMinutes = b.startTime.hour * 60 + b.startTime.minute;
-          return aMinutes.compareTo(bMinutes);
-        });
-    },
-    orElse: () => [],
-  );
+  return schedules
+      .where((s) => s.isActive)
+      .toList()
+    ..sort((a, b) {
+      // Сначала по дню недели, потом по времени
+      final dayCompare = a.dayOfWeek.compareTo(b.dayOfWeek);
+      if (dayCompare != 0) return dayCompare;
+      final aMinutes = a.startTime.hour * 60 + a.startTime.minute;
+      final bMinutes = b.startTime.hour * 60 + b.startTime.minute;
+      return aMinutes.compareTo(bMinutes);
+    });
 });
 
 /// Провайдер неактивных (архивных) слотов ученика
 final inactiveStudentSchedulesProvider =
-    Provider.family<List<StudentSchedule>, String>((ref, studentId) {
-  final schedulesAsync = ref.watch(studentSchedulesProvider(studentId));
+    Provider.family<List<StudentSchedule>, StudentScheduleParams>((ref, params) {
+  final schedules = ref.watch(studentSchedulesProvider(params));
 
-  return schedulesAsync.maybeWhen(
-    data: (schedules) => schedules.where((s) => !s.isActive).toList(),
-    orElse: () => [],
-  );
+  return schedules.where((s) => !s.isActive).toList();
 });
 
 /// Провайдер слотов преподавателя
@@ -129,8 +159,10 @@ class StudentScheduleController extends StateNotifier<AsyncValue<void>> {
 
   /// Инвалидация провайдеров после операций
   void _invalidate(String institutionId, String studentId) {
+    // Инвалидируем общий канал заведения — это обновит все зависимые провайдеры
     _ref.invalidate(institutionSchedulesStreamProvider(institutionId));
-    _ref.invalidate(studentSchedulesProvider(studentId));
+    // Также инвалидируем конкретный провайдер ученика
+    _ref.invalidate(studentSchedulesProvider(StudentScheduleParams(studentId, institutionId)));
   }
 
   /// Создать слот
@@ -459,10 +491,11 @@ class StudentScheduleController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await _repo.reassignTeacher(scheduleIds, newTeacherId);
-      // Инвалидируем для всех затронутых учеников
+      // Инвалидируем общий канал — это обновит все зависимые провайдеры
       _ref.invalidate(institutionSchedulesStreamProvider(institutionId));
+      // Также инвалидируем конкретных учеников
       for (final studentId in studentIds) {
-        _ref.invalidate(studentSchedulesProvider(studentId));
+        _ref.invalidate(studentSchedulesProvider(StudentScheduleParams(studentId, institutionId)));
       }
       state = const AsyncValue.data(null);
       return true;
