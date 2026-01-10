@@ -462,7 +462,7 @@ class StudentRepository {
   }) async {
     try {
       if (sourceIds.length < 2) {
-        throw DatabaseException('Нужно минимум 2 ученика для объединения');
+        throw const DatabaseException('Нужно минимум 2 ученика для объединения');
       }
 
       final result = await _client.rpc('merge_students', params: {

@@ -284,7 +284,7 @@ class InstitutionRepository {
           .select();
 
       if ((result as List).isEmpty) {
-        throw DatabaseException('Не удалось обновить цвет (RLS или запись не найдена)');
+        throw const DatabaseException('Не удалось обновить цвет (RLS или запись не найдена)');
       }
     } catch (e) {
       throw DatabaseException('Ошибка обновления цвета: $e');

@@ -411,10 +411,10 @@ class StudentDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: legacyBalanceController,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Остаток занятий',
                     hintText: 'При переносе из другой школы',
-                    prefixIcon: const Icon(Icons.sync_alt_outlined),
+                    prefixIcon: Icon(Icons.sync_alt_outlined),
                     suffixText: 'занятий',
                     helperText: 'Списывается первым, не влияет на доход',
                     helperMaxLines: 2,
@@ -896,7 +896,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.sync_alt,
                               size: 12,
                               color: AppColors.warning,
@@ -3551,7 +3551,8 @@ class _ScheduleSlotCard extends ConsumerWidget {
                   loading: () => const CircularProgressIndicator(),
                   error: (e, _) => Text('Ошибка: $e'),
                   data: (rooms) => DropdownButtonFormField<String>(
-                    value: selectedRoomId,
+                    key: ValueKey('tempRoom_$selectedRoomId'),
+                    initialValue: selectedRoomId,
                     decoration: const InputDecoration(labelText: 'Новый кабинет'),
                     items: rooms
                         .where((r) => r.id != schedule.roomId)
@@ -3929,7 +3930,8 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                 loading: () => const LinearProgressIndicator(),
                 error: (e, _) => Text('Ошибка: $e'),
                 data: (rooms) => DropdownButtonFormField<String>(
-                  value: _selectedRoomId,
+                  key: ValueKey('room_$_selectedRoomId'),
+                  initialValue: _selectedRoomId,
                   decoration: const InputDecoration(
                     labelText: 'Кабинет *',
                     prefixIcon: Icon(Icons.meeting_room),
@@ -3983,7 +3985,8 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                   });
 
                   return DropdownButtonFormField<String>(
-                    value: _selectedTeacherId,
+                    key: ValueKey('teacher_$_selectedTeacherId'),
+                    initialValue: _selectedTeacherId,
                     decoration: const InputDecoration(
                       labelText: 'Преподаватель *',
                       prefixIcon: Icon(Icons.person),
@@ -4045,7 +4048,8 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                   });
 
                   return DropdownButtonFormField<String>(
-                    value: _selectedSubjectId,
+                    key: ValueKey('subject_$_selectedSubjectId'),
+                    initialValue: _selectedSubjectId,
                     decoration: const InputDecoration(
                       labelText: 'Предмет (опционально)',
                       prefixIcon: Icon(Icons.book),
@@ -4104,7 +4108,8 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                   });
 
                   return DropdownButtonFormField<String>(
-                    value: _selectedLessonTypeId,
+                    key: ValueKey('lessonType_$_selectedLessonTypeId'),
+                    initialValue: _selectedLessonTypeId,
                     decoration: const InputDecoration(
                       labelText: 'Тип занятия (опционально)',
                       prefixIcon: Icon(Icons.category),
@@ -4560,7 +4565,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
   Future<void> _showReassignDialog() async {
     // Получаем список преподавателей
     final members = ref.read(membersProvider(widget.institutionId)).valueOrNull ?? [];
-    final teachers = members.where((m) => m.userId != null).toList();
+    final teachers = members.toList();
 
     if (teachers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -4588,7 +4593,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
   Future<void> _showReassignSlotsDialog() async {
     // Получаем список преподавателей
     final members = ref.read(membersProvider(widget.institutionId)).valueOrNull ?? [];
-    final teachers = members.where((m) => m.userId != null).toList();
+    final teachers = members.toList();
 
     if (teachers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -5172,16 +5177,16 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
 
               // Выбор преподавателя
               DropdownButtonFormField<String>(
-                value: _selectedTeacherId,
+                key: ValueKey('reassignTeacher_$_selectedTeacherId'),
+                initialValue: _selectedTeacherId,
                 decoration: const InputDecoration(
                   labelText: 'Новый преподаватель',
                   border: OutlineInputBorder(),
                 ),
                 items: widget.teachers
-                    .where((m) => m.userId != null)
                     .map((member) {
                       return DropdownMenuItem(
-                        value: member.userId!,
+                        value: member.userId,
                         child: Text(member.profile?.fullName ?? 'Неизвестный'),
                       );
                     })

@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:kabinet/features/institution/providers/subject_provider.dart';
+import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/features/subjects/repositories/subject_repository.dart';
 import 'package:kabinet/shared/models/subject.dart';
 
@@ -8,7 +8,23 @@ final subjectRepositoryProvider = Provider<SubjectRepository>((ref) {
   return SubjectRepository();
 });
 
-/// Провайдер списка предметов
+/// Провайдер списка предметов заведения (основной, используется в расписании)
+final subjectsProvider =
+    FutureProvider.family<List<Subject>, String>((ref, institutionId) async {
+  final client = SupabaseConfig.client;
+
+  final data = await client
+      .from('subjects')
+      .select()
+      .eq('institution_id', institutionId)
+      .isFilter('archived_at', null)
+      .order('sort_order')
+      .order('name');
+
+  return (data as List).map((item) => Subject.fromJson(item)).toList();
+});
+
+/// Провайдер списка предметов (альтернативный, через репозиторий)
 final subjectsListProvider =
     FutureProvider.family<List<Subject>, String>((ref, institutionId) async {
   final repo = ref.watch(subjectRepositoryProvider);

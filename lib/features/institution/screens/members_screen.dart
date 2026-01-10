@@ -1137,7 +1137,8 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                       }
 
                       return DropdownButtonFormField<String>(
-                        value: _selectedTeacherId,
+                        key: ValueKey(_selectedTeacherId),
+                        initialValue: _selectedTeacherId,
                         decoration: InputDecoration(
                           labelText: 'Преподаватель',
                           border: OutlineInputBorder(

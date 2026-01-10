@@ -1781,7 +1781,8 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
               }
 
               return DropdownButtonFormField<String>(
-                value: _selectedRoomId,
+                key: ValueKey('room_$_selectedRoomId'),
+                initialValue: _selectedRoomId,
                 decoration: InputDecoration(
                   labelText: 'Кабинет для занятий',
                   prefixIcon: const Icon(Icons.meeting_room_outlined),

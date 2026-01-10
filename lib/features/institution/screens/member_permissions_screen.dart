@@ -657,6 +657,7 @@ class _MemberPermissionsScreenState
                             title: Text(subject.name),
                             onTap: () async {
                               Navigator.pop(dialogContext);
+                              final messenger = ScaffoldMessenger.of(context);
                               await ref
                                   .read(teacherSubjectsControllerProvider.notifier)
                                   .addSubject(
@@ -665,7 +666,7 @@ class _MemberPermissionsScreenState
                                     institutionId: widget.institutionId,
                                   );
                               if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                messenger.showSnackBar(
                                   SnackBar(
                                     content: Text('Направление "${subject.name}" добавлено'),
                                     backgroundColor: AppColors.success,

@@ -2,7 +2,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
 import 'package:kabinet/shared/models/payment.dart';
-import 'package:kabinet/shared/models/payment_plan.dart';
 
 /// Репозиторий для работы с оплатами
 class PaymentRepository {
@@ -173,93 +172,6 @@ class PaymentRepository {
       // При любом изменении загружаем актуальные данные
       final payments = await getByInstitution(institutionId);
       yield payments;
-    }
-  }
-
-  // === Тарифы ===
-
-  /// Получить тарифы заведения
-  Future<List<PaymentPlan>> getPlans(String institutionId) async {
-    try {
-      final data = await _client
-          .from('payment_plans')
-          .select()
-          .eq('institution_id', institutionId)
-          .isFilter('archived_at', null)
-          .order('lessons_count');
-
-      return (data as List)
-          .map((item) => PaymentPlan.fromJson(item))
-          .toList();
-    } catch (e) {
-      throw DatabaseException('Ошибка загрузки тарифов: $e');
-    }
-  }
-
-  /// Создать тариф
-  Future<PaymentPlan> createPlan({
-    required String institutionId,
-    required String name,
-    required double price,
-    required int lessonsCount,
-    int validityDays = 30,
-  }) async {
-    try {
-      final data = await _client
-          .from('payment_plans')
-          .insert({
-            'institution_id': institutionId,
-            'name': name,
-            'price': price,
-            'lessons_count': lessonsCount,
-            'validity_days': validityDays,
-          })
-          .select()
-          .single();
-
-      return PaymentPlan.fromJson(data);
-    } catch (e) {
-      throw DatabaseException('Ошибка создания тарифа: $e');
-    }
-  }
-
-  /// Обновить тариф
-  Future<PaymentPlan> updatePlan(
-    String id, {
-    String? name,
-    double? price,
-    int? lessonsCount,
-    int? validityDays,
-  }) async {
-    try {
-      final updates = <String, dynamic>{};
-      if (name != null) updates['name'] = name;
-      if (price != null) updates['price'] = price;
-      if (lessonsCount != null) updates['lessons_count'] = lessonsCount;
-      if (validityDays != null) updates['validity_days'] = validityDays;
-
-      final data = await _client
-          .from('payment_plans')
-          .update(updates)
-          .eq('id', id)
-          .select()
-          .single();
-
-      return PaymentPlan.fromJson(data);
-    } catch (e) {
-      throw DatabaseException('Ошибка обновления тарифа: $e');
-    }
-  }
-
-  /// Архивировать тариф
-  Future<void> archivePlan(String id) async {
-    try {
-      await _client
-          .from('payment_plans')
-          .update({'archived_at': DateTime.now().toIso8601String()})
-          .eq('id', id);
-    } catch (e) {
-      throw DatabaseException('Ошибка архивации тарифа: $e');
     }
   }
 

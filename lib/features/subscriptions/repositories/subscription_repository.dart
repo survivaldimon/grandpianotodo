@@ -218,7 +218,7 @@ class SubscriptionRepository {
       );
 
       if (updated == null) {
-        throw DatabaseException('Подписка не найдена');
+        throw const DatabaseException('Подписка не найдена');
       }
 
       final result = Subscription.fromJson(updated as Map<String, dynamic>);

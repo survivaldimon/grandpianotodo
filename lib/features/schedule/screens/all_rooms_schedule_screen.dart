@@ -11,11 +11,10 @@ import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
-import 'package:kabinet/features/institution/providers/subject_provider.dart';
+import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
-import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/room.dart';
 import 'package:kabinet/shared/models/student.dart';
@@ -4097,11 +4096,12 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               error: (e, _) => const SizedBox.shrink(),
               data: (rooms) {
                 return DropdownButtonFormField<String?>(
+                  key: ValueKey('room_$_selectedRoomId'),
                   decoration: const InputDecoration(
                     labelText: 'Кабинет',
                     prefixIcon: Icon(Icons.door_front_door),
                   ),
-                  value: _selectedRoomId,
+                  initialValue: _selectedRoomId,
                   items: rooms.map((r) => DropdownMenuItem<String?>(
                     value: r.id,
                     child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
@@ -4121,11 +4121,12 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 error: (e, _) => ErrorView.inline(e),
                 data: (groups) {
                   return DropdownButtonFormField<String?>(
+                    key: ValueKey('group_$_selectedGroupId'),
                     decoration: const InputDecoration(
                       labelText: 'Группа',
                       prefixIcon: Icon(Icons.groups),
                     ),
-                    value: _selectedGroupId,
+                    initialValue: _selectedGroupId,
                     items: groups.map((g) => DropdownMenuItem<String?>(
                       value: g.id,
                       child: Text(g.name),
@@ -4142,11 +4143,12 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 error: (e, _) => ErrorView.inline(e),
                 data: (students) {
                   return DropdownButtonFormField<String?>(
+                    key: ValueKey('student_$_selectedStudentId'),
                     decoration: const InputDecoration(
                       labelText: 'Ученик',
                       prefixIcon: Icon(Icons.person),
                     ),
-                    value: _selectedStudentId,
+                    initialValue: _selectedStudentId,
                     items: students.map((s) => DropdownMenuItem<String?>(
                       value: s.id,
                       child: Text(s.name),
@@ -4166,11 +4168,12 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               data: (subjects) {
                 if (subjects.isEmpty) return const SizedBox.shrink();
                 return DropdownButtonFormField<String?>(
+                  key: ValueKey('subject_$_selectedSubjectId'),
                   decoration: const InputDecoration(
                     labelText: 'Предмет',
                     prefixIcon: Icon(Icons.music_note),
                   ),
-                  value: _selectedSubjectId,
+                  initialValue: _selectedSubjectId,
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
@@ -4196,11 +4199,12 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               data: (lessonTypes) {
                 if (lessonTypes.isEmpty) return const SizedBox.shrink();
                 return DropdownButtonFormField<String?>(
+                  key: ValueKey('type_$_selectedLessonTypeId'),
                   decoration: const InputDecoration(
                     labelText: 'Тип занятия',
                     prefixIcon: Icon(Icons.category),
                   ),
-                  value: _selectedLessonTypeId,
+                  initialValue: _selectedLessonTypeId,
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
@@ -6989,6 +6993,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                     children: [
                       // Dropdown выбора типа повтора
                       DropdownButtonFormField<RepeatType>(
+                        key: ValueKey('repeat_$_repeatType'),
                         decoration: InputDecoration(
                           labelText: 'Повтор',
                           prefixIcon: const Icon(Icons.repeat),
@@ -6997,7 +7002,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           ),
                           isDense: true,
                         ),
-                        value: _repeatType,
+                        initialValue: _repeatType,
                         items: RepeatType.values
                             .map((type) => DropdownMenuItem(
                                   value: type,
@@ -7169,7 +7174,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           if (_conflictDates.isNotEmpty)
                             Text(
                               'Конфликты: ${_conflictDates.length} (будут пропущены)',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: AppColors.error,
                                 fontSize: 12,
                               ),
@@ -8925,7 +8930,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
   Set<String> _selectedLessonIds = {};
 
   // Фильтр по дням недели (1=Пн ... 7=Вс)
-  Set<int> _selectedWeekdays = {};
+  final Set<int> _selectedWeekdays = {};
   // Лимит количества занятий (0 = без лимита)
   int _quantityLimit = 0;
 
@@ -9145,7 +9150,8 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<EditScope>(
-          value: _editScope,
+          key: ValueKey('scope_$_editScope'),
+          initialValue: _editScope,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.select_all),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -9399,7 +9405,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                 color: isSelected
                     ? Theme.of(context).colorScheme.primary
                     : isSeriesDate
-                        ? Theme.of(context).colorScheme.primaryContainer.withOpacity(isPast ? 0.3 : 1)
+                        ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: isPast ? 0.3 : 1)
                         : null,
                 borderRadius: BorderRadius.circular(8),
                 border: isCurrent
@@ -9421,8 +9427,8 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                     color: isSelected
                         ? Theme.of(context).colorScheme.onPrimary
                         : isSeriesDate
-                            ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(isPast ? 0.5 : 1)
-                            : Theme.of(context).colorScheme.onSurface.withOpacity(isPast ? 0.3 : 1),
+                            ? Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: isPast ? 0.5 : 1)
+                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: isPast ? 0.3 : 1),
                     fontWeight: isCurrent ? FontWeight.bold : null,
                   ),
                 ),
@@ -9693,7 +9699,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
             ),
             borderRadius: BorderRadius.circular(12),
             color: hasChange
-                ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+                ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
                 : null,
           ),
           child: Row(
