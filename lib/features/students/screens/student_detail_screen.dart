@@ -3002,7 +3002,11 @@ class _ScheduleSlotsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activeSchedules = ref.watch(activeStudentSchedulesProvider(studentId));
     final inactiveSchedules = ref.watch(inactiveStudentSchedulesProvider(studentId));
-    final schedulesAsync = ref.watch(studentSchedulesStreamProvider(studentId));
+    final schedulesAsync = ref.watch(studentSchedulesProvider(studentId));
+
+    // Паттерн valueOrNull для resilient UI
+    final schedules = schedulesAsync.valueOrNull;
+    final isLoading = schedulesAsync.isLoading && schedules == null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3024,24 +3028,16 @@ class _ScheduleSlotsSection extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
 
-        // Loading state
-        schedulesAsync.when(
-          loading: () => const Center(
+        // Loading state (только при первой загрузке)
+        if (isLoading)
+          const Center(
             child: Padding(
               padding: EdgeInsets.all(16),
               child: CircularProgressIndicator(),
             ),
-          ),
-          error: (e, _) => Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Ошибка загрузки: $e',
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
-          ),
-          data: (_) {
+          )
+        else if (schedules != null) ...[
+          Builder(builder: (_) {
             if (activeSchedules.isEmpty && inactiveSchedules.isEmpty) {
               return Card(
                 child: Padding(

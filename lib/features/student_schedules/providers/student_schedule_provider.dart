@@ -62,17 +62,18 @@ final schedulesForDateProvider =
   );
 });
 
-/// Провайдер слотов ученика (realtime)
-final studentSchedulesStreamProvider =
-    StreamProvider.family<List<StudentSchedule>, String>((ref, studentId) {
+/// Провайдер слотов ученика (FutureProvider вместо Stream для экономии каналов)
+/// Realtime не критичен — данные редко меняются, инвалидация в контроллере
+final studentSchedulesProvider =
+    FutureProvider.family<List<StudentSchedule>, String>((ref, studentId) async {
   final repo = ref.watch(studentScheduleRepositoryProvider);
-  return repo.watchByStudent(studentId);
+  return repo.getByStudent(studentId);
 });
 
 /// Провайдер активных слотов ученика
 final activeStudentSchedulesProvider =
     Provider.family<List<StudentSchedule>, String>((ref, studentId) {
-  final schedulesAsync = ref.watch(studentSchedulesStreamProvider(studentId));
+  final schedulesAsync = ref.watch(studentSchedulesProvider(studentId));
 
   return schedulesAsync.maybeWhen(
     data: (schedules) {
@@ -95,7 +96,7 @@ final activeStudentSchedulesProvider =
 /// Провайдер неактивных (архивных) слотов ученика
 final inactiveStudentSchedulesProvider =
     Provider.family<List<StudentSchedule>, String>((ref, studentId) {
-  final schedulesAsync = ref.watch(studentSchedulesStreamProvider(studentId));
+  final schedulesAsync = ref.watch(studentSchedulesProvider(studentId));
 
   return schedulesAsync.maybeWhen(
     data: (schedules) => schedules.where((s) => !s.isActive).toList(),
@@ -129,7 +130,7 @@ class StudentScheduleController extends StateNotifier<AsyncValue<void>> {
   /// Инвалидация провайдеров после операций
   void _invalidate(String institutionId, String studentId) {
     _ref.invalidate(institutionSchedulesStreamProvider(institutionId));
-    _ref.invalidate(studentSchedulesStreamProvider(studentId));
+    _ref.invalidate(studentSchedulesProvider(studentId));
   }
 
   /// Создать слот
@@ -461,7 +462,7 @@ class StudentScheduleController extends StateNotifier<AsyncValue<void>> {
       // Инвалидируем для всех затронутых учеников
       _ref.invalidate(institutionSchedulesStreamProvider(institutionId));
       for (final studentId in studentIds) {
-        _ref.invalidate(studentSchedulesStreamProvider(studentId));
+        _ref.invalidate(studentSchedulesProvider(studentId));
       }
       state = const AsyncValue.data(null);
       return true;
