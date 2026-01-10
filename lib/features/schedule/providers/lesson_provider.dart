@@ -688,6 +688,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Создать серию повторяющихся занятий
+  /// [repeatGroupId] — можно передать для объединения нескольких серий
+  /// (например, для разных дней недели в одном повторе)
   Future<List<Lesson>?> createSeries({
     required String institutionId,
     required String roomId,
@@ -700,6 +702,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     required TimeOfDay startTime,
     required TimeOfDay endTime,
     String? comment,
+    String? repeatGroupId,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -715,6 +718,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         startTime: startTime,
         endTime: endTime,
         comment: comment,
+        repeatGroupId: repeatGroupId,
       );
 
       // Инвалидируем кэш для всех дат
@@ -759,6 +763,138 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  // ============================================================
+  // МЕТОДЫ ОТМЕНЫ ЗАНЯТИЙ (АРХИВАЦИЯ + ОПЦИОНАЛЬНОЕ СПИСАНИЕ)
+  // ============================================================
+
+  /// Отменить одно занятие
+  /// [deductFromBalance] — списать занятие с баланса ученика (только для сегодняшних)
+  /// [studentIdsToDeduct] — для групповых: список ID учеников для списания
+  ///
+  /// Логика по дате:
+  /// - Прошлые занятия: нельзя отменить (проверяется в UI)
+  /// - Сегодняшние: можно отменить с опцией списания
+  /// - Будущие: можно отменить БЕЗ списания (только архивация)
+  Future<bool> cancelLesson({
+    required Lesson lesson,
+    required bool deductFromBalance,
+    required String institutionId,
+    List<String>? studentIdsToDeduct,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      // Определяем дату занятия относительно сегодня
+      final today = DateTime.now();
+      final todayOnly = DateTime(today.year, today.month, today.day);
+      final lessonDate = DateTime(lesson.date.year, lesson.date.month, lesson.date.day);
+      final isToday = lessonDate.isAtSameMomentAs(todayOnly);
+
+      // Списание ТОЛЬКО для сегодняшних занятий (не будущих, не прошлых)
+      final shouldDeduct = deductFromBalance && isToday && lesson.status != LessonStatus.completed;
+
+      if (shouldDeduct) {
+        if (lesson.isGroupLesson) {
+          // Для групповых — списываем выбранным ученикам
+          final idsToDeduct = studentIdsToDeduct ?? [];
+          for (final studentId in idsToDeduct) {
+            await _deductFromStudent(studentId);
+            _ref.invalidate(studentProvider(studentId));
+          }
+        } else if (lesson.studentId != null) {
+          // Для индивидуальных — списываем ученику
+          await _deductFromStudent(lesson.studentId!);
+          _ref.invalidate(studentProvider(lesson.studentId!));
+        }
+      }
+
+      // Архивируем занятие
+      await _repo.archive(lesson.id);
+      _invalidateForRoom(lesson.roomId, lesson.date, institutionId: institutionId);
+      // Инвалидируем список учеников для обновления баланса
+      _ref.invalidate(studentsProvider(institutionId));
+
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Вспомогательный метод для списания занятия с правильным приоритетом
+  /// Приоритет: 1) legacy_balance, 2) subscription, 3) долг (prepaid_lessons_count)
+  Future<void> _deductFromStudent(String studentId) async {
+    try {
+      final student = await _studentRepo.getById(studentId);
+
+      if (student.legacyBalance > 0) {
+        // Списываем из остатка (legacy_balance) в первую очередь
+        await _studentRepo.decrementLegacyBalance(studentId);
+      } else {
+        // Пробуем списать с подписки
+        final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(studentId);
+
+        if (subscriptionId == null) {
+          // Нет активной подписки — списываем напрямую (уход в долг)
+          await _studentRepo.decrementPrepaidCount(studentId);
+        }
+      }
+    } catch (e) {
+      // Не критичная ошибка - продолжаем
+      debugPrint('Error deducting from student $studentId: $e');
+    }
+  }
+
+  /// Отменить это и все последующие занятия серии
+  /// [deductFromBalance] — списать занятие с баланса (ТОЛЬКО сегодняшнее)
+  /// Возвращает количество отменённых занятий
+  ///
+  /// Логика:
+  /// - Сегодняшнее занятие → списать 1 (если выбрано)
+  /// - Будущие занятия → просто архивировать (без списания)
+  Future<int> cancelFollowingLessons({
+    required Lesson lesson,
+    required bool deductFromBalance,
+    required String institutionId,
+  }) async {
+    if (lesson.repeatGroupId == null) return 0;
+
+    state = const AsyncValue.loading();
+    try {
+      // Определяем дату занятия относительно сегодня
+      final today = DateTime.now();
+      final todayOnly = DateTime(today.year, today.month, today.day);
+      final lessonDate = DateTime(lesson.date.year, lesson.date.month, lesson.date.day);
+      final isToday = lessonDate.isAtSameMomentAs(todayOnly);
+
+      // Списание ТОЛЬКО для сегодняшнего занятия (не будущих)
+      // При отмене серии — списываем максимум 1 занятие (сегодняшнее)
+      if (deductFromBalance && isToday && lesson.status != LessonStatus.completed) {
+        if (lesson.studentId != null) {
+          await _deductFromStudent(lesson.studentId!);
+          _ref.invalidate(studentProvider(lesson.studentId!));
+        }
+      }
+
+      // Архивируем ВСЕ занятия серии (и сегодня, и будущие)
+      // Фильтрация по кабинету для защиты от старых данных
+      final count = await _repo.archiveFollowingLessons(
+        lesson.repeatGroupId!,
+        lesson.date,
+        roomId: lesson.roomId,
+      );
+
+      _invalidateForRoom(lesson.roomId, lesson.date, institutionId: institutionId);
+      // Инвалидируем список учеников для обновления баланса
+      _ref.invalidate(studentsProvider(institutionId));
+      state = const AsyncValue.data(null);
+      return count;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return 0;
+    }
+  }
+
   /// Обновить поля для последующих занятий серии
   /// Поддерживает: время, кабинет, ученик, предмет, тип занятия
   Future<bool> updateFollowing(
@@ -799,8 +935,19 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Получить количество последующих занятий в серии
-  Future<int> getFollowingCount(String repeatGroupId, DateTime fromDate) async {
-    final lessons = await _repo.getFollowingLessons(repeatGroupId, fromDate);
+  /// [roomId] и [startTime] — дополнительная фильтрация для точности
+  Future<int> getFollowingCount(
+    String repeatGroupId,
+    DateTime fromDate, {
+    String? roomId,
+    TimeOfDay? startTime,
+  }) async {
+    final lessons = await _repo.getFollowingLessons(
+      repeatGroupId,
+      fromDate,
+      roomId: roomId,
+      startTime: startTime,
+    );
     return lessons.length;
   }
 

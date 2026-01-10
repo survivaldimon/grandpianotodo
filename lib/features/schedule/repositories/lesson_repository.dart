@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
 import 'package:kabinet/shared/models/lesson.dart';
@@ -177,6 +178,8 @@ class LessonRepository {
   }
 
   /// Создать серию повторяющихся занятий
+  /// [repeatGroupId] — можно передать для объединения нескольких серий
+  /// (например, для разных дней недели в одном повторе)
   /// Возвращает список созданных занятий
   Future<List<Lesson>> createSeries({
     required String institutionId,
@@ -190,13 +193,14 @@ class LessonRepository {
     required TimeOfDay startTime,
     required TimeOfDay endTime,
     String? comment,
+    String? repeatGroupId,
   }) async {
     if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
     if (dates.isEmpty) throw const ValidationException('Список дат пуст');
 
     try {
-      // Генерируем общий ID для серии
-      final repeatGroupId = _generateUuid();
+      // Используем переданный ID или генерируем новый
+      final groupId_ = repeatGroupId ?? _generateUuid();
 
       final startStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
       final endStr = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
@@ -215,7 +219,7 @@ class LessonRepository {
             'end_time': endStr,
             'comment': comment,
             'created_by': _userId,
-            'repeat_group_id': repeatGroupId,
+            'repeat_group_id': groupId_,
           }).toList();
 
       final data = await _client
@@ -241,17 +245,9 @@ class LessonRepository {
     }
   }
 
-  /// Генерация UUID на клиенте
-  String _generateUuid() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replaceAllMapped(
-      RegExp(r'[xy]'),
-      (match) {
-        final r = (DateTime.now().millisecondsSinceEpoch + (match.group(0) == 'x' ? 0 : 8)) % 16;
-        final v = match.group(0) == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toRadixString(16);
-      },
-    );
-  }
+  /// Генерация UUID на клиенте (v4 random)
+  static const _uuid = Uuid();
+  String _generateUuid() => _uuid.v4();
 
   /// Получить все занятия серии (по repeat_group_id)
   Future<List<Lesson>> getSeriesLessons(String repeatGroupId) async {
@@ -278,17 +274,34 @@ class LessonRepository {
   }
 
   /// Получить последующие занятия серии (с указанной даты)
-  Future<List<Lesson>> getFollowingLessons(String repeatGroupId, DateTime fromDate) async {
+  /// Дополнительно фильтрует по room_id и start_time для точности
+  /// (защита от старых данных с дублирующимися repeat_group_id)
+  Future<List<Lesson>> getFollowingLessons(
+    String repeatGroupId,
+    DateTime fromDate, {
+    String? roomId,
+    TimeOfDay? startTime,
+  }) async {
     try {
       final dateStr = fromDate.toIso8601String().split('T').first;
 
-      final data = await _client
+      var query = _client
           .from('lessons')
           .select('id, date')
           .eq('repeat_group_id', repeatGroupId)
           .gte('date', dateStr)
-          .isFilter('archived_at', null)
-          .order('date');
+          .isFilter('archived_at', null);
+
+      // Дополнительная фильтрация для точности
+      if (roomId != null) {
+        query = query.eq('room_id', roomId);
+      }
+      if (startTime != null) {
+        final timeStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+        query = query.eq('start_time', timeStr);
+      }
+
+      final data = await query.order('date');
 
       return (data as List).map((item) => Lesson.fromJson({
         ...item,
@@ -579,6 +592,52 @@ class LessonRepository {
           .eq('id', id);
     } catch (e) {
       throw DatabaseException('Ошибка архивации занятия: $e');
+    }
+  }
+
+  /// Архивировать все последующие занятия серии
+  /// Возвращает количество архивированных занятий
+  /// [roomId] и [startTime] — дополнительная фильтрация для точности
+  Future<int> archiveFollowingLessons(
+    String repeatGroupId,
+    DateTime fromDate, {
+    String? roomId,
+    TimeOfDay? startTime,
+  }) async {
+    try {
+      final dateStr = fromDate.toIso8601String().split('T').first;
+
+      // Получаем ID занятий для архивации
+      var query = _client
+          .from('lessons')
+          .select('id')
+          .eq('repeat_group_id', repeatGroupId)
+          .gte('date', dateStr)
+          .isFilter('archived_at', null);
+
+      // Дополнительная фильтрация для точности
+      if (roomId != null) {
+        query = query.eq('room_id', roomId);
+      }
+      if (startTime != null) {
+        final timeStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+        query = query.eq('start_time', timeStr);
+      }
+
+      final lessonIds = await query;
+
+      final ids = (lessonIds as List).map((e) => e['id'] as String).toList();
+      if (ids.isEmpty) return 0;
+
+      // Архивируем все занятия
+      await _client
+          .from('lessons')
+          .update({'archived_at': DateTime.now().toIso8601String()})
+          .inFilter('id', ids);
+
+      return ids.length;
+    } catch (e) {
+      throw DatabaseException('Ошибка архивации серии занятий: $e');
     }
   }
 

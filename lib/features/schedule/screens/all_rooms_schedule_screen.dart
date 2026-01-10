@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
@@ -2793,6 +2794,15 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                       (permissions?.deleteAllLessons ?? false) ||
                       (isOwnLesson && (permissions?.deleteOwnLessons ?? false));
 
+    // Проверка даты: прошлые занятия нельзя отменить
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    final lessonDate = DateTime(lesson.date.year, lesson.date.month, lesson.date.day);
+    final isPastLesson = lessonDate.isBefore(todayOnly);
+
+    // Можно отменить только сегодняшние и будущие занятия (и не уже отменённые)
+    final canCancel = canDelete && !isPastLesson && !_isCancelled;
+
     ref.listen(lessonControllerProvider, (prev, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2912,6 +2922,25 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                         ],
                       ),
                     ),
+                    // Бейдж "Отменено" (если занятие отменено)
+                    if (_isCancelled) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Отменено',
+                          style: TextStyle(
+                            color: AppColors.error,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                     // Кнопка закрытия
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -3018,18 +3047,6 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                         onTap: () => _handleStatusChange(completed: !_isCompleted),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Отменено
-                    Expanded(
-                      child: _StatusButton(
-                        label: 'Отменено',
-                        icon: Icons.cancel_rounded,
-                        isActive: _isCancelled,
-                        color: AppColors.error,
-                        isLoading: _isLoading,
-                        onTap: () => _handleStatusChange(cancelled: !_isCancelled),
-                      ),
-                    ),
                     // Оплачено (если есть цена и ученик)
                     if (hasPrice && hasStudent) ...[
                       const SizedBox(width: 8),
@@ -3092,16 +3109,16 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                         ),
                       ),
                     ),
-                    // Удалить (только если есть право)
-                    if (canDelete) ...[
+                    // Отменить занятие (только если есть право и занятие не в прошлом)
+                    if (canCancel) ...[
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: controllerState.isLoading || _isLoading
                               ? null
-                              : _deleteLesson,
-                          icon: const Icon(Icons.delete_rounded, size: 18),
-                          label: const Text('Удалить'),
+                              : _showCancelSheet,
+                          icon: const Icon(Icons.cancel_outlined, size: 18),
+                          label: const Text('Отменить'),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             foregroundColor: AppColors.error,
@@ -3250,121 +3267,397 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     }
   }
 
-  Future<void> _deleteLesson() async {
-    final lesson = widget.lesson;
-    final controller = ref.read(lessonControllerProvider.notifier);
-
-    // Если занятие часть серии — показываем расширенный диалог
-    if (lesson.isRepeating) {
-      final followingCount = await controller.getFollowingCount(
-        lesson.repeatGroupId!,
-        lesson.date,
-      );
-
-      if (!mounted) return;
-
-      final result = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Удалить занятие?'),
-          content: Text(
-            followingCount > 1
-                ? 'Это занятие является частью серии повторяющихся занятий.\n\n'
-                    'Удалить только это занятие или это и все последующие ($followingCount шт.)?'
-                : 'Занятие будет удалено безвозвратно.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(null),
-              child: const Text('Отмена'),
-            ),
-            if (followingCount > 1)
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop('following'),
-                child: const Text('Это и все последующие', style: TextStyle(color: Colors.orange)),
-              ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop('single'),
-              child: const Text('Только это', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
-      );
-
-      if (result == null || !mounted) return;
-
-      bool success;
-      String message;
-
-      if (result == 'following') {
-        success = await controller.deleteFollowing(
-          lesson.repeatGroupId!,
-          lesson.date,
-          lesson.roomId,
-          widget.institutionId,
-        );
-        message = 'Удалено $followingCount занятий';
-      } else {
-        success = await controller.delete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
-        message = 'Занятие удалено';
-      }
-
-      if (success && mounted) {
-        widget.onUpdated();
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } else {
-      // Обычное занятие
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Удалить занятие?'),
-          content: const Text(
-            'Занятие будет удалено безвозвратно. Это действие нельзя отменить.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Удалить', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed == true && mounted) {
-        final success = await controller.delete(
-          lesson.id,
-          lesson.roomId,
-          lesson.date,
-          widget.institutionId,
-        );
-
-        if (success && mounted) {
+  /// Открывает шторку отмены занятия
+  void _showCancelSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _CancelLessonSheet(
+        lesson: widget.lesson,
+        institutionId: widget.institutionId,
+        onCancelled: () {
           widget.onUpdated();
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Занятие удалено'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
-    }
+          // Закрываем и детали занятия
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        },
+      ),
+    );
   }
 
   String _formatTime(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+/// Диалог отмены занятия
+/// Объединяет удаление и отмену в одну функцию с опцией списания баланса
+class _CancelLessonSheet extends ConsumerStatefulWidget {
+  final Lesson lesson;
+  final String institutionId;
+  final VoidCallback onCancelled;
+
+  const _CancelLessonSheet({
+    required this.lesson,
+    required this.institutionId,
+    required this.onCancelled,
+  });
+
+  @override
+  ConsumerState<_CancelLessonSheet> createState() => _CancelLessonSheetState();
+}
+
+class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
+  bool _deductFromBalance = false;
+  bool _cancelFollowing = false;
+  final Set<String> _selectedStudentIds = {};
+  bool _isLoading = false;
+  int _followingCount = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowingCount();
+    // Для групповых — по умолчанию выбираем всех
+    if (widget.lesson.isGroupLesson && widget.lesson.lessonStudents != null) {
+      for (final ls in widget.lesson.lessonStudents!) {
+        _selectedStudentIds.add(ls.studentId);
+      }
+    }
+  }
+
+  Future<void> _loadFollowingCount() async {
+    if (widget.lesson.repeatGroupId != null) {
+      final controller = ref.read(lessonControllerProvider.notifier);
+      // Считаем ВСЕ занятия серии (включая разные дни недели)
+      // После исправления UUID все занятия weekdays-серии имеют один repeatGroupId
+      final count = await controller.getFollowingCount(
+        widget.lesson.repeatGroupId!,
+        widget.lesson.date,
+      );
+      if (mounted) {
+        setState(() => _followingCount = count);
+      }
+    }
+  }
+
+  Future<void> _cancel() async {
+    setState(() => _isLoading = true);
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+    String message;
+    bool success;
+
+    if (_cancelFollowing && widget.lesson.repeatGroupId != null) {
+      // Отмена серии
+      final count = await controller.cancelFollowingLessons(
+        lesson: widget.lesson,
+        deductFromBalance: _deductFromBalance,
+        institutionId: widget.institutionId,
+      );
+      success = count > 0;
+      message = 'Отменено $count занятий';
+    } else {
+      // Отмена одного занятия
+      success = await controller.cancelLesson(
+        lesson: widget.lesson,
+        deductFromBalance: _deductFromBalance,
+        institutionId: widget.institutionId,
+        studentIdsToDeduct: widget.lesson.isGroupLesson ? _selectedStudentIds.toList() : null,
+      );
+      message = 'Занятие отменено';
+    }
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (success) {
+      widget.onCancelled();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final lesson = widget.lesson;
+    final isCompleted = lesson.status == LessonStatus.completed;
+    final showSeriesOption = lesson.repeatGroupId != null && _followingCount > 1;
+
+    // Определяем дату занятия относительно сегодня
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    final lessonDate = DateTime(lesson.date.year, lesson.date.month, lesson.date.day);
+    final isToday = lessonDate.isAtSameMomentAs(todayOnly);
+    final isFuture = lessonDate.isAfter(todayOnly);
+
+    // Для сегодняшних — можно выбрать списание
+    // Для будущих — списание недоступно (только архивация)
+    final canShowDeductOption = isToday && !isCompleted;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Заголовок
+                Text(
+                  'Отменить занятие',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Информация о занятии
+                Text(
+                  lesson.participantName,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Информация для будущих занятий (без списания)
+                if (isFuture) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: colorScheme.primary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Занятие будет отменено и архивировано без списания с баланса',
+                            style: TextStyle(color: colorScheme.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Предупреждение для проведённых занятий
+                if (isCompleted) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber, color: Colors.orange),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Занятие уже проведено. Списание баланса недоступно.',
+                            style: TextStyle(color: Colors.orange[800]),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Переключатель списания баланса (только для сегодняшних)
+                if (canShowDeductOption) ...[
+                  SwitchListTile(
+                    value: _deductFromBalance,
+                    onChanged: (value) => setState(() => _deductFromBalance = value),
+                    title: const Text('Списать занятие с баланса'),
+                    subtitle: const Text('Занятие будет вычтено из предоплаченных'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+
+                // Для групповых — чекбоксы участников (только для сегодняшних со списанием)
+                if (canShowDeductOption && _deductFromBalance && lesson.isGroupLesson) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Кому списать занятие:',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  ...?lesson.lessonStudents?.map((ls) {
+                    final isSelected = _selectedStudentIds.contains(ls.studentId);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedStudentIds.add(ls.studentId);
+                          } else {
+                            _selectedStudentIds.remove(ls.studentId);
+                          }
+                        });
+                      },
+                      title: Text(ls.student?.name ?? 'Ученик'),
+                      subtitle: Text('Баланс: ${ls.student?.balance ?? 0}'),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                ],
+
+                // Для серии — выбор "только это" или "все последующие"
+                if (showSeriesOption) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Это занятие является частью серии ($_followingCount шт.)',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        label: Text('Только это'),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        label: Text('Это и последующие'),
+                      ),
+                    ],
+                    selected: {_cancelFollowing},
+                    onSelectionChanged: (selected) {
+                      setState(() => _cancelFollowing = selected.first);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  // Подсказка: при отмене серии списывается только сегодняшнее
+                  if (_cancelFollowing && canShowDeductOption && _deductFromBalance) ...[
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 16, color: colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Списание применится только к сегодняшнему занятию',
+                              style: TextStyle(fontSize: 12, color: colorScheme.primary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  // Подсказка для будущих: все занятия серии будут архивированы без списания
+                  if (_cancelFollowing && isFuture) ...[
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 16, color: colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Все занятия серии будут архивированы без списания',
+                              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+
+                const SizedBox(height: 24),
+
+                // Кнопка отмены
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _isLoading ? null : _cancel,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            _cancelFollowing
+                                ? 'Отменить $_followingCount занятий'
+                                : 'Отменить занятие',
+                          ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Кнопка "Назад"
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Назад'),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -7549,6 +7842,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
       // Для режима weekdays — группируем по дням недели и создаём с соответствующим временем
       if (_repeatType == RepeatType.weekdays && _weekdayTimes.isNotEmpty) {
+        // Генерируем ОДИН общий repeatGroupId для всех дней недели
+        // Это позволяет правильно считать количество занятий серии
+        final sharedRepeatGroupId = const Uuid().v4();
+
         // Группируем даты по дню недели
         final datesByWeekday = <int, List<DateTime>>{};
         for (final date in validDates) {
@@ -7573,6 +7870,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
               groupId: _isGroupLesson ? _selectedGroup!.id : null,
               subjectId: _selectedSubject?.id,
               lessonTypeId: _selectedLessonType?.id,
+              repeatGroupId: sharedRepeatGroupId, // Общий ID для всей серии
             );
             totalCreated += lessons?.length ?? 0;
           }
