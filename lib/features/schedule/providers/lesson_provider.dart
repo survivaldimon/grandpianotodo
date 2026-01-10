@@ -243,11 +243,13 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       // Проверка конфликта времени
+      // studentId передаётся чтобы исключить слот этого же ученика из проверки
       final hasConflict = await _repo.hasTimeConflict(
         roomId: roomId,
         date: date,
         startTime: startTime,
         endTime: endTime,
+        studentId: studentId,
       );
 
       if (hasConflict) {

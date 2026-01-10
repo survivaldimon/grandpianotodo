@@ -74,6 +74,25 @@ class ErrorView extends StatelessWidget {
       return 'Сессия истекла. Войдите заново.';
     }
 
+    // Конфликт времени (кабинет занят)
+    if (errorStr.contains('кабинет занят') ||
+        errorStr.contains('занят в это время')) {
+      return 'Кабинет занят в это время';
+    }
+
+    // Если это Exception с кастомным сообщением — извлекаем его
+    if (error is Exception) {
+      final message = error.toString();
+      // Exception: message -> извлекаем message
+      if (message.startsWith('Exception: ')) {
+        final customMessage = message.substring('Exception: '.length);
+        // Возвращаем кастомное сообщение если оно не пустое и на кириллице
+        if (customMessage.isNotEmpty && RegExp(r'[а-яА-ЯёЁ]').hasMatch(customMessage)) {
+          return customMessage;
+        }
+      }
+    }
+
     // По умолчанию - общая ошибка
     return AppStrings.errorOccurred;
   }

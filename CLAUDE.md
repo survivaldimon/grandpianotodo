@@ -146,6 +146,13 @@
   - Проверка конфликтов с обычными занятиями при создании постоянного расписания
   - Новый метод `hasLessonConflictForDayOfWeek()` — проверка ВСЕХ будущих занятий
   - Двухуровневая защита: UI + контроллер
+- **`SESSION_2026_01_10_SCHEDULE_WEEK_VIEW.md`** — улучшения недельного расписания:
+  - Контрастный цвет текста для светлых цветов преподавателей (формула яркости W3C)
+  - Серый цвет бронирований в недельном режиме
+  - Пороговое распределение высоты ячеек (>=2 занятий = не растягивать)
+  - Создание занятий из слотов постоянного расписания
+  - Фильтрация слотов при наличии созданного занятия
+  - Улучшение сообщений об ошибках (извлечение кастомных Exception)
 
 ## Валюта
 
@@ -1434,6 +1441,167 @@ Future<bool> hasLessonConflictForDayOfWeek({
 - `lib/features/student_schedules/repositories/student_schedule_repository.dart` — методы проверки
 - `lib/features/student_schedules/providers/student_schedule_provider.dart` — контроллер с проверками
 - `lib/features/students/screens/student_detail_screen.dart` — UI с `_checkConflicts()`
+
+### 44. Контрастный цвет текста для светлых фонов
+При отображении текста на цветном фоне (цвет преподавателя) используется динамический расчёт контрастного цвета.
+
+**Проблема:** Текст занятия становился нечитабельным на светлом (белом) цвете преподавателя.
+
+**Решение:** Формула яркости W3C (luminance):
+
+```dart
+Color _getContrastTextColor(Color backgroundColor) {
+  // Формула яркости W3C: 0.299*R + 0.587*G + 0.114*B
+  final luminance = 0.299 * backgroundColor.r +
+      0.587 * backgroundColor.g +
+      0.114 * backgroundColor.b;
+  // Если фон светлый (>0.5) — чёрный текст, иначе — белый
+  return luminance > 0.5 ? Colors.black87 : Colors.white;
+}
+```
+
+**Применение:**
+- Текст и иконки в блоках занятий
+- Любые элементы на цветном фоне пользователя
+
+**Файл:** `lib/features/schedule/screens/all_rooms_schedule_screen.dart`
+
+### 45. Пороговое распределение высоты ячеек недельного расписания
+В недельном режиме расписания высота строк (дней) распределяется по пороговому принципу.
+
+**Проблема:** Равномерное распределение extra создавало пустое место в заполненных ячейках.
+
+**Решение:** Дни с >=2 занятиями НЕ растягиваются, пустые дни забирают всё extra:
+
+```dart
+if (totalMinHeight < availableHeight) {
+  const stretchThreshold = 2; // Порог: >=2 занятий = не растягивать
+
+  // Считаем дни, которые можно растягивать
+  int stretchableDays = 0;
+  for (var i = 0; i < 7; i++) {
+    if ((maxItemsPerDay[i] ?? 0) < stretchThreshold) {
+      stretchableDays++;
+    }
+  }
+
+  final extraTotal = availableHeight - totalMinHeight;
+  final extraPerStretchableDay = stretchableDays > 0
+      ? extraTotal / stretchableDays
+      : 0.0;
+
+  for (var i = 0; i < 7; i++) {
+    final items = maxItemsPerDay[i] ?? 0;
+    if (items < stretchThreshold) {
+      // Пустые/малозаполненные дни растягиваются
+      rowHeights[i] = baseRowHeights[i]! + extraPerStretchableDay;
+    } else {
+      // Заполненные дни остаются компактными
+      rowHeights[i] = baseRowHeights[i]!;
+    }
+  }
+}
+```
+
+**Логика:**
+- День с 0-1 занятиями → растягивается
+- День с >=2 занятиями → остаётся компактным
+- Все 7 дней заполняют экран по высоте
+
+**Файл:** `lib/features/schedule/screens/all_rooms_schedule_screen.dart`
+
+### 46. Поиск значения Dropdown по ID
+При передаче объекта в DropdownButton необходимо искать соответствующий элемент в списке по ID.
+
+**Проблема:** Ошибка "There should be exactly one item with [DropdownButton]'s value" при передаче объекта из другого источника (например, из слота расписания).
+
+**Причина:** Объекты из разных источников — разные инстансы с одинаковым ID.
+
+**Решение:**
+```dart
+// Находим соответствующий элемент в списке по ID
+final effectiveSubject = _selectedSubject != null
+    ? subjects.where((s) => s.id == _selectedSubject!.id).firstOrNull
+    : null;
+
+final effectiveLessonType = _selectedLessonType != null
+    ? lessonTypes.where((t) => t.id == _selectedLessonType!.id).firstOrNull
+    : null;
+
+// Используем найденный элемент в Dropdown
+DropdownButton<Subject>(
+  value: effectiveSubject,  // ← Элемент из списка, а не из внешнего источника
+  items: subjects.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+  onChanged: (s) => setState(() => _selectedSubject = s),
+)
+```
+
+**Правило:** Всегда передавать в `value` элемент из того же списка, что и в `items`.
+
+### 47. Фильтрация слотов постоянного расписания при наличии занятий
+Слоты постоянного расписания скрываются, если для них уже создано занятие.
+
+**Проблема:** После создания занятия из слота, слот оставался видимым и происходило наслоение.
+
+**Решение:** Фильтрация слотов перед отрисовкой:
+
+```dart
+final filteredSlots = scheduleSlots.where((slot) {
+  // Проверяем, есть ли занятие для этого слота
+  final hasLesson = lessonsList.any((lesson) {
+    // Тот же ученик
+    if (lesson.studentId != slot.studentId) return false;
+    // Тот же кабинет (учитывая динамический кабинет слота)
+    final effectiveRoomId = slot.getEffectiveRoomId(selectedDate);
+    if (lesson.roomId != effectiveRoomId) return false;
+    // Пересечение времени
+    return slot.hasTimeOverlap(lesson.startTime, lesson.endTime);
+  });
+  return !hasLesson; // Показываем только слоты без занятий
+}).toList();
+```
+
+**Применение:** В обоих режимах расписания (дневной и недельный).
+
+**Файл:** `lib/features/schedule/screens/all_rooms_schedule_screen.dart`
+
+### 48. Извлечение кастомных сообщений об ошибках
+`ErrorView.getUserFriendlyMessage()` извлекает понятные сообщения из Exception.
+
+**Логика:**
+1. Проверка на известные паттерны (сеть, таймаут, авторизация)
+2. Проверка на бизнес-ошибки ("кабинет занят")
+3. Извлечение кастомного сообщения из `Exception: message`
+4. Fallback на общую ошибку
+
+```dart
+static String getUserFriendlyMessage(Object error) {
+  final errorStr = error.toString().toLowerCase();
+
+  // Конфликт времени (кабинет занят)
+  if (errorStr.contains('кабинет занят') ||
+      errorStr.contains('занят в это время')) {
+    return 'Кабинет занят в это время';
+  }
+
+  // Если это Exception с кастомным сообщением — извлекаем его
+  if (error is Exception) {
+    final message = error.toString();
+    if (message.startsWith('Exception: ')) {
+      final customMessage = message.substring('Exception: '.length);
+      // Возвращаем кастомное сообщение если оно на кириллице
+      if (customMessage.isNotEmpty && RegExp(r'[а-яА-ЯёЁ]').hasMatch(customMessage)) {
+        return customMessage;
+      }
+    }
+  }
+
+  // По умолчанию - общая ошибка
+  return AppStrings.errorOccurred;
+}
+```
+
+**Файл:** `lib/core/widgets/error_view.dart`
 
 ## CI/CD
 
