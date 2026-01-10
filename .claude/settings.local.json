@@ -52,7 +52,18 @@
       "WebFetch(domain:supabase.com)",
       "Bash(/mnt/r/flutter/bin/flutter:*)",
       "Bash(/mnt/c/flutter/bin/dart.exe analyze:*)",
-      "Bash(/mnt/c/flutter/bin/cache/dart-sdk/bin/dart.exe analyze:*)"
+      "Bash(/mnt/c/flutter/bin/cache/dart-sdk/bin/dart.exe analyze:*)",
+      "Bash(for file in /mnt/r/kabinet/grandpianotodo/lib/core/widgets/*.dart)",
+      "Bash(do)",
+      "Bash(basename:*)",
+      "Bash(done)",
+      "Bash(while read package)",
+      "Bash(file=\"$package#package:kabinet/\")",
+      "Bash(file=\"/mnt/r/kabinet/grandpianotodo/lib/$file%.dart.dart\")",
+      "Bash(if [ ! -f \"$file\" ])",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(fi)"
     ]
   }
 }

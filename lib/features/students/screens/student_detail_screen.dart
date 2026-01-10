@@ -3093,8 +3093,8 @@ class _ScheduleSlotsSection extends ConsumerWidget {
                 ],
               ],
             );
-          },
-        ),
+          }),
+        ],
       ],
     );
   }

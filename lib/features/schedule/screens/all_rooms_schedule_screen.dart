@@ -3185,29 +3185,28 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                           onTap: () => _handleStatusChange(completed: !_isCompleted),
                         ),
                       ),
-                    ),
-                    // Оплачено (если есть цена и ученик)
-                    if (hasPrice && hasStudent) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _StatusButton(
-                          label: 'Оплачено',
-                          icon: Icons.monetization_on_rounded,
-                          isActive: _isPaid,
-                          color: AppColors.primary,
-                          isLoading: _isLoading || _isLoadingPayment,
-                          onTap: () {
-                            if (_isPaid) {
-                              _handleRemovePayment();
-                            } else {
-                              _handlePayment();
-                            }
-                          },
+                      // Оплачено (если есть цена и ученик)
+                      if (hasPrice && hasStudent) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _StatusButton(
+                            label: 'Оплачено',
+                            icon: Icons.monetization_on_rounded,
+                            isActive: _isPaid,
+                            color: AppColors.primary,
+                            isLoading: _isLoading || _isLoadingPayment,
+                            onTap: () {
+                              if (_isPaid) {
+                                _handleRemovePayment();
+                              } else {
+                                _handlePayment();
+                              }
+                            },
+                          ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
                 ], // конец if (canEdit)
 
                 const SizedBox(height: 20),
