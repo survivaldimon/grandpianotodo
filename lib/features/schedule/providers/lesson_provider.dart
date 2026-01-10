@@ -140,8 +140,8 @@ class InstitutionWeekParams {
   int get hashCode => Object.hash(institutionId, weekStart.year, weekStart.month, weekStart.day);
 }
 
-/// Провайдер занятий заведения за неделю
-/// Возвращает Map<DateTime, List<Lesson>> где ключ - дата (начало дня)
+/// Провайдер занятий заведения за неделю (FutureProvider - без realtime)
+/// Используется как fallback, предпочтительнее lessonsByInstitutionWeekStreamProvider
 final lessonsByInstitutionWeekProvider =
     FutureProvider.family<Map<DateTime, List<Lesson>>, InstitutionWeekParams>((ref, params) async {
   final repo = ref.watch(lessonRepositoryProvider);
@@ -155,6 +155,47 @@ final lessonsByInstitutionWeekProvider =
   }
 
   return result;
+});
+
+/// Провайдер занятий заведения за неделю (с realtime!)
+/// Комбинирует 7 StreamProvider (по одному на день)
+/// При изменении занятий любого дня — весь map автоматически обновляется
+final lessonsByInstitutionWeekStreamProvider =
+    Provider.family<AsyncValue<Map<DateTime, List<Lesson>>>, InstitutionWeekParams>((ref, params) {
+  final result = <DateTime, List<Lesson>>{};
+  var isLoading = false;
+  Object? error;
+  StackTrace? stackTrace;
+
+  // Собираем данные из StreamProvider для каждого дня недели
+  // Riverpod автоматически отслеживает зависимости
+  for (final day in params.weekDays) {
+    final normalizedDay = DateTime(day.year, day.month, day.day);
+    final dayParams = InstitutionDateParams(params.institutionId, day);
+    final dayAsync = ref.watch(lessonsByInstitutionStreamProvider(dayParams));
+
+    dayAsync.when(
+      loading: () => isLoading = true,
+      error: (e, st) {
+        error = e;
+        stackTrace = st;
+      },
+      data: (lessons) => result[normalizedDay] = lessons,
+    );
+  }
+
+  // Если хоть один день грузится и нет данных — loading
+  if (isLoading && result.isEmpty) {
+    return const AsyncValue.loading();
+  }
+
+  // Если есть ошибка и нет данных — error
+  if (error != null && result.isEmpty) {
+    return AsyncValue.error(error!, stackTrace ?? StackTrace.current);
+  }
+
+  // Возвращаем данные (даже если какие-то дни ещё грузятся)
+  return AsyncValue.data(result);
 });
 
 /// Провайдер выбранной даты

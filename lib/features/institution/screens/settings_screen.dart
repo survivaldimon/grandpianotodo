@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/constants/app_strings.dart';
 import 'package:kabinet/core/theme/theme_provider.dart';
+import 'package:kabinet/core/providers/phone_settings_provider.dart';
 import 'package:kabinet/features/auth/providers/auth_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
@@ -214,6 +215,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: Text(getThemeModeLabel(ref.watch(themeModeProvider))),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showThemeDialog(context, ref),
+              ),
+              ListTile(
+                leading: const Icon(Icons.phone),
+                title: const Text('Код страны для телефона'),
+                subtitle: Text(ref.watch(phoneCountryCodeProvider).displayLabel),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showPhoneCountryCodeDialog(context, ref),
               ),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
@@ -553,6 +561,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: ThemeMode.light,
               ),
             ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Диалог выбора кода страны для телефона
+  void _showPhoneCountryCodeDialog(BuildContext context, WidgetRef ref) {
+    final currentCode = ref.read(phoneCountryCodeProvider);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Код страны'),
+        contentPadding: const EdgeInsets.only(top: 16),
+        content: SingleChildScrollView(
+          child: RadioGroup<PhoneCountryCode>(
+            groupValue: currentCode,
+            onChanged: (code) {
+              ref.read(phoneCountryCodeProvider.notifier).setCountryCode(code!);
+              Navigator.pop(ctx);
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: PhoneCountryCode.values.map((code) {
+                return RadioListTile<PhoneCountryCode>(
+                  title: Text(code.displayLabel),
+                  subtitle: code == PhoneCountryCode.auto
+                      ? const Text('По локали устройства')
+                      : null,
+                  value: code,
+                );
+              }).toList(),
+            ),
           ),
         ),
         actions: [

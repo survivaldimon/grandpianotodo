@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
+import 'package:kabinet/core/providers/phone_settings_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/shared/models/student.dart';
 
@@ -66,7 +67,19 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
       (s) => s.phone != null && s.phone!.isNotEmpty,
       orElse: () => widget.students.first,
     );
-    _phoneController.text = firstWithPhone.phone ?? '';
+    if (firstWithPhone.phone != null && firstWithPhone.phone!.isNotEmpty) {
+      _phoneController.text = firstWithPhone.phone!;
+    } else {
+      // Автозаполнение кода страны если ни у кого нет телефона
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          final prefix = ref.read(phoneDefaultPrefixProvider);
+          if (prefix.isNotEmpty && _phoneController.text.isEmpty) {
+            _phoneController.text = '$prefix ';
+          }
+        }
+      });
+    }
   }
 
   @override

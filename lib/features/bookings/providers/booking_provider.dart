@@ -16,8 +16,8 @@ final bookingsByInstitutionDateProvider =
   return repo.watchByInstitutionAndDate(params.institutionId, params.date);
 });
 
-/// Провайдер бронирований за неделю
-/// Возвращает Map<DateTime, List<Booking>> где ключ - дата (начало дня)
+/// Провайдер бронирований за неделю (FutureProvider - без realtime)
+/// Используется как fallback
 final bookingsByInstitutionWeekProvider =
     FutureProvider.family<Map<DateTime, List<Booking>>, InstitutionWeekParams>(
         (ref, params) async {
@@ -43,6 +43,46 @@ final bookingsByInstitutionWeekProvider =
   }
 
   return result;
+});
+
+/// Провайдер бронирований за неделю (с realtime!)
+/// Комбинирует 7 StreamProvider (по одному на день)
+/// При изменении бронирований любого дня — весь map автоматически обновляется
+final bookingsByInstitutionWeekStreamProvider =
+    Provider.family<AsyncValue<Map<DateTime, List<Booking>>>, InstitutionWeekParams>((ref, params) {
+  final result = <DateTime, List<Booking>>{};
+  var isLoading = false;
+  Object? error;
+  StackTrace? stackTrace;
+
+  // Собираем данные из StreamProvider для каждого дня недели
+  for (final day in params.weekDays) {
+    final normalizedDay = DateTime(day.year, day.month, day.day);
+    final dayParams = InstitutionDateParams(params.institutionId, day);
+    final dayAsync = ref.watch(bookingsByInstitutionDateProvider(dayParams));
+
+    dayAsync.when(
+      loading: () => isLoading = true,
+      error: (e, st) {
+        error = e;
+        stackTrace = st;
+      },
+      data: (bookings) => result[normalizedDay] = bookings,
+    );
+  }
+
+  // Если хоть один день грузится и нет данных — loading
+  if (isLoading && result.isEmpty) {
+    return const AsyncValue.loading();
+  }
+
+  // Если есть ошибка и нет данных — error
+  if (error != null && result.isEmpty) {
+    return AsyncValue.error(error!, stackTrace ?? StackTrace.current);
+  }
+
+  // Возвращаем данные (даже если какие-то дни ещё грузятся)
+  return AsyncValue.data(result);
 });
 
 /// Провайдер брони по ID

@@ -134,8 +134,19 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Предзагружаем соседние даты при первом входе
-    _preloadAdjacentDates();
+    // Предзагружаем участников для цветов и соседние даты при первом входе
+    _preloadData();
+  }
+
+  /// Предзагрузка данных для мгновенного отображения
+  void _preloadData() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Предзагружаем участников (для цветов преподавателей)
+      ref.read(membersStreamProvider(widget.institutionId).future).catchError((_) => <InstitutionMember>[]);
+      // Предзагружаем соседние даты
+      _preloadAdjacentDates();
+    });
   }
 
   @override
@@ -148,9 +159,19 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Обновляем данные когда приложение возвращается из фона
     if (state == AppLifecycleState.resumed) {
+      // Инвалидируем дневной режим
       ref.invalidate(lessonsByInstitutionStreamProvider(
         InstitutionDateParams(widget.institutionId, _selectedDate),
       ));
+      ref.invalidate(bookingsByInstitutionDateProvider(
+        InstitutionDateParams(widget.institutionId, _selectedDate),
+      ));
+
+      // Инвалидируем недельный режим
+      final weekStart = InstitutionWeekParams.getWeekStart(_selectedDate);
+      final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
+      ref.invalidate(lessonsByInstitutionWeekStreamProvider(weekParams));
+      ref.invalidate(bookingsByInstitutionWeekStreamProvider(weekParams));
     }
   }
 
@@ -220,14 +241,12 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final workStartHour = institutionAsync.valueOrNull?.workStartHour ?? 8;
     final workEndHour = institutionAsync.valueOrNull?.workEndHour ?? 22;
 
-    // Получаем цвета преподавателей
-    final membersAsync = ref.watch(membersProvider(widget.institutionId));
-    final teacherColors = membersAsync.maybeWhen(
-      data: (members) => {
-        for (final m in members) m.userId: m.color,
-      },
-      orElse: () => <String, String?>{},
-    );
+    // Получаем цвета преподавателей (используем StreamProvider + valueOrNull для кеширования)
+    final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
+    final members = membersAsync.valueOrNull ?? [];
+    final teacherColors = {
+      for (final m in members) m.userId: m.color,
+    };
 
     // Получаем название выбранного кабинета для заголовка
     String title = 'Расписание';
@@ -501,10 +520,11 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   ) {
     final weekStart = InstitutionWeekParams.getWeekStart(_selectedDate);
     final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
-    final weekLessonsAsync = ref.watch(lessonsByInstitutionWeekProvider(weekParams));
+    // Используем StreamProvider для realtime обновлений недельного расписания
+    final weekLessonsAsync = ref.watch(lessonsByInstitutionWeekStreamProvider(weekParams));
 
-    // Загружаем брони за неделю
-    final weekBookingsAsync = ref.watch(bookingsByInstitutionWeekProvider(weekParams));
+    // Загружаем брони за неделю (с realtime)
+    final weekBookingsAsync = ref.watch(bookingsByInstitutionWeekStreamProvider(weekParams));
 
     // Загружаем все постоянные слоты заведения (для фильтрации по дням)
     final allScheduleSlotsAsync = ref.watch(institutionSchedulesStreamProvider(widget.institutionId));
@@ -2905,6 +2925,9 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     final canDelete = hasFullAccess ||
                       (permissions?.deleteAllLessons ?? false) ||
                       (isOwnLesson && (permissions?.deleteOwnLessons ?? false));
+    final canEdit = hasFullAccess ||
+                    (permissions?.editAllLessons ?? false) ||
+                    (isOwnLesson && (permissions?.editOwnLessons ?? true));
 
     ref.listen(lessonControllerProvider, (prev, next) {
       if (next.hasError) {
@@ -3115,34 +3138,36 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                   ),
                 ],
 
-                const SizedBox(height: 16),
+                // Статусы (только если есть право редактирования)
+                if (canEdit) ...[
+                  const SizedBox(height: 16),
 
-                // Статусы (оптимистичное обновление — UI меняется мгновенно)
-                Row(
-                  children: [
-                    // Проведено
-                    Expanded(
-                      child: _StatusButton(
-                        label: 'Проведено',
-                        icon: Icons.check_circle_rounded,
-                        isActive: _isCompleted,
-                        color: AppColors.success,
-                        isLoading: _isLoading,
-                        onTap: () => _handleStatusChange(completed: !_isCompleted),
+                  // Статусы (оптимистичное обновление — UI меняется мгновенно)
+                  Row(
+                    children: [
+                      // Проведено
+                      Expanded(
+                        child: _StatusButton(
+                          label: 'Проведено',
+                          icon: Icons.check_circle_rounded,
+                          isActive: _isCompleted,
+                          color: AppColors.success,
+                          isLoading: _isLoading,
+                          onTap: () => _handleStatusChange(completed: !_isCompleted),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Отменено
-                    Expanded(
-                      child: _StatusButton(
-                        label: 'Отменено',
-                        icon: Icons.cancel_rounded,
-                        isActive: _isCancelled,
-                        color: AppColors.error,
-                        isLoading: _isLoading,
-                        onTap: () => _handleStatusChange(cancelled: !_isCancelled),
+                      const SizedBox(width: 8),
+                      // Отменено
+                      Expanded(
+                        child: _StatusButton(
+                          label: 'Отменено',
+                          icon: Icons.cancel_rounded,
+                          isActive: _isCancelled,
+                          color: AppColors.error,
+                          isLoading: _isLoading,
+                          onTap: () => _handleStatusChange(cancelled: !_isCancelled),
+                        ),
                       ),
-                    ),
                     // Оплачено (если есть цена и ученик)
                     if (hasPrice && hasStudent) ...[
                       const SizedBox(width: 8),
@@ -3165,69 +3190,72 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                     ],
                   ],
                 ),
+                ], // конец if (canEdit)
 
                 const SizedBox(height: 20),
 
-                // Кнопки действий
-                Row(
-                  children: [
-                    // Редактировать
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: controllerState.isLoading || _isLoading
-                            ? null
-                            : () {
-                                Navigator.pop(context);
-                                showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  useSafeArea: lesson.isRepeating,
-                                  builder: (ctx) => lesson.isRepeating
-                                      ? _EditSeriesSheet(
-                                          lesson: lesson,
-                                          institutionId: widget.institutionId,
-                                          onUpdated: widget.onUpdated,
-                                        )
-                                      : _EditLessonSheet(
-                                          lesson: lesson,
-                                          institutionId: widget.institutionId,
-                                          onUpdated: widget.onUpdated,
-                                        ),
-                                );
-                              },
-                        icon: const Icon(Icons.edit_rounded, size: 18),
-                        label: const Text('Изменить'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Удалить (только если есть право)
-                    if (canDelete) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: controllerState.isLoading || _isLoading
-                              ? null
-                              : _deleteLesson,
-                          icon: const Icon(Icons.delete_rounded, size: 18),
-                          label: const Text('Удалить'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            foregroundColor: AppColors.error,
-                            side: const BorderSide(color: AppColors.error),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                // Кнопки действий (только если есть хотя бы одно право)
+                if (canEdit || canDelete)
+                  Row(
+                    children: [
+                      // Редактировать (только если есть право)
+                      if (canEdit)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: controllerState.isLoading || _isLoading
+                                ? null
+                                : () {
+                                    Navigator.pop(context);
+                                    showModalBottomSheet(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      useSafeArea: lesson.isRepeating,
+                                      builder: (ctx) => lesson.isRepeating
+                                          ? _EditSeriesSheet(
+                                              lesson: lesson,
+                                              institutionId: widget.institutionId,
+                                              onUpdated: widget.onUpdated,
+                                            )
+                                          : _EditLessonSheet(
+                                              lesson: lesson,
+                                              institutionId: widget.institutionId,
+                                              onUpdated: widget.onUpdated,
+                                            ),
+                                    );
+                                  },
+                            icon: const Icon(Icons.edit_rounded, size: 18),
+                            label: const Text('Изменить'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      // Удалить (только если есть право)
+                      if (canDelete) ...[
+                        if (canEdit) const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: controllerState.isLoading || _isLoading
+                                ? null
+                                : _deleteLesson,
+                            icon: const Icon(Icons.delete_rounded, size: 18),
+                            label: const Text('Удалить'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              foregroundColor: AppColors.error,
+                              side: const BorderSide(color: AppColors.error),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
 
                 if (controllerState.isLoading || _isLoading)
                   const Padding(

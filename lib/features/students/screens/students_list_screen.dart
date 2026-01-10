@@ -24,7 +24,10 @@ import 'package:kabinet/features/students/widgets/merge_students_dialog.dart';
 import 'package:kabinet/features/student_schedules/providers/student_schedule_provider.dart';
 import 'package:kabinet/features/student_schedules/repositories/student_schedule_repository.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
+import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
+import 'package:kabinet/shared/models/lesson_type.dart';
 import 'package:kabinet/core/widgets/ios_time_picker.dart';
+import 'package:kabinet/core/providers/phone_settings_provider.dart';
 
 // ============================================================================
 // ЛОКАЛЬНЫЕ ПРОВАЙДЕРЫ СВЯЗЕЙ ДЛЯ ФИЛЬТРАЦИИ
@@ -1154,9 +1157,11 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
   InstitutionMember? _selectedTeacher;
   Subject? _selectedSubject;
+  LessonType? _selectedLessonType;
   bool _isLoading = false;
   bool _teacherInitialized = false;
   bool _subjectInitialized = false;
+  bool _lessonTypeInitialized = false;
 
   // Настройки расписания
   bool _setupSchedule = false;
@@ -1167,6 +1172,24 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
   static const _defaultStartTime = TimeOfDay(hour: 14, minute: 0);
   static const _defaultEndTime = TimeOfDay(hour: 15, minute: 0);
+
+  @override
+  void initState() {
+    super.initState();
+    // Автозаполнение кода страны в поле телефона
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final prefix = ref.read(phoneDefaultPrefixProvider);
+        if (prefix.isNotEmpty && _phoneController.text.isEmpty) {
+          _phoneController.text = '$prefix ';
+          // Ставим курсор в конец
+          _phoneController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _phoneController.text.length),
+          );
+        }
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -1302,6 +1325,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
   Widget build(BuildContext context) {
     final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
+    final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
 
     return Container(
       decoration: BoxDecoration(
@@ -1417,12 +1441,12 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     // Показываем всех активных участников
                     final activeMembers = members.where((m) => !m.isArchived).toList();
 
-                    // Если нет прав на управление всеми учениками - автоматически привязываем к текущему пользователю
-                    if (!widget.canManageAllStudents && !_teacherInitialized) {
+                    // Автозаполнение текущего пользователя как преподавателя для ВСЕХ
+                    if (!_teacherInitialized) {
                       final currentMember = activeMembers.where((m) => m.userId == widget.currentUserId).firstOrNull;
                       if (currentMember != null) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) {
+                          if (mounted && !_teacherInitialized) {
                             setState(() {
                               _selectedTeacher = currentMember;
                               _teacherInitialized = true;
@@ -1472,8 +1496,14 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                       );
                     }
 
+                    // Ищем соответствующий элемент в списке по userId
+                    final effectiveTeacher = _selectedTeacher != null
+                        ? activeMembers.where((m) => m.userId == _selectedTeacher!.userId).firstOrNull
+                        : null;
+
                     return DropdownButtonFormField<InstitutionMember>(
-                      initialValue: _selectedTeacher,
+                      key: ValueKey('teacher_${effectiveTeacher?.userId}'),
+                      value: effectiveTeacher,
                       decoration: InputDecoration(
                         labelText: 'Преподаватель',
                         prefixIcon: const Icon(Icons.school_outlined),
@@ -1511,8 +1541,14 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                   data: (subjects) {
                     final activeSubjects = subjects.where((s) => s.archivedAt == null).toList();
 
+                    // Ищем соответствующий элемент в списке по id
+                    final effectiveSubject = _selectedSubject != null
+                        ? activeSubjects.where((s) => s.id == _selectedSubject!.id).firstOrNull
+                        : null;
+
                     return DropdownButtonFormField<Subject>(
-                      initialValue: _selectedSubject,
+                      key: ValueKey('subject_${effectiveSubject?.id}'),
+                      value: effectiveSubject,
                       decoration: InputDecoration(
                         labelText: 'Направление',
                         prefixIcon: const Icon(Icons.category_outlined),
@@ -1547,6 +1583,80 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                         );
                       }).toList(),
                       onChanged: (value) => setState(() => _selectedSubject = value),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Тип занятия
+                lessonTypesAsync.when(
+                  loading: () => _buildDropdownSkeleton('Тип занятия'),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (lessonTypes) {
+                    final activeTypes = lessonTypes.where((t) => t.archivedAt == null).toList();
+
+                    // Автовыбор если только один тип занятия
+                    if (activeTypes.length == 1 && !_lessonTypeInitialized) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && !_lessonTypeInitialized) {
+                          setState(() {
+                            _selectedLessonType = activeTypes.first;
+                            _lessonTypeInitialized = true;
+                          });
+                        }
+                      });
+                    }
+
+                    if (activeTypes.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+
+                    // Ищем соответствующий элемент в списке по id
+                    final effectiveLessonType = _selectedLessonType != null
+                        ? activeTypes.where((t) => t.id == _selectedLessonType!.id).firstOrNull
+                        : null;
+
+                    return DropdownButtonFormField<LessonType>(
+                      key: ValueKey('lessonType_${effectiveLessonType?.id}'),
+                      value: effectiveLessonType,
+                      decoration: InputDecoration(
+                        labelText: 'Тип занятия',
+                        prefixIcon: const Icon(Icons.event_note_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                      ),
+                      dropdownColor: Theme.of(context).colorScheme.surfaceContainer,
+                      hint: const Text('Выберите тип занятия'),
+                      items: activeTypes.map((type) {
+                        final color = type.color != null
+                            ? Color(int.parse('0xFF${type.color!.replaceAll('#', '')}'))
+                            : AppColors.primary;
+                        return DropdownMenuItem(
+                          value: type,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                type.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) => setState(() => _selectedLessonType = value),
                     );
                   },
                 ),

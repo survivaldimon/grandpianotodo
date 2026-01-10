@@ -80,10 +80,29 @@ class _MainShellState extends ConsumerState<MainShell>
     ref.invalidate(currentInstitutionProvider(institutionId));
     ref.invalidate(myMembershipProvider(institutionId));
 
-    // Инвалидируем провайдеры расписания
+    // Инвалидируем провайдеры расписания (для сегодня и ±3 дня)
     ref.invalidate(unmarkedLessonsProvider(institutionId));
     ref.invalidate(unmarkedLessonsStreamProvider(institutionId));
     ref.invalidate(institutionTodayLessonsProvider(institutionId));
+
+    // Инвалидируем занятия и бронирования для диапазона дат
+    final today = DateTime.now();
+    for (int i = -3; i <= 3; i++) {
+      final date = today.add(Duration(days: i));
+      final params = InstitutionDateParams(institutionId, date);
+      ref.invalidate(lessonsByInstitutionStreamProvider(params));
+      ref.invalidate(bookingsByInstitutionDateProvider(params));
+    }
+
+    // Инвалидируем недельные провайдеры (текущая неделя)
+    // Используем новые StreamProvider версии
+    final weekStart = InstitutionWeekParams.getWeekStart(today);
+    final weekParams = InstitutionWeekParams(institutionId, weekStart);
+    ref.invalidate(lessonsByInstitutionWeekStreamProvider(weekParams));
+    ref.invalidate(bookingsByInstitutionWeekStreamProvider(weekParams));
+    // Также инвалидируем старые FutureProvider для совместимости
+    ref.invalidate(lessonsByInstitutionWeekProvider(weekParams));
+    ref.invalidate(bookingsByInstitutionWeekProvider(weekParams));
 
     // Инвалидируем провайдеры оплат
     ref.invalidate(paymentsStreamProvider(institutionId));
@@ -93,12 +112,6 @@ class _MainShellState extends ConsumerState<MainShell>
 
     // Инвалидируем провайдеры участников
     ref.invalidate(membersStreamProvider(institutionId));
-
-    // Инвалидируем провайдеры бронирований
-    final today = DateTime.now();
-    ref.invalidate(bookingsByInstitutionDateProvider(
-      InstitutionDateParams(institutionId, today),
-    ));
 
     debugPrint('[MainShell] All providers invalidated');
   }
