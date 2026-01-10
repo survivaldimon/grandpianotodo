@@ -23,6 +23,7 @@ import 'package:kabinet/features/student_schedules/repositories/student_schedule
 import 'package:kabinet/shared/models/student_schedule.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
 import 'package:kabinet/core/widgets/ios_time_picker.dart';
+import 'package:kabinet/core/providers/phone_settings_provider.dart';
 import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/shared/models/payment.dart';
 import 'package:kabinet/shared/models/payment_plan.dart';
@@ -374,7 +375,10 @@ class StudentDetailScreen extends ConsumerWidget {
 
   void _showEditStudentDialog(BuildContext context, WidgetRef ref, Student student) {
     final nameController = TextEditingController(text: student.name);
-    final phoneController = TextEditingController(text: student.phone ?? '');
+    // Автозаполнение кода страны если телефон пустой
+    final prefix = ref.read(phoneDefaultPrefixProvider);
+    final phoneText = student.phone ?? (prefix.isNotEmpty ? '$prefix ' : '');
+    final phoneController = TextEditingController(text: phoneText);
     final commentController = TextEditingController(text: student.comment ?? '');
     final legacyBalanceController = TextEditingController(
       text: student.legacyBalance > 0 ? student.legacyBalance.toString() : '',

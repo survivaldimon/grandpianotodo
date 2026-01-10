@@ -135,8 +135,19 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Предзагружаем соседние даты при первом входе
-    _preloadAdjacentDates();
+    // Предзагружаем участников для цветов и соседние даты при первом входе
+    _preloadData();
+  }
+
+  /// Предзагрузка данных для мгновенного отображения
+  void _preloadData() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Предзагружаем участников (для цветов преподавателей)
+      ref.read(membersStreamProvider(widget.institutionId).future).catchError((_) => <InstitutionMember>[]);
+      // Предзагружаем соседние даты
+      _preloadAdjacentDates();
+    });
   }
 
   @override
@@ -149,9 +160,19 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Обновляем данные когда приложение возвращается из фона
     if (state == AppLifecycleState.resumed) {
+      // Инвалидируем дневной режим
       ref.invalidate(lessonsByInstitutionStreamProvider(
         InstitutionDateParams(widget.institutionId, _selectedDate),
       ));
+      ref.invalidate(bookingsByInstitutionDateProvider(
+        InstitutionDateParams(widget.institutionId, _selectedDate),
+      ));
+
+      // Инвалидируем недельный режим
+      final weekStart = InstitutionWeekParams.getWeekStart(_selectedDate);
+      final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
+      ref.invalidate(lessonsByInstitutionWeekStreamProvider(weekParams));
+      ref.invalidate(bookingsByInstitutionWeekStreamProvider(weekParams));
     }
   }
 
@@ -221,14 +242,12 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final workStartHour = institutionAsync.valueOrNull?.workStartHour ?? 8;
     final workEndHour = institutionAsync.valueOrNull?.workEndHour ?? 22;
 
-    // Получаем цвета преподавателей
-    final membersAsync = ref.watch(membersProvider(widget.institutionId));
-    final teacherColors = membersAsync.maybeWhen(
-      data: (members) => {
-        for (final m in members) m.userId: m.color,
-      },
-      orElse: () => <String, String?>{},
-    );
+    // Получаем цвета преподавателей (используем StreamProvider + valueOrNull для кеширования)
+    final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
+    final members = membersAsync.valueOrNull ?? [];
+    final teacherColors = {
+      for (final m in members) m.userId: m.color,
+    };
 
     // Получаем название выбранного кабинета для заголовка
     String title = 'Расписание';
@@ -368,11 +387,24 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         ? lessonsList
         : lessonsList.where((l) => _filters.matchesLesson(l)).toList();
 
+    // Фильтруем слоты — скрываем те, для которых уже создано занятие
+    final filteredSlots = scheduleSlots.where((slot) {
+      // Ищем занятие того же ученика в том же кабинете с пересечением времени
+      final hasLesson = lessonsList.any((lesson) {
+        if (lesson.studentId != slot.studentId) return false;
+        final effectiveRoomId = slot.getEffectiveRoomId(_selectedDate);
+        if (lesson.roomId != effectiveRoomId) return false;
+        // Проверяем пересечение времени
+        return slot.hasTimeOverlap(lesson.startTime, lesson.endTime);
+      });
+      return !hasLesson; // Показываем слот только если занятия нет
+    }).toList();
+
     // Вычисляем эффективные часы с учётом занятий, броней и слотов вне рабочего времени
     final effectiveHours = _calculateEffectiveHours(
       lessons: lessonsList,
       bookings: bookings,
-      scheduleSlots: scheduleSlots,
+      scheduleSlots: filteredSlots,
       workStartHour: workStartHour,
       workEndHour: workEndHour,
     );
@@ -385,7 +417,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       allRooms: rooms,
       lessons: filteredLessons,
       bookings: bookings,
-      scheduleSlots: scheduleSlots,
+      scheduleSlots: filteredSlots,
       selectedDate: _selectedDate,
       institutionId: widget.institutionId,
       selectedRoomId: _selectedRoomId,
@@ -489,10 +521,11 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   ) {
     final weekStart = InstitutionWeekParams.getWeekStart(_selectedDate);
     final weekParams = InstitutionWeekParams(widget.institutionId, weekStart);
-    final weekLessonsAsync = ref.watch(lessonsByInstitutionWeekProvider(weekParams));
+    // Используем StreamProvider для realtime обновлений недельного расписания
+    final weekLessonsAsync = ref.watch(lessonsByInstitutionWeekStreamProvider(weekParams));
 
-    // Загружаем брони за неделю
-    final weekBookingsAsync = ref.watch(bookingsByInstitutionWeekProvider(weekParams));
+    // Загружаем брони за неделю (с realtime)
+    final weekBookingsAsync = ref.watch(bookingsByInstitutionWeekStreamProvider(weekParams));
 
     // Загружаем все постоянные слоты заведения (для фильтрации по дням)
     final allScheduleSlotsAsync = ref.watch(institutionSchedulesStreamProvider(widget.institutionId));
@@ -527,14 +560,26 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     // Формируем map броней по дням (используем пустой map если ещё загружается)
     final bookingsMap = weekBookings ?? <DateTime, List<Booking>>{};
 
-    // Формируем map постоянных слотов по дням
+    // Формируем map постоянных слотов по дням (скрываем те, для которых уже создано занятие)
     final slotsByDay = <DateTime, List<StudentSchedule>>{};
     if (allScheduleSlots != null) {
       for (int i = 0; i < 7; i++) {
         final date = weekStart.add(Duration(days: i));
         final normalizedDate = DateTime(date.year, date.month, date.day);
+        final dayLessons = lessonsMap[normalizedDate] ?? [];
+
         slotsByDay[normalizedDate] = allScheduleSlots
-            .where((s) => s.isValidForDate(date))
+            .where((slot) {
+              if (!slot.isValidForDate(date)) return false;
+              // Скрываем слот если есть занятие того же ученика с пересечением времени
+              final hasLesson = dayLessons.any((lesson) {
+                if (lesson.studentId != slot.studentId) return false;
+                final effectiveRoomId = slot.getEffectiveRoomId(date);
+                if (lesson.roomId != effectiveRoomId) return false;
+                return slot.hasTimeOverlap(lesson.startTime, lesson.endTime);
+              });
+              return !hasLesson;
+            })
             .toList()
           ..sort((a, b) {
             final aMinutes = a.startTime.hour * 60 + a.startTime.minute;
@@ -647,7 +692,59 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         },
         onCreateLesson: () {
           Navigator.pop(context);
-          // TODO: Открыть форму создания занятия с предзаполненными данными из слота
+          // Открываем форму создания занятия с данными из слота
+          _showAddLessonFromSlot(slot);
+        },
+      ),
+    );
+  }
+
+  /// Открывает форму создания занятия с данными из постоянного слота
+  void _showAddLessonFromSlot(StudentSchedule slot) {
+    final roomsAsync = ref.read(roomsProvider(widget.institutionId));
+    final rooms = roomsAsync.valueOrNull ?? [];
+    if (rooms.isEmpty) return;
+
+    // Находим кабинет слота
+    final slotRoom = rooms.firstWhere(
+      (r) => r.id == slot.getEffectiveRoomId(_selectedDate),
+      orElse: () => rooms.first,
+    );
+
+    // Инвалидируем кеш справочников
+    ref.invalidate(subjectsProvider(widget.institutionId));
+    ref.invalidate(lessonTypesProvider(widget.institutionId));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _QuickAddLessonSheet(
+        rooms: rooms,
+        initialDate: _selectedDate,
+        institutionId: widget.institutionId,
+        preselectedRoom: slotRoom,
+        preselectedStartHour: slot.startTime.hour,
+        preselectedStartMinute: slot.startTime.minute,
+        preselectedEndHour: slot.endTime.hour,
+        preselectedEndMinute: slot.endTime.minute,
+        preselectedStudent: slot.student,
+        preselectedSubject: slot.subject,
+        preselectedLessonType: slot.lessonType,
+        onCreated: (DateTime createdDate) {
+          ref.invalidate(lessonsByInstitutionProvider(
+            InstitutionDateParams(widget.institutionId, createdDate),
+          ));
+          ref.invalidate(lessonsByInstitutionStreamProvider(
+            InstitutionDateParams(widget.institutionId, createdDate),
+          ));
+          if (createdDate != _selectedDate) {
+            ref.invalidate(lessonsByInstitutionProvider(
+              InstitutionDateParams(widget.institutionId, _selectedDate),
+            ));
+            ref.invalidate(lessonsByInstitutionStreamProvider(
+              InstitutionDateParams(widget.institutionId, _selectedDate),
+            ));
+          }
         },
       ),
     );
@@ -2212,6 +2309,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
       builder: (context, constraints) {
         // Вычисляем высоту каждой строки на основе максимального количества элементов (занятия + брони + слоты)
         final baseRowHeights = <int, double>{};
+        final maxItemsPerDay = <int, int>{}; // Для распределения extra
         for (var dayIndex = 0; dayIndex < 7; dayIndex++) {
           final date = widget.weekStart.add(Duration(days: dayIndex));
           final normalizedDate = DateTime(date.year, date.month, date.day);
@@ -2228,6 +2326,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             if (totalCount > maxItems) maxItems = totalCount;
           }
 
+          maxItemsPerDay[dayIndex] = maxItems; // Сохраняем для расчёта flex
           baseRowHeights[dayIndex] = maxItems > 0
               ? (maxItems * _WeekTimeGrid.lessonItemHeight + 8).clamp(_WeekTimeGrid.minRowHeight, double.infinity)
               : _WeekTimeGrid.minRowHeight;
@@ -2238,13 +2337,32 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
         final availableHeight = constraints.maxHeight - headerHeight;
         final totalMinHeight = baseRowHeights.values.fold(0.0, (sum, h) => sum + h);
 
-        // Если контента мало - растягиваем строки на всю доступную высоту
+        // Распределяем extra ТОЛЬКО на пустые/малозаполненные дни
+        // Дни с >= 2 занятиями не растягиваются вообще
         final rowHeights = <int, double>{};
         if (totalMinHeight < availableHeight) {
-          // Масштабируем пропорционально базовой высоте каждого дня
-          final scale = availableHeight / totalMinHeight;
+          const stretchThreshold = 2; // Дни с >= 2 занятий не растягиваются
+
+          // Считаем сколько дней могут растягиваться
+          int stretchableDays = 0;
           for (var i = 0; i < 7; i++) {
-            rowHeights[i] = baseRowHeights[i]! * scale;
+            if ((maxItemsPerDay[i] ?? 0) < stretchThreshold) {
+              stretchableDays++;
+            }
+          }
+
+          final extraTotal = availableHeight - totalMinHeight;
+          final extraPerStretchableDay = stretchableDays > 0 ? extraTotal / stretchableDays : 0.0;
+
+          for (var i = 0; i < 7; i++) {
+            final items = maxItemsPerDay[i] ?? 0;
+            if (items < stretchThreshold) {
+              // Пустой/малозаполненный день — растягиваем
+              rowHeights[i] = baseRowHeights[i]! + extraPerStretchableDay;
+            } else {
+              // Заполненный день — не растягиваем
+              rowHeights[i] = baseRowHeights[i]!;
+            }
           }
         } else {
           rowHeights.addAll(baseRowHeights);
@@ -2557,6 +2675,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
           onTap: () => widget.onCellTap(room, date),
           child: Container(
             width: expandColumns ? null : roomColumnWidth,
+            alignment: Alignment.topLeft,
             decoration: const BoxDecoration(
               border: Border(
                 left: BorderSide(color: AppColors.border, width: 0.5),
@@ -2565,7 +2684,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
             padding: const EdgeInsets.all(2),
             child: hasContent
                 ? _buildItemsList(roomLessons, roomBookings, roomSlots)
-                : const SizedBox.expand(),
+                : const SizedBox.shrink(),
           ),
         );
         return expandColumns ? Expanded(child: content) : content;
@@ -2622,19 +2741,21 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   }
 
   Widget _buildLessonItem(Lesson lesson) {
+    final bgColor = _getLessonColor(lesson);
+    final textColor = _getContrastTextColor(bgColor);
     return Container(
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
-        color: _getLessonColor(lesson),
+        color: bgColor,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         '${lesson.startTime.hour}:${lesson.startTime.minute.toString().padLeft(2, '0')} ${lesson.student?.name ?? lesson.group?.name ?? ''}',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w500,
-          color: Colors.white,
+          color: textColor,
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -2647,21 +2768,22 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.warning,
+        color: Colors.grey.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.grey, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.lock, size: 10, color: Colors.white),
+          Icon(Icons.lock, size: 10, color: Colors.grey[700]),
           const SizedBox(width: 2),
           Expanded(
             child: Text(
               '${booking.startTime.hour}:${booking.startTime.minute.toString().padLeft(2, '0')} ${booking.description ?? 'Бронь'}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
-                color: Colors.white,
+                color: Colors.grey[700],
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -2722,6 +2844,17 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
       return AppColors.lessonGroup;
     }
     return AppColors.lessonIndividual;
+  }
+
+  /// Возвращает контрастный цвет текста (белый или чёрный) в зависимости от яркости фона
+  Color _getContrastTextColor(Color backgroundColor) {
+    // Вычисляем относительную яркость по формуле W3C
+    // Используем новый API: r, g, b возвращают значения 0.0-1.0
+    final luminance = 0.299 * backgroundColor.r +
+        0.587 * backgroundColor.g +
+        0.114 * backgroundColor.b;
+    // Если яркость > 0.5 — фон светлый, используем тёмный текст
+    return luminance > 0.5 ? Colors.black87 : Colors.white;
   }
 }
 
@@ -2793,6 +2926,9 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     final canDelete = hasFullAccess ||
                       (permissions?.deleteAllLessons ?? false) ||
                       (isOwnLesson && (permissions?.deleteOwnLessons ?? false));
+    final canEdit = hasFullAccess ||
+                    (permissions?.editAllLessons ?? false) ||
+                    (isOwnLesson && (permissions?.editOwnLessons ?? true));
 
     // Проверка даты: прошлые занятия нельзя отменить
     final today = DateTime.now();
@@ -3031,20 +3167,23 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                   ),
                 ],
 
-                const SizedBox(height: 16),
+                // Статусы (только если есть право редактирования)
+                if (canEdit) ...[
+                  const SizedBox(height: 16),
 
-                // Статусы (оптимистичное обновление — UI меняется мгновенно)
-                Row(
-                  children: [
-                    // Проведено
-                    Expanded(
-                      child: _StatusButton(
-                        label: 'Проведено',
-                        icon: Icons.check_circle_rounded,
-                        isActive: _isCompleted,
-                        color: AppColors.success,
-                        isLoading: _isLoading,
-                        onTap: () => _handleStatusChange(completed: !_isCompleted),
+                  // Статусы (оптимистичное обновление — UI меняется мгновенно)
+                  Row(
+                    children: [
+                      // Проведено
+                      Expanded(
+                        child: _StatusButton(
+                          label: 'Проведено',
+                          icon: Icons.check_circle_rounded,
+                          isActive: _isCompleted,
+                          color: AppColors.success,
+                          isLoading: _isLoading,
+                          onTap: () => _handleStatusChange(completed: !_isCompleted),
+                        ),
                       ),
                     ),
                     // Оплачено (если есть цена и ученик)
@@ -3069,69 +3208,72 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                     ],
                   ],
                 ),
+                ], // конец if (canEdit)
 
                 const SizedBox(height: 20),
 
-                // Кнопки действий
-                Row(
-                  children: [
-                    // Редактировать
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: controllerState.isLoading || _isLoading
-                            ? null
-                            : () {
-                                Navigator.pop(context);
-                                showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  useSafeArea: lesson.isRepeating,
-                                  builder: (ctx) => lesson.isRepeating
-                                      ? _EditSeriesSheet(
-                                          lesson: lesson,
-                                          institutionId: widget.institutionId,
-                                          onUpdated: widget.onUpdated,
-                                        )
-                                      : _EditLessonSheet(
-                                          lesson: lesson,
-                                          institutionId: widget.institutionId,
-                                          onUpdated: widget.onUpdated,
-                                        ),
-                                );
-                              },
-                        icon: const Icon(Icons.edit_rounded, size: 18),
-                        label: const Text('Изменить'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Отменить занятие (только если есть право и занятие не в прошлом)
-                    if (canCancel) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: controllerState.isLoading || _isLoading
-                              ? null
-                              : _showCancelSheet,
-                          icon: const Icon(Icons.cancel_outlined, size: 18),
-                          label: const Text('Отменить'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            foregroundColor: AppColors.error,
-                            side: const BorderSide(color: AppColors.error),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                // Кнопки действий (только если есть хотя бы одно право)
+                if (canEdit || canCancel)
+                  Row(
+                    children: [
+                      // Редактировать (только если есть право)
+                      if (canEdit)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: controllerState.isLoading || _isLoading
+                                ? null
+                                : () {
+                                    Navigator.pop(context);
+                                    showModalBottomSheet(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      useSafeArea: lesson.isRepeating,
+                                      builder: (ctx) => lesson.isRepeating
+                                          ? _EditSeriesSheet(
+                                              lesson: lesson,
+                                              institutionId: widget.institutionId,
+                                              onUpdated: widget.onUpdated,
+                                            )
+                                          : _EditLessonSheet(
+                                              lesson: lesson,
+                                              institutionId: widget.institutionId,
+                                              onUpdated: widget.onUpdated,
+                                            ),
+                                    );
+                                  },
+                            icon: const Icon(Icons.edit_rounded, size: 18),
+                            label: const Text('Изменить'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      // Отменить занятие (только если есть право и занятие не в прошлом)
+                      if (canCancel) ...[
+                        if (canEdit) const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: controllerState.isLoading || _isLoading
+                                ? null
+                                : _showCancelSheet,
+                            icon: const Icon(Icons.cancel_outlined, size: 18),
+                            label: const Text('Отменить'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              foregroundColor: AppColors.error,
+                              side: const BorderSide(color: AppColors.error),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
 
                 if (controllerState.isLoading || _isLoading)
                   const Padding(
@@ -6507,6 +6649,16 @@ class _QuickAddLessonSheet extends ConsumerStatefulWidget {
   final int? preselectedStartHour;
   /// Предзаполненные минуты начала (при нажатии на ячейку)
   final int? preselectedStartMinute;
+  /// Предзаполненный час окончания (из постоянного слота)
+  final int? preselectedEndHour;
+  /// Предзаполненные минуты окончания (из постоянного слота)
+  final int? preselectedEndMinute;
+  /// Предзаполненный ученик (из постоянного слота)
+  final Student? preselectedStudent;
+  /// Предзаполненный предмет (из постоянного слота)
+  final Subject? preselectedSubject;
+  /// Предзаполненный тип занятия (из постоянного слота)
+  final LessonType? preselectedLessonType;
 
   const _QuickAddLessonSheet({
     required this.rooms,
@@ -6516,6 +6668,11 @@ class _QuickAddLessonSheet extends ConsumerStatefulWidget {
     this.preselectedRoom,
     this.preselectedStartHour,
     this.preselectedStartMinute,
+    this.preselectedEndHour,
+    this.preselectedEndMinute,
+    this.preselectedStudent,
+    this.preselectedSubject,
+    this.preselectedLessonType,
   });
 
   @override
@@ -6580,15 +6737,31 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
     // Если передано предзаполненное время — используем его
     if (widget.preselectedStartHour != null) {
-      final minute = widget.preselectedStartMinute ?? 0;
-      _startTime = TimeOfDay(hour: widget.preselectedStartHour!, minute: minute);
-      _endTime = TimeOfDay(hour: widget.preselectedStartHour! + 1, minute: minute);
+      final startMinute = widget.preselectedStartMinute ?? 0;
+      _startTime = TimeOfDay(hour: widget.preselectedStartHour!, minute: startMinute);
+
+      // Время окончания: из параметра или +1 час
+      if (widget.preselectedEndHour != null) {
+        final endMinute = widget.preselectedEndMinute ?? 0;
+        _endTime = TimeOfDay(hour: widget.preselectedEndHour!, minute: endMinute);
+      } else {
+        _endTime = TimeOfDay(hour: widget.preselectedStartHour! + 1, minute: startMinute);
+      }
     } else {
       final now = TimeOfDay.now();
       // Округляем до ближайшего часа
       _startTime = TimeOfDay(hour: now.hour, minute: 0);
       _endTime = TimeOfDay(hour: now.hour + 1, minute: 0);
     }
+
+    // Предзаполненный ученик из слота
+    _selectedStudent = widget.preselectedStudent;
+
+    // Предзаполненный предмет из слота
+    _selectedSubject = widget.preselectedSubject;
+
+    // Предзаполненный тип занятия из слота
+    _selectedLessonType = widget.preselectedLessonType;
 
     // Слушатель для двухэтапного закрытия
     _sheetController.addListener(_onSheetSizeChanged);
@@ -7173,6 +7346,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
               loading: () => const SizedBox.shrink(),
               error: (e, _) => const SizedBox.shrink(),
               data: (subjects) {
+                // Находим предзаполненный subject в списке по ID
+                final effectiveSubject = _selectedSubject != null
+                    ? subjects.where((s) => s.id == _selectedSubject!.id).firstOrNull
+                    : null;
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -7182,7 +7359,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           labelText: 'Предмет',
                           prefixIcon: Icon(Icons.music_note),
                         ),
-                        initialValue: _selectedSubject,
+                        initialValue: effectiveSubject,
                         items: [
                           const DropdownMenuItem<Subject?>(
                             value: null,
@@ -7222,6 +7399,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
               loading: () => const SizedBox.shrink(),
               error: (e, _) => const SizedBox.shrink(),
               data: (lessonTypes) {
+                // Находим предзаполненный lessonType в списке по ID
+                final effectiveLessonType = _selectedLessonType != null
+                    ? lessonTypes.where((lt) => lt.id == _selectedLessonType!.id).firstOrNull
+                    : null;
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -7231,7 +7412,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           labelText: 'Тип занятия',
                           prefixIcon: Icon(Icons.category),
                         ),
-                        initialValue: _selectedLessonType,
+                        initialValue: effectiveLessonType,
                         items: [
                           const DropdownMenuItem<LessonType?>(
                             value: null,

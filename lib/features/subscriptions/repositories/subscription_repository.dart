@@ -705,6 +705,38 @@ class SubscriptionRepository {
     }
   }
 
+  /// Обновить участников семейного абонемента
+  /// Полностью заменяет список участников новым
+  Future<Subscription> updateSubscriptionMembers({
+    required String subscriptionId,
+    required List<String> studentIds,
+  }) async {
+    if (studentIds.length < 2) {
+      throw const DatabaseException('В семейном абонементе должно быть минимум 2 участника');
+    }
+
+    try {
+      // 1. Удаляем всех текущих участников
+      await _client
+          .from('subscription_members')
+          .delete()
+          .eq('subscription_id', subscriptionId);
+
+      // 2. Добавляем новых участников
+      final memberInserts = studentIds.map((sid) => {
+        'subscription_id': subscriptionId,
+        'student_id': sid,
+      }).toList();
+
+      await _client.from('subscription_members').insert(memberInserts);
+
+      // 3. Возвращаем обновлённую подписку
+      return await getByIdWithMembers(subscriptionId);
+    } catch (e) {
+      throw DatabaseException('Ошибка обновления участников: $e');
+    }
+  }
+
   /// Стрим подписок студента включая семейные (realtime)
   /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
   Stream<List<Subscription>> watchByStudentIncludingFamily(String studentId) async* {

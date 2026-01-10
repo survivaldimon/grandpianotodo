@@ -258,28 +258,23 @@ class ConnectionManager {
     }
   }
 
-  /// Принудительное переподключение Realtime WebSocket
+  /// Принудительное переподключение Realtime
   /// Вызывается при возврате из фона и при восстановлении сети
+  ///
+  /// ВАЖНО: НЕ используем removeAllChannels() — это убивает все StreamProvider!
+  /// Вместо этого просто инвалидируем провайдеры, что создаёт новые streams.
   Future<void> reconnectRealtime() async {
-    debugPrint('[ConnectionManager] Reconnecting Realtime WebSocket...');
+    debugPrint('[ConnectionManager] Reconnecting Realtime...');
 
     try {
-      final client = SupabaseConfig.client;
-
-      // 1. Удаляем все существующие каналы (закрывает WebSocket соединения)
-      await client.removeAllChannels();
-      debugPrint('[ConnectionManager] All Realtime channels removed');
-
-      // 2. Небольшая задержка для очистки соединений
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      // 3. Вызываем callback для пересоздания подписок через Riverpod
+      // Вызываем callback для инвалидации провайдеров
+      // Это создаст новые stream подписки
       _onReconnectNeeded?.call();
 
-      debugPrint('[ConnectionManager] Realtime reconnect complete');
+      debugPrint('[ConnectionManager] Realtime reconnect complete (providers invalidated)');
     } catch (e) {
       debugPrint('[ConnectionManager] Realtime reconnect error: $e');
-      // Всё равно вызываем callback чтобы обновить данные
+      // Всё равно пробуем вызвать callback
       _onReconnectNeeded?.call();
     }
   }

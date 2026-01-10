@@ -13,6 +13,7 @@ import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/payment_plans/providers/payment_plan_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
+import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/models/payment.dart';
 import 'package:kabinet/shared/models/payment_plan.dart';
@@ -2297,6 +2298,10 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
   bool _showScrollDownFab = true;
   ScrollController? _currentScrollController;
 
+  // Для редактирования участников семейного абонемента
+  late List<String> _selectedMemberIds;
+  late List<String> _originalMemberIds;
+
   @override
   void initState() {
     super.initState();
@@ -2304,6 +2309,22 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
     _lessonsController = TextEditingController(text: widget.payment.lessonsCount.toString());
     _commentController = TextEditingController(text: widget.payment.comment ?? '');
     _selectedMethod = widget.payment.paymentMethod;
+
+    // Инициализируем участников из подписки
+    final members = widget.payment.subscription?.members ?? [];
+    _selectedMemberIds = members.map((m) => m.studentId).toList();
+    _originalMemberIds = List.from(_selectedMemberIds);
+  }
+
+  /// Проверяем, изменились ли участники
+  bool get _membersChanged {
+    if (_selectedMemberIds.length != _originalMemberIds.length) return true;
+    final sortedNew = List<String>.from(_selectedMemberIds)..sort();
+    final sortedOld = List<String>.from(_originalMemberIds)..sort();
+    for (int i = 0; i < sortedNew.length; i++) {
+      if (sortedNew[i] != sortedOld[i]) return true;
+    }
+    return false;
   }
 
   @override
@@ -2336,31 +2357,189 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
     );
   }
 
+  /// Секция выбора участников группового абонемента
+  Widget _buildMembersSection() {
+    final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.family_restroom,
+              color: AppColors.primary,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Участники абонемента',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${_selectedMemberIds.length} выбрано',
+              style: TextStyle(
+                fontSize: 12,
+                color: _selectedMemberIds.length >= 2
+                    ? AppColors.success
+                    : Colors.orange[700],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        studentsAsync.when(
+          loading: () => const LinearProgressIndicator(),
+          error: (e, _) => Text('Ошибка загрузки: $e'),
+          data: (students) {
+            if (students.isEmpty) {
+              return const Text('Нет учеников');
+            }
+
+            return Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: students.length,
+                itemBuilder: (context, index) {
+                  final student = students[index];
+                  final isSelected = _selectedMemberIds.contains(student.id);
+                  return CheckboxListTile(
+                    value: isSelected,
+                    onChanged: widget.canManage
+                        ? (checked) {
+                            setState(() {
+                              if (checked == true) {
+                                _selectedMemberIds.add(student.id);
+                              } else {
+                                _selectedMemberIds.remove(student.id);
+                              }
+                            });
+                          }
+                        : null,
+                    title: Text(student.name),
+                    secondary: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: isSelected
+                          ? AppColors.primary
+                          : Theme.of(context).colorScheme.surfaceContainerHigh,
+                      child: Text(
+                        student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isSelected ? Colors.white : Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                    controlAffinity: ListTileControlAffinity.trailing,
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+        if (_selectedMemberIds.length < 2)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.orange[700]),
+                const SizedBox(width: 4),
+                Text(
+                  'Минимум 2 участника',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.orange[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Проверяем минимум 2 участника для семейного абонемента
+    if (widget.payment.isFamilySubscription && _selectedMemberIds.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Выберите минимум 2 участника для группового абонемента'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    final controller = ref.read(paymentControllerProvider.notifier);
-    final result = await controller.updatePayment(
-      widget.payment.id,
-      studentId: widget.payment.studentId,
-      oldLessonsCount: widget.payment.lessonsCount,
-      amount: double.parse(_amountController.text),
-      lessonsCount: int.parse(_lessonsController.text),
-      paymentMethod: _selectedMethod,
-      comment: _commentController.text.isEmpty ? null : _commentController.text,
-    );
+    try {
+      final controller = ref.read(paymentControllerProvider.notifier);
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (result != null) {
-        widget.onChanged();
-        Navigator.pop(context);
+      // 1. Обновляем участников если изменились
+      if (_membersChanged && widget.payment.subscription != null) {
+        final subscriptionRepo = ref.read(subscriptionRepositoryProvider);
+        await subscriptionRepo.updateSubscriptionMembers(
+          subscriptionId: widget.payment.subscription!.id,
+          studentIds: _selectedMemberIds,
+        );
+
+        // Инвалидируем провайдеры затронутых студентов
+        final allAffectedIds = {..._originalMemberIds, ..._selectedMemberIds};
+        for (final studentId in allAffectedIds) {
+          ref.invalidate(studentProvider(studentId));
+          ref.invalidate(studentSubscriptionsProvider(studentId));
+        }
+
+        // Инвалидируем список оплат для обновления имён участников
+        ref.invalidate(paymentsStreamProvider(widget.institutionId));
+      }
+
+      // 2. Обновляем саму оплату
+      final result = await controller.updatePayment(
+        widget.payment.id,
+        studentId: widget.payment.studentId,
+        oldLessonsCount: widget.payment.lessonsCount,
+        amount: double.parse(_amountController.text),
+        lessonsCount: int.parse(_lessonsController.text),
+        paymentMethod: _selectedMethod,
+        comment: _commentController.text.isEmpty ? null : _commentController.text,
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (result != null) {
+          widget.onChanged();
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Оплата обновлена'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Оплата обновлена'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -2676,6 +2855,13 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                   maxLines: 3,
                                   enabled: widget.canManage,
                                 ),
+
+                                // Участники группового абонемента
+                                if (widget.payment.isFamilySubscription) ...[
+                                  const SizedBox(height: 24),
+                                  _buildMembersSection(),
+                                ],
+
                                 const SizedBox(height: 24),
 
                                 // Кнопка сохранения
