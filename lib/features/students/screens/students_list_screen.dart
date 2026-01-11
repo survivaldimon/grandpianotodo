@@ -21,8 +21,8 @@ import 'package:kabinet/shared/models/subject.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/models/student_group.dart';
 import 'package:kabinet/features/students/widgets/merge_students_dialog.dart';
-import 'package:kabinet/features/student_schedules/providers/student_schedule_provider.dart';
-import 'package:kabinet/features/student_schedules/repositories/student_schedule_repository.dart';
+import 'package:kabinet/features/bookings/providers/booking_provider.dart';
+import 'package:kabinet/features/bookings/repositories/booking_repository.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
 import 'package:kabinet/shared/models/lesson_type.dart';
@@ -1279,9 +1279,9 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     }
   }
 
-  /// Создаёт слоты постоянного расписания для ученика
+  /// Создаёт слоты постоянного расписания для ученика (weekly bookings)
   Future<void> _createScheduleSlots(String studentId) async {
-    final scheduleController = ref.read(studentScheduleControllerProvider.notifier);
+    final bookingController = ref.read(bookingControllerProvider.notifier);
     final teacherId = _selectedTeacher?.userId ?? widget.currentUserId;
 
     if (teacherId == null || _selectedRoomId == null) return;
@@ -1289,7 +1289,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     try {
       if (_selectedDays.length == 1) {
         final day = _selectedDays.first;
-        await scheduleController.create(
+        await bookingController.createRecurring(
           institutionId: widget.institutionId,
           studentId: studentId,
           teacherId: teacherId,
@@ -1306,7 +1306,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
           endTime: _endTimes[day]!,
         )).toList();
 
-        await scheduleController.createBatch(
+        await bookingController.createRecurringBatch(
           institutionId: widget.institutionId,
           studentId: studentId,
           teacherId: teacherId,

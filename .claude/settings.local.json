@@ -63,7 +63,13 @@
       "Bash(if [ ! -f \"$file\" ])",
       "Bash(then)",
       "Bash(echo:*)",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(/mnt/c/src/flutter/bin/flutter analyze:*)",
+      "Bash(/home/nikit/fvm/default/bin/flutter analyze:*)",
+      "Bash(/c/Development/flutter/bin/flutter analyze:*)",
+      "Bash(/mnt/r/flutter/bin/cache/dart-sdk/bin/dart analyze:*)",
+      "Bash(/mnt/r/flutter/bin/cache/dart-sdk/bin/dart.exe analyze:*)",
+      "Bash(flutter.bat analyze:*)"
     ]
   }
 }

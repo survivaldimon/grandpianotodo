@@ -733,8 +733,8 @@ class LessonRepository {
       final bookingData = await bookingQuery;
       if ((bookingData as List).isNotEmpty) return true;
 
-      // 3. Проверяем конфликт с постоянными слотами (student_schedules)
-      final hasScheduleConflict = await _checkScheduleSlotConflict(
+      // 3. Проверяем конфликт с постоянными слотами (weekly bookings)
+      final hasScheduleConflict = await _checkWeeklyBookingConflict(
         roomId: roomId,
         date: date,
         startTime: startTime,
@@ -751,7 +751,8 @@ class LessonRepository {
 
   /// Проверить конфликт с постоянными слотами расписания
   /// Возвращает true если есть конфликт
-  Future<bool> _checkScheduleSlotConflict({
+  /// Проверяет конфликт с еженедельными бронированиями (постоянными слотами)
+  Future<bool> _checkWeeklyBookingConflict({
     required String roomId,
     required DateTime date,
     required TimeOfDay startTime,
@@ -763,19 +764,21 @@ class LessonRepository {
     final endMinutes = endTime.hour * 60 + endTime.minute;
     final normalizedDate = DateTime(date.year, date.month, date.day);
 
-    // Получаем активные слоты для этого дня недели
+    // Получаем weekly бронирования для этого дня недели
     // Фильтрацию по кабинету и времени делаем на клиенте из-за replacement_room_id
     final slotsData = await _client
-        .from('student_schedules')
+        .from('bookings')
         .select('''
-          id, student_id, room_id, day_of_week, start_time, end_time,
-          is_active, is_paused, pause_until,
+          id, student_id, day_of_week, start_time, end_time,
+          is_paused, pause_until,
           replacement_room_id, replacement_until,
           valid_from, valid_until,
-          schedule_exceptions(exception_date)
+          booking_rooms(room_id),
+          booking_exceptions(exception_date)
         ''')
+        .eq('recurrence_type', 'weekly')
         .eq('day_of_week', dayOfWeek)
-        .eq('is_active', true);
+        .isFilter('archived_at', null);
 
     for (final slot in slotsData as List) {
       // Пропускаем слот своего ученика (можно создать занятие поверх своего слота)
@@ -784,7 +787,15 @@ class LessonRepository {
       }
 
       // Определяем актуальный кабинет слота на эту дату
-      String effectiveRoomId = slot['room_id'];
+      // Для weekly bookings основной кабинет берётся из booking_rooms
+      final bookingRooms = slot['booking_rooms'] as List?;
+      String? primaryRoomId = bookingRooms?.isNotEmpty == true
+          ? bookingRooms!.first['room_id']
+          : null;
+
+      if (primaryRoomId == null) continue;
+
+      String effectiveRoomId = primaryRoomId;
       if (slot['replacement_room_id'] != null && slot['replacement_until'] != null) {
         final replacementUntil = DateTime.parse(slot['replacement_until']);
         if (!normalizedDate.isAfter(replacementUntil)) {
@@ -812,8 +823,8 @@ class LessonRepository {
         if (normalizedDate.isAfter(validUntil)) continue;
       }
 
-      // Проверяем исключения
-      final exceptions = slot['schedule_exceptions'] as List?;
+      // Проверяем исключения (booking_exceptions)
+      final exceptions = slot['booking_exceptions'] as List?;
       if (exceptions != null) {
         bool hasException = false;
         for (final exc in exceptions) {

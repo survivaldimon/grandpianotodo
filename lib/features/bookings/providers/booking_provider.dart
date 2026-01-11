@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/features/bookings/models/booking.dart';
 import 'package:kabinet/features/bookings/repositories/booking_repository.dart';
-import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
+import 'package:kabinet/features/schedule/providers/lesson_provider.dart'
+    show InstitutionDateParams, InstitutionWeekParams;
 
 /// Провайдер репозитория бронирований
 final bookingRepositoryProvider = Provider<BookingRepository>((ref) {
@@ -14,6 +15,20 @@ final bookingsByInstitutionDateProvider =
     StreamProvider.family<List<Booking>, InstitutionDateParams>((ref, params) {
   final repo = ref.watch(bookingRepositoryProvider);
   return repo.watchByInstitutionAndDate(params.institutionId, params.date);
+});
+
+/// Провайдер еженедельных бронирований заведения (realtime)
+final weeklyBookingsByInstitutionProvider =
+    StreamProvider.family<List<Booking>, String>((ref, institutionId) {
+  final repo = ref.watch(bookingRepositoryProvider);
+  return repo.watchWeeklyByInstitution(institutionId);
+});
+
+/// Провайдер бронирований ученика (realtime)
+final bookingsByStudentProvider =
+    StreamProvider.family<List<Booking>, String>((ref, studentId) {
+  final repo = ref.watch(bookingRepositoryProvider);
+  return repo.watchByStudent(studentId);
 });
 
 /// Провайдер бронирований за неделю (FutureProvider - без realtime)
@@ -34,12 +49,19 @@ final bookingsByInstitutionWeekProvider =
   final result = <DateTime, List<Booking>>{};
   for (final day in params.weekDays) {
     final dayStart = DateTime(day.year, day.month, day.day);
-    result[dayStart] = bookings
-        .where((b) =>
-            b.date.year == day.year &&
-            b.date.month == day.month &&
-            b.date.day == day.day)
-        .toList();
+    result[dayStart] = bookings.where((b) {
+      // Разовые брони — по дате
+      if (!b.isRecurring && b.date != null) {
+        return b.date!.year == day.year &&
+            b.date!.month == day.month &&
+            b.date!.day == day.day;
+      }
+      // Еженедельные брони — по дню недели и isValidForDate
+      if (b.isRecurring && b.dayOfWeek == day.weekday) {
+        return b.isValidForDate(day);
+      }
+      return false;
+    }).toList();
   }
 
   return result;
@@ -92,6 +114,19 @@ final bookingProvider =
   return repo.getById(id);
 });
 
+/// Провайдер еженедельных бронирований для конкретной даты
+/// Аналог schedulesForDateProvider — возвращает weekly bookings, валидные для даты
+final weeklyBookingsForDateProvider =
+    Provider.family<List<Booking>, InstitutionDateParams>((ref, params) {
+  final weeklyAsync = ref.watch(weeklyBookingsByInstitutionProvider(params.institutionId));
+
+  // Получаем данные из async состояния
+  final weeklyBookings = weeklyAsync.valueOrNull ?? [];
+
+  // Фильтруем только те, что валидны для этой даты
+  return weeklyBookings.where((b) => b.isValidForDate(params.date)).toList();
+});
+
 /// Контроллер бронирований
 class BookingController extends StateNotifier<AsyncValue<void>> {
   final BookingRepository _repo;
@@ -103,11 +138,21 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
   void _invalidateForDate(String institutionId, DateTime date) {
     _ref.invalidate(
         bookingsByInstitutionDateProvider(InstitutionDateParams(institutionId, date)));
-    // Также инвалидируем недельный провайдер
-    // (он перезагрузится при следующем использовании)
   }
 
-  /// Создать бронирование
+  void _invalidateForStudent(String studentId) {
+    _ref.invalidate(bookingsByStudentProvider(studentId));
+  }
+
+  void _invalidateWeekly(String institutionId) {
+    _ref.invalidate(weeklyBookingsByInstitutionProvider(institutionId));
+  }
+
+  // ============================================
+  // Разовые бронирования
+  // ============================================
+
+  /// Создать разовое бронирование
   Future<Booking?> create({
     required String institutionId,
     required List<String> roomIds,
@@ -183,7 +228,7 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
         // Получаем текущую бронь для заполнения пропущенных параметров
         final current = await _repo.getById(id);
         final checkRoomIds = roomIds ?? current.rooms.map((r) => r.id).toList();
-        final checkDate = date ?? current.date;
+        final checkDate = date ?? current.date ?? originalDate;
         final checkStart = startTime ?? current.startTime;
         final checkEnd = endTime ?? current.endTime;
 
@@ -245,6 +290,424 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
     try {
       await _repo.delete(id);
       _invalidateForDate(institutionId, date);
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  // ============================================
+  // Еженедельные бронирования (постоянное расписание)
+  // ============================================
+
+  /// Создать еженедельное бронирование
+  Future<Booking?> createRecurring({
+    required String institutionId,
+    required String roomId,
+    required int dayOfWeek,
+    required TimeOfDay startTime,
+    required TimeOfDay endTime,
+    String? studentId,
+    String? teacherId,
+    String? subjectId,
+    String? lessonTypeId,
+    DateTime? validFrom,
+    DateTime? validUntil,
+    String? description,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      // Проверяем конфликт с другими weekly бронями
+      final hasConflict = await _repo.hasWeeklyConflict(
+        roomId: roomId,
+        dayOfWeek: dayOfWeek,
+        startTime: startTime,
+        endTime: endTime,
+      );
+
+      if (hasConflict) {
+        throw Exception('Кабинет уже забронирован в это время');
+      }
+
+      // Проверяем конфликт с занятиями (если есть ученик — пропускаем его занятия)
+      final hasLessonConflict = await _repo.hasLessonConflictForDayOfWeek(
+        roomId: roomId,
+        dayOfWeek: dayOfWeek,
+        startTime: startTime,
+        endTime: endTime,
+        studentId: studentId,
+      );
+
+      if (hasLessonConflict) {
+        throw Exception('В кабинете запланированы занятия в это время');
+      }
+
+      final booking = await _repo.createRecurring(
+        institutionId: institutionId,
+        roomId: roomId,
+        dayOfWeek: dayOfWeek,
+        startTime: startTime,
+        endTime: endTime,
+        studentId: studentId,
+        teacherId: teacherId,
+        subjectId: subjectId,
+        lessonTypeId: lessonTypeId,
+        validFrom: validFrom,
+        validUntil: validUntil,
+        description: description,
+      );
+
+      _invalidateWeekly(institutionId);
+      if (studentId != null) {
+        _invalidateForStudent(studentId);
+      }
+
+      state = const AsyncValue.data(null);
+      return booking;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow; // Пробрасываем ошибку для обработки в UI
+    }
+  }
+
+  /// Создать несколько еженедельных бронирований (для нескольких дней)
+  Future<List<Booking>?> createRecurringBatch({
+    required String institutionId,
+    required String roomId,
+    required List<DayTimeSlot> slots,
+    String? studentId,
+    String? teacherId,
+    String? subjectId,
+    String? lessonTypeId,
+    DateTime? validFrom,
+    DateTime? validUntil,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      // Проверяем конфликты для каждого слота
+      for (final slot in slots) {
+        final hasConflict = await _repo.hasWeeklyConflict(
+          roomId: roomId,
+          dayOfWeek: slot.dayOfWeek,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+        );
+
+        if (hasConflict) {
+          throw Exception('Кабинет уже забронирован в ${_dayName(slot.dayOfWeek)}');
+        }
+
+        final hasLessonConflict = await _repo.hasLessonConflictForDayOfWeek(
+          roomId: roomId,
+          dayOfWeek: slot.dayOfWeek,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          studentId: studentId,
+        );
+
+        if (hasLessonConflict) {
+          throw Exception('В кабинете запланированы занятия в ${_dayName(slot.dayOfWeek)}');
+        }
+      }
+
+      final bookings = await _repo.createRecurringBatch(
+        institutionId: institutionId,
+        roomId: roomId,
+        slots: slots,
+        studentId: studentId,
+        teacherId: teacherId,
+        subjectId: subjectId,
+        lessonTypeId: lessonTypeId,
+        validFrom: validFrom,
+        validUntil: validUntil,
+      );
+
+      _invalidateWeekly(institutionId);
+      if (studentId != null) {
+        _invalidateForStudent(studentId);
+      }
+
+      state = const AsyncValue.data(null);
+      return bookings;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow; // Пробрасываем ошибку для обработки в UI
+    }
+  }
+
+  String _dayName(int day) {
+    const days = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    return days[day];
+  }
+
+  /// Обновить еженедельное бронирование
+  Future<Booking?> updateRecurring(
+    String id, {
+    required String institutionId,
+    String? roomId,
+    int? dayOfWeek,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? studentId,
+    String? teacherId,
+    String? subjectId,
+    String? lessonTypeId,
+    DateTime? validFrom,
+    DateTime? validUntil,
+    String? description,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final current = await _repo.getById(id);
+
+      // Проверяем конфликты если меняются время/день/кабинет
+      if (roomId != null || dayOfWeek != null || startTime != null || endTime != null) {
+        final checkRoom = roomId ?? current.rooms.firstOrNull?.id;
+        final checkDay = dayOfWeek ?? current.dayOfWeek ?? 1;
+        final checkStart = startTime ?? current.startTime;
+        final checkEnd = endTime ?? current.endTime;
+
+        if (checkRoom != null) {
+          final hasConflict = await _repo.hasWeeklyConflict(
+            roomId: checkRoom,
+            dayOfWeek: checkDay,
+            startTime: checkStart,
+            endTime: checkEnd,
+            excludeBookingId: id,
+          );
+
+          if (hasConflict) {
+            throw Exception('Кабинет уже забронирован в это время');
+          }
+        }
+      }
+
+      final booking = await _repo.update(
+        id,
+        roomIds: roomId != null ? [roomId] : null,
+        dayOfWeek: dayOfWeek,
+        startTime: startTime,
+        endTime: endTime,
+        studentId: studentId,
+        teacherId: teacherId,
+        subjectId: subjectId,
+        lessonTypeId: lessonTypeId,
+        validFrom: validFrom,
+        validUntil: validUntil,
+        description: description,
+      );
+
+      _invalidateWeekly(institutionId);
+      _ref.invalidate(bookingProvider(id));
+      if (current.studentId != null) {
+        _invalidateForStudent(current.studentId!);
+      }
+      if (studentId != null && studentId != current.studentId) {
+        _invalidateForStudent(studentId);
+      }
+
+      state = const AsyncValue.data(null);
+      return booking;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
+  /// Удалить еженедельное бронирование
+  Future<bool> deleteRecurring(String id, String institutionId, String? studentId) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.delete(id);
+      _invalidateWeekly(institutionId);
+      if (studentId != null) {
+        _invalidateForStudent(studentId);
+      }
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  // ============================================
+  // Архивация
+  // ============================================
+
+  /// Архивировать бронирование
+  Future<bool> archive(String id, String institutionId, String? studentId) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.archive(id);
+      _invalidateWeekly(institutionId);
+      _ref.invalidate(bookingProvider(id));
+      if (studentId != null) {
+        _invalidateForStudent(studentId);
+      }
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Разархивировать бронирование
+  Future<bool> unarchive(String id, String institutionId, String? studentId) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.unarchive(id);
+      _invalidateWeekly(institutionId);
+      _ref.invalidate(bookingProvider(id));
+      if (studentId != null) {
+        _invalidateForStudent(studentId);
+      }
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  // ============================================
+  // Пауза/Возобновление
+  // ============================================
+
+  /// Приостановить бронирование
+  Future<Booking?> pause(String id, String institutionId, DateTime? untilDate) async {
+    state = const AsyncValue.loading();
+    try {
+      final booking = await _repo.pause(id, untilDate);
+      _invalidateWeekly(institutionId);
+      _ref.invalidate(bookingProvider(id));
+      if (booking.studentId != null) {
+        _invalidateForStudent(booking.studentId!);
+      }
+      state = const AsyncValue.data(null);
+      return booking;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
+  /// Возобновить бронирование
+  Future<Booking?> resume(String id, String institutionId) async {
+    state = const AsyncValue.loading();
+    try {
+      final booking = await _repo.resume(id);
+      _invalidateWeekly(institutionId);
+      _ref.invalidate(bookingProvider(id));
+      if (booking.studentId != null) {
+        _invalidateForStudent(booking.studentId!);
+      }
+      state = const AsyncValue.data(null);
+      return booking;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
+  // ============================================
+  // Замена кабинета
+  // ============================================
+
+  /// Установить временную замену кабинета
+  Future<Booking?> setReplacement(
+    String id,
+    String institutionId,
+    String replacementRoomId,
+    DateTime replacementUntil,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      final booking = await _repo.setReplacement(id, replacementRoomId, replacementUntil);
+      _invalidateWeekly(institutionId);
+      _ref.invalidate(bookingProvider(id));
+      if (booking.studentId != null) {
+        _invalidateForStudent(booking.studentId!);
+      }
+      state = const AsyncValue.data(null);
+      return booking;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
+  /// Снять временную замену кабинета
+  Future<Booking?> clearReplacement(String id, String institutionId) async {
+    state = const AsyncValue.loading();
+    try {
+      final booking = await _repo.clearReplacement(id);
+      _invalidateWeekly(institutionId);
+      _ref.invalidate(bookingProvider(id));
+      if (booking.studentId != null) {
+        _invalidateForStudent(booking.studentId!);
+      }
+      state = const AsyncValue.data(null);
+      return booking;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
+  // ============================================
+  // Исключения
+  // ============================================
+
+  /// Добавить исключение (дату когда бронь не действует)
+  Future<BookingException?> addException({
+    required String bookingId,
+    required String institutionId,
+    required DateTime exceptionDate,
+    String? reason,
+    String? studentId,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final exception = await _repo.addException(
+        bookingId: bookingId,
+        exceptionDate: exceptionDate,
+        reason: reason,
+      );
+      _invalidateWeekly(institutionId);
+      _invalidateForDate(institutionId, exceptionDate);
+      _ref.invalidate(bookingProvider(bookingId));
+      if (studentId != null) {
+        _invalidateForStudent(studentId);
+      }
+      state = const AsyncValue.data(null);
+      return exception;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
+  /// Удалить исключение
+  Future<bool> removeException({
+    required String exceptionId,
+    required String bookingId,
+    required String institutionId,
+    required DateTime exceptionDate,
+    String? studentId,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.removeException(exceptionId);
+      _invalidateWeekly(institutionId);
+      _invalidateForDate(institutionId, exceptionDate);
+      _ref.invalidate(bookingProvider(bookingId));
+      if (studentId != null) {
+        _invalidateForStudent(studentId);
+      }
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {

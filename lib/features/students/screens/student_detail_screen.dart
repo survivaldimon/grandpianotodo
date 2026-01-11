@@ -18,9 +18,9 @@ import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
 import 'package:kabinet/shared/models/lesson_type.dart';
-import 'package:kabinet/features/student_schedules/providers/student_schedule_provider.dart';
-import 'package:kabinet/features/student_schedules/repositories/student_schedule_repository.dart';
-import 'package:kabinet/shared/models/student_schedule.dart';
+import 'package:kabinet/features/bookings/providers/booking_provider.dart';
+import 'package:kabinet/features/bookings/models/booking.dart';
+import 'package:kabinet/features/bookings/repositories/booking_repository.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
 import 'package:kabinet/core/widgets/ios_time_picker.dart';
 import 'package:kabinet/core/providers/phone_settings_provider.dart';
@@ -3000,12 +3000,13 @@ class _ScheduleSlotsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final params = StudentScheduleParams(studentId, institutionId);
-    final activeSchedules = ref.watch(activeStudentSchedulesProvider(params));
-    final inactiveSchedules = ref.watch(inactiveStudentSchedulesProvider(params));
-    // Проверяем loading через основной stream заведения
-    final institutionSchedulesAsync = ref.watch(institutionSchedulesStreamProvider(institutionId));
-    final isLoading = institutionSchedulesAsync.isLoading && institutionSchedulesAsync.valueOrNull == null;
+    final bookingsAsync = ref.watch(bookingsByStudentProvider(studentId));
+    final bookings = bookingsAsync.valueOrNull ?? [];
+    final isLoading = bookingsAsync.isLoading && bookingsAsync.valueOrNull == null;
+
+    // Разделяем на активные и неактивные (на паузе или архивированные)
+    final activeBookings = bookings.where((b) => !b.isPaused && b.archivedAt == null).toList();
+    final inactiveBookings = bookings.where((b) => b.isPaused || b.archivedAt != null).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3037,7 +3038,7 @@ class _ScheduleSlotsSection extends ConsumerWidget {
           )
         else ...[
           Builder(builder: (_) {
-            if (activeSchedules.isEmpty && inactiveSchedules.isEmpty) {
+            if (activeBookings.isEmpty && inactiveBookings.isEmpty) {
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -3065,26 +3066,26 @@ class _ScheduleSlotsSection extends ConsumerWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Active schedules
-                ...activeSchedules.map((schedule) => _ScheduleSlotCard(
-                  schedule: schedule,
+                // Active bookings
+                ...activeBookings.map((booking) => _BookingSlotCard(
+                  booking: booking,
                   institutionId: institutionId,
                   canEdit: canEdit,
                 )),
 
-                // Inactive schedules in ExpansionTile
-                if (inactiveSchedules.isNotEmpty) ...[
+                // Inactive bookings in ExpansionTile
+                if (inactiveBookings.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   ExpansionTile(
                     tilePadding: EdgeInsets.zero,
                     title: Text(
-                      'Архив (${inactiveSchedules.length})',
+                      'Архив (${inactiveBookings.length})',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    children: inactiveSchedules.map((schedule) => _ScheduleSlotCard(
-                      schedule: schedule,
+                    children: inactiveBookings.map((booking) => _BookingSlotCard(
+                      booking: booking,
                       institutionId: institutionId,
                       canEdit: canEdit,
                       isInactive: true,
@@ -3103,7 +3104,7 @@ class _ScheduleSlotsSection extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) => _AddScheduleSlotSheet(
+      builder: (sheetContext) => _AddBookingSlotSheet(
         studentId: studentId,
         institutionId: institutionId,
       ),
@@ -3111,15 +3112,15 @@ class _ScheduleSlotsSection extends ConsumerWidget {
   }
 }
 
-/// Карточка слота расписания
-class _ScheduleSlotCard extends ConsumerWidget {
-  final StudentSchedule schedule;
+/// Карточка слота бронирования (постоянного расписания)
+class _BookingSlotCard extends ConsumerWidget {
+  final Booking booking;
   final String institutionId;
   final bool canEdit;
   final bool isInactive;
 
-  const _ScheduleSlotCard({
-    required this.schedule,
+  const _BookingSlotCard({
+    required this.booking,
     required this.institutionId,
     this.canEdit = true,
     this.isInactive = false,
@@ -3155,7 +3156,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      schedule.dayName,
+                      booking.dayName,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: isInactive
@@ -3175,7 +3176,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                   children: [
                     // Time
                     Text(
-                      schedule.timeRange,
+                      booking.timeRange,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: isInactive
@@ -3196,7 +3197,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            schedule.room?.name ?? 'Кабинет',
+                            booking.rooms.isNotEmpty ? booking.rooms.first.name : 'Кабинет',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -3204,7 +3205,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                           ),
                         ),
                         // Replacement indicator
-                        if (schedule.hasReplacement) ...[
+                        if (booking.hasReplacement) ...[
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -3216,7 +3217,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '→ ${schedule.replacementRoom?.name ?? 'Замена'}',
+                              '→ ${booking.replacementRoom?.name ?? 'Замена'}',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: Colors.orange.shade700,
                               ),
@@ -3227,7 +3228,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                     ),
 
                     // Teacher
-                    if (schedule.teacher != null) ...[
+                    if (booking.teacher != null) ...[
                       const SizedBox(height: 2),
                       Row(
                         children: [
@@ -3239,7 +3240,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
-                              schedule.teacher!.fullName,
+                              booking.teacher!.fullName,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -3257,10 +3258,10 @@ class _ScheduleSlotCard extends ConsumerWidget {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (schedule.isPaused)
+                  if (booking.isPaused)
                     Tooltip(
-                      message: schedule.pauseUntil != null
-                          ? 'Пауза до ${DateFormat('dd.MM').format(schedule.pauseUntil!)}'
+                      message: booking.pauseUntil != null
+                          ? 'Пауза до ${DateFormat('dd.MM').format(booking.pauseUntil!)}'
                           : 'На паузе',
                       child: Icon(
                         Icons.pause_circle,
@@ -3318,7 +3319,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                       ),
                       child: Center(
                         child: Text(
-                          schedule.dayName,
+                          booking.dayName,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: Theme.of(context).colorScheme.onPrimaryContainer,
@@ -3332,11 +3333,11 @@ class _ScheduleSlotCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${schedule.dayNameFull}, ${schedule.timeRange}',
+                            '${booking.dayNameFull}, ${booking.timeRange}',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           Text(
-                            schedule.room?.name ?? 'Кабинет',
+                            booking.rooms.isNotEmpty ? booking.rooms.first.name : 'Кабинет',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
@@ -3352,13 +3353,13 @@ class _ScheduleSlotCard extends ConsumerWidget {
               // Actions
               if (!isInactive) ...[
                 // Pause/Resume
-                if (schedule.isPaused)
+                if (booking.isPaused)
                   ListTile(
                     leading: const Icon(Icons.play_arrow, color: Colors.green),
                     title: const Text('Возобновить'),
                     onTap: () {
                       Navigator.pop(sheetContext);
-                      _resumeSchedule(context, ref);
+                      _resumeBooking(context, ref);
                     },
                   )
                 else
@@ -3372,7 +3373,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                   ),
 
                 // Replacement room
-                if (schedule.hasReplacement)
+                if (booking.hasReplacement)
                   ListTile(
                     leading: const Icon(Icons.undo, color: AppColors.primary),
                     title: const Text('Снять замену кабинета'),
@@ -3391,23 +3392,23 @@ class _ScheduleSlotCard extends ConsumerWidget {
                     },
                   ),
 
-                // Deactivate
+                // Archive
                 ListTile(
                   leading: const Icon(Icons.archive, color: Colors.orange),
-                  title: const Text('Деактивировать'),
+                  title: const Text('Архивировать'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    _deactivateSchedule(context, ref);
+                    _archiveBooking(context, ref);
                   },
                 ),
               ] else ...[
-                // Reactivate
+                // Unarchive
                 ListTile(
                   leading: const Icon(Icons.unarchive, color: Colors.green),
-                  title: const Text('Активировать'),
+                  title: const Text('Разархивировать'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    _reactivateSchedule(context, ref);
+                    _unarchiveBooking(context, ref);
                   },
                 ),
               ],
@@ -3418,7 +3419,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                 title: const Text('Удалить', style: TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _deleteSchedule(context, ref);
+                  _deleteBooking(context, ref);
                 },
               ),
             ],
@@ -3428,16 +3429,12 @@ class _ScheduleSlotCard extends ConsumerWidget {
     );
   }
 
-  void _resumeSchedule(BuildContext context, WidgetRef ref) async {
-    final controller = ref.read(studentScheduleControllerProvider.notifier);
-    final success = await controller.resume(
-      schedule.id,
-      institutionId,
-      schedule.studentId,
-    );
-    if (success && context.mounted) {
+  void _resumeBooking(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(bookingControllerProvider.notifier);
+    final result = await controller.resume(booking.id, booking.institutionId);
+    if (result != null && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Расписание возобновлено')),
+        const SnackBar(content: Text('Бронирование возобновлено')),
       );
     }
   }
@@ -3448,7 +3445,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Приостановить расписание'),
+          title: const Text('Приостановить бронирование'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3491,18 +3488,13 @@ class _ScheduleSlotCard extends ConsumerWidget {
                   ? null
                   : () async {
                       Navigator.pop(dialogContext);
-                      final controller = ref.read(studentScheduleControllerProvider.notifier);
-                      final success = await controller.pause(
-                        schedule.id,
-                        pauseUntil!,
-                        institutionId,
-                        schedule.studentId,
-                      );
-                      if (success && context.mounted) {
+                      final controller = ref.read(bookingControllerProvider.notifier);
+                      final result = await controller.pause(booking.id, booking.institutionId, pauseUntil);
+                      if (result != null && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Расписание приостановлено до ${DateFormat('dd.MM.yyyy').format(pauseUntil!)}',
+                              'Бронирование приостановлено до ${DateFormat('dd.MM.yyyy').format(pauseUntil!)}',
                             ),
                           ),
                         );
@@ -3517,13 +3509,9 @@ class _ScheduleSlotCard extends ConsumerWidget {
   }
 
   void _clearReplacement(BuildContext context, WidgetRef ref) async {
-    final controller = ref.read(studentScheduleControllerProvider.notifier);
-    final success = await controller.clearReplacement(
-      schedule.id,
-      institutionId,
-      schedule.studentId,
-    );
-    if (success && context.mounted) {
+    final controller = ref.read(bookingControllerProvider.notifier);
+    final result = await controller.clearReplacement(booking.id, booking.institutionId);
+    if (result != null && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Замена кабинета снята')),
       );
@@ -3554,7 +3542,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                     initialValue: selectedRoomId,
                     decoration: const InputDecoration(labelText: 'Новый кабинет'),
                     items: rooms
-                        .where((r) => r.id != schedule.roomId)
+                        .where((r) => r.id != booking.primaryRoomId)
                         .map((r) => DropdownMenuItem(
                               value: r.id,
                               child: Text(r.name),
@@ -3602,15 +3590,14 @@ class _ScheduleSlotCard extends ConsumerWidget {
                     ? null
                     : () async {
                         Navigator.pop(dialogContext);
-                        final controller = ref.read(studentScheduleControllerProvider.notifier);
-                        final success = await controller.setReplacement(
-                          schedule.id,
+                        final controller = ref.read(bookingControllerProvider.notifier);
+                        final result = await controller.setReplacement(
+                          booking.id,
+                          booking.institutionId,
                           selectedRoomId!,
                           replacementUntil!,
-                          institutionId,
-                          schedule.studentId,
                         );
-                        if (success && context.mounted) {
+                        if (result != null && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Замена кабинета установлена')),
                           );
@@ -3625,13 +3612,13 @@ class _ScheduleSlotCard extends ConsumerWidget {
     );
   }
 
-  void _deactivateSchedule(BuildContext context, WidgetRef ref) async {
+  void _archiveBooking(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Деактивировать расписание?'),
+        title: const Text('Архивировать бронирование?'),
         content: const Text(
-          'Слот будет перемещён в архив. Вы сможете активировать его позже.',
+          'Слот будет перемещён в архив. Вы сможете разархивировать его позже.',
         ),
         actions: [
           TextButton(
@@ -3640,46 +3627,38 @@ class _ScheduleSlotCard extends ConsumerWidget {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Деактивировать'),
+            child: const Text('Архивировать'),
           ),
         ],
       ),
     );
 
     if (confirmed == true) {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
-      final success = await controller.deactivate(
-        schedule.id,
-        institutionId,
-        schedule.studentId,
-      );
+      final controller = ref.read(bookingControllerProvider.notifier);
+      final success = await controller.archive(booking.id, booking.institutionId, booking.studentId);
       if (success && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Расписание деактивировано')),
+          const SnackBar(content: Text('Бронирование архивировано')),
         );
       }
     }
   }
 
-  void _reactivateSchedule(BuildContext context, WidgetRef ref) async {
-    final controller = ref.read(studentScheduleControllerProvider.notifier);
-    final success = await controller.reactivate(
-      schedule.id,
-      institutionId,
-      schedule.studentId,
-    );
+  void _unarchiveBooking(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(bookingControllerProvider.notifier);
+    final success = await controller.unarchive(booking.id, booking.institutionId, booking.studentId);
     if (success && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Расписание активировано')),
+        const SnackBar(content: Text('Бронирование разархивировано')),
       );
     }
   }
 
-  void _deleteSchedule(BuildContext context, WidgetRef ref) async {
+  void _deleteBooking(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить расписание?'),
+        title: const Text('Удалить бронирование?'),
         content: const Text(
           'Этот слот будет удалён навсегда. Это действие нельзя отменить.',
         ),
@@ -3698,36 +3677,32 @@ class _ScheduleSlotCard extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
-      final success = await controller.delete(
-        schedule.id,
-        institutionId,
-        schedule.studentId,
-      );
+      final controller = ref.read(bookingControllerProvider.notifier);
+      final success = await controller.deleteRecurring(booking.id, booking.institutionId, booking.studentId);
       if (success && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Расписание удалено')),
+          const SnackBar(content: Text('Бронирование удалено')),
         );
       }
     }
   }
 }
 
-/// Форма добавления нового слота расписания
-class _AddScheduleSlotSheet extends ConsumerStatefulWidget {
+/// Форма добавления нового слота бронирования (постоянного расписания)
+class _AddBookingSlotSheet extends ConsumerStatefulWidget {
   final String studentId;
   final String institutionId;
 
-  const _AddScheduleSlotSheet({
+  const _AddBookingSlotSheet({
     required this.studentId,
     required this.institutionId,
   });
 
   @override
-  ConsumerState<_AddScheduleSlotSheet> createState() => _AddScheduleSlotSheetState();
+  ConsumerState<_AddBookingSlotSheet> createState() => _AddBookingSlotSheetState();
 }
 
-class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
+class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
   final _formKey = GlobalKey<FormState>();
 
   // Выбранные дни недели (для batch создания)
@@ -3790,7 +3765,7 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
   }
 
   /// Проверяет конфликты для всех выбранных дней
-  /// Проверяет: 1) другие постоянные расписания, 2) ВСЕ будущие занятия
+  /// Проверяет: 1) другие повторяющиеся бронирования, 2) ВСЕ будущие занятия
   Future<void> _checkConflicts() async {
     if (_selectedRoomId == null || _selectedDays.isEmpty) {
       setState(() {
@@ -3802,22 +3777,22 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
 
     setState(() => _isCheckingConflicts = true);
 
-    final repo = ref.read(studentScheduleRepositoryProvider);
+    final repo = ref.read(bookingRepositoryProvider);
     final newConflicts = <int>{};
 
     for (final day in _selectedDays) {
       final startTime = _startTimes[day] ?? _defaultStartTime;
       final endTime = _endTimes[day] ?? _defaultEndTime;
 
-      // 1. Проверяем конфликт с другими постоянными расписаниями
-      final hasScheduleConflict = await repo.hasScheduleConflict(
+      // 1. Проверяем конфликт с другими повторяющимися бронированиями
+      final hasBookingConflict = await repo.hasWeeklyConflict(
         roomId: _selectedRoomId!,
         dayOfWeek: day,
         startTime: startTime,
         endTime: endTime,
       );
 
-      if (hasScheduleConflict) {
+      if (hasBookingConflict) {
         newConflicts.add(day);
         continue; // Уже конфликт — не нужно проверять занятия
       }
@@ -4383,12 +4358,12 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
     setState(() => _isSubmitting = true);
 
     try {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
+      final controller = ref.read(bookingControllerProvider.notifier);
 
       if (_selectedDays.length == 1) {
         // Single slot
         final day = _selectedDays.first;
-        await controller.create(
+        await controller.createRecurring(
           institutionId: widget.institutionId,
           studentId: widget.studentId,
           teacherId: _selectedTeacherId!,
@@ -4407,7 +4382,7 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
           endTime: _endTimes[day]!,
         )).toList();
 
-        await controller.createBatch(
+        await controller.createRecurringBatch(
           institutionId: widget.institutionId,
           studentId: widget.studentId,
           teacherId: _selectedTeacherId!,
@@ -4424,8 +4399,8 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
           SnackBar(
             content: Text(
               _selectedDays.length == 1
-                  ? 'Слот расписания создан'
-                  : 'Создано ${_selectedDays.length} слотов расписания',
+                  ? 'Бронирование создано'
+                  : 'Создано ${_selectedDays.length} бронирований',
             ),
           ),
         );
@@ -4465,7 +4440,7 @@ class _BulkLessonActionsSheet extends ConsumerStatefulWidget {
 
 class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet> {
   List<Lesson>? _futureLessons;
-  List<StudentSchedule>? _scheduleSlots;
+  List<Booking>? _scheduleSlots;
   bool _isLoading = true;
   bool _isProcessing = false;
   String? _loadError;
@@ -4479,19 +4454,19 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
   Future<void> _loadData() async {
     try {
       final lessonRepo = ref.read(lessonRepositoryProvider);
-      final scheduleRepo = ref.read(studentScheduleRepositoryProvider);
+      final bookingRepo = ref.read(bookingRepositoryProvider);
 
       // Загружаем параллельно
       final results = await Future.wait([
         lessonRepo.getFutureLessonsForStudent(widget.student.id),
-        scheduleRepo.getByStudent(widget.student.id),
+        bookingRepo.getByStudent(widget.student.id),
       ]);
 
       if (mounted) {
         setState(() {
           _futureLessons = results[0] as List<Lesson>;
-          _scheduleSlots = (results[1] as List<StudentSchedule>)
-              .where((s) => s.isActive)
+          _scheduleSlots = (results[1] as List<Booking>)
+              .where((b) => b.archivedAt == null && b.isRecurring)
               .toList();
           _isLoading = false;
           _loadError = null;
@@ -4637,21 +4612,23 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
     setState(() => _isProcessing = true);
 
     try {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
-      final scheduleIds = _scheduleSlots!.map((s) => s.id).toList();
+      final controller = ref.read(bookingControllerProvider.notifier);
 
-      await controller.reassignTeacher(
-        scheduleIds,
-        selectedTeacherId,
-        widget.institutionId,
-        [widget.student.id],
-      );
+      // TODO: Implement reassignTeacher in BookingController
+      // For now, we'll update each slot individually
+      for (final slot in _scheduleSlots!) {
+        await controller.updateRecurring(
+          slot.id,
+          institutionId: widget.institutionId,
+          teacherId: selectedTeacherId,
+        );
+      }
 
       if (mounted) {
         Navigator.pop(context);
         widget.onCompleted();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Переназначено ${scheduleIds.length} слотов')),
+          SnackBar(content: Text('Переназначено ${_scheduleSlots!.length} слотов')),
         );
       }
     } catch (e) {
@@ -4682,14 +4659,13 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
     setState(() => _isProcessing = true);
 
     try {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
+      final controller = ref.read(bookingControllerProvider.notifier);
 
       for (final slot in _scheduleSlots!) {
         await controller.pause(
           slot.id,
-          pauseUntil,
           widget.institutionId,
-          widget.student.id,
+          pauseUntil,
         );
       }
 
@@ -4741,10 +4717,10 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
     setState(() => _isProcessing = true);
 
     try {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
+      final controller = ref.read(bookingControllerProvider.notifier);
 
       for (final slot in _scheduleSlots!) {
-        await controller.deactivate(
+        await controller.archive(
           slot.id,
           widget.institutionId,
           widget.student.id,
