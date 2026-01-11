@@ -31,10 +31,9 @@ import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/core/widgets/shimmer_loading.dart';
 import 'package:kabinet/features/bookings/models/booking.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
+import 'package:kabinet/features/bookings/repositories/booking_repository.dart';
 import 'package:kabinet/features/groups/providers/group_provider.dart';
 import 'package:kabinet/shared/models/student_group.dart';
-import 'package:kabinet/features/student_schedules/providers/student_schedule_provider.dart';
-import 'package:kabinet/shared/models/student_schedule.dart';
 
 /// Класс для хранения состояния фильтров расписания
 class ScheduleFilters {
@@ -235,6 +234,15 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     _preloadAdjacentDates();
   }
 
+  /// Обработчик выбора даты
+  void _onDateSelected(DateTime date) {
+    setState(() {
+      _selectedDate = date;
+      _savedScrollOffset = null;
+    });
+    _preloadAdjacentDates();
+  }
+
   /// Предзагрузка данных для соседних дат (±3 дня)
   void _preloadAdjacentDates() {
     // Используем addPostFrameCallback чтобы не блокировать текущий build
@@ -272,9 +280,9 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       bookingsByInstitutionDateProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
     );
 
-    // Получаем постоянные слоты для выбранной даты
+    // Получаем еженедельные бронирования (постоянные слоты) для выбранной даты
     final scheduleSlots = ref.watch(
-      schedulesForDateProvider(ScheduleDateParams(widget.institutionId, _selectedDate)),
+      weeklyBookingsForDateProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
     );
 
     // Получаем права пользователя (используем StreamProvider для realtime обновления)
@@ -380,10 +388,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             _WeekDaySelector(
               selectedDate: _selectedDate,
               scrollToTodayKey: _scrollResetKey,
-              onDateSelected: (date) {
-                setState(() => _selectedDate = date);
-                _preloadAdjacentDates();
-              },
+              onDateSelected: _onDateSelected,
             ),
           // Селектор недели (для недельного режима)
           if (_viewMode == ScheduleViewMode.week)
@@ -414,7 +419,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     AsyncValue<List<Room>> allRoomsAsync,
     AsyncValue<List<Lesson>> lessonsAsync,
     AsyncValue<List<Booking>> bookingsAsync,
-    List<StudentSchedule> scheduleSlots,
+    List<Booking> scheduleSlots,
     bool canManageRooms,
     int workStartHour,
     int workEndHour,
@@ -449,23 +454,28 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final lessonsList = lessons ?? [];
 
     // Получаем брони (пустой список при загрузке/ошибке)
-    final bookings = bookingsAsync.valueOrNull ?? [];
+    // Фильтруем: еженедельные брони с учеником показываются как scheduleSlots, не как обычные брони
+    final allBookings = bookingsAsync.valueOrNull ?? [];
+    final bookings = allBookings.where((b) {
+      // Еженедельные брони с учеником — это слоты расписания, не показываем их как обычные брони
+      if (b.isRecurring && b.studentId != null) return false;
+      return true;
+    }).toList();
 
     final filteredLessons = _filters.isEmpty
         ? lessonsList
         : lessonsList.where((l) => _filters.matchesLesson(l)).toList();
 
     // Фильтруем слоты — скрываем те, для которых уже создано занятие
+    // (чтобы не было визуального наложения)
     final filteredSlots = scheduleSlots.where((slot) {
-      // Ищем занятие того же ученика в том же кабинете с пересечением времени
       final hasLesson = lessonsList.any((lesson) {
         if (lesson.studentId != slot.studentId) return false;
         final effectiveRoomId = slot.getEffectiveRoomId(_selectedDate);
         if (lesson.roomId != effectiveRoomId) return false;
-        // Проверяем пересечение времени
         return slot.hasTimeOverlap(lesson.startTime, lesson.endTime);
       });
-      return !hasLesson; // Показываем слот только если занятия нет
+      return !hasLesson;
     }).toList();
 
     // Вычисляем эффективные часы с учётом занятий, броней и слотов вне рабочего времени
@@ -557,7 +567,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   (int, int) _calculateEffectiveHours({
     required List<Lesson> lessons,
     List<Booking> bookings = const [],
-    List<StudentSchedule> scheduleSlots = const [],
+    List<Booking> scheduleSlots = const [],
     required int workStartHour,
     required int workEndHour,
   }) {
@@ -634,7 +644,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     final weekBookingsAsync = ref.watch(bookingsByInstitutionWeekStreamProvider(weekParams));
 
     // Загружаем все постоянные слоты заведения (для фильтрации по дням)
-    final allScheduleSlotsAsync = ref.watch(institutionSchedulesStreamProvider(widget.institutionId));
+    final allScheduleSlotsAsync = ref.watch(weeklyBookingsByInstitutionProvider(widget.institutionId));
 
     // Все кабинеты для диалогов создания занятий
     final allRooms = allRoomsAsync.valueOrNull ?? [];
@@ -666,10 +676,19 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     }
 
     // Формируем map броней по дням (используем пустой map если ещё загружается)
-    final bookingsMap = weekBookings ?? <DateTime, List<Booking>>{};
+    // Фильтруем: еженедельные брони с учеником показываются как слоты, не как обычные брони
+    final rawBookingsMap = weekBookings ?? <DateTime, List<Booking>>{};
+    final bookingsMap = <DateTime, List<Booking>>{};
+    for (final entry in rawBookingsMap.entries) {
+      bookingsMap[entry.key] = entry.value.where((b) {
+        if (b.isRecurring && b.studentId != null) return false;
+        return true;
+      }).toList();
+    }
 
-    // Формируем map постоянных слотов по дням (скрываем те, для которых уже создано занятие)
-    final slotsByDay = <DateTime, List<StudentSchedule>>{};
+    // Формируем map постоянных слотов по дням
+    // Скрываем слоты, для которых уже создано занятие (чтобы не было наложения)
+    final slotsByDay = <DateTime, List<Booking>>{};
     if (allScheduleSlots != null) {
       for (int i = 0; i < 7; i++) {
         final date = weekStart.add(Duration(days: i));
@@ -787,7 +806,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     );
   }
 
-  void _showScheduleSlotDetail(StudentSchedule slot) {
+  void _showScheduleSlotDetail(Booking slot) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -796,7 +815,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         selectedDate: _selectedDate,
         institutionId: widget.institutionId,
         onUpdated: () {
-          ref.invalidate(institutionSchedulesStreamProvider(widget.institutionId));
+          ref.invalidate(weeklyBookingsByInstitutionProvider(widget.institutionId));
         },
         onCreateLesson: () {
           Navigator.pop(context);
@@ -808,7 +827,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
   }
 
   /// Открывает форму создания занятия с данными из постоянного слота
-  void _showAddLessonFromSlot(StudentSchedule slot) {
+  void _showAddLessonFromSlot(Booking slot) {
     final roomsAsync = ref.read(roomsProvider(widget.institutionId));
     final rooms = roomsAsync.valueOrNull ?? [];
     if (rooms.isEmpty) return;
@@ -1283,7 +1302,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final List<Room> allRooms; // Все кабинеты для заголовков
   final List<Lesson> lessons;
   final List<Booking> bookings;
-  final List<StudentSchedule> scheduleSlots; // Постоянные слоты
+  final List<Booking> scheduleSlots; // Постоянные слоты (weekly bookings)
   final DateTime selectedDate;
   final String institutionId;
   final String? selectedRoomId;
@@ -1294,7 +1313,7 @@ class _AllRoomsTimeGrid extends StatefulWidget {
   final Map<String, String?> teacherColors; // userId → hex color
   final void Function(Lesson) onLessonTap;
   final void Function(Booking) onBookingTap;
-  final void Function(StudentSchedule) onScheduleSlotTap;
+  final void Function(Booking) onScheduleSlotTap;
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, int hour, int minute) onAddLesson;
   final VoidCallback? onAddRoom;
@@ -2048,7 +2067,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
   /// Создаёт блок постоянного слота расписания
   Widget _buildScheduleSlotBlock(
     BuildContext context,
-    StudentSchedule slot,
+    Booking slot,
     double roomColumnWidth,
   ) {
     // Получаем актуальный кабинет на выбранную дату (с учётом замены)
@@ -2161,7 +2180,8 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
   }
 
   /// Возвращает цвет преподавателя
-  Color _getTeacherColor(String teacherId) {
+  Color _getTeacherColor(String? teacherId) {
+    if (teacherId == null) return AppColors.primary;
     final teacherColor = widget.teacherColors[teacherId];
     if (teacherColor != null && teacherColor.isNotEmpty) {
       try {
@@ -2236,7 +2256,7 @@ class _ScheduleItem {
   final _ItemType type;
   final Lesson? lesson;
   final Booking? booking;
-  final StudentSchedule? slot;
+  final Booking? slot;
 
   _ScheduleItem({
     required this.startMinutes,
@@ -2981,7 +3001,7 @@ class _WeekTimeGrid extends StatefulWidget {
   final List<Room> allRooms;
   final Map<DateTime, List<Lesson>> lessonsByDay;
   final Map<DateTime, List<Booking>> bookingsByDay;
-  final Map<DateTime, List<StudentSchedule>> slotsByDay;
+  final Map<DateTime, List<Booking>> slotsByDay;
   final DateTime weekStart;
   final String institutionId;
   final String? selectedRoomId;
@@ -3197,7 +3217,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
           for (final room in rooms) {
             final lessonsCount = dayLessons.where((l) => l.roomId == room.id).length;
             final bookingsCount = dayBookings.where((b) => b.rooms.any((r) => r.id == room.id)).length;
-            final slotsCount = daySlots.where((s) => s.roomId == room.id).length;
+            final slotsCount = daySlots.where((s) => s.getEffectiveRoomId(date) == room.id).length;
             final totalCount = lessonsCount + bookingsCount + slotsCount;
             if (totalCount > maxItems) maxItems = totalCount;
           }
@@ -3542,7 +3562,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
 
         // Постоянные слоты для этого кабинета
         final roomSlots = daySlots
-            .where((s) => s.roomId == room.id)
+            .where((s) => s.getEffectiveRoomId(date) == room.id)
             .toList();
 
         final hasContent = roomLessons.isNotEmpty || roomBookings.isNotEmpty || roomSlots.isNotEmpty;
@@ -3569,7 +3589,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   }
 
   /// Строит список всех элементов (занятия, брони, слоты) отсортированных по времени
-  Widget _buildItemsList(List<Lesson> lessons, List<Booking> bookings, List<StudentSchedule> slots) {
+  Widget _buildItemsList(List<Lesson> lessons, List<Booking> bookings, List<Booking> slots) {
     // Собираем все элементы с временем начала для сортировки
     final items = <_ScheduleItem>[];
 
@@ -3670,7 +3690,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
     );
   }
 
-  Widget _buildSlotItem(StudentSchedule slot) {
+  Widget _buildSlotItem(Booking slot) {
     return Container(
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -5648,8 +5668,8 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
   }
 }
 
-/// Форма создания нового занятия или бронирования
-/// Режим формы: занятие или бронирование
+/// Форма создания нового занятия, бронирования или постоянного расписания
+/// Режим формы: занятие, бронирование или постоянное расписание
 enum _AddFormMode { lesson, booking }
 
 /// Тип повтора занятий
@@ -7692,6 +7712,14 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
   // Для режима бронирования
   Set<String> _selectedRoomIds = {};
   final TextEditingController _descriptionController = TextEditingController();
+  bool _isWeeklyBooking = false; // Еженедельное повторение
+
+  // Для еженедельного бронирования (постоянное расписание)
+  final Set<int> _scheduleDays = {}; // Выбранные дни недели (1-7)
+  final Map<int, TimeOfDay> _scheduleStartTimes = {};
+  final Map<int, TimeOfDay> _scheduleEndTimes = {};
+  final Set<int> _scheduleConflictingDays = {};
+  bool _isCheckingScheduleConflicts = false;
 
   // Для повторяющихся занятий
   RepeatType _repeatType = RepeatType.none;
@@ -7883,23 +7911,29 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 ),
               ),
             ),
-            // Переключатель режима: Занятие / Бронь
+            // Переключатель режима: Занятие / Бронирование
             SegmentedButton<_AddFormMode>(
               segments: const [
                 ButtonSegment<_AddFormMode>(
                   value: _AddFormMode.lesson,
                   label: Text('Занятие'),
-                  icon: Icon(Icons.school, size: 18),
+                  icon: Icon(Icons.school, size: 16),
                 ),
                 ButtonSegment<_AddFormMode>(
                   value: _AddFormMode.booking,
                   label: Text('Бронь'),
-                  icon: Icon(Icons.lock_clock, size: 18),
+                  icon: Icon(Icons.lock_clock, size: 16),
                 ),
               ],
               selected: {_mode},
               onSelectionChanged: (Set<_AddFormMode> newSelection) {
-                setState(() => _mode = newSelection.first);
+                setState(() {
+                  _mode = newSelection.first;
+                  // Сбрасываем еженедельный режим при смене вкладки
+                  if (_mode != _AddFormMode.booking) {
+                    _isWeeklyBooking = false;
+                  }
+                });
               },
             ),
             const SizedBox(height: 16),
@@ -7969,135 +8003,503 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
             // ========== РЕЖИМ БРОНИРОВАНИЯ ==========
             if (_mode == _AddFormMode.booking) ...[
-              // Выбор кабинетов (мультиселект)
-              Text(
-                'Кабинеты',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+              // Переключатель "Еженедельно"
+              SwitchListTile(
+                title: const Text('Повторять еженедельно'),
+                subtitle: Text(
+                  _isWeeklyBooking
+                      ? 'Постоянное расписание с привязкой к ученику'
+                      : 'Разовое бронирование кабинета',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                value: _isWeeklyBooking,
+                onChanged: (value) {
+                  setState(() {
+                    _isWeeklyBooking = value;
+                    // Сбрасываем данные при переключении
+                    if (value) {
+                      _selectedRoomIds.clear();
+                      _descriptionController.clear();
+                    } else {
+                      _scheduleDays.clear();
+                      _scheduleStartTimes.clear();
+                      _scheduleEndTimes.clear();
+                      _scheduleConflictingDays.clear();
+                      _selectedStudent = null;
+                    }
+                  });
+                },
+                contentPadding: EdgeInsets.zero,
               ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: widget.rooms.map((room) {
-                  final isSelected = _selectedRoomIds.contains(room.id);
-                  final roomLabel = room.number != null
-                      ? 'Каб. ${room.number}'
-                      : room.name;
-                  return FilterChip(
-                    label: Text(roomLabel),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedRoomIds.add(room.id);
-                        } else {
-                          _selectedRoomIds.remove(room.id);
-                        }
-                      });
-                    },
-                    selectedColor: AppColors.warning.withValues(alpha: 0.3),
-                    checkmarkColor: AppColors.warning,
-                  );
-                }).toList(),
-              ),
-              if (_selectedRoomIds.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Выберите хотя бы один кабинет',
-                    style: TextStyle(
-                      color: AppColors.error,
-                      fontSize: 12,
+              const SizedBox(height: 16),
+
+              // ----- РАЗОВАЯ БРОНЬ (не еженедельно) -----
+              if (!_isWeeklyBooking) ...[
+                // Выбор кабинетов (мультиселект)
+                Text(
+                  'Кабинеты',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.rooms.map((room) {
+                    final isSelected = _selectedRoomIds.contains(room.id);
+                    final roomLabel = room.number != null
+                        ? 'Каб. ${room.number}'
+                        : room.name;
+                    return FilterChip(
+                      label: Text(roomLabel),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedRoomIds.add(room.id);
+                          } else {
+                            _selectedRoomIds.remove(room.id);
+                          }
+                        });
+                      },
+                      selectedColor: AppColors.warning.withValues(alpha: 0.3),
+                      checkmarkColor: AppColors.warning,
+                    );
+                  }).toList(),
+                ),
+                if (_selectedRoomIds.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Выберите хотя бы один кабинет',
+                      style: TextStyle(
+                        color: AppColors.error,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 16),
 
-            // Дата
-            InkWell(
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (date != null) {
-                  setState(() => _selectedDate = date);
-                  // Предзагрузка не нужна — это локальное состояние формы
-                }
-              },
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Дата *',
-                  prefixIcon: Icon(Icons.calendar_today),
+                // Дата
+                InkWell(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) {
+                      setState(() => _selectedDate = date);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Дата *',
+                      prefixIcon: Icon(Icons.calendar_today),
+                    ),
+                    child: Text(AppDateUtils.formatDayMonth(_selectedDate)),
+                  ),
                 ),
-                child: Text(AppDateUtils.formatDayMonth(_selectedDate)),
-              ),
-            ),
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // Время (комбинированный пикер)
-            InkWell(
-              onTap: () async {
-                final range = await showIosTimeRangePicker(
-                  context: context,
-                  initialStartTime: _startTime,
-                  initialEndTime: _endTime,
-                  minuteInterval: 5,
-                );
-                if (range != null) {
-                  setState(() {
-                    _startTime = range.start;
-                    _endTime = range.end;
-                  });
-                }
-              },
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Время *',
-                  prefixIcon: Icon(Icons.access_time),
+                // Время
+                InkWell(
+                  onTap: () async {
+                    final range = await showIosTimeRangePicker(
+                      context: context,
+                      initialStartTime: _startTime,
+                      initialEndTime: _endTime,
+                      minuteInterval: 5,
+                    );
+                    if (range != null) {
+                      setState(() {
+                        _startTime = range.start;
+                        _endTime = range.end;
+                      });
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Время *',
+                      prefixIcon: Icon(Icons.access_time),
+                    ),
+                    child: Text('${_formatTime(_startTime)} – ${_formatTime(_endTime)}'),
+                  ),
                 ),
-                child: Text('${_formatTime(_startTime)} – ${_formatTime(_endTime)}'),
-              ),
-            ),
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // ========== Продолжение РЕЖИМА БРОНИРОВАНИЯ ==========
-            if (_mode == _AddFormMode.booking) ...[
-              // Описание
-              TextField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Описание (опционально)',
-                  prefixIcon: Icon(Icons.description),
-                  hintText: 'Мероприятие, встреча и т.д.',
+                // Описание
+                TextField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Описание (опционально)',
+                    prefixIcon: Icon(Icons.description),
+                    hintText: 'Мероприятие, встреча и т.д.',
+                  ),
+                  maxLines: 2,
                 ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Кнопка создания брони
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.warning,
-                  foregroundColor: Colors.white,
+                // Кнопка создания разовой брони
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.warning,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: isLoading || _selectedRoomIds.isEmpty
+                      ? null
+                      : _createBooking,
+                  icon: const Icon(Icons.lock),
+                  label: const Text('Забронировать'),
                 ),
-                onPressed: isLoading || _selectedRoomIds.isEmpty
-                    ? null
-                    : _createBooking,
-                icon: const Icon(Icons.lock),
-                label: const Text('Забронировать'),
-              ),
 
-              if (isLoading)
-                const Padding(
-                  padding: EdgeInsets.only(top: 16),
-                  child: Center(child: CircularProgressIndicator()),
+                if (isLoading)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+              ],
+
+              // ----- ЕЖЕНЕДЕЛЬНАЯ БРОНЬ (постоянное расписание) -----
+              if (_isWeeklyBooking) ...[
+                // Кабинет (один)
+                Builder(
+                  builder: (context) {
+                    final roomsAsync = ref.watch(roomsProvider(widget.institutionId));
+                    final rooms = roomsAsync.valueOrNull ?? widget.rooms;
+
+                    if (_selectedRoom != null && !rooms.any((r) => r.id == _selectedRoom!.id)) {
+                      _selectedRoom = rooms.isNotEmpty ? rooms.first : null;
+                    }
+
+                    return rooms.isEmpty
+                        ? InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Кабинет *',
+                              prefixIcon: Icon(Icons.door_front_door),
+                            ),
+                            child: Text(
+                              'Нет кабинетов',
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            ),
+                          )
+                        : DropdownButtonFormField<Room>(
+                            decoration: const InputDecoration(
+                              labelText: 'Кабинет *',
+                              prefixIcon: Icon(Icons.door_front_door),
+                            ),
+                            value: _selectedRoom,
+                            items: rooms.map((r) => DropdownMenuItem<Room>(
+                              value: r,
+                              child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
+                            )).toList(),
+                            onChanged: (room) {
+                              setState(() => _selectedRoom = room);
+                              _checkScheduleConflicts();
+                            },
+                          );
+                  },
                 ),
+                const SizedBox(height: 16),
+
+                // Дни недели
+                Text(
+                  'Дни недели *',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final day in [
+                      (1, 'Пн'),
+                      (2, 'Вт'),
+                      (3, 'Ср'),
+                      (4, 'Чт'),
+                      (5, 'Пт'),
+                      (6, 'Сб'),
+                      (7, 'Вс')
+                    ])
+                      FilterChip(
+                        label: Text(day.$2),
+                        selected: _scheduleDays.contains(day.$1),
+                        avatar: _scheduleConflictingDays.contains(day.$1)
+                            ? Icon(Icons.warning_amber, size: 16, color: Theme.of(context).colorScheme.error)
+                            : null,
+                        backgroundColor: _scheduleConflictingDays.contains(day.$1)
+                            ? Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3)
+                            : null,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _scheduleDays.add(day.$1);
+                              _scheduleStartTimes[day.$1] = _startTime;
+                              _scheduleEndTimes[day.$1] = _endTime;
+                            } else {
+                              _scheduleDays.remove(day.$1);
+                              _scheduleStartTimes.remove(day.$1);
+                              _scheduleEndTimes.remove(day.$1);
+                              _scheduleConflictingDays.remove(day.$1);
+                            }
+                          });
+                          _checkScheduleConflicts();
+                        },
+                      ),
+                  ],
+                ),
+                if (_scheduleDays.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Выберите хотя бы один день',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+
+                // Время для выбранных дней
+                if (_scheduleDays.isNotEmpty) ...[
+                  Text(
+                    'Время занятий',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  ..._buildScheduleDayTimeRows(),
+                  const SizedBox(height: 16),
+                ],
+
+                // Ученик
+                Builder(builder: (context) {
+                  final myStudentIdsAsync = ref.watch(myStudentIdsProvider(widget.institutionId));
+
+                  return studentsAsync.when(
+                    loading: () => const CircularProgressIndicator(),
+                    error: (e, _) => ErrorView.inline(e),
+                    data: (allStudents) {
+                      final myStudentIds = myStudentIdsAsync.valueOrNull ?? <String>{};
+                      final myStudents = allStudents.where((s) => myStudentIds.contains(s.id)).toList();
+                      final otherStudents = allStudents.where((s) => !myStudentIds.contains(s.id)).toList();
+                      final currentStudent = _selectedStudent != null
+                          ? allStudents.where((s) => s.id == _selectedStudent!.id).firstOrNull
+                          : null;
+
+                      return allStudents.isEmpty
+                          ? InputDecorator(
+                              decoration: const InputDecoration(
+                                labelText: 'Ученик *',
+                                prefixIcon: Icon(Icons.person),
+                              ),
+                              child: Text(
+                                'Нет учеников',
+                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              ),
+                            )
+                          : InkWell(
+                              onTap: () => _showStudentPickerSheet(
+                                context: context,
+                                myStudents: myStudents,
+                                otherStudents: otherStudents,
+                                allStudents: allStudents,
+                                currentStudent: currentStudent,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              child: InputDecorator(
+                                decoration: InputDecoration(
+                                  labelText: 'Ученик *',
+                                  prefixIcon: const Icon(Icons.person),
+                                  suffixIcon: const Icon(Icons.arrow_drop_down),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: Text(
+                                  currentStudent?.name ?? 'Выберите ученика',
+                                  style: currentStudent != null
+                                      ? null
+                                      : TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                ),
+                              ),
+                            );
+                    },
+                  );
+                }),
+                const SizedBox(height: 16),
+
+                // Преподаватель
+                membersAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (e, _) => const SizedBox.shrink(),
+                  data: (members) {
+                    final activeMembers = members.where((m) => !m.isArchived).toList();
+                    if (activeMembers.length <= 1) return const SizedBox.shrink();
+
+                    final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+                    _selectedTeacher ??= activeMembers.where((m) => m.userId == currentUserId).firstOrNull;
+
+                    final currentTeacher = _selectedTeacher != null
+                        ? activeMembers.where((m) => m.userId == _selectedTeacher!.userId).firstOrNull
+                        : null;
+
+                    return DropdownButtonFormField<InstitutionMember?>(
+                      decoration: const InputDecoration(
+                        labelText: 'Преподаватель *',
+                        prefixIcon: Icon(Icons.school),
+                      ),
+                      value: currentTeacher,
+                      items: activeMembers.map((m) => DropdownMenuItem<InstitutionMember?>(
+                        value: m,
+                        child: Text(m.profile?.fullName ?? 'Без имени'),
+                      )).toList(),
+                      onChanged: (member) {
+                        setState(() => _selectedTeacher = member);
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Предмет
+                subjectsAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (e, _) => const SizedBox.shrink(),
+                  data: (subjects) {
+                    final effectiveSubject = _selectedSubject != null
+                        ? subjects.where((s) => s.id == _selectedSubject!.id).firstOrNull
+                        : null;
+                    return DropdownButtonFormField<Subject?>(
+                      decoration: const InputDecoration(
+                        labelText: 'Предмет',
+                        prefixIcon: Icon(Icons.music_note),
+                      ),
+                      value: effectiveSubject,
+                      items: [
+                        const DropdownMenuItem<Subject?>(value: null, child: Text('Не выбран')),
+                        ...subjects.map((s) => DropdownMenuItem<Subject?>(
+                          value: s,
+                          child: Text(s.name),
+                        )),
+                      ],
+                      onChanged: (subject) {
+                        setState(() => _selectedSubject = subject);
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Тип занятия
+                lessonTypesAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (e, _) => const SizedBox.shrink(),
+                  data: (lessonTypes) {
+                    final effectiveLessonType = _selectedLessonType != null
+                        ? lessonTypes.where((lt) => lt.id == _selectedLessonType!.id).firstOrNull
+                        : null;
+                    return DropdownButtonFormField<LessonType?>(
+                      decoration: const InputDecoration(
+                        labelText: 'Тип занятия',
+                        prefixIcon: Icon(Icons.category),
+                      ),
+                      value: effectiveLessonType,
+                      items: [
+                        const DropdownMenuItem<LessonType?>(value: null, child: Text('Не выбран')),
+                        ...lessonTypes.map((lt) => DropdownMenuItem<LessonType?>(
+                          value: lt,
+                          child: Text('${lt.name} (${lt.defaultDurationMinutes} мин)'),
+                        )),
+                      ],
+                      onChanged: (lessonType) {
+                        setState(() {
+                          _selectedLessonType = lessonType;
+                          if (lessonType != null) {
+                            // Обновляем длительность для всех выбранных дней
+                            for (final day in _scheduleDays) {
+                              final start = _scheduleStartTimes[day] ?? _startTime;
+                              final startMinutes = start.hour * 60 + start.minute;
+                              final endMinutes = startMinutes + lessonType.defaultDurationMinutes;
+                              _scheduleEndTimes[day] = TimeOfDay(
+                                hour: endMinutes ~/ 60,
+                                minute: endMinutes % 60,
+                              );
+                            }
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Статус проверки конфликтов
+                if (_isCheckingScheduleConflicts)
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Проверка конфликтов...',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                  )
+                else if (_scheduleConflictingDays.isNotEmpty)
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Конфликты: ${_scheduleConflictingDays.length} дн. (измените время)',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 24),
+
+                // Кнопка создания еженедельного слота
+                ElevatedButton.icon(
+                  onPressed: _scheduleDays.isEmpty ||
+                          _isCheckingScheduleConflicts ||
+                          _scheduleConflictingDays.isNotEmpty ||
+                          _selectedStudent == null ||
+                          _selectedRoom == null
+                      ? null
+                      : _createSchedule,
+                  icon: _isCheckingScheduleConflicts
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.repeat),
+                  label: Text(
+                    _isCheckingScheduleConflicts
+                        ? 'Проверка...'
+                        : _scheduleConflictingDays.isNotEmpty
+                            ? 'Есть конфликты'
+                            : _scheduleDays.length > 1
+                                ? 'Создать ${_scheduleDays.length} слотов'
+                                : 'Создать слот',
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 8),
             ],
@@ -8731,6 +9133,263 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
           backgroundColor: Colors.green,
         ),
       );
+    }
+  }
+
+  /// Строит строки времени для постоянного расписания (каждый день)
+  List<Widget> _buildScheduleDayTimeRows() {
+    const days = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    final sortedDays = _scheduleDays.toList()..sort();
+
+    return sortedDays.map((dayNumber) {
+      final startTime = _scheduleStartTimes[dayNumber] ?? _startTime;
+      final endTime = _scheduleEndTimes[dayNumber] ?? _endTime;
+      final hasConflict = _scheduleConflictingDays.contains(dayNumber);
+
+      // Расчёт длительности
+      final startMinutes = startTime.hour * 60 + startTime.minute;
+      final endMinutes = endTime.hour * 60 + endTime.minute;
+      final durationMinutes = endMinutes - startMinutes;
+      final durationText = durationMinutes > 0
+          ? (durationMinutes >= 60
+              ? '${durationMinutes ~/ 60} ч${durationMinutes % 60 > 0 ? ' ${durationMinutes % 60} мин' : ''}'
+              : '$durationMinutes мин')
+          : 'Некорректно';
+
+      return Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        color: hasConflict
+            ? Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3)
+            : null,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _pickScheduleDayTimeRange(dayNumber),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Day label
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: hasConflict
+                        ? Theme.of(context).colorScheme.errorContainer
+                        : Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text(
+                      days[dayNumber],
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: hasConflict
+                                ? Theme.of(context).colorScheme.onErrorContainer
+                                : Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Time range
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_formatTimeOfDay(startTime)} — ${_formatTimeOfDay(endTime)}',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasConflict ? 'Конфликт! Время занято' : durationText,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: hasConflict
+                                  ? Theme.of(context).colorScheme.error
+                                  : (durationMinutes > 0
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.error),
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Conflict or Edit icon
+                Icon(
+                  hasConflict ? Icons.warning_amber_rounded : Icons.edit_outlined,
+                  color: hasConflict
+                      ? Theme.of(context).colorScheme.error
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  /// Выбор времени для конкретного дня недели в постоянном расписании
+  Future<void> _pickScheduleDayTimeRange(int dayNumber) async {
+    final currentStart = _scheduleStartTimes[dayNumber] ?? _startTime;
+    final currentEnd = _scheduleEndTimes[dayNumber] ?? _endTime;
+
+    final result = await showIosTimeRangePicker(
+      context: context,
+      initialStartTime: currentStart,
+      initialEndTime: currentEnd,
+      minuteInterval: 5,
+      minHour: 6,
+      maxHour: 23,
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _scheduleStartTimes[dayNumber] = result.start;
+        _scheduleEndTimes[dayNumber] = result.end;
+      });
+      _checkScheduleConflicts();
+    }
+  }
+
+  /// Проверяет конфликты для постоянного расписания
+  Future<void> _checkScheduleConflicts() async {
+    if (_selectedRoom == null || _scheduleDays.isEmpty) {
+      setState(() {
+        _scheduleConflictingDays.clear();
+        _isCheckingScheduleConflicts = false;
+      });
+      return;
+    }
+
+    setState(() => _isCheckingScheduleConflicts = true);
+
+    final repo = ref.read(bookingRepositoryProvider);
+    final newConflicts = <int>{};
+
+    for (final day in _scheduleDays) {
+      final startTime = _scheduleStartTimes[day] ?? _startTime;
+      final endTime = _scheduleEndTimes[day] ?? _endTime;
+
+      // 1. Проверяем конфликт с другими еженедельными бронированиями
+      final hasScheduleConflict = await repo.hasWeeklyConflict(
+        roomId: _selectedRoom!.id,
+        dayOfWeek: day,
+        startTime: startTime,
+        endTime: endTime,
+      );
+
+      if (hasScheduleConflict) {
+        newConflicts.add(day);
+        continue;
+      }
+
+      // 2. Проверяем конфликт с ВСЕМИ будущими занятиями для этого дня недели
+      final hasLessonConflict = await repo.hasLessonConflictForDayOfWeek(
+        roomId: _selectedRoom!.id,
+        dayOfWeek: day,
+        startTime: startTime,
+        endTime: endTime,
+        studentId: _selectedStudent?.id,
+      );
+
+      if (hasLessonConflict) {
+        newConflicts.add(day);
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _scheduleConflictingDays.clear();
+        _scheduleConflictingDays.addAll(newConflicts);
+        _isCheckingScheduleConflicts = false;
+      });
+    }
+  }
+
+  /// Создание постоянного расписания
+  Future<void> _createSchedule() async {
+    if (_scheduleDays.isEmpty || _selectedStudent == null || _selectedRoom == null) {
+      return;
+    }
+
+    // Получаем teacherId - либо выбранный, либо текущий пользователь
+    final teacherId = _selectedTeacher?.userId ??
+        SupabaseConfig.client.auth.currentUser?.id;
+
+    if (teacherId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Не удалось определить преподавателя'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final controller = ref.read(bookingControllerProvider.notifier);
+
+    try {
+      if (_scheduleDays.length == 1) {
+        // Один слот
+        final day = _scheduleDays.first;
+        await controller.createRecurring(
+          institutionId: widget.institutionId,
+          studentId: _selectedStudent!.id,
+          teacherId: teacherId,
+          roomId: _selectedRoom!.id,
+          subjectId: _selectedSubject?.id,
+          lessonTypeId: _selectedLessonType?.id,
+          dayOfWeek: day,
+          startTime: _scheduleStartTimes[day] ?? _startTime,
+          endTime: _scheduleEndTimes[day] ?? _endTime,
+        );
+      } else {
+        // Несколько слотов (batch)
+        final slots = _scheduleDays.map((day) => DayTimeSlot(
+          dayOfWeek: day,
+          startTime: _scheduleStartTimes[day] ?? _startTime,
+          endTime: _scheduleEndTimes[day] ?? _endTime,
+        )).toList();
+
+        await controller.createRecurringBatch(
+          institutionId: widget.institutionId,
+          studentId: _selectedStudent!.id,
+          teacherId: teacherId,
+          roomId: _selectedRoom!.id,
+          subjectId: _selectedSubject?.id,
+          lessonTypeId: _selectedLessonType?.id,
+          slots: slots,
+        );
+      }
+
+      if (mounted) {
+        widget.onCreated(_selectedDate);
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _scheduleDays.length == 1
+                  ? 'Постоянное расписание создано'
+                  : 'Создано ${_scheduleDays.length} слотов расписания',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -9587,7 +10246,7 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
     final success = await controller.delete(
       widget.booking.id,
       widget.institutionId,
-      widget.booking.date,
+      widget.booking.date!, // Для разовых бронирований date всегда есть
     );
 
     if (mounted) {
@@ -9943,7 +10602,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
 
 /// BottomSheet для деталей постоянного слота
 class _ScheduleSlotDetailSheet extends ConsumerStatefulWidget {
-  final StudentSchedule slot;
+  final Booking slot;
   final DateTime selectedDate;
   final String institutionId;
   final VoidCallback onUpdated;
@@ -10042,7 +10701,7 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
                   _buildInfoRow(
                     Icons.meeting_room,
                     'Кабинет',
-                    slot.room?.name ?? 'Не указан',
+                    slot.getEffectiveRoom(widget.selectedDate)?.name ?? 'Не указан',
                   ),
 
                   // Если есть замена кабинета
@@ -10219,9 +10878,9 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
 
     setState(() => _isLoading = true);
     try {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
+      final controller = ref.read(bookingControllerProvider.notifier);
       await controller.addException(
-        scheduleId: widget.slot.id,
+        bookingId: widget.slot.id,
         exceptionDate: widget.selectedDate,
         institutionId: widget.institutionId,
         studentId: widget.slot.studentId,
@@ -10260,12 +10919,11 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
 
     setState(() => _isLoading = true);
     try {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
+      final controller = ref.read(bookingControllerProvider.notifier);
       await controller.pause(
         widget.slot.id,
-        untilDate,
         widget.institutionId,
-        widget.slot.studentId,
+        untilDate,
       );
 
       widget.onUpdated();
@@ -10290,11 +10948,10 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
   Future<void> _resumeSlot() async {
     setState(() => _isLoading = true);
     try {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
+      final controller = ref.read(bookingControllerProvider.notifier);
       await controller.resume(
         widget.slot.id,
         widget.institutionId,
-        widget.slot.studentId,
       );
 
       widget.onUpdated();
@@ -10345,8 +11002,8 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
 
     setState(() => _isLoading = true);
     try {
-      final controller = ref.read(studentScheduleControllerProvider.notifier);
-      await controller.deactivate(
+      final controller = ref.read(bookingControllerProvider.notifier);
+      await controller.archive(
         widget.slot.id,
         widget.institutionId,
         widget.slot.studentId,

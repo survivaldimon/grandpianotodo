@@ -161,6 +161,13 @@
   - RLS политики для `lesson_history`
   - Null-safety для `Profile.fromJson`
   - Публичная функция `showLessonDetailSheet()`
+- **`SESSION_2026_01_11_UNIFIED_BOOKINGS.md`** — объединение student_schedules и bookings:
+  - Единая система бронирований (точечные + повторяющиеся)
+  - Расширение модели Booking: recurrence_type, day_of_week, student_id, teacher_id и др.
+  - Удаление автоматической генерации занятий при просмотре
+  - Ручное создание занятий из слотов через кнопку "Создать занятие"
+  - SQL миграции для переноса данных из student_schedules
+  - Удаление старых файлов student_schedules
 
 ## Валюта
 
@@ -1408,12 +1415,12 @@ WITH CHECK (user_id = auth.uid());
 ALTER PUBLICATION supabase_realtime ADD TABLE institution_members;
 ```
 
-### 43. Проверка конфликтов постоянного расписания
-При создании постоянного расписания проверяются конфликты с другими слотами и обычными занятиями.
+### 43. Проверка конфликтов повторяющихся бронирований
+При создании повторяющегося бронирования (weekly booking) проверяются конфликты с другими слотами и обычными занятиями.
 
 **Двухуровневая проверка:**
-1. **Конфликт с постоянными слотами** (`hasScheduleConflict`)
-   - Таблица: `student_schedules`
+1. **Конфликт с другими бронированиями** (`hasScheduleConflict`)
+   - Таблица: `bookings` (recurrence_type = 'weekly')
    - Тот же кабинет, день недели, пересечение времени
 
 2. **Конфликт с обычными занятиями** (`hasLessonConflictForDayOfWeek`)
@@ -1443,11 +1450,11 @@ Future<bool> hasLessonConflictForDayOfWeek({
 
 **Защита на двух уровнях:**
 1. **UI** — `_checkConflicts()` показывает конфликты до отправки
-2. **Контроллер** — `create()`/`createBatch()` проверяют перед записью в БД
+2. **Контроллер** — `createRecurring()`/`createRecurringBatch()` проверяют перед записью в БД
 
 **Ключевые файлы:**
-- `lib/features/student_schedules/repositories/student_schedule_repository.dart` — методы проверки
-- `lib/features/student_schedules/providers/student_schedule_provider.dart` — контроллер с проверками
+- `lib/features/bookings/repositories/booking_repository.dart` — методы проверки
+- `lib/features/bookings/providers/booking_provider.dart` — контроллер с проверками
 - `lib/features/students/screens/student_detail_screen.dart` — UI с `_checkConflicts()`
 
 ### 44. Контрастный цвет текста для светлых фонов
@@ -1709,6 +1716,91 @@ Future<bool> updateDefaultRooms(String memberId, String institutionId, List<Stri
 ALTER TABLE institution_members
 ADD COLUMN IF NOT EXISTS default_room_ids JSONB DEFAULT NULL;
 ```
+
+### 51. Объединённая система бронирований (Unified Bookings)
+Системы `student_schedules` (постоянные занятия) и `bookings` (бронирования) объединены в единую систему.
+
+**Два типа бронирований:**
+| Тип | recurrence_type | Описание | Визуал |
+|-----|-----------------|----------|--------|
+| **Точечное** | `once` | Разовое бронирование на дату | Оранжевый блок 🔒 |
+| **Повторяющееся** | `weekly` | Еженедельное (по дню недели) | Пунктирная рамка 🔁 |
+
+**Расширенная модель Booking:**
+```dart
+class Booking {
+  // Базовые поля
+  final String institutionId;
+  final DateTime? date;           // NULL для weekly
+  final TimeOfDay startTime;
+  final TimeOfDay endTime;
+  final String? description;
+
+  // Повторение
+  final RecurrenceType recurrenceType;  // 'once' | 'weekly'
+  final int? dayOfWeek;                  // 1-7 для weekly
+  final DateTime? validFrom;
+  final DateTime? validUntil;
+
+  // Привязка к ученику (для постоянного расписания)
+  final String? studentId;
+  final String? teacherId;
+  final String? subjectId;
+  final String? lessonTypeId;
+
+  // Пауза
+  final bool isPaused;
+  final DateTime? pauseUntil;
+
+  // Замена кабинета
+  final String? replacementRoomId;
+  final DateTime? replacementUntil;
+
+  // Вычисляемые
+  bool get isRecurring => recurrenceType == RecurrenceType.weekly;
+  bool get isStudentBooking => studentId != null;
+}
+```
+
+**БЕЗ автоматической генерации занятий:**
+- Занятия НЕ создаются автоматически при просмотре расписания
+- Создание занятия — только вручную через кнопку "Создать занятие"
+- Слоты всегда видны (пунктирная рамка), пока нет занятия на эту дату
+
+**Фильтрация слотов при наличии занятия:**
+```dart
+// Слот скрывается если есть занятие того же ученика в то же время
+final filteredSlots = scheduleSlots.where((slot) {
+  final hasLesson = lessonsList.any((lesson) {
+    if (lesson.studentId != slot.studentId) return false;
+    final effectiveRoomId = slot.getEffectiveRoomId(date);
+    if (lesson.roomId != effectiveRoomId) return false;
+    return slot.hasTimeOverlap(lesson.startTime, lesson.endTime);
+  });
+  return !hasLesson;
+}).toList();
+```
+
+**Создание занятия из слота:**
+1. Клик на слот (пунктирный блок) → открывается `_ScheduleSlotDetailSheet`
+2. Кнопка "Создать занятие на [дата]" → открывается форма с предзаполненными данными
+3. После создания слот скрывается (занятие его заменяет)
+4. На следующую неделю слот снова появится
+
+**SQL миграции:**
+- `supabase/migrations/20260111_unify_bookings_schedules.sql` — расширение таблицы bookings
+- `supabase/migrations/20260111_migrate_student_schedules_data.sql` — перенос данных
+
+**Удалённые файлы (deprecated):**
+- `lib/features/student_schedules/` — вся папка
+- `lib/shared/models/student_schedule.dart`
+
+**Ключевые файлы:**
+- `lib/features/bookings/models/booking.dart` — расширенная модель
+- `lib/features/bookings/repositories/booking_repository.dart` — CRUD + проверка конфликтов
+- `lib/features/bookings/providers/booking_provider.dart` — провайдеры и контроллер
+- `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — UI слотов и форм
+- `lib/features/students/screens/student_detail_screen.dart` — управление расписанием ученика
 
 ## CI/CD
 
