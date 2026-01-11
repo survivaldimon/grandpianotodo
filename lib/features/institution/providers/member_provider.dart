@@ -120,6 +120,27 @@ class MemberController extends StateNotifier<AsyncValue<void>> {
       return false;
     }
   }
+
+  /// Обновить кабинеты по умолчанию
+  /// [roomIds]: null = не настроено, [] = показывать все, [...] = выбранные
+  Future<bool> updateDefaultRooms(
+    String memberId,
+    String institutionId,
+    List<String>? roomIds,
+  ) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.updateMemberDefaultRooms(memberId, roomIds);
+      _ref.invalidate(membersProvider(institutionId));
+      _ref.invalidate(membersStreamProvider(institutionId));
+      _ref.invalidate(myMembershipProvider(institutionId));
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
 }
 
 /// Провайдер контроллера участников
@@ -158,4 +179,18 @@ final needsOnboardingProvider = Provider.family<bool, String>((ref, institutionI
   final hasSubjects = (subjectsAsync.valueOrNull?.length ?? 0) > 0;
 
   return !hasColor || !hasSubjects;
+});
+
+/// Провайдер проверки необходимости настройки кабинетов
+/// Возвращает true если пользователю нужно настроить кабинеты по умолчанию
+/// Возвращает false пока данные загружаются (чтобы промпт не мелькал)
+final needsRoomSetupProvider = Provider.family<bool, String>((ref, institutionId) {
+  final membershipAsync = ref.watch(myMembershipProvider(institutionId));
+  final membership = membershipAsync.valueOrNull;
+
+  // Пока membership загружается — не показываем промпт
+  if (membership == null) return false;
+
+  // Если defaultRoomIds == null — настройка не выполнена
+  return membership.defaultRoomIds == null;
 });

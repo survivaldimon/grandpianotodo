@@ -1052,6 +1052,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
   List<LessonConflict> _conflicts = [];
   bool _isCheckingConflicts = false;
   bool _isReassigning = false;
+  bool _hasCheckedConflicts = false; // Проверка завершена успешно
   List<Lesson>? _futureLessons;
 
   @override
@@ -1155,6 +1156,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                           setState(() {
                             _selectedTeacherId = value;
                             _conflicts = [];
+                            _hasCheckedConflicts = false; // Сбрасываем при смене преподавателя
                           });
                           if (value != null) {
                             _checkConflicts(value);
@@ -1294,7 +1296,11 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _selectedTeacherId != null && !_isReassigning
+                    // Кнопка активна только после успешной проверки конфликтов
+                    onPressed: _selectedTeacherId != null &&
+                            !_isReassigning &&
+                            !_isCheckingConflicts &&
+                            _hasCheckedConflicts
                         ? _reassignLessons
                         : null,
                     child: _isReassigning
@@ -1339,6 +1345,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
         setState(() {
           _conflicts = conflicts;
           _isCheckingConflicts = false;
+          _hasCheckedConflicts = true; // Проверка успешно завершена
         });
       }
     } catch (e) {
@@ -1346,6 +1353,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
         setState(() {
           _conflicts = [];
           _isCheckingConflicts = false;
+          _hasCheckedConflicts = false; // Проверка провалилась
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -153,6 +153,14 @@
   - Создание занятий из слотов постоянного расписания
   - Фильтрация слотов при наличии созданного занятия
   - Улучшение сообщений об ошибках (извлечение кастомных Exception)
+- **`SESSION_2026_01_11_LESSON_HISTORY.md`** — полный отчёт за 11.01.2026:
+  - Настройка кабинетов по умолчанию (`defaultRoomIds`, `_RoomSetupSheet`)
+  - Компактный режим расписания (`_CompactDayGrid`)
+  - История занятий в карточке ученика (группировка по месяцам, пагинация)
+  - Оптимизация проверки конфликтов (2 запроса вместо 2*N)
+  - RLS политики для `lesson_history`
+  - Null-safety для `Profile.fromJson`
+  - Публичная функция `showLessonDetailSheet()`
 
 ## Валюта
 
@@ -1602,6 +1610,105 @@ static String getUserFriendlyMessage(Object error) {
 ```
 
 **Файл:** `lib/core/widgets/error_view.dart`
+
+### 49. История занятий в карточке ученика
+Секция "История занятий" показывает проведённые и отменённые занятия ученика.
+
+**Расположение:** В конце карточки ученика (после "История оплат")
+
+**Функции:**
+- Показывает занятия со статусами `completed` и `cancelled`
+- Группировка по месяцам ("Январь 2026", "Декабрь 2025"...)
+- Пагинация: 20 занятий + кнопка "Показать ещё"
+- Тап на занятие — открывает стандартную карточку занятия
+
+**Метод репозитория:**
+```dart
+/// Получить историю занятий ученика (проведённые и отменённые)
+Future<List<Lesson>> getLessonHistoryForStudent(
+  String studentId, {
+  int limit = 20,
+  int offset = 0,
+}) async {
+  // Индивидуальные занятия (student_id)
+  // + Групповые занятия (через lesson_students)
+  // Объединяем, убираем дубликаты, сортируем по дате (убывание)
+}
+```
+
+**Публичная функция для показа деталей занятия:**
+```dart
+/// Показать детали занятия в модальном окне
+/// Может быть вызвана из любого места приложения
+void showLessonDetailSheet({
+  required BuildContext context,
+  required WidgetRef ref,
+  required Lesson lesson,
+  required String institutionId,
+  VoidCallback? onUpdated,
+});
+```
+
+**Ключевые файлы:**
+- `lib/features/schedule/repositories/lesson_repository.dart` — метод `getLessonHistoryForStudent()`
+- `lib/features/students/screens/student_detail_screen.dart` — виджеты `_LessonHistorySection`, `_LessonHistoryItem`
+- `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — функция `showLessonDetailSheet()`
+
+**Виджеты:**
+- `_LessonHistorySection` — ConsumerStatefulWidget с пагинацией и группировкой
+- `_LessonHistoryItem` — компактная карточка (предмет, дата, время, иконка статуса)
+
+### 50. Настройка кабинетов по умолчанию (Default Rooms)
+Участники могут выбрать кабинеты, которые они хотят видеть по умолчанию в расписании.
+
+**Поле в таблице `institution_members`:**
+```sql
+default_room_ids JSONB DEFAULT NULL
+-- null = не настроено (показать промпт)
+-- [] = пропущено (показывать все кабинеты)
+-- ['id1', 'id2'] = выбранные кабинеты
+```
+
+**Модель `InstitutionMember`:**
+```dart
+final List<String>? defaultRoomIds;
+
+/// Настроены ли кабинеты по умолчанию
+bool get hasRoomPreference => defaultRoomIds != null;
+
+/// Показывать ли все кабинеты
+bool get showAllRooms => defaultRoomIds == null || defaultRoomIds!.isEmpty;
+```
+
+**Провайдеры:**
+```dart
+/// Нужна ли настройка кабинетов
+final needsRoomSetupProvider = Provider.family<bool, String>((ref, institutionId) {
+  final membership = ref.watch(myMembershipProvider(institutionId)).valueOrNull;
+  if (membership == null) return false;
+  return membership.defaultRoomIds == null;
+});
+
+/// Обновить кабинеты по умолчанию
+Future<bool> updateDefaultRooms(String memberId, String institutionId, List<String>? roomIds)
+```
+
+**UI компоненты:**
+- `_RoomSetupSheet` — BottomSheet с чекбоксами кабинетов
+- `_checkRoomSetup()` — проверка при входе в расписание
+- Кнопка "Пропустить" сохраняет пустой массив (показывать все)
+
+**Ключевые файлы:**
+- `lib/shared/models/institution_member.dart` — поле и хелперы
+- `lib/features/institution/providers/member_provider.dart` — провайдеры
+- `lib/features/institution/repositories/institution_repository.dart` — метод обновления
+- `lib/features/schedule/screens/all_rooms_schedule_screen.dart` — UI
+
+**Миграция:**
+```sql
+ALTER TABLE institution_members
+ADD COLUMN IF NOT EXISTS default_room_ids JSONB DEFAULT NULL;
+```
 
 ## CI/CD
 

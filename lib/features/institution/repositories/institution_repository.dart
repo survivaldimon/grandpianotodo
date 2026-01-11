@@ -291,6 +291,24 @@ class InstitutionRepository {
     }
   }
 
+  /// Обновить кабинеты по умолчанию для участника
+  /// [roomIds]: null = не настроено, [] = показывать все, [...] = выбранные
+  Future<void> updateMemberDefaultRooms(String memberId, List<String>? roomIds) async {
+    try {
+      final result = await _client
+          .from('institution_members')
+          .update({'default_room_ids': roomIds})
+          .eq('id', memberId)
+          .select();
+
+      if ((result as List).isEmpty) {
+        throw const DatabaseException('Не удалось обновить кабинеты (RLS или запись не найдена)');
+      }
+    } catch (e) {
+      throw DatabaseException('Ошибка обновления кабинетов: $e');
+    }
+  }
+
   /// Удалить участника (архивация)
   Future<void> removeMember(String memberId) async {
     try {

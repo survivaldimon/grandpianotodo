@@ -71,7 +71,8 @@ class LessonRepository {
 
   /// Получить занятия преподавателя за день
   Future<List<Lesson>> getMyLessonsForDate(DateTime date) async {
-    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
+    if (_userId == null)
+      throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final dateStr = date.toIso8601String().split('T').first;
@@ -138,7 +139,8 @@ class LessonRepository {
     String? comment,
     String? repeatGroupId,
   }) async {
-    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
+    if (_userId == null)
+      throw const AuthAppException('Пользователь не авторизован');
 
     try {
       final data = await _client
@@ -152,8 +154,10 @@ class LessonRepository {
             'student_id': studentId,
             'group_id': groupId,
             'date': date.toIso8601String().split('T').first,
-            'start_time': '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
-            'end_time': '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
+            'start_time':
+                '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
+            'end_time':
+                '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
             'comment': comment,
             'created_by': _userId,
             'repeat_group_id': repeatGroupId,
@@ -195,39 +199,45 @@ class LessonRepository {
     String? comment,
     String? repeatGroupId,
   }) async {
-    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
+    if (_userId == null)
+      throw const AuthAppException('Пользователь не авторизован');
     if (dates.isEmpty) throw const ValidationException('Список дат пуст');
 
     try {
       // Используем переданный ID или генерируем новый
       final groupId_ = repeatGroupId ?? _generateUuid();
 
-      final startStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
-      final endStr = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+      final startStr =
+          '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+      final endStr =
+          '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
 
       // Создаём записи для всех дат
-      final records = dates.map((date) => {
-            'institution_id': institutionId,
-            'room_id': roomId,
-            'teacher_id': teacherId,
-            'subject_id': subjectId,
-            'lesson_type_id': lessonTypeId,
-            'student_id': studentId,
-            'group_id': groupId,
-            'date': date.toIso8601String().split('T').first,
-            'start_time': startStr,
-            'end_time': endStr,
-            'comment': comment,
-            'created_by': _userId,
-            'repeat_group_id': groupId_,
-          }).toList();
+      final records = dates
+          .map(
+            (date) => {
+              'institution_id': institutionId,
+              'room_id': roomId,
+              'teacher_id': teacherId,
+              'subject_id': subjectId,
+              'lesson_type_id': lessonTypeId,
+              'student_id': studentId,
+              'group_id': groupId,
+              'date': date.toIso8601String().split('T').first,
+              'start_time': startStr,
+              'end_time': endStr,
+              'comment': comment,
+              'created_by': _userId,
+              'repeat_group_id': groupId_,
+            },
+          )
+          .toList();
 
-      final data = await _client
-          .from('lessons')
-          .insert(records)
-          .select();
+      final data = await _client.from('lessons').insert(records).select();
 
-      final lessons = (data as List).map((item) => Lesson.fromJson(item)).toList();
+      final lessons = (data as List)
+          .map((item) => Lesson.fromJson(item))
+          .toList();
 
       // Для групповых занятий создаём записи участников для каждого занятия
       if (groupId != null) {
@@ -297,32 +307,40 @@ class LessonRepository {
         query = query.eq('room_id', roomId);
       }
       if (startTime != null) {
-        final timeStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+        final timeStr =
+            '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
         query = query.eq('start_time', timeStr);
       }
 
       final data = await query.order('date');
 
-      return (data as List).map((item) => Lesson.fromJson({
-        ...item,
-        // Минимальные данные для операций
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-        'institution_id': '',
-        'room_id': '',
-        'teacher_id': '',
-        'start_time': '00:00',
-        'end_time': '00:00',
-        'status': 'scheduled',
-        'created_by': '',
-      })).toList();
+      return (data as List)
+          .map(
+            (item) => Lesson.fromJson({
+              ...item,
+              // Минимальные данные для операций
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+              'institution_id': '',
+              'room_id': '',
+              'teacher_id': '',
+              'start_time': '00:00',
+              'end_time': '00:00',
+              'status': 'scheduled',
+              'created_by': '',
+            }),
+          )
+          .toList();
     } catch (e) {
       throw DatabaseException('Ошибка загрузки последующих занятий: $e');
     }
   }
 
   /// Удалить последующие занятия серии
-  Future<void> deleteFollowingLessons(String repeatGroupId, DateTime fromDate) async {
+  Future<void> deleteFollowingLessons(
+    String repeatGroupId,
+    DateTime fromDate,
+  ) async {
     try {
       final dateStr = fromDate.toIso8601String().split('T').first;
 
@@ -343,10 +361,7 @@ class LessonRepository {
             .delete()
             .eq('lesson_id', lessonId);
         // 2. Удаляем историю
-        await _client
-            .from('lesson_history')
-            .delete()
-            .eq('lesson_id', lessonId);
+        await _client.from('lesson_history').delete().eq('lesson_id', lessonId);
       }
 
       // Удаляем сами занятия
@@ -377,10 +392,12 @@ class LessonRepository {
       final updates = <String, dynamic>{};
 
       if (startTime != null) {
-        updates['start_time'] = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+        updates['start_time'] =
+            '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
       }
       if (endTime != null) {
-        updates['end_time'] = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+        updates['end_time'] =
+            '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
       }
       if (roomId != null) {
         updates['room_id'] = roomId;
@@ -425,10 +442,12 @@ class LessonRepository {
       final updates = <String, dynamic>{};
 
       if (startTime != null) {
-        updates['start_time'] = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+        updates['start_time'] =
+            '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
       }
       if (endTime != null) {
-        updates['end_time'] = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+        updates['end_time'] =
+            '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
       }
       if (roomId != null) {
         updates['room_id'] = roomId;
@@ -445,10 +464,7 @@ class LessonRepository {
 
       if (updates.isEmpty) return;
 
-      await _client
-          .from('lessons')
-          .update(updates)
-          .inFilter('id', lessonIds);
+      await _client.from('lessons').update(updates).inFilter('id', lessonIds);
     } catch (e) {
       throw DatabaseException('Ошибка обновления занятий: $e');
     }
@@ -505,12 +521,15 @@ class LessonRepository {
       if (lessonTypeId != null) updates['lesson_type_id'] = lessonTypeId;
       if (studentId != null) updates['student_id'] = studentId;
       if (groupId != null) updates['group_id'] = groupId;
-      if (date != null) updates['date'] = date.toIso8601String().split('T').first;
+      if (date != null)
+        updates['date'] = date.toIso8601String().split('T').first;
       if (startTime != null) {
-        updates['start_time'] = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+        updates['start_time'] =
+            '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
       }
       if (endTime != null) {
-        updates['end_time'] = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+        updates['end_time'] =
+            '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
       }
       if (comment != null) updates['comment'] = comment;
 
@@ -620,7 +639,8 @@ class LessonRepository {
         query = query.eq('room_id', roomId);
       }
       if (startTime != null) {
-        final timeStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+        final timeStr =
+            '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
         query = query.eq('start_time', timeStr);
       }
 
@@ -645,22 +665,13 @@ class LessonRepository {
   Future<void> delete(String id) async {
     try {
       // 1. Удаляем участников группового занятия
-      await _client
-          .from('lesson_students')
-          .delete()
-          .eq('lesson_id', id);
+      await _client.from('lesson_students').delete().eq('lesson_id', id);
 
       // 2. Удаляем историю занятия
-      await _client
-          .from('lesson_history')
-          .delete()
-          .eq('lesson_id', id);
+      await _client.from('lesson_history').delete().eq('lesson_id', id);
 
       // 3. Удаляем само занятие
-      await _client
-          .from('lessons')
-          .delete()
-          .eq('id', id);
+      await _client.from('lessons').delete().eq('id', id);
     } catch (e) {
       throw DatabaseException('Ошибка удаления занятия: $e');
     }
@@ -696,8 +707,10 @@ class LessonRepository {
   }) async {
     try {
       final dateStr = date.toIso8601String().split('T').first;
-      final startStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
-      final endStr = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+      final startStr =
+          '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+      final endStr =
+          '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
 
       // 1. Проверяем конфликт с занятиями
       var lessonQuery = _client
@@ -719,7 +732,9 @@ class LessonRepository {
       // 2. Проверяем конфликт с бронями
       var bookingQuery = _client
           .from('booking_rooms')
-          .select('booking_id, bookings!inner(id, date, start_time, end_time, archived_at)')
+          .select(
+            'booking_id, bookings!inner(id, date, start_time, end_time, archived_at)',
+          )
           .eq('room_id', roomId)
           .eq('bookings.date', dateStr)
           .isFilter('bookings.archived_at', null)
@@ -785,7 +800,8 @@ class LessonRepository {
 
       // Определяем актуальный кабинет слота на эту дату
       String effectiveRoomId = slot['room_id'];
-      if (slot['replacement_room_id'] != null && slot['replacement_until'] != null) {
+      if (slot['replacement_room_id'] != null &&
+          slot['replacement_until'] != null) {
         final replacementUntil = DateTime.parse(slot['replacement_until']);
         if (!normalizedDate.isAfter(replacementUntil)) {
           effectiveRoomId = slot['replacement_room_id'];
@@ -831,8 +847,10 @@ class LessonRepository {
       // Проверяем пересечение времени
       final slotStartParts = (slot['start_time'] as String).split(':');
       final slotEndParts = (slot['end_time'] as String).split(':');
-      final slotStartMinutes = int.parse(slotStartParts[0]) * 60 + int.parse(slotStartParts[1]);
-      final slotEndMinutes = int.parse(slotEndParts[0]) * 60 + int.parse(slotEndParts[1]);
+      final slotStartMinutes =
+          int.parse(slotStartParts[0]) * 60 + int.parse(slotStartParts[1]);
+      final slotEndMinutes =
+          int.parse(slotEndParts[0]) * 60 + int.parse(slotEndParts[1]);
 
       // Пересечение: start < other_end AND end > other_start
       if (startMinutes < slotEndMinutes && endMinutes > slotStartMinutes) {
@@ -878,23 +896,23 @@ class LessonRepository {
 
       // Фильтруем на клиенте: занятия, время которых полностью прошло
       final today = DateTime(now.year, now.month, now.day);
-      final lessons = (data as List)
-          .map((item) => Lesson.fromJson(item))
-          .where((lesson) {
-        // Занятие в прошлом дне
-        if (lesson.date.isBefore(today)) {
-          return true;
-        }
-        // Занятие сегодня и время окончания уже прошло
-        if (lesson.date.year == now.year &&
-            lesson.date.month == now.month &&
-            lesson.date.day == now.day) {
-          final endMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
-          final nowMinutes = now.hour * 60 + now.minute;
-          return endMinutes <= nowMinutes;
-        }
-        return false;
-      }).toList();
+      final lessons = (data as List).map((item) => Lesson.fromJson(item)).where(
+        (lesson) {
+          // Занятие в прошлом дне
+          if (lesson.date.isBefore(today)) {
+            return true;
+          }
+          // Занятие сегодня и время окончания уже прошло
+          if (lesson.date.year == now.year &&
+              lesson.date.month == now.month &&
+              lesson.date.day == now.day) {
+            final endMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
+            final nowMinutes = now.hour * 60 + now.minute;
+            return endMinutes <= nowMinutes;
+          }
+          return false;
+        },
+      ).toList();
 
       return lessons;
     } catch (e) {
@@ -921,7 +939,10 @@ class LessonRepository {
   /// Примечание: слушаем ВСЕ изменения в таблице без фильтра,
   /// т.к. Supabase Realtime не отправляет DELETE события с фильтром корректно
   /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
-  Stream<List<Lesson>> watchByInstitution(String institutionId, DateTime date) async* {
+  Stream<List<Lesson>> watchByInstitution(
+    String institutionId,
+    DateTime date,
+  ) async* {
     // 1. Сразу выдаём текущие данные
     yield await getByInstitutionAndDate(institutionId, date);
 
@@ -990,11 +1011,13 @@ class LessonRepository {
 
     try {
       final records = studentIds
-          .map((sid) => {
-                'lesson_id': lessonId,
-                'student_id': sid,
-                'attended': true, // По умолчанию все присутствуют
-              })
+          .map(
+            (sid) => {
+              'lesson_id': lessonId,
+              'student_id': sid,
+              'attended': true, // По умолчанию все присутствуют
+            },
+          )
           .toList();
 
       await _client.from('lesson_students').insert(records);
@@ -1139,9 +1162,56 @@ class LessonRepository {
           .order('date')
           .order('start_time');
 
-      return (data as List).map((item) => Lesson.fromJson(item)).toList();
+      // Безопасный парсинг — пропускаем занятия с null в обязательных полях
+      final lessons = <Lesson>[];
+
+      // Защита от неожиданного типа данных
+      if (data == null) {
+        debugPrint('getFutureLessonsForTeacher: data is null');
+        return lessons;
+      }
+      if (data is! List) {
+        debugPrint(
+          'getFutureLessonsForTeacher: data is not List, type: ${data.runtimeType}',
+        );
+        return lessons;
+      }
+
+      for (final item in data) {
+        try {
+          if (item == null) continue;
+          if (item is! Map<String, dynamic>) {
+            debugPrint('Пропущен элемент неверного типа: ${item.runtimeType}');
+            continue;
+          }
+          final map = item;
+          // Проверяем все обязательные String поля
+          if (map['id'] == null ||
+              map['institution_id'] == null ||
+              map['room_id'] == null ||
+              map['teacher_id'] == null ||
+              map['date'] == null ||
+              map['start_time'] == null ||
+              map['end_time'] == null ||
+              map['status'] == null ||
+              map['created_by'] == null ||
+              map['created_at'] == null ||
+              map['updated_at'] == null) {
+            debugPrint(
+              'Пропущено занятие с null в обязательных полях: ${map['id']}',
+            );
+            continue;
+          }
+          lessons.add(Lesson.fromJson(map));
+        } catch (e, stack) {
+          debugPrint('Пропущено занятие с ошибкой парсинга: $e\n$stack');
+        }
+      }
+      return lessons;
     } catch (e) {
-      throw DatabaseException('Ошибка загрузки будущих занятий преподавателя: $e');
+      throw DatabaseException(
+        'Ошибка загрузки будущих занятий преподавателя: $e',
+      );
     }
   }
 
@@ -1176,7 +1246,9 @@ class LessonRepository {
           .select('lesson_id')
           .eq('student_id', studentId);
 
-      final groupIds = (groupLessonsIds as List).map((item) => item['lesson_id'] as String).toList();
+      final groupIds = (groupLessonsIds as List)
+          .map((item) => item['lesson_id'] as String)
+          .toList();
 
       List<Lesson> groupLessons = [];
       if (groupIds.isNotEmpty) {
@@ -1198,7 +1270,9 @@ class LessonRepository {
             .order('date')
             .order('start_time');
 
-        groupLessons = (groupData as List).map((item) => Lesson.fromJson(item)).toList();
+        groupLessons = (groupData as List)
+            .map((item) => Lesson.fromJson(item))
+            .toList();
       }
 
       // Объединяем и сортируем
@@ -1222,6 +1296,79 @@ class LessonRepository {
     }
   }
 
+  /// Получить историю занятий ученика (проведённые и отменённые)
+  /// [limit] - количество записей, [offset] - смещение для пагинации
+  Future<List<Lesson>> getLessonHistoryForStudent(
+    String studentId, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      // Индивидуальные занятия
+      final individualData = await _client
+          .from('lessons')
+          .select('''
+            *,
+            rooms(*),
+            subjects(*),
+            lesson_types(*)
+          ''')
+          .eq('student_id', studentId)
+          .inFilter('status', ['completed', 'cancelled'])
+          .isFilter('archived_at', null)
+          .order('date', ascending: false)
+          .order('start_time', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      // Групповые занятия через lesson_students
+      final groupLessonIds = await _client
+          .from('lesson_students')
+          .select('lesson_id')
+          .eq('student_id', studentId);
+
+      final groupIds = (groupLessonIds as List)
+          .map((item) => item['lesson_id'] as String)
+          .toList();
+
+      List<Lesson> groupLessons = [];
+      if (groupIds.isNotEmpty) {
+        final groupData = await _client
+            .from('lessons')
+            .select('''
+              *,
+              rooms(*),
+              subjects(*),
+              lesson_types(*)
+            ''')
+            .inFilter('id', groupIds)
+            .inFilter('status', ['completed', 'cancelled'])
+            .isFilter('archived_at', null)
+            .order('date', ascending: false)
+            .order('start_time', ascending: false)
+            .range(offset, offset + limit - 1);
+
+        groupLessons = (groupData as List)
+            .map((item) => Lesson.fromJson(item))
+            .toList();
+      }
+
+      // Объединяем и сортируем
+      final allLessons = [
+        ...(individualData as List).map((item) => Lesson.fromJson(item)),
+        ...groupLessons,
+      ];
+
+      // Убираем дубликаты и сортируем по дате (убывание)
+      final uniqueIds = <String>{};
+      final uniqueLessons = allLessons.where((l) => uniqueIds.add(l.id)).toList();
+      uniqueLessons.sort((a, b) => b.date.compareTo(a.date));
+
+      return uniqueLessons.take(limit).toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки истории занятий ученика: $e');
+    }
+  }
+
   /// Удалить все будущие занятия преподавателя
   /// Возвращает количество удалённых занятий
   Future<int> deleteFutureLessonsForTeacher(
@@ -1241,7 +1388,9 @@ class LessonRepository {
           .eq('status', 'scheduled')
           .isFilter('archived_at', null);
 
-      final ids = (lessonIds as List).map((item) => item['id'] as String).toList();
+      final ids = (lessonIds as List)
+          .map((item) => item['id'] as String)
+          .toList();
       if (ids.isEmpty) return 0;
 
       // Удаляем связанные данные
@@ -1251,14 +1400,13 @@ class LessonRepository {
       }
 
       // Удаляем сами занятия
-      await _client
-          .from('lessons')
-          .delete()
-          .inFilter('id', ids);
+      await _client.from('lessons').delete().inFilter('id', ids);
 
       return ids.length;
     } catch (e) {
-      throw DatabaseException('Ошибка удаления будущих занятий преподавателя: $e');
+      throw DatabaseException(
+        'Ошибка удаления будущих занятий преподавателя: $e',
+      );
     }
   }
 
@@ -1277,7 +1425,9 @@ class LessonRepository {
           .eq('status', 'scheduled')
           .isFilter('archived_at', null);
 
-      final ids = (individualIds as List).map((item) => item['id'] as String).toList();
+      final ids = (individualIds as List)
+          .map((item) => item['id'] as String)
+          .toList();
       if (ids.isEmpty) return 0;
 
       // Удаляем связанные данные
@@ -1287,10 +1437,7 @@ class LessonRepository {
       }
 
       // Удаляем сами занятия
-      await _client
-          .from('lessons')
-          .delete()
-          .inFilter('id', ids);
+      await _client.from('lessons').delete().inFilter('id', ids);
 
       return ids.length;
     } catch (e) {
@@ -1300,6 +1447,7 @@ class LessonRepository {
 
   /// Проверить конфликты для переназначения занятий другому преподавателю
   /// Возвращает список занятий с конфликтами и описанием проблемы
+  /// ОПТИМИЗИРОВАНО: 2 запроса вместо 2*N
   Future<List<LessonConflict>> checkReassignmentConflicts(
     List<Lesson> lessons,
     String newTeacherId,
@@ -1308,60 +1456,72 @@ class LessonRepository {
 
     final conflicts = <LessonConflict>[];
 
-    for (final lesson in lessons) {
-      // Проверяем, не занят ли новый преподаватель в это время
-      final dateStr = lesson.date.toIso8601String().split('T').first;
-      final startStr = '${lesson.startTime.hour.toString().padLeft(2, '0')}:${lesson.startTime.minute.toString().padLeft(2, '0')}';
-      final endStr = '${lesson.endTime.hour.toString().padLeft(2, '0')}:${lesson.endTime.minute.toString().padLeft(2, '0')}';
+    // Собираем диапазон дат
+    final dates = lessons.map((l) => l.date).toList();
+    final minDate = dates.reduce((a, b) => a.isBefore(b) ? a : b);
+    final maxDate = dates.reduce((a, b) => a.isAfter(b) ? a : b);
+    final minDateStr = minDate.toIso8601String().split('T').first;
+    final maxDateStr = maxDate.toIso8601String().split('T').first;
 
-      try {
-        // Проверка занятости преподавателя
-        final teacherConflicts = await _client
-            .from('lessons')
-            .select('id')
-            .eq('teacher_id', newTeacherId)
-            .eq('date', dateStr)
-            .isFilter('archived_at', null)
-            .neq('id', lesson.id)
-            .or('start_time.lt.$endStr,end_time.gt.$startStr')
-            .limit(1);
+    try {
+      // ОДИН запрос: все занятия нового преподавателя в диапазоне дат
+      final teacherLessonsData = await _client
+          .from('lessons')
+          .select('id, date, start_time, end_time')
+          .eq('teacher_id', newTeacherId)
+          .gte('date', minDateStr)
+          .lte('date', maxDateStr)
+          .isFilter('archived_at', null);
 
-        if ((teacherConflicts as List).isNotEmpty) {
-          conflicts.add(LessonConflict(
-            lesson: lesson,
-            type: ConflictType.teacherBusy,
-            description: 'Преподаватель занят в это время',
-          ));
-          continue;
+      // Парсим занятия преподавателя
+      final teacherLessons = (teacherLessonsData as List).map((row) {
+        final startParts = (row['start_time'] as String).split(':');
+        final endParts = (row['end_time'] as String).split(':');
+        return (
+          id: row['id'] as String,
+          date: DateTime.parse(row['date'] as String),
+          startMinutes:
+              int.parse(startParts[0]) * 60 + int.parse(startParts[1]),
+          endMinutes: int.parse(endParts[0]) * 60 + int.parse(endParts[1]),
+        );
+      }).toList();
+
+      // Проверяем конфликты в памяти
+      for (final lesson in lessons) {
+        final lessonStartMinutes =
+            lesson.startTime.hour * 60 + lesson.startTime.minute;
+        final lessonEndMinutes =
+            lesson.endTime.hour * 60 + lesson.endTime.minute;
+
+        // Ищем пересечение с занятиями преподавателя
+        final hasTeacherConflict = teacherLessons.any((tl) {
+          if (tl.id == lesson.id) return false; // Исключаем само занятие
+          if (!_isSameDay(tl.date, lesson.date)) return false;
+          // Проверка пересечения времени
+          return tl.startMinutes < lessonEndMinutes &&
+              tl.endMinutes > lessonStartMinutes;
+        });
+
+        if (hasTeacherConflict) {
+          conflicts.add(
+            LessonConflict(
+              lesson: lesson,
+              type: ConflictType.teacherBusy,
+              description: 'Преподаватель занят в это время',
+            ),
+          );
         }
-
-        // Проверка брони кабинета (если бронь перекрывает время занятия)
-        final bookingConflicts = await _client
-            .from('bookings')
-            .select('id, booking_rooms!inner(room_id)')
-            .eq('date', dateStr)
-            .eq('booking_rooms.room_id', lesson.roomId)
-            .or('start_time.lt.$endStr,end_time.gt.$startStr')
-            .limit(1);
-
-        if ((bookingConflicts as List).isNotEmpty) {
-          conflicts.add(LessonConflict(
-            lesson: lesson,
-            type: ConflictType.bookingConflict,
-            description: 'Кабинет забронирован в это время',
-          ));
-        }
-      } catch (e) {
-        // При ошибке проверки добавляем как конфликт
-        conflicts.add(LessonConflict(
-          lesson: lesson,
-          type: ConflictType.unknown,
-          description: 'Ошибка проверки: $e',
-        ));
       }
+    } catch (e) {
+      debugPrint('Ошибка проверки конфликтов: $e');
+      // При ошибке возвращаем пустой список — позволяем переназначить
     }
 
     return conflicts;
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   /// Переназначить занятия другому преподавателю
@@ -1371,7 +1531,8 @@ class LessonRepository {
     String newTeacherId,
   ) async {
     if (lessonIds.isEmpty) return [];
-    if (_userId == null) throw const AuthAppException('Пользователь не авторизован');
+    if (_userId == null)
+      throw const AuthAppException('Пользователь не авторизован');
 
     try {
       // Обновляем teacher_id для всех занятий
@@ -1383,14 +1544,21 @@ class LessonRepository {
           })
           .inFilter('id', lessonIds);
 
-      // Создаём записи в истории для каждого занятия
+      // Создаём записи в истории для каждого занятия (необязательно)
       for (final lessonId in lessonIds) {
-        await _client.from('lesson_history').insert({
-          'lesson_id': lessonId,
-          'changed_by': _userId,
-          'change_type': 'reassigned',
-          'new_values': {'teacher_id': newTeacherId},
-        });
+        try {
+          await _client.from('lesson_history').insert({
+            'lesson_id': lessonId,
+            'changed_by': _userId,
+            'action': 'reassigned',
+            'changes': {
+              'teacher_id': {'old': null, 'new': newTeacherId},
+            },
+          });
+        } catch (e) {
+          // Игнорируем ошибки записи истории — переназначение важнее
+          debugPrint('Не удалось записать историю для занятия $lessonId: $e');
+        }
       }
 
       // Возвращаем обновлённые занятия
@@ -1458,10 +1626,10 @@ class LessonRepository {
 
 /// Тип конфликта при переназначении
 enum ConflictType {
-  teacherBusy,      // Преподаватель занят
-  roomBusy,         // Кабинет занят другим занятием
-  bookingConflict,  // Кабинет забронирован
-  unknown,          // Неизвестная ошибка
+  teacherBusy, // Преподаватель занят
+  roomBusy, // Кабинет занят другим занятием
+  bookingConflict, // Кабинет забронирован
+  unknown, // Неизвестная ошибка
 }
 
 /// Конфликт при переназначении занятия

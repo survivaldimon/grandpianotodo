@@ -220,6 +220,12 @@ class InstitutionMember {
   /// Цвет для отображения в расписании (hex, например '4CAF50')
   final String? color;
 
+  /// Кабинеты по умолчанию для расписания
+  /// null = не настроено (показать промпт)
+  /// [] = пропущено (показывать все кабинеты)
+  /// ['id1', 'id2'] = выбранные кабинеты
+  final List<String>? defaultRoomIds;
+
   /// Профиль пользователя (join)
   final Profile? profile;
 
@@ -233,10 +239,17 @@ class InstitutionMember {
     required this.joinedAt,
     this.archivedAt,
     this.color,
+    this.defaultRoomIds,
     this.profile,
   });
 
   bool get isArchived => archivedAt != null;
+
+  /// Настроены ли кабинеты по умолчанию
+  bool get hasRoomPreference => defaultRoomIds != null;
+
+  /// Показывать ли все кабинеты (пусто или не настроено)
+  bool get showAllRooms => defaultRoomIds == null || defaultRoomIds!.isEmpty;
 
   factory InstitutionMember.fromJson(Map<String, dynamic> json) =>
       InstitutionMember(
@@ -252,6 +265,9 @@ class InstitutionMember {
             ? DateTime.parse(json['archived_at'] as String)
             : null,
         color: json['color'] as String?,
+        defaultRoomIds: json['default_room_ids'] != null
+            ? List<String>.from(json['default_room_ids'] as List)
+            : null,
         profile: json['profiles'] != null
             ? Profile.fromJson(json['profiles'] as Map<String, dynamic>)
             : null,
@@ -272,6 +288,7 @@ class InstitutionMember {
         joinedAt: member.joinedAt,
         archivedAt: member.archivedAt,
         color: member.color,
+        defaultRoomIds: member.defaultRoomIds,
         profile: Profile.fromJson(profileData),
       );
 

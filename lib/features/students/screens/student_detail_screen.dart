@@ -33,6 +33,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kabinet/features/students/widgets/merge_students_dialog.dart';
 import 'package:kabinet/features/schedule/repositories/lesson_repository.dart';
 import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
+import 'package:kabinet/features/schedule/screens/all_rooms_schedule_screen.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 
@@ -51,7 +52,9 @@ class StudentDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final studentAsync = ref.watch(studentProvider(studentId));
     final paymentsAsync = ref.watch(studentPaymentsProvider(studentId));
-    final subscriptionsAsync = ref.watch(allSubscriptionsStreamProvider(studentId));
+    final subscriptionsAsync = ref.watch(
+      allSubscriptionsStreamProvider(studentId),
+    );
 
     return studentAsync.when(
       loading: () => const Scaffold(body: LoadingIndicator()),
@@ -66,10 +69,12 @@ class StudentDetailScreen extends ConsumerWidget {
         final hasDebt = student.balance < 0;
         // Проверяем права
         final permissions = ref.watch(myPermissionsProvider(institutionId));
-        final institutionAsync = ref.watch(currentInstitutionProvider(institutionId));
-        final isMyStudentAsync = ref.watch(isMyStudentProvider(
-          IsMyStudentParams(studentId, institutionId),
-        ));
+        final institutionAsync = ref.watch(
+          currentInstitutionProvider(institutionId),
+        );
+        final isMyStudentAsync = ref.watch(
+          isMyStudentProvider(IsMyStudentParams(studentId, institutionId)),
+        );
 
         // Проверяем права на редактирование ученика
         final isOwner = institutionAsync.maybeWhen(
@@ -82,14 +87,14 @@ class StudentDetailScreen extends ConsumerWidget {
           data: (v) => v,
           orElse: () => false,
         );
-        final canEditStudent = hasFullAccess ||
+        final canEditStudent =
+            hasFullAccess ||
             (permissions?.manageAllStudents ?? false) ||
             (isMyStudent && (permissions?.manageOwnStudents ?? false));
 
         // Право архивировать: владелец, или есть права archiveData, или свой ученик
-        final canArchive = isOwner ||
-            (permissions?.archiveData ?? false) ||
-            isMyStudent;
+        final canArchive =
+            isOwner || (permissions?.archiveData ?? false) || isMyStudent;
 
         return Scaffold(
           appBar: AppBar(
@@ -136,7 +141,10 @@ class StudentDetailScreen extends ConsumerWidget {
                             children: [
                               Icon(Icons.unarchive, color: Colors.green),
                               SizedBox(width: 8),
-                              Text('Разархивировать', style: TextStyle(color: Colors.green)),
+                              Text(
+                                'Разархивировать',
+                                style: TextStyle(color: Colors.green),
+                              ),
                             ],
                           ),
                         ),
@@ -146,7 +154,10 @@ class StudentDetailScreen extends ConsumerWidget {
                             children: [
                               Icon(Icons.delete_forever, color: Colors.red),
                               SizedBox(width: 8),
-                              Text('Удалить навсегда', style: TextStyle(color: Colors.red)),
+                              Text(
+                                'Удалить навсегда',
+                                style: TextStyle(color: Colors.red),
+                              ),
                             ],
                           ),
                         ),
@@ -157,7 +168,10 @@ class StudentDetailScreen extends ConsumerWidget {
                             children: [
                               Icon(Icons.archive, color: Colors.orange),
                               SizedBox(width: 8),
-                              Text('Архивировать', style: TextStyle(color: Colors.orange)),
+                              Text(
+                                'Архивировать',
+                                style: TextStyle(color: Colors.orange),
+                              ),
                             ],
                           ),
                         ),
@@ -183,7 +197,9 @@ class StudentDetailScreen extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -201,7 +217,9 @@ class StudentDetailScreen extends ConsumerWidget {
                                 ),
                               ),
                               Text(
-                                DateFormat('dd.MM.yyyy').format(student.archivedAt!),
+                                DateFormat(
+                                  'dd.MM.yyyy',
+                                ).format(student.archivedAt!),
                                 style: TextStyle(
                                   color: Colors.orange.shade700,
                                   fontSize: 13,
@@ -230,7 +248,10 @@ class StudentDetailScreen extends ConsumerWidget {
                         if (student.phone != null) ...[
                           Row(
                             children: [
-                              const Icon(Icons.phone, color: AppColors.textSecondary),
+                              const Icon(
+                                Icons.phone,
+                                color: AppColors.textSecondary,
+                              ),
                               const SizedBox(width: 12),
                               Text(
                                 student.phone!,
@@ -243,9 +264,8 @@ class StudentDetailScreen extends ConsumerWidget {
                         if (student.comment != null) ...[
                           Text(
                             'Комментарий:',
-                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(color: AppColors.textSecondary),
                           ),
                           const SizedBox(height: 4),
                           Text(student.comment!),
@@ -266,11 +286,14 @@ class StudentDetailScreen extends ConsumerWidget {
                   student: student,
                   hasDebt: hasDebt,
                   studentId: studentId,
-                  onAddPayment: canEditStudent ? () => _showAddPaymentDialog(context, ref) : null,
+                  onAddPayment: canEditStudent
+                      ? () => _showAddPaymentDialog(context, ref)
+                      : null,
                   onManageLessons: canEditStudent && !student.isArchived
                       ? () => _showBulkLessonActionsSheet(context, ref, student)
                       : null,
-                  showAvgCost: hasFullAccess, // Только владелец/админ видит среднюю стоимость
+                  showAvgCost:
+                      hasFullAccess, // Только владелец/админ видит среднюю стоимость
                 ),
                 const SizedBox(height: 16),
 
@@ -285,7 +308,8 @@ class StudentDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 subscriptionsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, _) => ErrorView.inline(e),
                   data: (subscriptions) {
                     if (subscriptions.isEmpty) {
@@ -300,13 +324,24 @@ class StudentDetailScreen extends ConsumerWidget {
                       );
                     }
                     return Column(
-                      children: subscriptions.map((sub) => _SubscriptionCard(
-                        subscription: sub,
-                        currentStudentId: studentId,
-                        onFreeze: canEditStudent ? () => _showFreezeDialog(context, ref, sub) : null,
-                        onUnfreeze: canEditStudent ? () => _unfreezeSubscription(context, ref, sub) : null,
-                        onExtend: canEditStudent ? () => _showExtendDialog(context, ref, sub) : null,
-                      )).toList(),
+                      children: subscriptions
+                          .map(
+                            (sub) => _SubscriptionCard(
+                              subscription: sub,
+                              currentStudentId: studentId,
+                              onFreeze: canEditStudent
+                                  ? () => _showFreezeDialog(context, ref, sub)
+                                  : null,
+                              onUnfreeze: canEditStudent
+                                  ? () =>
+                                        _unfreezeSubscription(context, ref, sub)
+                                  : null,
+                              onExtend: canEditStudent
+                                  ? () => _showExtendDialog(context, ref, sub)
+                                  : null,
+                            ),
+                          )
+                          .toList(),
                     );
                   },
                 ),
@@ -351,7 +386,8 @@ class StudentDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 paymentsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, _) => ErrorView.inline(e),
                   data: (payments) {
                     if (payments.isEmpty) {
@@ -361,9 +397,19 @@ class StudentDetailScreen extends ConsumerWidget {
                       );
                     }
                     return Column(
-                      children: payments.map((p) => _PaymentItem(payment: p)).toList(),
+                      children: payments
+                          .map((p) => _PaymentItem(payment: p))
+                          .toList(),
                     );
                   },
+                ),
+
+                const SizedBox(height: 24),
+
+                // История занятий
+                _LessonHistorySection(
+                  studentId: studentId,
+                  institutionId: institutionId,
                 ),
               ],
             ),
@@ -373,13 +419,19 @@ class StudentDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showEditStudentDialog(BuildContext context, WidgetRef ref, Student student) {
+  void _showEditStudentDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Student student,
+  ) {
     final nameController = TextEditingController(text: student.name);
     // Автозаполнение кода страны если телефон пустой
     final prefix = ref.read(phoneDefaultPrefixProvider);
     final phoneText = student.phone ?? (prefix.isNotEmpty ? '$prefix ' : '');
     final phoneController = TextEditingController(text: phoneText);
-    final commentController = TextEditingController(text: student.comment ?? '');
+    final commentController = TextEditingController(
+      text: student.comment ?? '',
+    );
     final legacyBalanceController = TextEditingController(
       text: student.legacyBalance > 0 ? student.legacyBalance.toString() : '',
     );
@@ -398,7 +450,8 @@ class StudentDetailScreen extends ConsumerWidget {
                 TextFormField(
                   controller: nameController,
                   decoration: const InputDecoration(labelText: 'ФИО'),
-                  validator: (v) => v == null || v.isEmpty ? 'Введите имя' : null,
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Введите имя' : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -439,13 +492,19 @@ class StudentDetailScreen extends ConsumerWidget {
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 final controller = ref.read(studentControllerProvider.notifier);
-                final legacyBalance = int.tryParse(legacyBalanceController.text.trim());
+                final legacyBalance = int.tryParse(
+                  legacyBalanceController.text.trim(),
+                );
                 final success = await controller.update(
                   studentId,
                   institutionId: institutionId,
                   name: nameController.text.trim(),
-                  phone: phoneController.text.isEmpty ? null : phoneController.text.trim(),
-                  comment: commentController.text.isEmpty ? null : commentController.text.trim(),
+                  phone: phoneController.text.isEmpty
+                      ? null
+                      : phoneController.text.trim(),
+                  comment: commentController.text.isEmpty
+                      ? null
+                      : commentController.text.trim(),
                   legacyBalance: legacyBalance,
                 );
                 if (success && context.mounted) {
@@ -463,7 +522,11 @@ class StudentDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showBulkLessonActionsSheet(BuildContext context, WidgetRef ref, Student student) {
+  void _showBulkLessonActionsSheet(
+    BuildContext context,
+    WidgetRef ref,
+    Student student,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -495,7 +558,10 @@ class StudentDetailScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               final controller = ref.read(studentControllerProvider.notifier);
-              final success = await controller.archive(studentId, institutionId);
+              final success = await controller.archive(
+                studentId,
+                institutionId,
+              );
               if (success && context.mounted) {
                 Navigator.pop(context);
                 context.pop();
@@ -530,7 +596,10 @@ class StudentDetailScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               final controller = ref.read(studentControllerProvider.notifier);
-              final success = await controller.restore(studentId, institutionId);
+              final success = await controller.restore(
+                studentId,
+                institutionId,
+              );
               if (success && context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -551,7 +620,11 @@ class StudentDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmDeleteCompletely(BuildContext context, WidgetRef ref, Student student) {
+  void _confirmDeleteCompletely(
+    BuildContext context,
+    WidgetRef ref,
+    Student student,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -609,7 +682,10 @@ class StudentDetailScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               final controller = ref.read(studentControllerProvider.notifier);
-              final success = await controller.deleteCompletely(studentId, institutionId);
+              final success = await controller.deleteCompletely(
+                studentId,
+                institutionId,
+              );
               if (success && context.mounted) {
                 Navigator.pop(context); // Закрыть диалог
                 context.pop(); // Вернуться к списку учеников
@@ -649,7 +725,11 @@ class StudentDetailScreen extends ConsumerWidget {
   }
 
   /// Показать диалог выбора учеников для объединения
-  void _showMergeWithDialog(BuildContext context, WidgetRef ref, Student currentStudent) {
+  void _showMergeWithDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Student currentStudent,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -670,14 +750,20 @@ class StudentDetailScreen extends ConsumerWidget {
           );
           // Если создан новый ученик — переходим к нему
           if (newStudent != null && context.mounted) {
-            context.go('/institutions/$institutionId/students/${newStudent.id}');
+            context.go(
+              '/institutions/$institutionId/students/${newStudent.id}',
+            );
           }
         },
       ),
     );
   }
 
-  void _showFreezeDialog(BuildContext context, WidgetRef ref, Subscription subscription) {
+  void _showFreezeDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Subscription subscription,
+  ) {
     final daysController = TextEditingController(text: '14');
     final formKey = GlobalKey<FormState>();
 
@@ -693,9 +779,9 @@ class StudentDetailScreen extends ConsumerWidget {
               Text(
                 'При заморозке срок действия абонемента приостанавливается. '
                 'После разморозки срок будет продлён на количество дней заморозки.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -725,7 +811,9 @@ class StudentDetailScreen extends ConsumerWidget {
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
-                final controller = ref.read(subscriptionControllerProvider.notifier);
+                final controller = ref.read(
+                  subscriptionControllerProvider.notifier,
+                );
                 final result = await controller.freeze(
                   subscription.id,
                   studentId,
@@ -746,19 +834,29 @@ class StudentDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _unfreezeSubscription(BuildContext context, WidgetRef ref, Subscription subscription) async {
+  void _unfreezeSubscription(
+    BuildContext context,
+    WidgetRef ref,
+    Subscription subscription,
+  ) async {
     final controller = ref.read(subscriptionControllerProvider.notifier);
     final result = await controller.unfreeze(subscription.id, studentId);
     if (result != null && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Абонемент разморожен. Срок продлён до ${DateFormat('dd.MM.yyyy').format(result.expiresAt)}'),
+          content: Text(
+            'Абонемент разморожен. Срок продлён до ${DateFormat('dd.MM.yyyy').format(result.expiresAt)}',
+          ),
         ),
       );
     }
   }
 
-  void _showExtendDialog(BuildContext context, WidgetRef ref, Subscription subscription) {
+  void _showExtendDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Subscription subscription,
+  ) {
     final daysController = TextEditingController(text: '7');
     final formKey = GlobalKey<FormState>();
 
@@ -773,9 +871,9 @@ class StudentDetailScreen extends ConsumerWidget {
             children: [
               Text(
                 'Текущий срок: до ${DateFormat('dd.MM.yyyy').format(subscription.expiresAt)}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -805,7 +903,9 @@ class StudentDetailScreen extends ConsumerWidget {
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
-                final controller = ref.read(subscriptionControllerProvider.notifier);
+                final controller = ref.read(
+                  subscriptionControllerProvider.notifier,
+                );
                 final result = await controller.extend(
                   subscription.id,
                   studentId,
@@ -815,7 +915,9 @@ class StudentDetailScreen extends ConsumerWidget {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Срок продлён до ${DateFormat('dd.MM.yyyy').format(result.expiresAt)}'),
+                      content: Text(
+                        'Срок продлён до ${DateFormat('dd.MM.yyyy').format(result.expiresAt)}',
+                      ),
                     ),
                   );
                 }
@@ -853,7 +955,9 @@ class _BalanceAndCostCard extends ConsumerWidget {
     final formatter = NumberFormat('#,###', 'ru_RU');
 
     return Card(
-      color: (hasDebt ? AppColors.error : AppColors.primary).withValues(alpha: 0.1),
+      color: (hasDebt ? AppColors.error : AppColors.primary).withValues(
+        alpha: 0.1,
+      ),
       child: Padding(
         padding: AppSizes.paddingAllL,
         child: Column(
@@ -868,30 +972,34 @@ class _BalanceAndCostCard extends ConsumerWidget {
                       Text(
                         AppStrings.prepaidLessons.toUpperCase(),
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                          color: AppColors.textSecondary,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         student.balance.toString(),
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: hasDebt ? AppColors.error : AppColors.primary,
+                              color: hasDebt
+                                  ? AppColors.error
+                                  : AppColors.primary,
                             ),
                       ),
                       Text(
                         'занятий',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       // Разбивка баланса если есть legacy
                       if (student.hasLegacyBalance) ...[
                         const SizedBox(height: 8),
                         Text(
                           'из абонементов: ${student.subscriptionBalance}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 color: AppColors.textSecondary,
                                 fontSize: 11,
                               ),
@@ -908,7 +1016,8 @@ class _BalanceAndCostCard extends ConsumerWidget {
                             const SizedBox(width: 4),
                             Text(
                               'из остатка: ${student.legacyBalance}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
                                     color: AppColors.warning,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w500,
@@ -932,70 +1041,72 @@ class _BalanceAndCostCard extends ConsumerWidget {
                   // Средняя стоимость
                   Expanded(
                     child: avgCostAsync.when(
-                    loading: () => const Center(
-                      child: SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                      loading: () => const Center(
+                        child: SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                       ),
-                    ),
-                    error: (_, __) => const SizedBox.shrink(),
-                    data: (stats) {
-                      if (!stats.hasData) {
+                      error: (_, __) => const SizedBox.shrink(),
+                      data: (stats) {
+                        if (!stats.hasData) {
+                          return Column(
+                            children: [
+                              Text(
+                                'СР. СТОИМОСТЬ',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(color: AppColors.textSecondary),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '—',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textSecondary,
+                                    ),
+                              ),
+                              Text(
+                                'нет данных',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: AppColors.textSecondary),
+                              ),
+                            ],
+                          );
+                        }
                         return Column(
                           children: [
                             Text(
-                              'СР. СТОИМОСТЬ',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
+                              stats.isApproximate
+                                  ? 'СР. СТОИМОСТЬ ≈'
+                                  : 'СР. СТОИМОСТЬ',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: AppColors.textSecondary),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '—',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              '${formatter.format(stats.displayCost.round())} ₸',
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.textSecondary,
+                                    color: AppColors.primary,
                                   ),
                             ),
                             Text(
-                              'нет данных',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
+                              'за занятие',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.textSecondary),
                             ),
                           ],
                         );
-                      }
-                      return Column(
-                        children: [
-                          Text(
-                            stats.isApproximate ? 'СР. СТОИМОСТЬ ≈' : 'СР. СТОИМОСТЬ',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${formatter.format(stats.displayCost.round())} ₸',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                          ),
-                          Text(
-                            'за занятие',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                          ),
-                        ],
-                      );
-                    },
+                      },
+                    ),
                   ),
-                ),
                 ], // if (showAvgCost)
               ],
             ),
@@ -1073,8 +1184,8 @@ class _LessonStatsCard extends ConsumerWidget {
                 Text(
                   'Статистика занятий',
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -1097,16 +1208,16 @@ class _LessonStatsCard extends ConsumerWidget {
                             const SizedBox(height: 4),
                             Text(
                               stats.completed.toString(),
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.success,
                                   ),
                             ),
                             Text(
                               'Проведено',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.success,
-                                  ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.success),
                             ),
                           ],
                         ),
@@ -1131,16 +1242,16 @@ class _LessonStatsCard extends ConsumerWidget {
                             const SizedBox(height: 4),
                             Text(
                               stats.cancelled.toString(),
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.error,
                                   ),
                             ),
                             Text(
                               'Отменено',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.error,
-                                  ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.error),
                             ),
                           ],
                         ),
@@ -1188,7 +1299,9 @@ class _PaymentItem extends StatelessWidget {
               ),
               child: Icon(
                 payment.isCorrection ? Icons.edit : Icons.payments,
-                color: payment.isCorrection ? AppColors.warning : AppColors.success,
+                color: payment.isCorrection
+                    ? AppColors.warning
+                    : AppColors.success,
                 size: 20,
               ),
             ),
@@ -1210,7 +1323,10 @@ class _PaymentItem extends StatelessWidget {
                       if (payment.paymentPlan != null) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -1228,7 +1344,10 @@ class _PaymentItem extends StatelessWidget {
                       if (hasDiscount) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.warning.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -1236,7 +1355,11 @@ class _PaymentItem extends StatelessWidget {
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.discount, size: 12, color: AppColors.warning),
+                              Icon(
+                                Icons.discount,
+                                size: 12,
+                                color: AppColors.warning,
+                              ),
                               SizedBox(width: 2),
                               Text(
                                 'Скидка',
@@ -1255,12 +1378,10 @@ class _PaymentItem extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '${payment.lessonsCount} занятий • $dateStr',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
                   ),
-                  if (payment.comment != null && payment.comment!.isNotEmpty) ...[
+                  if (payment.comment != null &&
+                      payment.comment!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       payment.comment!,
@@ -1356,7 +1477,10 @@ class _SubscriptionCard extends StatelessWidget {
               children: [
                 // Status badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(4),
@@ -1374,7 +1498,10 @@ class _SubscriptionCard extends StatelessWidget {
                 // Payment plan name badge
                 if (subscription.paymentPlanName != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
@@ -1388,20 +1515,21 @@ class _SubscriptionCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                if (subscription.isExpiringSoon && status == SubscriptionStatus.active) ...[
+                if (subscription.isExpiringSoon &&
+                    status == SubscriptionStatus.active) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.warning.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
                       'Скоро истекает',
-                      style: TextStyle(
-                        color: AppColors.warning,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: AppColors.warning, fontSize: 12),
                     ),
                   ),
                 ],
@@ -1409,7 +1537,10 @@ class _SubscriptionCard extends StatelessWidget {
                 if (subscription.isFamilySubscription) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.purple.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
@@ -1441,17 +1572,13 @@ class _SubscriptionCard extends StatelessWidget {
             // Lessons info
             Row(
               children: [
-                Icon(
-                  Icons.school,
-                  size: 18,
-                  color: statusColor,
-                ),
+                Icon(Icons.school, size: 18, color: statusColor),
                 const SizedBox(width: 8),
                 Text(
                   '${subscription.lessonsRemaining} / ${subscription.lessonsTotal} занятий',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -1465,7 +1592,8 @@ class _SubscriptionCard extends StatelessWidget {
                   color: AppColors.textSecondary,
                 ),
                 const SizedBox(width: 8),
-                if (status == SubscriptionStatus.frozen && subscription.frozenUntil != null)
+                if (status == SubscriptionStatus.frozen &&
+                    subscription.frozenUntil != null)
                   Text(
                     'Заморожен до ${DateFormat('dd.MM.yyyy').format(subscription.frozenUntil!)}',
                     style: const TextStyle(color: AppColors.info),
@@ -1481,7 +1609,8 @@ class _SubscriptionCard extends StatelessWidget {
                           : AppColors.textSecondary,
                     ),
                   ),
-                if (status == SubscriptionStatus.active && subscription.daysUntilExpiration >= 0) ...[
+                if (status == SubscriptionStatus.active &&
+                    subscription.daysUntilExpiration >= 0) ...[
                   const SizedBox(width: 8),
                   Text(
                     '(${subscription.daysUntilExpiration} дн.)',
@@ -1505,15 +1634,13 @@ class _SubscriptionCard extends StatelessWidget {
               valueColor: AlwaysStoppedAnimation(statusColor),
             ),
             // Family members (only for family subscriptions)
-            if (subscription.isFamilySubscription && subscription.members != null && subscription.members!.isNotEmpty) ...[
+            if (subscription.isFamilySubscription &&
+                subscription.members != null &&
+                subscription.members!.isNotEmpty) ...[
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Icon(
-                    Icons.people,
-                    size: 18,
-                    color: Colors.purple,
-                  ),
+                  const Icon(Icons.people, size: 18, color: Colors.purple),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Wrap(
@@ -1522,35 +1649,51 @@ class _SubscriptionCard extends StatelessWidget {
                       children: subscription.members!
                           .where((m) => m.student != null)
                           .map((member) {
-                        final isCurrentStudent = member.studentId == currentStudentId;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isCurrentStudent
-                                ? Colors.purple.withValues(alpha: 0.2)
-                                : Colors.grey.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: isCurrentStudent
-                                ? Border.all(color: Colors.purple.withValues(alpha: 0.5))
-                                : null,
-                          ),
-                          child: Text(
-                            member.student!.name,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isCurrentStudent ? FontWeight.bold : FontWeight.normal,
-                              color: isCurrentStudent ? Colors.purple : AppColors.textSecondary,
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                            final isCurrentStudent =
+                                member.studentId == currentStudentId;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isCurrentStudent
+                                    ? Colors.purple.withValues(alpha: 0.2)
+                                    : Colors.grey.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: isCurrentStudent
+                                    ? Border.all(
+                                        color: Colors.purple.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              child: Text(
+                                member.student!.name,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isCurrentStudent
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: isCurrentStudent
+                                      ? Colors.purple
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            );
+                          })
+                          .toList(),
                     ),
                   ),
                 ],
               ),
             ],
             // Action buttons (only if can edit)
-            if (status != SubscriptionStatus.exhausted && (onFreeze != null || onUnfreeze != null || onExtend != null)) ...[
+            if (status != SubscriptionStatus.exhausted &&
+                (onFreeze != null ||
+                    onUnfreeze != null ||
+                    onExtend != null)) ...[
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -1559,12 +1702,21 @@ class _SubscriptionCard extends StatelessWidget {
                   if (status == SubscriptionStatus.active && onFreeze != null)
                     OutlinedButton.icon(
                       onPressed: onFreeze,
-                      icon: const Icon(Icons.ac_unit, size: 18, color: AppColors.info),
+                      icon: const Icon(
+                        Icons.ac_unit,
+                        size: 18,
+                        color: AppColors.info,
+                      ),
                       label: const Text('Заморозить'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.info,
-                        side: BorderSide(color: AppColors.info.withValues(alpha: 0.5)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        side: BorderSide(
+                          color: AppColors.info.withValues(alpha: 0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                       ),
                     ),
                   if (status == SubscriptionStatus.frozen && onUnfreeze != null)
@@ -1575,18 +1727,32 @@ class _SubscriptionCard extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.success,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                       ),
                     ),
-                  if ((status == SubscriptionStatus.active || status == SubscriptionStatus.expired) && onExtend != null)
+                  if ((status == SubscriptionStatus.active ||
+                          status == SubscriptionStatus.expired) &&
+                      onExtend != null)
                     OutlinedButton.icon(
                       onPressed: onExtend,
-                      icon: const Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
+                      icon: const Icon(
+                        Icons.calendar_today,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
                       label: const Text('Продлить'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        side: BorderSide(
+                          color: AppColors.primary.withValues(alpha: 0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                       ),
                     ),
                 ],
@@ -1820,12 +1986,17 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_today, color: AppColors.primary),
+                        const Icon(
+                          Icons.calendar_today,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1839,7 +2010,10 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              DateFormat('dd MMMM yyyy', 'ru').format(_selectedDate),
+                              DateFormat(
+                                'dd MMMM yyyy',
+                                'ru',
+                              ).format(_selectedDate),
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
@@ -1860,7 +2034,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                   data: (plans) {
                     // Находим выбранный план по ID
                     final currentPlan = _selectedPlan != null
-                        ? plans.where((p) => p.id == _selectedPlan!.id).firstOrNull
+                        ? plans
+                              .where((p) => p.id == _selectedPlan!.id)
+                              .firstOrNull
                         : null;
                     return DropdownButtonFormField<PaymentPlan?>(
                       decoration: InputDecoration(
@@ -1878,10 +2054,12 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           value: null,
                           child: Text('Свой вариант'),
                         ),
-                        ...plans.map((plan) => DropdownMenuItem<PaymentPlan?>(
-                              value: plan,
-                              child: Text(plan.displayNameWithValidity),
-                            )),
+                        ...plans.map(
+                          (plan) => DropdownMenuItem<PaymentPlan?>(
+                            value: plan,
+                            child: Text(plan.displayNameWithValidity),
+                          ),
+                        ),
                       ],
                       onChanged: _onPlanSelected,
                     );
@@ -1899,7 +2077,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           : Colors.grey[100],
                       borderRadius: BorderRadius.circular(12),
                       border: _hasDiscount
-                          ? Border.all(color: AppColors.warning.withValues(alpha: 0.3))
+                          ? Border.all(
+                              color: AppColors.warning.withValues(alpha: 0.3),
+                            )
                           : null,
                     ),
                     child: Column(
@@ -1922,7 +2102,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                             const SizedBox(width: 4),
                             Icon(
                               Icons.discount,
-                              color: _hasDiscount ? AppColors.warning : Colors.grey,
+                              color: _hasDiscount
+                                  ? AppColors.warning
+                                  : Colors.grey,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
@@ -1946,7 +2128,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                     hintText: 'Размер скидки',
                                     suffixText: '₸',
                                     filled: true,
-                                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                    fillColor: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
                                     contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 12,
                                       vertical: 12,
@@ -2085,7 +2269,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 SizedBox(
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: _isLoading || controllerState.isLoading ? null : _submit,
+                    onPressed: _isLoading || controllerState.isLoading
+                        ? null
+                        : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
@@ -2188,8 +2374,12 @@ class _TeachersSection extends ConsumerWidget {
                 return Chip(
                   avatar: const Icon(Icons.person, size: 18),
                   label: Text(name),
-                  deleteIcon: canEdit ? const Icon(Icons.close, size: 18) : null,
-                  onDeleted: canEdit ? () => _removeTeacher(context, ref, binding.userId) : null,
+                  deleteIcon: canEdit
+                      ? const Icon(Icons.close, size: 18)
+                      : null,
+                  onDeleted: canEdit
+                      ? () => _removeTeacher(context, ref, binding.userId)
+                      : null,
                 );
               }).toList(),
             );
@@ -2205,7 +2395,8 @@ class _TeachersSection extends ConsumerWidget {
       builder: (dialogContext) => Consumer(
         builder: (context, ref, _) {
           final membersAsync = ref.watch(membersStreamProvider(institutionId));
-          final existingTeachers = ref.watch(studentTeachersProvider(studentId)).valueOrNull ?? [];
+          final existingTeachers =
+              ref.watch(studentTeachersProvider(studentId)).valueOrNull ?? [];
           final existingIds = existingTeachers.map((t) => t.userId).toSet();
 
           return Padding(
@@ -2220,7 +2411,8 @@ class _TeachersSection extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 membersAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, _) => ErrorView.inline(e),
                   data: (members) {
                     final available = members
@@ -2241,11 +2433,15 @@ class _TeachersSection extends ConsumerWidget {
                           leading: const CircleAvatar(
                             child: Icon(Icons.person),
                           ),
-                          title: Text(member.profile?.fullName ?? member.roleName),
+                          title: Text(
+                            member.profile?.fullName ?? member.roleName,
+                          ),
                           onTap: () async {
                             Navigator.pop(dialogContext);
                             await ref
-                                .read(studentBindingsControllerProvider.notifier)
+                                .read(
+                                  studentBindingsControllerProvider.notifier,
+                                )
                                 .addTeacher(
                                   studentId: studentId,
                                   userId: member.userId,
@@ -2253,7 +2449,9 @@ class _TeachersSection extends ConsumerWidget {
                                 );
                             if (dialogContext.mounted) {
                               ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                const SnackBar(content: Text('Преподаватель добавлен')),
+                                const SnackBar(
+                                  content: Text('Преподаватель добавлен'),
+                                ),
                               );
                             }
                           },
@@ -2323,10 +2521,7 @@ class _SubjectsSection extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Предметы',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text('Предметы', style: Theme.of(context).textTheme.titleMedium),
             if (canEdit)
               IconButton(
                 icon: const Icon(Icons.add, size: 20),
@@ -2357,13 +2552,21 @@ class _SubjectsSection extends ConsumerWidget {
               children: subjects.map((binding) {
                 final name = binding.subject?.name ?? 'Неизвестный';
                 final color = binding.subject?.color != null
-                    ? Color(int.parse('0xFF${binding.subject!.color!.replaceAll('#', '')}'))
+                    ? Color(
+                        int.parse(
+                          '0xFF${binding.subject!.color!.replaceAll('#', '')}',
+                        ),
+                      )
                     : AppColors.primary;
                 return Chip(
                   avatar: Icon(Icons.book, size: 18, color: color),
                   label: Text(name),
-                  deleteIcon: canEdit ? const Icon(Icons.close, size: 18) : null,
-                  onDeleted: canEdit ? () => _removeSubject(context, ref, binding.subjectId) : null,
+                  deleteIcon: canEdit
+                      ? const Icon(Icons.close, size: 18)
+                      : null,
+                  onDeleted: canEdit
+                      ? () => _removeSubject(context, ref, binding.subjectId)
+                      : null,
                 );
               }).toList(),
             );
@@ -2378,8 +2581,11 @@ class _SubjectsSection extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => Consumer(
         builder: (context, ref, _) {
-          final subjectsListAsync = ref.watch(subjectsListProvider(institutionId));
-          final existingSubjects = ref.watch(studentSubjectsProvider(studentId)).valueOrNull ?? [];
+          final subjectsListAsync = ref.watch(
+            subjectsListProvider(institutionId),
+          );
+          final existingSubjects =
+              ref.watch(studentSubjectsProvider(studentId)).valueOrNull ?? [];
           final existingIds = existingSubjects.map((s) => s.subjectId).toSet();
 
           return Padding(
@@ -2394,11 +2600,16 @@ class _SubjectsSection extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 subjectsListAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, _) => ErrorView.inline(e),
                   data: (subjects) {
                     final available = subjects
-                        .where((s) => !existingIds.contains(s.id) && s.archivedAt == null)
+                        .where(
+                          (s) =>
+                              !existingIds.contains(s.id) &&
+                              s.archivedAt == null,
+                        )
                         .toList();
                     if (available.isEmpty) {
                       return const Padding(
@@ -2412,7 +2623,11 @@ class _SubjectsSection extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         final subject = available[index];
                         final color = subject.color != null
-                            ? Color(int.parse('0xFF${subject.color!.replaceAll('#', '')}'))
+                            ? Color(
+                                int.parse(
+                                  '0xFF${subject.color!.replaceAll('#', '')}',
+                                ),
+                              )
                             : AppColors.primary;
                         return ListTile(
                           leading: CircleAvatar(
@@ -2423,7 +2638,9 @@ class _SubjectsSection extends ConsumerWidget {
                           onTap: () async {
                             Navigator.pop(dialogContext);
                             await ref
-                                .read(studentBindingsControllerProvider.notifier)
+                                .read(
+                                  studentBindingsControllerProvider.notifier,
+                                )
                                 .addSubject(
                                   studentId: studentId,
                                   subjectId: subject.id,
@@ -2431,7 +2648,9 @@ class _SubjectsSection extends ConsumerWidget {
                                 );
                             if (dialogContext.mounted) {
                               ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                const SnackBar(content: Text('Предмет добавлен')),
+                                const SnackBar(
+                                  content: Text('Предмет добавлен'),
+                                ),
                               );
                             }
                           },
@@ -2466,9 +2685,9 @@ class _SubjectsSection extends ConsumerWidget {
                   .read(studentBindingsControllerProvider.notifier)
                   .removeSubject(studentId, subjectId);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Предмет удалён')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Предмет удалён')));
               }
             },
             child: const Text('Удалить', style: TextStyle(color: Colors.red)),
@@ -2515,7 +2734,11 @@ class _LessonTypesSection extends ConsumerWidget {
                 if (canEdit)
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () => _showAddLessonTypeDialog(context, ref, allLessonTypesAsync),
+                    onPressed: () => _showAddLessonTypeDialog(
+                      context,
+                      ref,
+                      allLessonTypesAsync,
+                    ),
                     tooltip: 'Добавить тип занятия',
                   ),
               ],
@@ -2537,20 +2760,33 @@ class _LessonTypesSection extends ConsumerWidget {
                     if (lessonType == null) return const SizedBox.shrink();
                     return Chip(
                       avatar: CircleAvatar(
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-                        child: const Icon(Icons.category, size: 16, color: AppColors.primary),
+                        backgroundColor: AppColors.primary.withValues(
+                          alpha: 0.2,
+                        ),
+                        child: const Icon(
+                          Icons.category,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
                       ),
                       label: Text(lessonType.name),
-                      deleteIcon: canEdit ? const Icon(Icons.close, size: 18) : null,
+                      deleteIcon: canEdit
+                          ? const Icon(Icons.close, size: 18)
+                          : null,
                       onDeleted: canEdit
-                          ? () => _removeLessonType(context, ref, binding.lessonTypeId)
+                          ? () => _removeLessonType(
+                              context,
+                              ref,
+                              binding.lessonTypeId,
+                            )
                           : null,
                     );
                   }).toList(),
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Text('Ошибка: $e', style: const TextStyle(color: Colors.red)),
+              error: (e, _) =>
+                  Text('Ошибка: $e', style: const TextStyle(color: Colors.red)),
             ),
           ],
         ),
@@ -2563,9 +2799,13 @@ class _LessonTypesSection extends ConsumerWidget {
     WidgetRef ref,
     AsyncValue<List<LessonType>> allLessonTypesAsync,
   ) {
-    final existingIds = ref.read(studentLessonTypesProvider(studentId)).valueOrNull
-        ?.map((e) => e.lessonTypeId)
-        .toSet() ?? {};
+    final existingIds =
+        ref
+            .read(studentLessonTypesProvider(studentId))
+            .valueOrNull
+            ?.map((e) => e.lessonTypeId)
+            .toSet() ??
+        {};
 
     showModalBottomSheet(
       context: context,
@@ -2598,7 +2838,8 @@ class _LessonTypesSection extends ConsumerWidget {
               const SizedBox(height: 16),
               Expanded(
                 child: allLessonTypesAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Center(child: Text('Ошибка: $e')),
                   data: (allLessonTypes) {
                     final available = allLessonTypes
@@ -2616,14 +2857,21 @@ class _LessonTypesSection extends ConsumerWidget {
                         final lessonType = available[index];
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-                            child: const Icon(Icons.category, color: AppColors.primary),
+                            backgroundColor: AppColors.primary.withValues(
+                              alpha: 0.2,
+                            ),
+                            child: const Icon(
+                              Icons.category,
+                              color: AppColors.primary,
+                            ),
                           ),
                           title: Text(lessonType.name),
                           onTap: () async {
                             Navigator.pop(dialogContext);
                             await ref
-                                .read(studentBindingsControllerProvider.notifier)
+                                .read(
+                                  studentBindingsControllerProvider.notifier,
+                                )
                                 .addLessonType(
                                   studentId: studentId,
                                   lessonTypeId: lessonType.id,
@@ -2631,7 +2879,9 @@ class _LessonTypesSection extends ConsumerWidget {
                                 );
                             if (dialogContext.mounted) {
                               ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                const SnackBar(content: Text('Тип занятия добавлен')),
+                                const SnackBar(
+                                  content: Text('Тип занятия добавлен'),
+                                ),
                               );
                             }
                           },
@@ -2648,7 +2898,11 @@ class _LessonTypesSection extends ConsumerWidget {
     );
   }
 
-  void _removeLessonType(BuildContext context, WidgetRef ref, String lessonTypeId) {
+  void _removeLessonType(
+    BuildContext context,
+    WidgetRef ref,
+    String lessonTypeId,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -2776,7 +3030,8 @@ class _SelectStudentsForMergeSheetState
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerLow,
                 ),
-                onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
+                onChanged: (value) =>
+                    setState(() => _searchQuery = value.toLowerCase()),
               ),
             ),
 
@@ -2788,14 +3043,19 @@ class _SelectStudentsForMergeSheetState
                 data: (students) {
                   // Фильтруем: исключаем текущего ученика и архивированных
                   var filtered = students
-                      .where((s) =>
-                          s.id != widget.currentStudent.id && s.archivedAt == null)
+                      .where(
+                        (s) =>
+                            s.id != widget.currentStudent.id &&
+                            s.archivedAt == null,
+                      )
                       .toList();
 
                   // Поиск
                   if (_searchQuery.isNotEmpty) {
                     filtered = filtered
-                        .where((s) => s.name.toLowerCase().contains(_searchQuery))
+                        .where(
+                          (s) => s.name.toLowerCase().contains(_searchQuery),
+                        )
                         .toList();
                   }
 
@@ -2884,11 +3144,19 @@ class _SelectStudentsForMergeSheetState
                         onPressed: _selectedIds.isEmpty
                             ? null
                             : () {
-                                final selectedStudents = ref
-                                    .read(studentsProvider(widget.institutionId))
-                                    .valueOrNull
-                                    ?.where((s) => _selectedIds.contains(s.id))
-                                    .toList() ?? [];
+                                final selectedStudents =
+                                    ref
+                                        .read(
+                                          studentsProvider(
+                                            widget.institutionId,
+                                          ),
+                                        )
+                                        .valueOrNull
+                                        ?.where(
+                                          (s) => _selectedIds.contains(s.id),
+                                        )
+                                        .toList() ??
+                                    [];
                                 widget.onStudentsSelected(selectedStudents);
                               },
                         icon: const Icon(Icons.arrow_forward),
@@ -2965,19 +3233,26 @@ class _MergedStudentsCard extends ConsumerWidget {
             data: (names) => Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: names.map((name) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  name,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              )).toList(),
+              children: names
+                  .map(
+                    (name) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        name,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ],
@@ -3000,8 +3275,12 @@ class _ScheduleSlotsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeSchedules = ref.watch(activeStudentSchedulesProvider(studentId));
-    final inactiveSchedules = ref.watch(inactiveStudentSchedulesProvider(studentId));
+    final activeSchedules = ref.watch(
+      activeStudentSchedulesProvider(studentId),
+    );
+    final inactiveSchedules = ref.watch(
+      inactiveStudentSchedulesProvider(studentId),
+    );
     final schedulesAsync = ref.watch(studentSchedulesStreamProvider(studentId));
 
     return Column(
@@ -3057,7 +3336,9 @@ class _ScheduleSlotsSection extends ConsumerWidget {
                         child: Text(
                           'Нет постоянного расписания',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -3071,11 +3352,13 @@ class _ScheduleSlotsSection extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Active schedules
-                ...activeSchedules.map((schedule) => _ScheduleSlotCard(
-                  schedule: schedule,
-                  institutionId: institutionId,
-                  canEdit: canEdit,
-                )),
+                ...activeSchedules.map(
+                  (schedule) => _ScheduleSlotCard(
+                    schedule: schedule,
+                    institutionId: institutionId,
+                    canEdit: canEdit,
+                  ),
+                ),
 
                 // Inactive schedules in ExpansionTile
                 if (inactiveSchedules.isNotEmpty) ...[
@@ -3088,12 +3371,16 @@ class _ScheduleSlotsSection extends ConsumerWidget {
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    children: inactiveSchedules.map((schedule) => _ScheduleSlotCard(
-                      schedule: schedule,
-                      institutionId: institutionId,
-                      canEdit: canEdit,
-                      isInactive: true,
-                    )).toList(),
+                    children: inactiveSchedules
+                        .map(
+                          (schedule) => _ScheduleSlotCard(
+                            schedule: schedule,
+                            institutionId: institutionId,
+                            canEdit: canEdit,
+                            isInactive: true,
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               ],
@@ -3280,11 +3567,7 @@ class _ScheduleSlotCard extends ConsumerWidget {
                       color: AppColors.textSecondary,
                     )
                   else
-                    Icon(
-                      Icons.repeat,
-                      size: 20,
-                      color: teacherColor,
-                    ),
+                    Icon(Icons.repeat, size: 20, color: teacherColor),
                   if (canEdit)
                     Icon(
                       Icons.chevron_right,
@@ -3324,10 +3607,13 @@ class _ScheduleSlotCard extends ConsumerWidget {
                       child: Center(
                         child: Text(
                           schedule.dayName,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                              ),
                         ),
                       ),
                     ),
@@ -3342,9 +3628,12 @@ class _ScheduleSlotCard extends ConsumerWidget {
                           ),
                           Text(
                             schedule.room?.name ?? 'Кабинет',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
                           ),
                         ],
                       ),
@@ -3388,7 +3677,10 @@ class _ScheduleSlotCard extends ConsumerWidget {
                   )
                 else
                   ListTile(
-                    leading: const Icon(Icons.swap_horiz, color: AppColors.primary),
+                    leading: const Icon(
+                      Icons.swap_horiz,
+                      color: AppColors.primary,
+                    ),
                     title: const Text('Временная замена кабинета'),
                     onTap: () {
                       Navigator.pop(sheetContext);
@@ -3420,7 +3712,10 @@ class _ScheduleSlotCard extends ConsumerWidget {
               // Delete
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                title: const Text(
+                  'Удалить',
+                  style: TextStyle(color: Colors.red),
+                ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _deleteSchedule(context, ref);
@@ -3441,9 +3736,9 @@ class _ScheduleSlotCard extends ConsumerWidget {
       schedule.studentId,
     );
     if (success && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Расписание возобновлено')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Расписание возобновлено')));
     }
   }
 
@@ -3496,7 +3791,9 @@ class _ScheduleSlotCard extends ConsumerWidget {
                   ? null
                   : () async {
                       Navigator.pop(dialogContext);
-                      final controller = ref.read(studentScheduleControllerProvider.notifier);
+                      final controller = ref.read(
+                        studentScheduleControllerProvider.notifier,
+                      );
                       final success = await controller.pause(
                         schedule.id,
                         pauseUntil!,
@@ -3529,9 +3826,9 @@ class _ScheduleSlotCard extends ConsumerWidget {
       schedule.studentId,
     );
     if (success && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Замена кабинета снята')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Замена кабинета снята')));
     }
   }
 
@@ -3557,13 +3854,17 @@ class _ScheduleSlotCard extends ConsumerWidget {
                   data: (rooms) => DropdownButtonFormField<String>(
                     key: ValueKey('tempRoom_$selectedRoomId'),
                     initialValue: selectedRoomId,
-                    decoration: const InputDecoration(labelText: 'Новый кабинет'),
+                    decoration: const InputDecoration(
+                      labelText: 'Новый кабинет',
+                    ),
                     items: rooms
                         .where((r) => r.id != schedule.roomId)
-                        .map((r) => DropdownMenuItem(
-                              value: r.id,
-                              child: Text(r.name),
-                            ))
+                        .map(
+                          (r) => DropdownMenuItem(
+                            value: r.id,
+                            child: Text(r.name),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) => setState(() => selectedRoomId = v),
                   ),
@@ -3607,7 +3908,9 @@ class _ScheduleSlotCard extends ConsumerWidget {
                     ? null
                     : () async {
                         Navigator.pop(dialogContext);
-                        final controller = ref.read(studentScheduleControllerProvider.notifier);
+                        final controller = ref.read(
+                          studentScheduleControllerProvider.notifier,
+                        );
                         final success = await controller.setReplacement(
                           schedule.id,
                           selectedRoomId!,
@@ -3617,7 +3920,9 @@ class _ScheduleSlotCard extends ConsumerWidget {
                         );
                         if (success && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Замена кабинета установлена')),
+                            const SnackBar(
+                              content: Text('Замена кабинета установлена'),
+                            ),
                           );
                         }
                       },
@@ -3674,9 +3979,9 @@ class _ScheduleSlotCard extends ConsumerWidget {
       schedule.studentId,
     );
     if (success && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Расписание активировано')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Расписание активировано')));
     }
   }
 
@@ -3710,9 +4015,9 @@ class _ScheduleSlotCard extends ConsumerWidget {
         schedule.studentId,
       );
       if (success && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Расписание удалено')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Расписание удалено')));
       }
     }
   }
@@ -3729,7 +4034,8 @@ class _AddScheduleSlotSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_AddScheduleSlotSheet> createState() => _AddScheduleSlotSheetState();
+  ConsumerState<_AddScheduleSlotSheet> createState() =>
+      _AddScheduleSlotSheetState();
 }
 
 class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
@@ -3785,7 +4091,9 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
     }
 
     // Типы занятий ученика
-    final lessonTypesAsync = ref.read(studentLessonTypesProvider(widget.studentId));
+    final lessonTypesAsync = ref.read(
+      studentLessonTypesProvider(widget.studentId),
+    );
     final lessonTypes = lessonTypesAsync.valueOrNull ?? [];
     if (lessonTypes.length == 1 && _selectedLessonTypeId == null) {
       setState(() => _selectedLessonTypeId = lessonTypes.first.lessonTypeId);
@@ -3855,13 +4163,21 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
     final roomsAsync = ref.watch(roomsStreamProvider(widget.institutionId));
     final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
-    final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
+    final lessonTypesAsync = ref.watch(
+      lessonTypesProvider(widget.institutionId),
+    );
     final currentUserId = ref.watch(currentUserIdProvider);
 
     // Привязки ученика для автозаполнения
-    final studentTeachersAsync = ref.watch(studentTeachersProvider(widget.studentId));
-    final studentSubjectsAsync = ref.watch(studentSubjectsProvider(widget.studentId));
-    final studentLessonTypesAsync = ref.watch(studentLessonTypesProvider(widget.studentId));
+    final studentTeachersAsync = ref.watch(
+      studentTeachersProvider(widget.studentId),
+    );
+    final studentSubjectsAsync = ref.watch(
+      studentSubjectsProvider(widget.studentId),
+    );
+    final studentLessonTypesAsync = ref.watch(
+      studentLessonTypesProvider(widget.studentId),
+    );
 
     final studentTeachers = studentTeachersAsync.valueOrNull ?? [];
     final studentSubjects = studentSubjectsAsync.valueOrNull ?? [];
@@ -3910,10 +4226,7 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
               const SizedBox(height: 24),
 
               // Days of week selection
-              Text(
-                'Дни недели',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
+              Text('Дни недели', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
               _buildDaysSelector(),
               const SizedBox(height: 16),
@@ -3941,7 +4254,10 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                     prefixIcon: Icon(Icons.meeting_room),
                   ),
                   items: rooms
-                      .map((r) => DropdownMenuItem(value: r.id, child: Text(r.name)))
+                      .map(
+                        (r) =>
+                            DropdownMenuItem(value: r.id, child: Text(r.name)),
+                      )
                       .toList(),
                   onChanged: (v) {
                     setState(() => _selectedRoomId = v);
@@ -3963,7 +4279,10 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                     if (studentTeachers.length == 1) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (mounted && _selectedTeacherId == null) {
-                          setState(() => _selectedTeacherId = studentTeachers.first.userId);
+                          setState(
+                            () => _selectedTeacherId =
+                                studentTeachers.first.userId,
+                          );
                         }
                       });
                     } else {
@@ -3974,19 +4293,28 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                       );
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (mounted && _selectedTeacherId == null) {
-                          setState(() => _selectedTeacherId = currentMember.userId);
+                          setState(
+                            () => _selectedTeacherId = currentMember.userId,
+                          );
                         }
                       });
                     }
                   }
 
                   // Сортируем: сначала привязанные преподаватели
-                  final bindingUserIds = studentTeachers.map((t) => t.userId).toSet();
-                  final sortedMembers = [...members]..sort((a, b) {
-                    final aIsBound = bindingUserIds.contains(a.userId) ? 0 : 1;
-                    final bIsBound = bindingUserIds.contains(b.userId) ? 0 : 1;
-                    return aIsBound.compareTo(bIsBound);
-                  });
+                  final bindingUserIds = studentTeachers
+                      .map((t) => t.userId)
+                      .toSet();
+                  final sortedMembers = [...members]
+                    ..sort((a, b) {
+                      final aIsBound = bindingUserIds.contains(a.userId)
+                          ? 0
+                          : 1;
+                      final bIsBound = bindingUserIds.contains(b.userId)
+                          ? 0
+                          : 1;
+                      return aIsBound.compareTo(bIsBound);
+                    });
 
                   return DropdownButtonFormField<String>(
                     key: ValueKey('teacher_$_selectedTeacherId'),
@@ -3996,32 +4324,37 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                       prefixIcon: Icon(Icons.person),
                     ),
                     items: sortedMembers
-                        .map((m) => DropdownMenuItem(
-                              value: m.userId,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (bindingUserIds.contains(m.userId))
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: Icon(
-                                        Icons.star,
-                                        size: 16,
-                                        color: Theme.of(context).colorScheme.primary,
-                                      ),
-                                    ),
-                                  Flexible(
-                                    child: Text(
-                                      m.profile?.fullName ?? 'Преподаватель',
-                                      overflow: TextOverflow.ellipsis,
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m.userId,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (bindingUserIds.contains(m.userId))
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Icon(
+                                      Icons.star,
+                                      size: 16,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ))
+                                Flexible(
+                                  child: Text(
+                                    m.profile?.fullName ?? 'Преподаватель',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) => setState(() => _selectedTeacherId = v),
-                    validator: (v) => v == null ? 'Выберите преподавателя' : null,
+                    validator: (v) =>
+                        v == null ? 'Выберите преподавателя' : null,
                   );
                 },
               ),
@@ -4035,21 +4368,28 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                   if (subjects.isEmpty) return const SizedBox.shrink();
 
                   // Автоматически выбираем если один привязанный предмет
-                  if (_selectedSubjectId == null && studentSubjects.length == 1) {
+                  if (_selectedSubjectId == null &&
+                      studentSubjects.length == 1) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted && _selectedSubjectId == null) {
-                        setState(() => _selectedSubjectId = studentSubjects.first.subjectId);
+                        setState(
+                          () => _selectedSubjectId =
+                              studentSubjects.first.subjectId,
+                        );
                       }
                     });
                   }
 
                   // Сортируем: сначала привязанные предметы
-                  final bindingSubjectIds = studentSubjects.map((s) => s.subjectId).toSet();
-                  final sortedSubjects = [...subjects]..sort((a, b) {
-                    final aIsBound = bindingSubjectIds.contains(a.id) ? 0 : 1;
-                    final bIsBound = bindingSubjectIds.contains(b.id) ? 0 : 1;
-                    return aIsBound.compareTo(bIsBound);
-                  });
+                  final bindingSubjectIds = studentSubjects
+                      .map((s) => s.subjectId)
+                      .toSet();
+                  final sortedSubjects = [...subjects]
+                    ..sort((a, b) {
+                      final aIsBound = bindingSubjectIds.contains(a.id) ? 0 : 1;
+                      final bIsBound = bindingSubjectIds.contains(b.id) ? 0 : 1;
+                      return aIsBound.compareTo(bIsBound);
+                    });
 
                   return DropdownButtonFormField<String>(
                     key: ValueKey('subject_$_selectedSubjectId'),
@@ -4059,27 +4399,37 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                       prefixIcon: Icon(Icons.book),
                     ),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('Не указано')),
-                      ...sortedSubjects.map((s) => DropdownMenuItem(
-                        value: s.id,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (bindingSubjectIds.contains(s.id))
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Icon(
-                                  Icons.star,
-                                  size: 16,
-                                  color: Theme.of(context).colorScheme.primary,
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Не указано'),
+                      ),
+                      ...sortedSubjects.map(
+                        (s) => DropdownMenuItem(
+                          value: s.id,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (bindingSubjectIds.contains(s.id))
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Icon(
+                                    Icons.star,
+                                    size: 16,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                ),
+                              Flexible(
+                                child: Text(
+                                  s.name,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            Flexible(
-                              child: Text(s.name, overflow: TextOverflow.ellipsis),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      )),
+                      ),
                     ],
                     onChanged: (v) => setState(() => _selectedSubjectId = v),
                   );
@@ -4095,21 +4445,28 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                   if (types.isEmpty) return const SizedBox.shrink();
 
                   // Автоматически выбираем если один привязанный тип
-                  if (_selectedLessonTypeId == null && studentLessonTypes.length == 1) {
+                  if (_selectedLessonTypeId == null &&
+                      studentLessonTypes.length == 1) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted && _selectedLessonTypeId == null) {
-                        setState(() => _selectedLessonTypeId = studentLessonTypes.first.lessonTypeId);
+                        setState(
+                          () => _selectedLessonTypeId =
+                              studentLessonTypes.first.lessonTypeId,
+                        );
                       }
                     });
                   }
 
                   // Сортируем: сначала привязанные типы
-                  final bindingTypeIds = studentLessonTypes.map((t) => t.lessonTypeId).toSet();
-                  final sortedTypes = [...types]..sort((a, b) {
-                    final aIsBound = bindingTypeIds.contains(a.id) ? 0 : 1;
-                    final bIsBound = bindingTypeIds.contains(b.id) ? 0 : 1;
-                    return aIsBound.compareTo(bIsBound);
-                  });
+                  final bindingTypeIds = studentLessonTypes
+                      .map((t) => t.lessonTypeId)
+                      .toSet();
+                  final sortedTypes = [...types]
+                    ..sort((a, b) {
+                      final aIsBound = bindingTypeIds.contains(a.id) ? 0 : 1;
+                      final bIsBound = bindingTypeIds.contains(b.id) ? 0 : 1;
+                      return aIsBound.compareTo(bIsBound);
+                    });
 
                   return DropdownButtonFormField<String>(
                     key: ValueKey('lessonType_$_selectedLessonTypeId'),
@@ -4119,27 +4476,37 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                       prefixIcon: Icon(Icons.category),
                     ),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('Не указано')),
-                      ...sortedTypes.map((t) => DropdownMenuItem(
-                        value: t.id,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (bindingTypeIds.contains(t.id))
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Icon(
-                                  Icons.star,
-                                  size: 16,
-                                  color: Theme.of(context).colorScheme.primary,
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Не указано'),
+                      ),
+                      ...sortedTypes.map(
+                        (t) => DropdownMenuItem(
+                          value: t.id,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (bindingTypeIds.contains(t.id))
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Icon(
+                                    Icons.star,
+                                    size: 16,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                ),
+                              Flexible(
+                                child: Text(
+                                  t.name,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            Flexible(
-                              child: Text(t.name, overflow: TextOverflow.ellipsis),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      )),
+                      ),
                     ],
                     onChanged: (v) => setState(() => _selectedLessonTypeId = v),
                   );
@@ -4186,7 +4553,8 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
 
               // Submit button
               ElevatedButton.icon(
-                onPressed: _selectedDays.isEmpty ||
+                onPressed:
+                    _selectedDays.isEmpty ||
                         _isSubmitting ||
                         _isCheckingConflicts ||
                         _conflictingDays.isNotEmpty
@@ -4203,10 +4571,10 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                   _isCheckingConflicts
                       ? 'Проверка...'
                       : _conflictingDays.isNotEmpty
-                          ? 'Есть конфликты'
-                          : _selectedDays.length > 1
-                              ? 'Создать ${_selectedDays.length} слотов'
-                              : 'Создать слот',
+                      ? 'Есть конфликты'
+                      : _selectedDays.length > 1
+                      ? 'Создать ${_selectedDays.length} слотов'
+                      : 'Создать слот',
                 ),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
@@ -4269,8 +4637,8 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
     final durationMinutes = endMinutes - startMinutes;
     final durationText = durationMinutes > 0
         ? (durationMinutes >= 60
-            ? '${durationMinutes ~/ 60} ч${durationMinutes % 60 > 0 ? ' ${durationMinutes % 60} мин' : ''}'
-            : '$durationMinutes мин')
+              ? '${durationMinutes ~/ 60} ч${durationMinutes % 60 > 0 ? ' ${durationMinutes % 60} мин' : ''}'
+              : '$durationMinutes мин')
         : 'Некорректно';
 
     return Card(
@@ -4327,8 +4695,8 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
                         color: hasConflict
                             ? Theme.of(context).colorScheme.error
                             : (durationMinutes > 0
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.error),
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.error),
                       ),
                     ),
                   ],
@@ -4406,11 +4774,15 @@ class _AddScheduleSlotSheetState extends ConsumerState<_AddScheduleSlotSheet> {
         );
       } else {
         // Multiple slots (batch)
-        final slots = _selectedDays.map((day) => DayTimeSlot(
-          dayOfWeek: day,
-          startTime: _startTimes[day]!,
-          endTime: _endTimes[day]!,
-        )).toList();
+        final slots = _selectedDays
+            .map(
+              (day) => DayTimeSlot(
+                dayOfWeek: day,
+                startTime: _startTimes[day]!,
+                endTime: _endTimes[day]!,
+              ),
+            )
+            .toList();
 
         await controller.createBatch(
           institutionId: widget.institutionId,
@@ -4465,10 +4837,12 @@ class _BulkLessonActionsSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_BulkLessonActionsSheet> createState() => _BulkLessonActionsSheetState();
+  ConsumerState<_BulkLessonActionsSheet> createState() =>
+      _BulkLessonActionsSheetState();
 }
 
-class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet> {
+class _BulkLessonActionsSheetState
+    extends ConsumerState<_BulkLessonActionsSheet> {
   List<Lesson>? _futureLessons;
   List<StudentSchedule>? _scheduleSlots;
   bool _isLoading = true;
@@ -4549,9 +4923,9 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
       if (mounted) {
         Navigator.pop(context);
         widget.onCompleted();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Удалено $count занятий')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Удалено $count занятий')));
       }
     } catch (e) {
       if (mounted) {
@@ -4568,7 +4942,8 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
 
   Future<void> _showReassignDialog() async {
     // Получаем список преподавателей
-    final members = ref.read(membersProvider(widget.institutionId)).valueOrNull ?? [];
+    final members =
+        ref.read(membersProvider(widget.institutionId)).valueOrNull ?? [];
     final teachers = members.toList();
 
     if (teachers.isEmpty) {
@@ -4596,7 +4971,8 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
 
   Future<void> _showReassignSlotsDialog() async {
     // Получаем список преподавателей
-    final members = ref.read(membersProvider(widget.institutionId)).valueOrNull ?? [];
+    final members =
+        ref.read(membersProvider(widget.institutionId)).valueOrNull ?? [];
     final teachers = members.toList();
 
     if (teachers.isEmpty) {
@@ -4619,19 +4995,22 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
-            ...teachers.map((member) => ListTile(
-              leading: CircleAvatar(
-                backgroundColor: member.color != null
-                    ? Color(int.parse('FF${member.color}', radix: 16))
-                    : AppColors.primary,
-                child: Text(
-                  member.profile?.fullName.substring(0, 1).toUpperCase() ?? '?',
-                  style: const TextStyle(color: Colors.white),
+            ...teachers.map(
+              (member) => ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: member.color != null
+                      ? Color(int.parse('FF${member.color}', radix: 16))
+                      : AppColors.primary,
+                  child: Text(
+                    member.profile?.fullName.substring(0, 1).toUpperCase() ??
+                        '?',
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
+                title: Text(member.profile?.fullName ?? 'Без имени'),
+                onTap: () => Navigator.pop(context, member.userId),
               ),
-              title: Text(member.profile?.fullName ?? 'Без имени'),
-              onTap: () => Navigator.pop(context, member.userId),
-            )),
+            ),
           ],
         ),
       ),
@@ -4702,7 +5081,9 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
         Navigator.pop(context);
         widget.onCompleted();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Приостановлено ${_scheduleSlots!.length} слотов')),
+          SnackBar(
+            content: Text('Приостановлено ${_scheduleSlots!.length} слотов'),
+          ),
         );
       }
     } catch (e) {
@@ -4760,7 +5141,9 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
         Navigator.pop(context);
         widget.onCompleted();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Деактивировано ${_scheduleSlots!.length} слотов')),
+          SnackBar(
+            content: Text('Деактивировано ${_scheduleSlots!.length} слотов'),
+          ),
         );
       }
     } catch (e) {
@@ -4779,18 +5162,19 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle
-              Center(
+        child: Column(
+          children: [
+            // Drag handle
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Center(
                 child: Container(
                   width: 40,
                   height: 4,
@@ -4800,242 +5184,301 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 16),
 
-              // Заголовок
-              Text(
-                'Управление занятиями',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                widget.student.name,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Статистика
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator())
-              else if (_loadError != null)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    borderRadius: BorderRadius.circular(12),
+            // Заголовок (фиксированный)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Управление занятиями',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Ошибка загрузки: $_loadError',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onErrorContainer,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (_futureLessons!.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text('Нет запланированных занятий'),
-                      ),
-                    ],
-                  ),
-                )
-              else ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.event_note,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Найдено ${_futureLessons!.length} будущих занятий',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Кнопки действий
-                if (_isProcessing)
-                  const Center(child: CircularProgressIndicator())
-                else ...[
-                  // Переназначить преподавателя
-                  ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: AppColors.primary,
-                      child: Icon(Icons.swap_horiz, color: Colors.white),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.student.name,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    title: const Text('Переназначить преподавателя'),
-                    subtitle: const Text('Выбрать нового преподавателя для всех занятий'),
-                    onTap: _showReassignDialog,
-                  ),
-                  const Divider(),
-
-                  // Удалить все занятия
-                  ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Colors.red,
-                      child: Icon(Icons.delete_sweep, color: Colors.white),
-                    ),
-                    title: const Text(
-                      'Удалить все занятия',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    subtitle: const Text('Баланс абонементов не изменится'),
-                    onTap: _deleteFutureLessons,
                   ),
                 ],
-              ],
+              ),
+            ),
+            const SizedBox(height: 16),
 
-              // Секция постоянного расписания
-              if (_scheduleSlots != null && _scheduleSlots!.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 16),
-
-                // Заголовок секции
-                Row(
+            // Scrollable content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.repeat,
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Постоянное расписание',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Инфо о слотах
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_month,
-                        color: Theme.of(context).colorScheme.secondary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    // Статистика
+                    if (_isLoading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (_loadError != null)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
                           children: [
-                            Text(
-                              '${_scheduleSlots!.length} ${_scheduleSlots!.length == 1 ? 'слот' : _scheduleSlots!.length < 5 ? 'слота' : 'слотов'}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w500,
-                                color: Theme.of(context).colorScheme.secondary,
+                            Icon(
+                              Icons.error_outline,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Ошибка загрузки: $_loadError',
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onErrorContainer,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _scheduleSlots!.map((s) => '${s.dayName} ${s.timeRange}').join(', '),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ],
+                        ),
+                      )
+                    else if (_futureLessons!.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text('Нет запланированных занятий'),
+                            ),
+                          ],
+                        ),
+                      )
+                    else ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.event_note,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Найдено ${_futureLessons!.length} будущих занятий',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 16),
+
+                      // Кнопки действий
+                      if (_isProcessing)
+                        const Center(child: CircularProgressIndicator())
+                      else ...[
+                        // Переназначить преподавателя
+                        ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: AppColors.primary,
+                            child: Icon(Icons.swap_horiz, color: Colors.white),
+                          ),
+                          title: const Text('Переназначить преподавателя'),
+                          subtitle: const Text(
+                            'Выбрать нового преподавателя для всех занятий',
+                          ),
+                          onTap: _showReassignDialog,
+                        ),
+                        const Divider(),
+
+                        // Удалить все занятия
+                        ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: Colors.red,
+                            child: Icon(
+                              Icons.delete_sweep,
+                              color: Colors.white,
+                            ),
+                          ),
+                          title: const Text(
+                            'Удалить все занятия',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                          subtitle: const Text(
+                            'Баланс абонементов не изменится',
+                          ),
+                          onTap: _deleteFutureLessons,
+                        ),
+                      ],
                     ],
-                  ),
+
+                    // Секция постоянного расписания
+                    if (_scheduleSlots != null &&
+                        _scheduleSlots!.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 16),
+
+                      // Заголовок секции
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.repeat,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Постоянное расписание',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Инфо о слотах
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .secondaryContainer
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_month,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${_scheduleSlots!.length} ${_scheduleSlots!.length == 1
+                                        ? 'слот'
+                                        : _scheduleSlots!.length < 5
+                                        ? 'слота'
+                                        : 'слотов'}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.secondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _scheduleSlots!
+                                        .map(
+                                          (s) => '${s.dayName} ${s.timeRange}',
+                                        )
+                                        .join(', '),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Кнопки действий для слотов
+                      if (!_isProcessing) ...[
+                        // Переназначить преподавателя
+                        ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.secondary,
+                            child: const Icon(
+                              Icons.swap_horiz,
+                              color: Colors.white,
+                            ),
+                          ),
+                          title: const Text('Переназначить преподавателя'),
+                          subtitle: const Text('Для всех слотов расписания'),
+                          onTap: _showReassignSlotsDialog,
+                        ),
+                        const Divider(),
+
+                        // Приостановить все
+                        ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: AppColors.warning,
+                            child: Icon(Icons.pause, color: Colors.white),
+                          ),
+                          title: const Text(
+                            'Приостановить',
+                            style: TextStyle(color: AppColors.warning),
+                          ),
+                          subtitle: const Text(
+                            'Временно приостановить все слоты',
+                          ),
+                          onTap: _pauseAllSlots,
+                        ),
+                        const Divider(),
+
+                        // Деактивировать все
+                        ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: Colors.orange,
+                            child: Icon(Icons.archive, color: Colors.white),
+                          ),
+                          title: const Text(
+                            'Деактивировать',
+                            style: TextStyle(color: Colors.orange),
+                          ),
+                          subtitle: const Text(
+                            'Отключить постоянное расписание',
+                          ),
+                          onTap: _deactivateAllSlots,
+                        ),
+                      ],
+                    ],
+                    const SizedBox(height: 16),
+                  ],
                 ),
-                const SizedBox(height: 16),
-
-                // Кнопки действий для слотов
-                if (!_isProcessing) ...[
-                  // Переназначить преподавателя
-                  ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.secondary,
-                      child: const Icon(Icons.swap_horiz, color: Colors.white),
-                    ),
-                    title: const Text('Переназначить преподавателя'),
-                    subtitle: const Text('Для всех слотов расписания'),
-                    onTap: _showReassignSlotsDialog,
-                  ),
-                  const Divider(),
-
-                  // Приостановить все
-                  ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: AppColors.warning,
-                      child: Icon(Icons.pause, color: Colors.white),
-                    ),
-                    title: const Text(
-                      'Приостановить',
-                      style: TextStyle(color: AppColors.warning),
-                    ),
-                    subtitle: const Text('Временно приостановить все слоты'),
-                    onTap: _pauseAllSlots,
-                  ),
-                  const Divider(),
-
-                  // Деактивировать все
-                  ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Colors.orange,
-                      child: Icon(Icons.archive, color: Colors.white),
-                    ),
-                    title: const Text(
-                      'Деактивировать',
-                      style: TextStyle(color: Colors.orange),
-                    ),
-                    subtitle: const Text('Отключить постоянное расписание'),
-                    onTap: _deactivateAllSlots,
-                  ),
-                ],
-              ],
-
-              const SizedBox(height: 16),
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -5057,7 +5500,8 @@ class _ReassignTeacherSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_ReassignTeacherSheet> createState() => _ReassignTeacherSheetState();
+  ConsumerState<_ReassignTeacherSheet> createState() =>
+      _ReassignTeacherSheetState();
 }
 
 class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
@@ -5093,9 +5537,9 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
           _conflicts = [];
           _isChecking = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка проверки: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка проверки: $e')));
       }
     }
   }
@@ -5127,7 +5571,9 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Переназначено ${lessonsToReassign.length} занятий')),
+          SnackBar(
+            content: Text('Переназначено ${lessonsToReassign.length} занятий'),
+          ),
         );
         widget.onReassigned();
       }
@@ -5147,7 +5593,8 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
   @override
   Widget build(BuildContext context) {
     final conflictCount = _conflicts?.length ?? 0;
-    final canReassign = _conflicts != null && (widget.lessons.length - conflictCount) > 0;
+    final canReassign =
+        _conflicts != null && (widget.lessons.length - conflictCount) > 0;
 
     return Container(
       padding: EdgeInsets.only(
@@ -5187,14 +5634,12 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
                   labelText: 'Новый преподаватель',
                   border: OutlineInputBorder(),
                 ),
-                items: widget.teachers
-                    .map((member) {
-                      return DropdownMenuItem(
-                        value: member.userId,
-                        child: Text(member.profile?.fullName ?? 'Неизвестный'),
-                      );
-                    })
-                    .toList(),
+                items: widget.teachers.map((member) {
+                  return DropdownMenuItem(
+                    value: member.userId,
+                    child: Text(member.profile?.fullName ?? 'Неизвестный'),
+                  );
+                }).toList(),
                 onChanged: (value) {
                   setState(() {
                     _selectedTeacherId = value;
@@ -5263,7 +5708,9 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
                         Text(
                           'Можно переназначить: ${widget.lessons.length - conflictCount} занятий',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             fontSize: 13,
                           ),
                         ),
@@ -5272,23 +5719,31 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
                   ),
                   const SizedBox(height: 8),
                   // Список конфликтов (первые 5)
-                  ...(_conflicts!.take(5).map((conflict) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.close, size: 16, color: Colors.red),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${DateFormat('d MMM', 'ru').format(conflict.lesson.date)}, '
-                            '${conflict.lesson.startTime.hour}:${conflict.lesson.startTime.minute.toString().padLeft(2, '0')} — '
-                            '${conflict.description}',
-                            style: const TextStyle(fontSize: 13),
+                  ...(_conflicts!
+                      .take(5)
+                      .map(
+                        (conflict) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.close,
+                                size: 16,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${DateFormat('d MMM', 'ru').format(conflict.lesson.date)}, '
+                                  '${conflict.lesson.startTime.hour}:${conflict.lesson.startTime.minute.toString().padLeft(2, '0')} — '
+                                  '${conflict.description}',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ))),
+                      )),
                   if (_conflicts!.length > 5)
                     Text(
                       '...и ещё ${_conflicts!.length - 5} конфликтов',
@@ -5318,6 +5773,211 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
               ],
 
               const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Секция истории занятий с пагинацией и группировкой по месяцам
+class _LessonHistorySection extends ConsumerStatefulWidget {
+  final String studentId;
+  final String institutionId;
+
+  const _LessonHistorySection({
+    required this.studentId,
+    required this.institutionId,
+  });
+
+  @override
+  ConsumerState<_LessonHistorySection> createState() =>
+      _LessonHistorySectionState();
+}
+
+class _LessonHistorySectionState extends ConsumerState<_LessonHistorySection> {
+  final List<Lesson> _lessons = [];
+  bool _isLoading = false;
+  bool _hasMore = true;
+  static const int _pageSize = 20;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMore();
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoading || !_hasMore) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final repo = ref.read(lessonRepositoryProvider);
+      final newLessons = await repo.getLessonHistoryForStudent(
+        widget.studentId,
+        limit: _pageSize,
+        offset: _lessons.length,
+      );
+
+      setState(() {
+        _lessons.addAll(newLessons);
+        _hasMore = newLessons.length == _pageSize;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Группировка по месяцам
+    final grouped = _groupByMonth(_lessons);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'История занятий',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 12),
+        if (_lessons.isEmpty && _isLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (_lessons.isEmpty)
+          Text(
+            'Нет завершённых занятий',
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          )
+        else ...[
+          // Группы по месяцам
+          for (final entry in grouped.entries) ...[
+            // Заголовок месяца
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                entry.key, // "Январь 2026"
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+            ),
+            // Занятия месяца
+            ...entry.value.map(
+              (lesson) => _LessonHistoryItem(
+                lesson: lesson,
+                onTap: () => _showLessonDetails(lesson),
+              ),
+            ),
+          ],
+
+          // Кнопка "Показать ещё"
+          if (_hasMore)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : TextButton.icon(
+                        onPressed: _loadMore,
+                        icon: const Icon(Icons.expand_more),
+                        label: const Text('Показать ещё'),
+                      ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Map<String, List<Lesson>> _groupByMonth(List<Lesson> lessons) {
+    final Map<String, List<Lesson>> grouped = {};
+    for (final lesson in lessons) {
+      final key =
+          DateFormat('LLLL yyyy', 'ru').format(lesson.date); // "январь 2026"
+      final capitalizedKey =
+          key[0].toUpperCase() + key.substring(1); // "Январь 2026"
+      grouped.putIfAbsent(capitalizedKey, () => []).add(lesson);
+    }
+    return grouped;
+  }
+
+  void _showLessonDetails(Lesson lesson) {
+    showLessonDetailSheet(
+      context: context,
+      ref: ref,
+      lesson: lesson,
+      institutionId: widget.institutionId,
+      onUpdated: () {
+        // Перезагружаем историю при изменении занятия
+        setState(() {
+          _lessons.clear();
+          _hasMore = true;
+        });
+        _loadMore();
+      },
+    );
+  }
+}
+
+/// Компактная карточка занятия в списке
+class _LessonHistoryItem extends StatelessWidget {
+  final Lesson lesson;
+  final VoidCallback onTap;
+
+  const _LessonHistoryItem({
+    required this.lesson,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompleted = lesson.status == LessonStatus.completed;
+    final statusColor = isCompleted ? Colors.green : AppColors.warning;
+    final statusIcon =
+        isCompleted ? Icons.check_circle_outline : Icons.cancel_outlined;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Иконка статуса
+              Icon(statusIcon, color: statusColor, size: 24),
+              const SizedBox(width: 12),
+
+              // Основная информация
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      lesson.subject?.name ?? 'Без предмета',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${DateFormat('d MMM', 'ru').format(lesson.date)} • '
+                      '${lesson.startTime.format(context)} - ${lesson.endTime.format(context)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Стрелка
+              Icon(
+                Icons.chevron_right,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),
