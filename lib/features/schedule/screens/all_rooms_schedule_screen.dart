@@ -2273,7 +2273,7 @@ class _CompactDayGrid extends StatefulWidget {
   final List<Room> allRooms;
   final List<Lesson> lessons;
   final List<Booking> bookings;
-  final List<StudentSchedule> scheduleSlots;
+  final List<Booking> scheduleSlots;
   final DateTime selectedDate;
   final String institutionId;
   final String? selectedRoomId;
@@ -2284,7 +2284,7 @@ class _CompactDayGrid extends StatefulWidget {
   final Map<String, String?> teacherColors;
   final void Function(Lesson) onLessonTap;
   final void Function(Booking) onBookingTap;
-  final void Function(StudentSchedule) onScheduleSlotTap;
+  final void Function(Booking) onScheduleSlotTap;
   final void Function(String roomId, double currentOffset) onRoomTap;
   final void Function(Room room, int hour, int minute) onAddLesson;
   final VoidCallback? onAddRoom;
@@ -2762,7 +2762,7 @@ class _CompactDayGridState extends State<_CompactDayGrid> {
     return widgets;
   }
 
-  Widget _buildPositionedSlot(StudentSchedule slot, List<Room> rooms, double columnWidth) {
+  Widget _buildPositionedSlot(Booking slot, List<Room> rooms, double columnWidth) {
     final effectiveRoomId = slot.getEffectiveRoomId(widget.selectedDate);
     final roomIndex = rooms.indexWhere((r) => r.id == effectiveRoomId);
     if (roomIndex == -1) return const SizedBox.shrink();
@@ -2886,7 +2886,7 @@ class _CompactDayGridState extends State<_CompactDayGrid> {
     int hour,
     List<Lesson> lessons,
     List<Booking> bookings,
-    List<StudentSchedule> slots,
+    List<Booking> slots,
   ) {
     const minGapMinutes = 15;
     final hourStart = hour * 60;
