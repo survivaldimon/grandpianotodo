@@ -7999,6 +7999,55 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 },
               ),
               const SizedBox(height: 16),
+
+              // Дата
+              InkWell(
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (date != null) {
+                    setState(() => _selectedDate = date);
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Дата *',
+                    prefixIcon: Icon(Icons.calendar_today),
+                  ),
+                  child: Text(AppDateUtils.formatDayMonth(_selectedDate)),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Время
+              InkWell(
+                onTap: () async {
+                  final range = await showIosTimeRangePicker(
+                    context: context,
+                    initialStartTime: _startTime,
+                    initialEndTime: _endTime,
+                    minuteInterval: 5,
+                  );
+                  if (range != null) {
+                    setState(() {
+                      _startTime = range.start;
+                      _endTime = range.end;
+                    });
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Время *',
+                    prefixIcon: Icon(Icons.access_time),
+                  ),
+                  child: Text('${_formatTime(_startTime)} – ${_formatTime(_endTime)}'),
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
 
             // ========== РЕЖИМ БРОНИРОВАНИЯ ==========
