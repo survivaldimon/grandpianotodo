@@ -264,6 +264,7 @@ class IosTimeRangePicker extends StatefulWidget {
   final int minuteInterval;
   final int minHour;
   final int maxHour;
+  final int defaultDurationMinutes; // Длительность по умолчанию
 
   const IosTimeRangePicker({
     super.key,
@@ -272,6 +273,7 @@ class IosTimeRangePicker extends StatefulWidget {
     this.minuteInterval = 5,
     this.minHour = 0,
     this.maxHour = 23,
+    this.defaultDurationMinutes = 60, // По умолчанию 1 час
   });
 
   @override
@@ -318,6 +320,35 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
     _endMinuteController = FixedExtentScrollController(
       initialItem: _endMinuteIndex,
     );
+  }
+
+  /// Автоматически обновить время окончания на основе длительности
+  void _autoUpdateEndTime() {
+    final startMinutes = _startHour * 60 + _minutes[_startMinuteIndex];
+    final endMinutes = startMinutes + widget.defaultDurationMinutes;
+
+    final newEndHour = (endMinutes ~/ 60).clamp(widget.minHour, widget.maxHour);
+    final newEndMinute = endMinutes % 60;
+    final newEndMinuteIndex = _findClosestMinuteIndex(newEndMinute);
+
+    if (newEndHour != _endHour || newEndMinuteIndex != _endMinuteIndex) {
+      setState(() {
+        _endHour = newEndHour;
+        _endMinuteIndex = newEndMinuteIndex;
+      });
+
+      // Анимируем скролл к новому значению
+      _endHourController.animateToItem(
+        _endHour - widget.minHour,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+      _endMinuteController.animateToItem(
+        _endMinuteIndex,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   int _findClosestMinuteIndex(int minute) {
@@ -484,6 +515,7 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
                                       setState(() {
                                         _startHour = hours[index % hours.length];
                                       });
+                                      _autoUpdateEndTime();
                                     },
                                     children: hours.map((hour) {
                                       return Center(
@@ -520,6 +552,7 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
                                       setState(() {
                                         _startMinuteIndex = index % _minutes.length;
                                       });
+                                      _autoUpdateEndTime();
                                     },
                                     children: _minutes.map((minute) {
                                       return Center(
@@ -649,6 +682,8 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
 }
 
 /// Показать iOS-стиль пикер диапазона времени
+///
+/// [defaultDurationMinutes] - длительность по умолчанию (автоподстановка конца при изменении начала)
 Future<TimeRange?> showIosTimeRangePicker({
   required BuildContext context,
   required TimeOfDay initialStartTime,
@@ -656,6 +691,7 @@ Future<TimeRange?> showIosTimeRangePicker({
   int minuteInterval = 5,
   int minHour = 0,
   int maxHour = 23,
+  int defaultDurationMinutes = 60,
 }) {
   return showModalBottomSheet<TimeRange>(
     context: context,
@@ -666,6 +702,7 @@ Future<TimeRange?> showIosTimeRangePicker({
       minuteInterval: minuteInterval,
       minHour: minHour,
       maxHour: maxHour,
+      defaultDurationMinutes: defaultDurationMinutes,
     ),
   );
 }

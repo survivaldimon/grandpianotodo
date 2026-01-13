@@ -30,6 +30,7 @@ class LessonRepository {
           ''')
           .eq('room_id', roomId)
           .eq('date', dateStr)
+          .neq('status', 'cancelled') // Отменённые занятия не показываем в расписании
           .isFilter('archived_at', null)
           .order('start_time');
 
@@ -60,6 +61,7 @@ class LessonRepository {
           ''')
           .eq('institution_id', institutionId)
           .eq('date', dateStr)
+          .neq('status', 'cancelled') // Отменённые занятия не показываем в расписании
           .isFilter('archived_at', null)
           .order('start_time');
 
@@ -602,6 +604,44 @@ class LessonRepository {
     }
   }
 
+  /// Установить флаг списания занятия
+  Future<void> setIsDeducted(String lessonId, bool isDeducted) async {
+    try {
+      await _client
+          .from('lessons')
+          .update({'is_deducted': isDeducted})
+          .eq('id', lessonId);
+    } catch (e) {
+      debugPrint('Error setting is_deducted: $e');
+    }
+  }
+
+  /// Установить ID записи переноса баланса (balance transfer) для занятия
+  /// Вызывается при complete() когда занятие списывается с переноса
+  Future<void> setTransferPaymentId(String lessonId, String transferPaymentId) async {
+    try {
+      await _client
+          .from('lessons')
+          .update({'transfer_payment_id': transferPaymentId})
+          .eq('id', lessonId);
+    } catch (e) {
+      debugPrint('Error setting transfer_payment_id: $e');
+    }
+  }
+
+  /// Убрать привязку к записи переноса баланса
+  /// Вызывается при uncomplete() для возврата занятия
+  Future<void> clearTransferPaymentId(String lessonId) async {
+    try {
+      await _client
+          .from('lessons')
+          .update({'transfer_payment_id': null})
+          .eq('id', lessonId);
+    } catch (e) {
+      debugPrint('Error clearing transfer_payment_id: $e');
+    }
+  }
+
   /// Архивировать занятие
   Future<void> archive(String id) async {
     try {
@@ -661,6 +701,54 @@ class LessonRepository {
     }
   }
 
+  /// Отменить все последующие занятия серии (устанавливает статус 'cancelled')
+  /// В отличие от архивации, отменённые занятия остаются в истории
+  /// Возвращает количество отменённых занятий
+  Future<int> cancelFollowingLessons(
+    String repeatGroupId,
+    DateTime fromDate, {
+    String? roomId,
+    TimeOfDay? startTime,
+  }) async {
+    try {
+      final dateStr = fromDate.toIso8601String().split('T').first;
+
+      // Получаем ID занятий для отмены (только scheduled)
+      var query = _client
+          .from('lessons')
+          .select('id')
+          .eq('repeat_group_id', repeatGroupId)
+          .gte('date', dateStr)
+          .eq('status', 'scheduled')
+          .isFilter('archived_at', null);
+
+      // Дополнительная фильтрация для точности
+      if (roomId != null) {
+        query = query.eq('room_id', roomId);
+      }
+      if (startTime != null) {
+        final timeStr =
+            '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+        query = query.eq('start_time', timeStr);
+      }
+
+      final lessonIds = await query;
+
+      final ids = (lessonIds as List).map((e) => e['id'] as String).toList();
+      if (ids.isEmpty) return 0;
+
+      // Устанавливаем статус 'cancelled' для всех занятий
+      await _client
+          .from('lessons')
+          .update({'status': 'cancelled'})
+          .inFilter('id', ids);
+
+      return ids.length;
+    } catch (e) {
+      throw DatabaseException('Ошибка отмены серии занятий: $e');
+    }
+  }
+
   /// Удалить занятие полностью
   Future<void> delete(String id) async {
     try {
@@ -712,12 +800,13 @@ class LessonRepository {
       final endStr =
           '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
 
-      // 1. Проверяем конфликт с занятиями
+      // 1. Проверяем конфликт с занятиями (исключаем отменённые)
       var lessonQuery = _client
           .from('lessons')
           .select('id')
           .eq('room_id', roomId)
           .eq('date', dateStr)
+          .neq('status', 'cancelled') // Отменённые занятия не блокируют время
           .isFilter('archived_at', null)
           .lt('start_time', endStr)
           .gt('end_time', startStr);

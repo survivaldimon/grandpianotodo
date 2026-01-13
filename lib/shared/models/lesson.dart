@@ -52,6 +52,8 @@ class Lesson extends BaseModel {
   final String createdBy;
   final String? repeatGroupId; // ID группы повторяющихся занятий
   final String? subscriptionId; // ID подписки для расчёта стоимости
+  final String? transferPaymentId; // ID записи переноса баланса, с которой списано
+  final bool isDeducted; // Было ли списано с баланса при отмене
 
   /// Связанные объекты (join)
   final Room? room;
@@ -84,6 +86,8 @@ class Lesson extends BaseModel {
     required this.createdBy,
     this.repeatGroupId,
     this.subscriptionId,
+    this.transferPaymentId,
+    this.isDeducted = false,
     this.room,
     this.teacher,
     this.subject,
@@ -145,6 +149,8 @@ class Lesson extends BaseModel {
         createdBy: json['created_by'] as String,
         repeatGroupId: json['repeat_group_id'] as String?,
         subscriptionId: json['subscription_id'] as String?,
+        transferPaymentId: json['transfer_payment_id'] as String?,
+        isDeducted: json['is_deducted'] as bool? ?? false,
         room: json['rooms'] != null
             ? Room.fromJson(json['rooms'] as Map<String, dynamic>)
             : null,
@@ -189,6 +195,8 @@ class Lesson extends BaseModel {
         'created_by': createdBy,
         'repeat_group_id': repeatGroupId,
         'subscription_id': subscriptionId,
+        'transfer_payment_id': transferPaymentId,
+        'is_deducted': isDeducted,
       };
 
   Lesson copyWith({
@@ -205,6 +213,8 @@ class Lesson extends BaseModel {
     String? comment,
     String? repeatGroupId,
     String? subscriptionId,
+    String? transferPaymentId,
+    bool? isDeducted,
   }) =>
       Lesson(
         id: id,
@@ -226,6 +236,8 @@ class Lesson extends BaseModel {
         createdBy: createdBy,
         repeatGroupId: repeatGroupId ?? this.repeatGroupId,
         subscriptionId: subscriptionId ?? this.subscriptionId,
+        transferPaymentId: transferPaymentId ?? this.transferPaymentId,
+        isDeducted: isDeducted ?? this.isDeducted,
         room: room,
         teacher: teacher,
         subject: subject,

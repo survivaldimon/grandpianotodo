@@ -23,6 +23,7 @@ import 'package:kabinet/shared/models/student_group.dart';
 import 'package:kabinet/features/students/widgets/merge_students_dialog.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 import 'package:kabinet/features/bookings/repositories/booking_repository.dart';
+import 'package:kabinet/features/payments/repositories/payment_repository.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
 import 'package:kabinet/shared/models/lesson_type.dart';
@@ -116,6 +117,46 @@ final _studentLastActivityProvider =
   return result;
 });
 
+/// Связи: studentId → список имён преподавателей
+final _studentTeacherNamesProvider =
+    FutureProvider.family<Map<String, List<String>>, String>((ref, institutionId) async {
+  final client = SupabaseConfig.client;
+
+  // Получаем связи student_teachers
+  final bindingsData = await client
+      .from('student_teachers')
+      .select('student_id, user_id')
+      .eq('institution_id', institutionId);
+
+  // Получаем имена участников
+  final membersData = await client
+      .from('institution_members')
+      .select('user_id, profiles(full_name)')
+      .eq('institution_id', institutionId);
+
+  // Создаём map userId → имя
+  final userNames = <String, String>{};
+  for (final member in membersData as List) {
+    final userId = member['user_id'] as String;
+    final profile = member['profiles'] as Map<String, dynamic>?;
+    final fullName = profile?['full_name'] as String? ?? 'Без имени';
+    userNames[userId] = fullName;
+  }
+
+  // Создаём map studentId → список имён преподавателей
+  final result = <String, List<String>>{};
+  for (final binding in bindingsData as List) {
+    final studentId = binding['student_id'] as String;
+    final userId = binding['user_id'] as String;
+    final teacherName = userNames[userId];
+    if (teacherName != null) {
+      result.putIfAbsent(studentId, () => []).add(teacherName);
+    }
+  }
+
+  return result;
+});
+
 // ============================================================================
 // ЭКРАН СПИСКА УЧЕНИКОВ
 // ============================================================================
@@ -140,6 +181,10 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
   bool _isSelectionMode = false;
   Set<String> _selectedStudentIds = {};
 
+  // Поиск по имени (поле под фильтрами)
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
   // Расширенные фильтры
   Set<String> _selectedTeacherIds = {};
   Set<String> _selectedSubjectIds = {};
@@ -159,6 +204,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -254,6 +300,11 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
     final groupBindingsAsync = ref.watch(_studentGroupBindingsProvider(widget.institutionId));
     final lastActivityAsync = ref.watch(_studentLastActivityProvider(widget.institutionId));
 
+    // Имена преподавателей для отображения (только если видим всех учеников)
+    final teacherNamesAsync = canManageAllStudents
+        ? ref.watch(_studentTeacherNamesProvider(widget.institutionId))
+        : null;
+
     // Для отображения в фильтрах
     final membersAsync = ref.watch(membersProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
@@ -270,15 +321,6 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
         title: _isSelectionMode
             ? Text('Выбрано: ${_selectedStudentIds.length}')
             : const Text(AppStrings.students),
-        actions: [
-          if (!_isSelectionMode)
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () {
-                // TODO: Search
-              },
-            ),
-        ],
         bottom: _isSelectionMode
             ? null
             : TabBar(
@@ -305,6 +347,50 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
           // ========== ВКЛАДКА УЧЕНИКОВ ==========
           Column(
             children: [
+              // Поле поиска по имени
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Поиск по имени...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              setState(() {
+                                _searchQuery = '';
+                                _searchController.clear();
+                              });
+                            },
+                          )
+                        : null,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value.toLowerCase();
+                    });
+                  },
+                ),
+              ),
+
               // Основные фильтры (Все/Мои/С долгом/Архив)
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -407,7 +493,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
 
                     // Всегда показываем данные (даже если фоном идёт обновление или ошибка)
                     // Применяем расширенные фильтры
-                    final filteredStudents = _applyAdvancedFilters(
+                    var filteredStudents = _applyAdvancedFilters(
                       students,
                       teacherBindings: teacherBindingsAsync.valueOrNull ?? {},
                       subjectBindings: subjectBindingsAsync.valueOrNull ?? {},
@@ -415,7 +501,17 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                       lastActivityMap: lastActivityAsync.valueOrNull ?? {},
                     );
 
+                    // Применяем поиск по имени
+                    if (_searchQuery.isNotEmpty) {
+                      filteredStudents = filteredStudents
+                          .where((s) => s.name.toLowerCase().contains(_searchQuery))
+                          .toList();
+                    }
+
                     if (filteredStudents.isEmpty) {
+                      if (_searchQuery.isNotEmpty) {
+                        return _buildSearchEmptyState();
+                      }
                       if (_hasAdvancedFilters) {
                         return _buildFilteredEmptyState();
                       }
@@ -431,6 +527,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                         ref.invalidate(_studentSubjectBindingsProvider(widget.institutionId));
                         ref.invalidate(_studentGroupBindingsProvider(widget.institutionId));
                         ref.invalidate(_studentLastActivityProvider(widget.institutionId));
+                        ref.invalidate(_studentTeacherNamesProvider(widget.institutionId));
                       },
                       child: ListView.builder(
                         padding: AppSizes.paddingHorizontalM,
@@ -438,8 +535,11 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                         itemBuilder: (context, index) {
                           final student = filteredStudents[index];
                           final isSelected = _selectedStudentIds.contains(student.id);
+                          // Получаем имена преподавателей для этого ученика
+                          final teacherNames = teacherNamesAsync?.valueOrNull?[student.id];
                           return _StudentCard(
                             student: student,
+                            teacherNames: teacherNames,
                             isSelectionMode: _isSelectionMode,
                             isSelected: isSelected,
                             onTap: () {
@@ -874,6 +974,37 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
     );
   }
 
+  Widget _buildSearchEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 64,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Ничего не найдено',
+            style: TextStyle(
+              fontSize: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Попробуйте изменить запрос',
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState(BuildContext context, WidgetRef ref, StudentFilter filter) {
     switch (filter) {
       case StudentFilter.archived:
@@ -1215,16 +1346,37 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
     try {
       final controller = ref.read(studentControllerProvider.notifier);
-      final legacyBalance = int.tryParse(_legacyBalanceController.text.trim()) ?? 0;
+      final initialBalance = int.tryParse(_legacyBalanceController.text.trim()) ?? 0;
+
+      // Создаём ученика БЕЗ legacyBalance (новая система balance_transfer)
       final student = await controller.create(
         institutionId: widget.institutionId,
         name: _nameController.text.trim(),
         phone: _phoneController.text.isEmpty ? null : _phoneController.text.trim(),
         comment: _commentController.text.isEmpty ? null : _commentController.text.trim(),
-        legacyBalance: legacyBalance,
+        legacyBalance: 0, // Всегда 0 — баланс теперь через balance_transfer
       );
 
       if (student != null) {
+        // Если введён начальный баланс — создаём запись balance_transfer
+        if (initialBalance > 0) {
+          try {
+            final paymentRepo = PaymentRepository();
+            await paymentRepo.createBalanceTransfer(
+              institutionId: widget.institutionId,
+              studentId: student.id,
+              lessonsCount: initialBalance,
+              comment: 'Начальный остаток',
+            );
+            // Инвалидируем провайдеры для обновления баланса
+            ref.invalidate(studentProvider(student.id));
+            ref.invalidate(studentsProvider(widget.institutionId));
+          } catch (e) {
+            // Не критичная ошибка — ученик создан, но баланс не добавлен
+            debugPrint('Error creating balance transfer: $e');
+          }
+        }
+
         // Создаём привязки если выбраны
         if (_selectedTeacher != null || _selectedSubject != null) {
           final bindingsController = ref.read(studentBindingsControllerProvider.notifier);
@@ -2167,6 +2319,7 @@ class _GroupCard extends StatelessWidget {
 
 class _StudentCard extends StatelessWidget {
   final Student student;
+  final List<String>? teacherNames;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final bool isSelectionMode;
@@ -2174,6 +2327,7 @@ class _StudentCard extends StatelessWidget {
 
   const _StudentCard({
     required this.student,
+    this.teacherNames,
     required this.onTap,
     this.onLongPress,
     this.isSelectionMode = false,
@@ -2230,6 +2384,19 @@ class _StudentCard extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                     ),
+                    // Имя преподавателя (если есть)
+                    if (teacherNames != null && teacherNames!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        teacherNames!.join(', '),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Row(
                       children: [

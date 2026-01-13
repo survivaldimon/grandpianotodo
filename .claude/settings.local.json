@@ -69,7 +69,20 @@
       "Bash(/c/Development/flutter/bin/flutter analyze:*)",
       "Bash(/mnt/r/flutter/bin/cache/dart-sdk/bin/dart analyze:*)",
       "Bash(/mnt/r/flutter/bin/cache/dart-sdk/bin/dart.exe analyze:*)",
-      "Bash(flutter.bat analyze:*)"
+      "Bash(flutter.bat analyze:*)",
+      "Bash(/mnt/c/tools/flutter/bin/flutter.bat analyze:*)",
+      "Bash(/home/bigslainy/.local/share/pnpm/dart format:*)",
+      "Bash(/mnt/c/flutter/bin/dart format:*)",
+      "Bash(/mnt/c/flutter/bin/cache/dart-sdk/bin/dart.exe format:*)",
+      "Bash(dart format:*)",
+      "Bash(/home/bigslainy/fvm/default/bin/flutter analyze:*)",
+      "Bash(git clone:*)",
+      "Bash(~/.bashrc)",
+      "Bash(export PATH=\"$HOME/flutter/bin:$PATH\")",
+      "Bash(flutter doctor:*)",
+      "Bash(sudo apt-get:*)",
+      "Bash(~/flutter/bin/flutter analyze:*)",
+      "Bash(/mnt/c/flutter/flutter/bin/flutter analyze:*)"
     ]
   }
 }

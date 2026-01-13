@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
+import 'package:kabinet/features/payments/repositories/payment_repository.dart';
 import 'package:kabinet/features/schedule/repositories/lesson_repository.dart';
 import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
@@ -17,6 +18,11 @@ final lessonRepositoryProvider = Provider<LessonRepository>((ref) {
 /// Провайдер репозитория подписок (для списания занятий)
 final subscriptionRepoProvider = Provider<SubscriptionRepository>((ref) {
   return SubscriptionRepository();
+});
+
+/// Провайдер репозитория оплат (для balance transfer)
+final _paymentRepoProvider = Provider<PaymentRepository>((ref) {
+  return PaymentRepository();
 });
 
 /// Параметры для загрузки занятий по кабинету
@@ -160,6 +166,7 @@ final lessonsByInstitutionWeekProvider =
 /// Провайдер занятий заведения за неделю (с realtime!)
 /// Комбинирует 7 StreamProvider (по одному на день)
 /// При изменении занятий любого дня — весь map автоматически обновляется
+/// ВАЖНО: Используем valueOrNull для сохранения данных при перезагрузке
 final lessonsByInstitutionWeekStreamProvider =
     Provider.family<AsyncValue<Map<DateTime, List<Lesson>>>, InstitutionWeekParams>((ref, params) {
   final result = <DateTime, List<Lesson>>{};
@@ -174,14 +181,21 @@ final lessonsByInstitutionWeekStreamProvider =
     final dayParams = InstitutionDateParams(params.institutionId, day);
     final dayAsync = ref.watch(lessonsByInstitutionStreamProvider(dayParams));
 
-    dayAsync.when(
-      loading: () => isLoading = true,
-      error: (e, st) {
-        error = e;
-        stackTrace = st;
-      },
-      data: (lessons) => result[normalizedDay] = lessons,
-    );
+    // Используем valueOrNull чтобы сохранить предыдущее значение при перезагрузке
+    // Это предотвращает "мигание" данных когда Realtime триггерит обновление
+    final lessons = dayAsync.valueOrNull;
+    if (lessons != null) {
+      result[normalizedDay] = lessons;
+    }
+
+    // Отслеживаем состояние только для ПЕРВОЙ загрузки (когда нет кеша)
+    if (dayAsync.isLoading && lessons == null) {
+      isLoading = true;
+    }
+    if (dayAsync.hasError && lessons == null) {
+      error = dayAsync.error;
+      stackTrace = dayAsync.stackTrace;
+    }
   }
 
   // Если хоть один день грузится и нет данных — loading
@@ -261,9 +275,10 @@ final unmarkedLessonsStreamProvider =
 class LessonController extends StateNotifier<AsyncValue<void>> {
   final LessonRepository _repo;
   final SubscriptionRepository _subscriptionRepo;
+  final PaymentRepository _paymentRepo;
   final Ref _ref;
 
-  LessonController(this._repo, this._subscriptionRepo, this._ref) : super(const AsyncValue.data(null));
+  LessonController(this._repo, this._subscriptionRepo, this._paymentRepo, this._ref) : super(const AsyncValue.data(null));
 
   /// Получить репозиторий студентов для работы с долгом
   StudentRepository get _studentRepo => _ref.read(studentRepositoryProvider);
@@ -420,23 +435,22 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         // Ошибка списания НЕ должна влиять на успешное изменение статуса
         if (lesson.studentId != null) {
           // Индивидуальное занятие
+          // Приоритет списания: 1) balance_transfer, 2) subscription, 3) долг
           try {
-            // Приоритет списания: 1) legacy_balance, 2) subscription, 3) долг
-            final student = await _studentRepo.getById(lesson.studentId!);
-
-            if (student.legacyBalance > 0) {
-              // Списываем из остатка (legacy_balance) в первую очередь
-              await _studentRepo.decrementLegacyBalance(lesson.studentId!);
-              // subscriptionId остаётся null — не привязано к подписке
+            // 1. Сначала пробуем списать с balance_transfer (остаток занятий)
+            final transferId = await _paymentRepo.deductBalanceTransfer(lesson.studentId!);
+            if (transferId != null) {
+              // Сохраняем transfer_payment_id для корректного возврата
+              await _repo.setTransferPaymentId(id, transferId);
             } else {
-              // Пробуем списать с подписки
+              // 2. Пробуем списать с подписки
               final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
 
               if (subscriptionId != null) {
                 // Привязываем занятие к подписке для расчёта стоимости
                 await _repo.setSubscriptionId(id, subscriptionId);
               } else {
-                // Нет активной подписки — списываем напрямую (уход в долг)
+                // 3. Нет активной подписки — списываем напрямую (уход в долг)
                 await _studentRepo.decrementPrepaidCount(lesson.studentId!);
               }
             }
@@ -449,14 +463,15 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
             if (!lessonStudent.attended) continue;
 
             try {
-              // Приоритет списания: 1) legacy_balance, 2) subscription, 3) долг
-              final student = await _studentRepo.getById(lessonStudent.studentId);
-
-              if (student.legacyBalance > 0) {
-                // Списываем из остатка (legacy_balance) в первую очередь
-                await _studentRepo.decrementLegacyBalance(lessonStudent.studentId);
-                // subscriptionId остаётся null — не привязано к подписке
+              // Приоритет списания: 1) balance_transfer, 2) subscription, 3) долг
+              // 1. Сначала пробуем списать с balance_transfer
+              final transferId = await _paymentRepo.deductBalanceTransfer(lessonStudent.studentId);
+              if (transferId != null) {
+                // Для групповых занятий не сохраняем transfer_payment_id в lesson
+                // т.к. у каждого участника может быть свой источник
+                // TODO: Добавить поле в lesson_students если нужен точный возврат
               } else {
+                // 2. Пробуем списать с подписки
                 final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lessonStudent.studentId);
 
                 if (subscriptionId != null) {
@@ -467,7 +482,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
                     subscriptionId,
                   );
                 } else {
-                  // Нет активной подписки — списываем напрямую (уход в долг)
+                  // 3. Нет активной подписки — списываем напрямую (уход в долг)
                   await _studentRepo.decrementPrepaidCount(lessonStudent.studentId);
                 }
               }
@@ -524,7 +539,11 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       if (lesson.studentId != null) {
         // Индивидуальное занятие
         try {
-          if (lesson.subscriptionId != null) {
+          if (lesson.transferPaymentId != null) {
+            // Было списано с balance_transfer — возвращаем туда
+            await _paymentRepo.returnBalanceTransferLesson(lesson.transferPaymentId!);
+            await _repo.clearTransferPaymentId(id);
+          } else if (lesson.subscriptionId != null) {
             // Было списано с подписки — возвращаем туда
             await _subscriptionRepo.returnLesson(
               lesson.studentId!,
@@ -551,6 +570,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
           if (!wasCancelled && !lessonStudent.attended) continue;
 
           try {
+            // TODO: Для точного возврата balance_transfer в групповых занятиях
+            // нужно добавить поле transfer_payment_id в lesson_students
             if (lessonStudent.subscriptionId != null) {
               // Было списано с подписки — возвращаем туда
               await _subscriptionRepo.returnLesson(
@@ -562,7 +583,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
                 lessonStudent.studentId,
               );
             } else {
-              // Было списано в долг — возвращаем (уменьшаем долг)
+              // Было списано в долг или balance_transfer — возвращаем в prepaid
+              // (balance_transfer для групповых не отслеживается индивидуально)
               await _studentRepo.incrementPrepaidCount(lessonStudent.studentId);
             }
           } catch (e) {
@@ -628,22 +650,22 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       if (!alreadyDeducted) {
         if (lesson.studentId != null) {
           // Индивидуальное занятие
+          // Приоритет списания: 1) balance_transfer, 2) subscription, 3) долг
           try {
-            // Приоритет списания: 1) legacy_balance, 2) subscription, 3) долг
-            final student = await _studentRepo.getById(lesson.studentId!);
-
-            if (student.legacyBalance > 0) {
-              // Списываем из остатка (legacy_balance) в первую очередь
-              await _studentRepo.decrementLegacyBalance(lesson.studentId!);
-              // subscriptionId остаётся null — не привязано к подписке
+            // 1. Сначала пробуем списать с balance_transfer (остаток занятий)
+            final transferId = await _paymentRepo.deductBalanceTransfer(lesson.studentId!);
+            if (transferId != null) {
+              // Сохраняем transfer_payment_id для корректного возврата
+              await _repo.setTransferPaymentId(id, transferId);
             } else {
+              // 2. Пробуем списать с подписки
               final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
 
               if (subscriptionId != null) {
                 // Привязываем занятие к подписке для корректного возврата
                 await _repo.setSubscriptionId(id, subscriptionId);
               } else {
-                // Нет активной подписки — списываем напрямую (уход в долг)
+                // 3. Нет активной подписки — списываем напрямую (уход в долг)
                 await _studentRepo.decrementPrepaidCount(lesson.studentId!);
               }
             }
@@ -655,14 +677,14 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
           for (final lessonStudent in lesson.lessonStudents!) {
             // Для отменённых занятий списываем у ВСЕХ участников (не только attended)
             try {
-              // Приоритет списания: 1) legacy_balance, 2) subscription, 3) долг
-              final student = await _studentRepo.getById(lessonStudent.studentId);
-
-              if (student.legacyBalance > 0) {
-                // Списываем из остатка (legacy_balance) в первую очередь
-                await _studentRepo.decrementLegacyBalance(lessonStudent.studentId);
-                // subscriptionId остаётся null
+              // Приоритет списания: 1) balance_transfer, 2) subscription, 3) долг
+              // 1. Сначала пробуем списать с balance_transfer
+              final transferId = await _paymentRepo.deductBalanceTransfer(lessonStudent.studentId);
+              if (transferId != null) {
+                // Для групповых занятий не сохраняем transfer_payment_id
+                // т.к. у каждого участника может быть свой источник
               } else {
+                // 2. Пробуем списать с подписки
                 final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(lessonStudent.studentId);
 
                 if (subscriptionId != null) {
@@ -672,6 +694,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
                     subscriptionId,
                   );
                 } else {
+                  // 3. Нет активной подписки — списываем напрямую (уход в долг)
                   await _studentRepo.decrementPrepaidCount(lessonStudent.studentId);
                 }
               }
@@ -720,8 +743,60 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   Future<bool> delete(String id, String roomId, DateTime date, String institutionId) async {
     state = const AsyncValue.loading();
     try {
+      // Получаем занятие перед удалением для возврата баланса
+      final lesson = await _repo.getById(id);
+
+      // Если занятие было проведено или отменено — нужно вернуть списанное
+      final wasDeducted = lesson.status == LessonStatus.completed ||
+                          lesson.status == LessonStatus.cancelled;
+
+      if (wasDeducted) {
+        if (lesson.studentId != null) {
+          // Индивидуальное занятие
+          try {
+            if (lesson.transferPaymentId != null) {
+              // Было списано с balance_transfer — возвращаем туда
+              await _paymentRepo.returnBalanceTransferLesson(lesson.transferPaymentId!);
+            } else if (lesson.subscriptionId != null) {
+              // Было списано с подписки — возвращаем туда
+              await _subscriptionRepo.returnLesson(
+                lesson.studentId!,
+                subscriptionId: lesson.subscriptionId,
+              );
+            } else {
+              // Было списано в долг — возвращаем
+              await _studentRepo.incrementPrepaidCount(lesson.studentId!);
+            }
+          } catch (e) {
+            debugPrint('Error returning balance on delete: $e');
+          }
+        } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+          // Групповое занятие
+          final wasCancelled = lesson.status == LessonStatus.cancelled;
+          for (final lessonStudent in lesson.lessonStudents!) {
+            // Для completed возвращаем только присутствовавшим
+            // Для cancelled возвращаем всем
+            if (!wasCancelled && !lessonStudent.attended) continue;
+
+            try {
+              if (lessonStudent.subscriptionId != null) {
+                await _subscriptionRepo.returnLesson(
+                  lessonStudent.studentId,
+                  subscriptionId: lessonStudent.subscriptionId,
+                );
+              } else {
+                await _studentRepo.incrementPrepaidCount(lessonStudent.studentId);
+              }
+            } catch (e) {
+              debugPrint('Error returning for student ${lessonStudent.studentId}: $e');
+            }
+          }
+        }
+      }
+
       await _repo.delete(id);
       _invalidateForRoom(roomId, date, institutionId: institutionId);
+      _ref.invalidate(studentsProvider(institutionId));
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -831,9 +906,17 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       final todayOnly = DateTime(today.year, today.month, today.day);
       final lessonDate = DateTime(lesson.date.year, lesson.date.month, lesson.date.day);
       final isToday = lessonDate.isAtSameMomentAs(todayOnly);
+      final wasCompleted = lesson.status == LessonStatus.completed;
 
-      // Списание ТОЛЬКО для сегодняшних занятий (не будущих, не прошлых)
-      final shouldDeduct = deductFromBalance && isToday && lesson.status != LessonStatus.completed;
+      // Если занятие было проведено — сначала возвращаем списанное
+      // (как uncomplete, но без смены статуса на scheduled)
+      if (wasCompleted) {
+        await _returnDeductedForLesson(lesson);
+      }
+
+      // Списание ТОЛЬКО для сегодняшних занятий
+      // (для проведённых занятий теперь тоже доступно, т.к. выше мы вернули списанное)
+      final shouldDeduct = deductFromBalance && isToday;
 
       if (shouldDeduct) {
         if (lesson.isGroupLesson) {
@@ -845,16 +928,38 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
           }
         } else if (lesson.studentId != null) {
           // Для индивидуальных — списываем ученику
-          await _deductFromStudent(lesson.studentId!);
+          final transferId = await _deductFromStudent(lesson.studentId!);
+          if (transferId != null) {
+            // Сохраняем transfer_payment_id для корректного возврата
+            await _repo.setTransferPaymentId(lesson.id, transferId);
+          }
           _ref.invalidate(studentProvider(lesson.studentId!));
         }
       }
 
-      // Архивируем занятие
-      await _repo.archive(lesson.id);
+      // Устанавливаем статус "отменено" (не архивируем, чтобы занятие было в истории)
+      await _repo.cancel(lesson.id);
+
+      // Сохраняем флаг списания для отображения в истории
+      if (shouldDeduct) {
+        await _repo.setIsDeducted(lesson.id, true);
+      } else {
+        // Если было проведено но не списываем при отмене — сбрасываем флаг
+        await _repo.setIsDeducted(lesson.id, false);
+      }
+
       _invalidateForRoom(lesson.roomId, lesson.date, institutionId: institutionId);
       // Инвалидируем список учеников для обновления баланса
       _ref.invalidate(studentsProvider(institutionId));
+
+      // Инвалидируем статистику занятий ученика
+      if (lesson.studentId != null) {
+        _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+      } else if (lesson.isGroupLesson && lesson.lessonStudents != null) {
+        for (final ls in lesson.lessonStudents!) {
+          _ref.invalidate(studentLessonStatsProvider(ls.studentId));
+        }
+      }
 
       state = const AsyncValue.data(null);
       return true;
@@ -865,26 +970,83 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Вспомогательный метод для списания занятия с правильным приоритетом
-  /// Приоритет: 1) legacy_balance, 2) subscription, 3) долг (prepaid_lessons_count)
-  Future<void> _deductFromStudent(String studentId) async {
+  /// Приоритет: 1) balance_transfer, 2) subscription, 3) долг (prepaid_lessons_count)
+  /// Возвращает transferPaymentId если списано с balance_transfer
+  Future<String?> _deductFromStudent(String studentId) async {
     try {
-      final student = await _studentRepo.getById(studentId);
-
-      if (student.legacyBalance > 0) {
-        // Списываем из остатка (legacy_balance) в первую очередь
-        await _studentRepo.decrementLegacyBalance(studentId);
-      } else {
-        // Пробуем списать с подписки
-        final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(studentId);
-
-        if (subscriptionId == null) {
-          // Нет активной подписки — списываем напрямую (уход в долг)
-          await _studentRepo.decrementPrepaidCount(studentId);
-        }
+      // 1. Сначала пробуем списать с balance_transfer (остаток занятий)
+      final transferId = await _paymentRepo.deductBalanceTransfer(studentId);
+      if (transferId != null) {
+        return transferId;
       }
+
+      // 2. Пробуем списать с подписки
+      final subscriptionId = await _subscriptionRepo.deductLessonAndGetId(studentId);
+
+      if (subscriptionId == null) {
+        // 3. Нет активной подписки — списываем напрямую (уход в долг)
+        await _studentRepo.decrementPrepaidCount(studentId);
+      }
+
+      return null; // Не списано с balance_transfer
     } catch (e) {
       // Не критичная ошибка - продолжаем
       debugPrint('Error deducting from student $studentId: $e');
+      return null;
+    }
+  }
+
+  /// Возвращает списанное занятие на баланс (для проведённых занятий)
+  /// Используется при отмене проведённого занятия
+  Future<void> _returnDeductedForLesson(Lesson lesson) async {
+    try {
+      if (lesson.studentId != null) {
+        // Индивидуальное занятие
+        if (lesson.transferPaymentId != null) {
+          // Было списано с balance_transfer — возвращаем туда
+          await _paymentRepo.returnBalanceTransferLesson(lesson.transferPaymentId!);
+          await _repo.clearTransferPaymentId(lesson.id);
+        } else if (lesson.subscriptionId != null) {
+          // Было списано с подписки — возвращаем туда
+          await _subscriptionRepo.returnLesson(
+            lesson.studentId!,
+            subscriptionId: lesson.subscriptionId,
+          );
+          await _repo.clearSubscriptionId(lesson.id);
+        } else {
+          // Было списано в долг — возвращаем
+          await _studentRepo.incrementPrepaidCount(lesson.studentId!);
+        }
+        _ref.invalidate(studentProvider(lesson.studentId!));
+      } else if (lesson.groupId != null && lesson.lessonStudents != null) {
+        // Групповое занятие — возвращаем занятие присутствовавшим участникам
+        for (final lessonStudent in lesson.lessonStudents!) {
+          if (!lessonStudent.attended) continue;
+
+          try {
+            // TODO: Для точного возврата balance_transfer в групповых занятиях
+            // нужно добавить поле transfer_payment_id в lesson_students
+            if (lessonStudent.subscriptionId != null) {
+              await _subscriptionRepo.returnLesson(
+                lessonStudent.studentId,
+                subscriptionId: lessonStudent.subscriptionId,
+              );
+              await _repo.clearLessonStudentSubscriptionId(
+                lesson.id,
+                lessonStudent.studentId,
+              );
+            } else {
+              // Было списано в долг или balance_transfer — возвращаем в prepaid
+              await _studentRepo.incrementPrepaidCount(lessonStudent.studentId);
+            }
+            _ref.invalidate(studentProvider(lessonStudent.studentId));
+          } catch (e) {
+            debugPrint('Error returning lesson for student ${lessonStudent.studentId}: $e');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error returning deducted lesson: $e');
     }
   }
 
@@ -910,26 +1072,46 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       final lessonDate = DateTime(lesson.date.year, lesson.date.month, lesson.date.day);
       final isToday = lessonDate.isAtSameMomentAs(todayOnly);
 
+      final wasCompleted = lesson.status == LessonStatus.completed;
+
+      // Если текущее занятие было проведено — сначала возвращаем списанное
+      if (wasCompleted) {
+        await _returnDeductedForLesson(lesson);
+      }
+
       // Списание ТОЛЬКО для сегодняшнего занятия (не будущих)
-      // При отмене серии — списываем максимум 1 занятие (сегодняшнее)
-      if (deductFromBalance && isToday && lesson.status != LessonStatus.completed) {
+      final shouldDeduct = deductFromBalance && isToday;
+      if (shouldDeduct) {
         if (lesson.studentId != null) {
           await _deductFromStudent(lesson.studentId!);
           _ref.invalidate(studentProvider(lesson.studentId!));
         }
       }
 
-      // Архивируем ВСЕ занятия серии (и сегодня, и будущие)
-      // Фильтрация по кабинету для защиты от старых данных
-      final count = await _repo.archiveFollowingLessons(
+      // Отменяем ВСЕ занятия серии (устанавливаем статус 'cancelled')
+      // Занятия остаются в истории (не архивируются)
+      final count = await _repo.cancelFollowingLessons(
         lesson.repeatGroupId!,
         lesson.date,
         roomId: lesson.roomId,
       );
 
+      // Сохраняем флаг списания для текущего занятия
+      if (shouldDeduct) {
+        await _repo.setIsDeducted(lesson.id, true);
+      } else {
+        await _repo.setIsDeducted(lesson.id, false);
+      }
+
       _invalidateForRoom(lesson.roomId, lesson.date, institutionId: institutionId);
       // Инвалидируем список учеников для обновления баланса
       _ref.invalidate(studentsProvider(institutionId));
+
+      // Инвалидируем статистику занятий ученика
+      if (lesson.studentId != null) {
+        _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+      }
+
       state = const AsyncValue.data(null);
       return count;
     } catch (e, st) {
@@ -1132,7 +1314,8 @@ final lessonControllerProvider =
     StateNotifierProvider<LessonController, AsyncValue<void>>((ref) {
   final repo = ref.watch(lessonRepositoryProvider);
   final subscriptionRepo = ref.watch(subscriptionRepoProvider);
-  return LessonController(repo, subscriptionRepo, ref);
+  final paymentRepo = ref.watch(_paymentRepoProvider);
+  return LessonController(repo, subscriptionRepo, paymentRepo, ref);
 });
 
 // ============================================================

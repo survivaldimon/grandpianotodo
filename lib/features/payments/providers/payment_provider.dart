@@ -119,8 +119,9 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
   PaymentController(this._repo, this._subscriptionRepo, this._ref) : super(const AsyncValue.data(null));
 
   /// Создать оплату
-  /// Тариф используется только для автозаполнения полей, подписка НЕ создаётся
-  /// Занятия добавляются в prepaid_lessons_count через триггер в БД
+  /// Если указан тариф (paymentPlanId) и срок действия (validityDays) — создаётся подписка
+  /// В этом случае занятия учитываются через subscription.lessons_remaining
+  /// Иначе — занятия добавляются в prepaid_lessons_count через триггер в БД
   Future<Payment?> create({
     required String institutionId,
     required String studentId,
@@ -128,12 +129,16 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     required double amount,
     required int lessonsCount,
     String paymentMethod = 'cash',
+    int? validityDays, // Срок действия (если указан — создаётся подписка)
     DateTime? paidAt,
     String? comment,
   }) async {
     state = const AsyncValue.loading();
     try {
-      // Создаём платёж (триггер автоматически добавит занятия в prepaid_lessons_count)
+      // Определяем, нужно ли создавать подписку
+      final hasSubscription = paymentPlanId != null && validityDays != null;
+
+      // Создаём платёж (если hasSubscription — триггер пропустит запись)
       final payment = await _repo.create(
         institutionId: institutionId,
         studentId: studentId,
@@ -141,9 +146,25 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         amount: amount,
         lessonsCount: lessonsCount,
         paymentMethod: paymentMethod,
+        hasSubscription: hasSubscription,
         paidAt: paidAt,
         comment: comment,
       );
+
+      // Если есть тариф — создаём подписку
+      if (hasSubscription) {
+        final expiresAt = DateTime.now().add(Duration(days: validityDays!));
+        await _subscriptionRepo.create(
+          institutionId: institutionId,
+          studentId: studentId,
+          paymentId: payment.id,
+          lessonsTotal: lessonsCount,
+          expiresAt: expiresAt,
+        );
+        // Инвалидируем провайдеры подписок
+        _ref.invalidate(studentSubscriptionsProvider(studentId));
+        _ref.invalidate(activeSubscriptionsProvider(studentId));
+      }
 
       _ref.invalidate(studentPaymentsProvider(studentId));
       _ref.invalidate(studentProvider(studentId));
@@ -197,6 +218,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     double? amount,
     int? lessonsCount,
     String? paymentMethod,
+    DateTime? paidAt,
     String? comment,
   }) async {
     state = const AsyncValue.loading();
@@ -208,6 +230,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         amount: amount,
         lessonsCount: lessonsCount,
         paymentMethod: paymentMethod,
+        paidAt: paidAt,
         comment: comment,
       );
       _ref.invalidate(studentPaymentsProvider(studentId));
@@ -275,6 +298,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       // Создаём платёж, привязываем к первому ученику
+      // hasSubscription: true — триггер не добавит занятия в prepaid_lessons_count
       final payment = await _repo.create(
         institutionId: institutionId,
         studentId: studentIds.first,
@@ -282,6 +306,7 @@ class PaymentController extends StateNotifier<AsyncValue<void>> {
         amount: amount,
         lessonsCount: lessonsCount,
         paymentMethod: paymentMethod,
+        hasSubscription: true,
         paidAt: paidAt,
         comment: comment,
       );

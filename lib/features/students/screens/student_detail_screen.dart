@@ -13,6 +13,8 @@ import 'package:kabinet/shared/providers/supabase_provider.dart';
 import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
+import 'package:kabinet/features/payments/repositories/payment_repository.dart';
+import 'package:kabinet/features/payments/screens/payments_screen.dart' show showAddPaymentSheet;
 import 'package:kabinet/features/payment_plans/providers/payment_plan_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
@@ -130,7 +132,7 @@ class StudentDetailScreen extends ConsumerWidget {
                         ),
                       ),
                     if (canArchive) ...[
-                      if (student.isArchived) ...[
+                      if (student.isArchived)
                         const PopupMenuItem(
                           value: 'restore',
                           child: Row(
@@ -140,18 +142,8 @@ class StudentDetailScreen extends ConsumerWidget {
                               Text('Разархивировать', style: TextStyle(color: Colors.green)),
                             ],
                           ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_forever, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Удалить навсегда', style: TextStyle(color: Colors.red)),
-                            ],
-                          ),
-                        ),
-                      ] else
+                        )
+                      else
                         const PopupMenuItem(
                           value: 'archive',
                           child: Row(
@@ -162,6 +154,17 @@ class StudentDetailScreen extends ConsumerWidget {
                             ],
                           ),
                         ),
+                      // Удалить навсегда — доступно всегда (и для архивированных, и для активных)
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_forever, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Удалить навсегда', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -270,6 +273,9 @@ class StudentDetailScreen extends ConsumerWidget {
                   onAddPayment: canEditStudent ? () => _showAddPaymentDialog(context, ref) : null,
                   onManageLessons: canEditStudent && !student.isArchived
                       ? () => _showBulkLessonActionsSheet(context, ref, student)
+                      : null,
+                  onAddLessons: canEditStudent && !student.isArchived
+                      ? () => _showAddLessonsSheet(context, ref, student)
                       : null,
                   showAvgCost: hasFullAccess, // Только владелец/админ видит среднюю стоимость
                 ),
@@ -382,91 +388,18 @@ class StudentDetailScreen extends ConsumerWidget {
   }
 
   void _showEditStudentDialog(BuildContext context, WidgetRef ref, Student student) {
-    final nameController = TextEditingController(text: student.name);
-    // Автозаполнение кода страны если телефон пустой
-    final prefix = ref.read(phoneDefaultPrefixProvider);
-    final phoneText = student.phone ?? (prefix.isNotEmpty ? '$prefix ' : '');
-    final phoneController = TextEditingController(text: phoneText);
-    final commentController = TextEditingController(text: student.comment ?? '');
-    final legacyBalanceController = TextEditingController(
-      text: student.legacyBalance > 0 ? student.legacyBalance.toString() : '',
-    );
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Редактировать ученика'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'ФИО'),
-                  validator: (v) => v == null || v.isEmpty ? 'Введите имя' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(labelText: 'Телефон'),
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: commentController,
-                  decoration: const InputDecoration(labelText: 'Комментарий'),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: legacyBalanceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Остаток занятий',
-                    hintText: 'При переносе из другой школы',
-                    prefixIcon: Icon(Icons.sync_alt_outlined),
-                    suffixText: 'занятий',
-                    helperText: 'Списывается первым, не влияет на доход',
-                    helperMaxLines: 2,
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                final controller = ref.read(studentControllerProvider.notifier);
-                final legacyBalance = int.tryParse(legacyBalanceController.text.trim());
-                final success = await controller.update(
-                  studentId,
-                  institutionId: institutionId,
-                  name: nameController.text.trim(),
-                  phone: phoneController.text.isEmpty ? null : phoneController.text.trim(),
-                  comment: commentController.text.isEmpty ? null : commentController.text.trim(),
-                  legacyBalance: legacyBalance,
-                );
-                if (success && context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ученик обновлен')),
-                  );
-                }
-              }
-            },
-            child: const Text('Сохранить'),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _EditStudentSheet(
+        student: student,
+        institutionId: institutionId,
+        phoneDefaultPrefix: ref.read(phoneDefaultPrefixProvider),
+        onSaved: () {
+          ref.invalidate(studentProvider(studentId));
+          ref.invalidate(studentPaymentsProvider(studentId));
+        },
       ),
     );
   }
@@ -482,6 +415,22 @@ class StudentDetailScreen extends ConsumerWidget {
           // Инвалидируем провайдеры после операций
           ref.invalidate(studentProvider(studentId));
           ref.invalidate(studentLessonStatsProvider(studentId));
+        },
+      ),
+    );
+  }
+
+  void _showAddLessonsSheet(BuildContext context, WidgetRef ref, Student student) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _AddLessonsSheet(
+        student: student,
+        institutionId: institutionId,
+        onCompleted: () {
+          // Инвалидируем провайдеры после операций
+          ref.invalidate(studentProvider(studentId));
+          ref.invalidate(studentPaymentsProvider(studentId));
         },
       ),
     );
@@ -641,18 +590,20 @@ class StudentDetailScreen extends ConsumerWidget {
   }
 
   void _showAddPaymentDialog(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
+    // Используем унифицированный экран добавления оплаты
+    showAddPaymentSheet(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => _AddPaymentSheet(
-        institutionId: institutionId,
-        studentId: studentId,
-        onCreated: () {
-          ref.invalidate(studentProvider(studentId));
-          ref.invalidate(studentPaymentsProvider(studentId));
-          ref.invalidate(subscriptionsStreamProvider(studentId));
-        },
-      ),
+      ref: ref,
+      institutionId: institutionId,
+      canAddForAllStudents: false, // В карточке ученика - только для этого ученика
+      preselectedStudentId: studentId,
+      onSuccess: () {
+        ref.invalidate(studentProvider(studentId));
+        ref.invalidate(studentPaymentsProvider(studentId));
+        ref.invalidate(subscriptionsStreamProvider(studentId));
+        ref.invalidate(studentSubscriptionsProvider(studentId));
+        ref.invalidate(activeSubscriptionsProvider(studentId));
+      },
     );
   }
 
@@ -844,6 +795,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
   final String studentId;
   final VoidCallback? onAddPayment;
   final VoidCallback? onManageLessons;
+  final VoidCallback? onAddLessons; // Добавить занятия (balance transfer)
   final bool showAvgCost;
 
   const _BalanceAndCostCard({
@@ -852,6 +804,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
     required this.studentId,
     this.onAddPayment,
     this.onManageLessons,
+    this.onAddLessons,
     this.showAvgCost = true,
   });
 
@@ -894,11 +847,11 @@ class _BalanceAndCostCard extends ConsumerWidget {
                               color: AppColors.textSecondary,
                             ),
                       ),
-                      // Разбивка баланса если есть legacy
+                      // Разбивка баланса если есть остаток (transfer balance)
                       if (student.hasLegacyBalance) ...[
                         const SizedBox(height: 8),
                         Text(
-                          'из абонементов: ${student.subscriptionBalance}',
+                          'Абонементы: ${student.subscriptionBalance}',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: AppColors.textSecondary,
                                 fontSize: 11,
@@ -915,7 +868,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'из остатка: ${student.legacyBalance}',
+                              'Остаток: ${student.legacyBalance}',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppColors.warning,
                                     fontSize: 11,
@@ -923,6 +876,36 @@ class _BalanceAndCostCard extends ConsumerWidget {
                                   ),
                             ),
                           ],
+                        ),
+                      ],
+                      // Кнопка добавления занятий (balance transfer)
+                      if (onAddLessons != null) ...[
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: onAddLessons,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.add_circle_outline,
+                                  size: 14,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Добавить занятия',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -1174,6 +1157,12 @@ class _PaymentItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final dateStr = DateFormat('dd.MM.yyyy').format(payment.paidAt);
     final formatter = NumberFormat('#,###', 'ru_RU');
+
+    // Специальное отображение для balance_transfer записей
+    if (payment.isBalanceTransfer) {
+      return _buildBalanceTransferItem(context, dateStr);
+    }
+
     final amountStr = '${formatter.format(payment.amount.toInt())} ₸';
 
     // Проверяем, есть ли скидка в комментарии
@@ -1296,6 +1285,122 @@ class _PaymentItem extends StatelessWidget {
                   'Корр.',
                   style: TextStyle(
                     color: AppColors.warning,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Отображение записи переноса баланса (balance_transfer)
+  Widget _buildBalanceTransferItem(BuildContext context, String dateStr) {
+    final remaining = payment.transferLessonsRemaining ?? 0;
+    final total = payment.lessonsCount;
+    final isExhausted = remaining <= 0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: isExhausted
+          ? Theme.of(context).colorScheme.surfaceContainerLow
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Иконка
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isExhausted
+                    ? Colors.grey.withValues(alpha: 0.1)
+                    : AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.sync_alt,
+                color: isExhausted ? Colors.grey : AppColors.warning,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Информация
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Остаток занятий',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: isExhausted
+                              ? Colors.grey
+                              : Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Бейдж с количеством
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isExhausted
+                              ? Colors.grey.withValues(alpha: 0.2)
+                              : AppColors.warning.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$remaining / $total',
+                          style: TextStyle(
+                            color: isExhausted ? Colors.grey : AppColors.warning,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    dateStr,
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (payment.comment != null && payment.comment!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      payment.comment!,
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Индикатор исчерпания
+            if (isExhausted)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Исчерпан',
+                  style: TextStyle(
+                    color: Colors.grey,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
@@ -1601,537 +1706,6 @@ class _SubscriptionCard extends StatelessWidget {
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Форма добавления оплаты
-class _AddPaymentSheet extends ConsumerStatefulWidget {
-  final String institutionId;
-  final String studentId;
-  final VoidCallback onCreated;
-
-  const _AddPaymentSheet({
-    required this.institutionId,
-    required this.studentId,
-    required this.onCreated,
-  });
-
-  @override
-  ConsumerState<_AddPaymentSheet> createState() => _AddPaymentSheetState();
-}
-
-class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
-  final _lessonsController = TextEditingController();
-  final _validityController = TextEditingController(text: '30');
-  final _discountController = TextEditingController();
-  final _commentController = TextEditingController();
-
-  PaymentPlan? _selectedPlan;
-  DateTime _selectedDate = DateTime.now();
-  bool _isLoading = false;
-  bool _hasDiscount = false;
-  double _originalPrice = 0;
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _lessonsController.dispose();
-    _validityController.dispose();
-    _discountController.dispose();
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  void _onPlanSelected(PaymentPlan? plan) {
-    setState(() {
-      _selectedPlan = plan;
-      if (plan != null) {
-        _originalPrice = plan.price;
-        _lessonsController.text = plan.lessonsCount.toString();
-        _validityController.text = plan.validityDays.toString();
-        _updateFinalAmount();
-      } else {
-        _originalPrice = 0;
-        _hasDiscount = false;
-        _discountController.clear();
-        _amountController.clear();
-      }
-    });
-  }
-
-  void _updateFinalAmount() {
-    if (_selectedPlan != null) {
-      double finalAmount = _originalPrice;
-      if (_hasDiscount && _discountController.text.isNotEmpty) {
-        final discount = double.tryParse(_discountController.text) ?? 0;
-        finalAmount = _originalPrice - discount;
-        if (finalAmount < 0) finalAmount = 0;
-      }
-      _amountController.text = finalAmount.toStringAsFixed(0);
-    }
-  }
-
-  Future<void> _selectDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-    );
-    if (date != null) {
-      setState(() => _selectedDate = date);
-    }
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    // Формируем комментарий со скидкой
-    String? comment = _commentController.text.trim();
-    if (_hasDiscount && _discountController.text.isNotEmpty) {
-      final discount = double.tryParse(_discountController.text) ?? 0;
-      if (discount > 0) {
-        final discountNote = 'Скидка: ${discount.toStringAsFixed(0)} ₸';
-        comment = comment.isEmpty ? discountNote : '$discountNote\n$comment';
-      }
-    }
-
-    final controller = ref.read(paymentControllerProvider.notifier);
-    final payment = await controller.create(
-      institutionId: widget.institutionId,
-      studentId: widget.studentId,
-      paymentPlanId: _selectedPlan?.id,
-      amount: double.parse(_amountController.text),
-      lessonsCount: int.parse(_lessonsController.text),
-      paidAt: _selectedDate,
-      comment: comment.isEmpty ? null : comment,
-    );
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (payment != null) {
-        widget.onCreated();
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Оплата добавлена'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final plansAsync = ref.watch(paymentPlansProvider(widget.institutionId));
-    final controllerState = ref.watch(paymentControllerProvider);
-
-    ref.listen(paymentControllerProvider, (prev, next) {
-      if (next.hasError && mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        });
-      }
-    });
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Индикатор
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Заголовок
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.payments,
-                        color: AppColors.success,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Добавить оплату',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Выберите тариф или введите сумму',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Дата оплаты
-                InkWell(
-                  onTap: _selectDate,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today, color: AppColors.primary),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Дата оплаты',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              DateFormat('dd MMMM yyyy', 'ru').format(_selectedDate),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Тариф
-                plansAsync.when(
-                  loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => ErrorView.inline(e),
-                  data: (plans) {
-                    // Находим выбранный план по ID
-                    final currentPlan = _selectedPlan != null
-                        ? plans.where((p) => p.id == _selectedPlan!.id).firstOrNull
-                        : null;
-                    return DropdownButtonFormField<PaymentPlan?>(
-                      decoration: InputDecoration(
-                        labelText: 'Тариф',
-                        prefixIcon: const Icon(Icons.credit_card_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                      ),
-                      initialValue: currentPlan,
-                      items: [
-                        const DropdownMenuItem<PaymentPlan?>(
-                          value: null,
-                          child: Text('Свой вариант'),
-                        ),
-                        ...plans.map((plan) => DropdownMenuItem<PaymentPlan?>(
-                              value: plan,
-                              child: Text(plan.displayNameWithValidity),
-                            )),
-                      ],
-                      onChanged: _onPlanSelected,
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Скидка (только если выбран тариф)
-                if (_selectedPlan != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _hasDiscount
-                          ? AppColors.warning.withValues(alpha: 0.1)
-                          : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                      border: _hasDiscount
-                          ? Border.all(color: AppColors.warning.withValues(alpha: 0.3))
-                          : null,
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Checkbox(
-                              value: _hasDiscount,
-                              onChanged: (value) {
-                                setState(() {
-                                  _hasDiscount = value ?? false;
-                                  if (!_hasDiscount) {
-                                    _discountController.clear();
-                                  }
-                                  _updateFinalAmount();
-                                });
-                              },
-                              activeColor: AppColors.warning,
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.discount,
-                              color: _hasDiscount ? AppColors.warning : Colors.grey,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Скидка',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_hasDiscount) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  controller: _discountController,
-                                  decoration: InputDecoration(
-                                    hintText: 'Размер скидки',
-                                    suffixText: '₸',
-                                    filled: true,
-                                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (_) {
-                                    _updateFinalAmount();
-                                    setState(() {});
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'Было: ${_originalPrice.toStringAsFixed(0)} ₸',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                      decoration: TextDecoration.lineThrough,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Итого: ${_amountController.text} ₸',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.success,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                // Сумма
-                TextFormField(
-                  controller: _amountController,
-                  decoration: InputDecoration(
-                    labelText: 'Сумма',
-                    suffixText: '₸',
-                    prefixIcon: const Icon(Icons.payments_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Введите сумму';
-                    if (double.tryParse(v) == null) return 'Неверная сумма';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Количество занятий и Срок действия в одной строке
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _lessonsController,
-                        decoration: InputDecoration(
-                          labelText: 'Занятий',
-                          prefixIcon: const Icon(Icons.school_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Введите';
-                          if (int.tryParse(v) == null) return 'Число';
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _validityController,
-                        decoration: InputDecoration(
-                          labelText: 'Срок (дней)',
-                          prefixIcon: const Icon(Icons.timer_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Введите';
-                          final num = int.tryParse(v);
-                          if (num == null || num <= 0) return 'Ошибка';
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Комментарий
-                TextFormField(
-                  controller: _commentController,
-                  decoration: InputDecoration(
-                    labelText: 'Комментарий (необязательно)',
-                    prefixIcon: const Icon(Icons.comment_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 24),
-
-                // Кнопка
-                SizedBox(
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _isLoading || controllerState.isLoading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.success,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading || controllerState.isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
-                            ),
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.check),
-                              const SizedBox(width: 8),
-                              Text(
-                                _amountController.text.isNotEmpty
-                                    ? 'Добавить оплату ${_amountController.text} ₸'
-                                    : 'Добавить оплату',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
         ),
       ),
     );
@@ -5505,6 +5079,650 @@ class _LessonHistoryItem extends StatelessWidget {
                 Icons.chevron_right,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Обновлённый диалог редактирования ученика (BottomSheet)
+class _EditStudentSheet extends ConsumerStatefulWidget {
+  final Student student;
+  final String institutionId;
+  final String phoneDefaultPrefix;
+  final VoidCallback? onSaved;
+
+  const _EditStudentSheet({
+    required this.student,
+    required this.institutionId,
+    required this.phoneDefaultPrefix,
+    this.onSaved,
+  });
+
+  @override
+  ConsumerState<_EditStudentSheet> createState() => _EditStudentSheetState();
+}
+
+class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _commentController;
+  final _lessonsController = TextEditingController();
+  final _lessonsCommentController = TextEditingController();
+
+  bool _isSaving = false;
+  bool _showLessonsSection = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.student.name);
+    final phoneText = widget.student.phone ??
+        (widget.phoneDefaultPrefix.isNotEmpty ? '${widget.phoneDefaultPrefix} ' : '');
+    _phoneController = TextEditingController(text: phoneText);
+    _commentController = TextEditingController(text: widget.student.comment ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _commentController.dispose();
+    _lessonsController.dispose();
+    _lessonsCommentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveStudent() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final controller = ref.read(studentControllerProvider.notifier);
+      final success = await controller.update(
+        widget.student.id,
+        institutionId: widget.institutionId,
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.isEmpty ? null : _phoneController.text.trim(),
+        comment: _commentController.text.isEmpty ? null : _commentController.text.trim(),
+      );
+
+      if (success && mounted) {
+        Navigator.pop(context);
+        widget.onSaved?.call();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ученик обновлен')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _addLessons() async {
+    final lessonsCount = int.tryParse(_lessonsController.text.trim()) ?? 0;
+    if (lessonsCount == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Введите количество занятий')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final repo = PaymentRepository();
+      final comment = _lessonsCommentController.text.trim();
+
+      await repo.createBalanceTransfer(
+        institutionId: widget.institutionId,
+        studentId: widget.student.id,
+        lessonsCount: lessonsCount,
+        comment: comment.isEmpty ? null : comment,
+      );
+
+      if (mounted) {
+        _lessonsController.clear();
+        _lessonsCommentController.clear();
+        setState(() => _showLessonsSection = false);
+        widget.onSaved?.call();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              lessonsCount > 0
+                  ? 'Добавлено $lessonsCount занятий'
+                  : 'Списано ${lessonsCount.abs()} занятий',
+            ),
+            backgroundColor: lessonsCount > 0 ? Colors.green : Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: cs.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+
+                // Заголовок
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: cs.primaryContainer,
+                      child: Text(
+                        widget.student.name.isNotEmpty
+                            ? widget.student.name[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(color: cs.onPrimaryContainer),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Редактировать',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            widget.student.name,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // === Секция: Основная информация ===
+                _buildSectionHeader('Основная информация', Icons.person_outline),
+                const SizedBox(height: 12),
+
+                // ФИО
+                TextFormField(
+                  controller: _nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: 'ФИО',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.badge_outlined),
+                  ),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя' : null,
+                ),
+                const SizedBox(height: 12),
+
+                // Телефон
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Телефон',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Комментарий
+                TextFormField(
+                  controller: _commentController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: 'Комментарий',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.notes_outlined),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // === Секция: Остаток занятий ===
+                _buildSectionHeader('Остаток занятий', Icons.sync_alt),
+                const SizedBox(height: 8),
+
+                // Текущий баланс
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: widget.student.legacyBalance > 0
+                              ? Colors.orange.withValues(alpha: 0.2)
+                              : cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.account_balance_wallet_outlined,
+                          color: widget.student.legacyBalance > 0
+                              ? Colors.orange
+                              : cs.onSurfaceVariant,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Текущий остаток',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            Text(
+                              '${widget.student.legacyBalance} занятий',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: widget.student.legacyBalance > 0
+                                    ? Colors.orange
+                                    : cs.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Кнопка добавить/убрать занятия
+                      if (!_showLessonsSection)
+                        FilledButton.tonalIcon(
+                          onPressed: () => setState(() => _showLessonsSection = true),
+                          icon: const Icon(Icons.edit, size: 18),
+                          label: const Text('Изменить'),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Форма добавления/списания занятий
+                if (_showLessonsSection) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Изменить остаток',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: Colors.orange.shade800,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => setState(() {
+                                _showLessonsSection = false;
+                                _lessonsController.clear();
+                                _lessonsCommentController.clear();
+                              }),
+                              icon: const Icon(Icons.close, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _lessonsController,
+                          keyboardType: const TextInputType.numberWithOptions(signed: true),
+                          decoration: InputDecoration(
+                            labelText: 'Количество',
+                            hintText: '+5 или -3',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: cs.surface,
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _lessonsCommentController,
+                          decoration: InputDecoration(
+                            labelText: 'Причина (опционально)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: cs.surface,
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _isSaving ? null : _addLessons,
+                            icon: _isSaving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.check),
+                            label: const Text('Применить'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+
+                // Кнопка сохранения
+                FilledButton(
+                  onPressed: _isSaving ? null : _saveStudent,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Сохранить изменения'),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Форма добавления занятий (balance transfer)
+class _AddLessonsSheet extends StatefulWidget {
+  final Student student;
+  final String institutionId;
+  final VoidCallback? onCompleted;
+
+  const _AddLessonsSheet({
+    required this.student,
+    required this.institutionId,
+    this.onCompleted,
+  });
+
+  @override
+  State<_AddLessonsSheet> createState() => _AddLessonsSheetState();
+}
+
+class _AddLessonsSheetState extends State<_AddLessonsSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _lessonsController = TextEditingController(text: '1');
+  final _commentController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _lessonsController.dispose();
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final lessonsCount = int.tryParse(_lessonsController.text.trim()) ?? 0;
+    if (lessonsCount == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Количество занятий не может быть 0')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final repo = PaymentRepository();
+      final comment = _commentController.text.trim();
+
+      await repo.createBalanceTransfer(
+        institutionId: widget.institutionId,
+        studentId: widget.student.id,
+        lessonsCount: lessonsCount,
+        comment: comment.isEmpty ? null : comment,
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onCompleted?.call();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              lessonsCount > 0
+                  ? 'Добавлено $lessonsCount занятий'
+                  : 'Списано ${lessonsCount.abs()} занятий',
+            ),
+            backgroundColor: lessonsCount > 0 ? Colors.green : Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Заголовок
+              Row(
+                children: [
+                  const Icon(Icons.sync_alt, color: AppColors.warning),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Добавить занятия',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Остаток занятий: ${widget.student.legacyBalance}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 24),
+
+              // Поле количества занятий
+              TextFormField(
+                controller: _lessonsController,
+                keyboardType: const TextInputType.numberWithOptions(signed: true),
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: 'Количество занятий',
+                  hintText: 'Положительное или отрицательное число',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.numbers),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Введите количество';
+                  }
+                  final count = int.tryParse(value.trim());
+                  if (count == null) {
+                    return 'Введите целое число';
+                  }
+                  if (count == 0) {
+                    return 'Количество не может быть 0';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Поле комментария
+              TextFormField(
+                controller: _commentController,
+                textInputAction: TextInputAction.done,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Комментарий (необязательно)',
+                  hintText: 'Например: Перенос с другого абонемента',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.comment_outlined),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Кнопка
+              ElevatedButton.icon(
+                onPressed: _isLoading ? null : _submit,
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check),
+                label: const Text('Сохранить'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         ),

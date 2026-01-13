@@ -70,6 +70,7 @@ final bookingsByInstitutionWeekProvider =
 /// Провайдер бронирований за неделю (с realtime!)
 /// Комбинирует 7 StreamProvider (по одному на день)
 /// При изменении бронирований любого дня — весь map автоматически обновляется
+/// ВАЖНО: Используем valueOrNull для сохранения данных при перезагрузке
 final bookingsByInstitutionWeekStreamProvider =
     Provider.family<AsyncValue<Map<DateTime, List<Booking>>>, InstitutionWeekParams>((ref, params) {
   final result = <DateTime, List<Booking>>{};
@@ -83,14 +84,21 @@ final bookingsByInstitutionWeekStreamProvider =
     final dayParams = InstitutionDateParams(params.institutionId, day);
     final dayAsync = ref.watch(bookingsByInstitutionDateProvider(dayParams));
 
-    dayAsync.when(
-      loading: () => isLoading = true,
-      error: (e, st) {
-        error = e;
-        stackTrace = st;
-      },
-      data: (bookings) => result[normalizedDay] = bookings,
-    );
+    // Используем valueOrNull чтобы сохранить предыдущее значение при перезагрузке
+    // Это предотвращает "мигание" данных когда Realtime триггерит обновление
+    final bookings = dayAsync.valueOrNull;
+    if (bookings != null) {
+      result[normalizedDay] = bookings;
+    }
+
+    // Отслеживаем состояние только для ПЕРВОЙ загрузки (когда нет кеша)
+    if (dayAsync.isLoading && bookings == null) {
+      isLoading = true;
+    }
+    if (dayAsync.hasError && bookings == null) {
+      error = dayAsync.error;
+      stackTrace = dayAsync.stackTrace;
+    }
   }
 
   // Если хоть один день грузится и нет данных — loading

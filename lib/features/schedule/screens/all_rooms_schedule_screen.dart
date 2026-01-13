@@ -33,6 +33,7 @@ import 'package:kabinet/features/bookings/models/booking.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 import 'package:kabinet/features/bookings/repositories/booking_repository.dart';
 import 'package:kabinet/features/groups/providers/group_provider.dart';
+import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/shared/models/student_group.dart';
 
 /// Класс для хранения состояния фильтров расписания
@@ -226,8 +227,11 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
 
   /// Переход к сегодняшней дате с прокруткой к началу
   void _goToToday() {
+    final oldDate = _selectedDate;
+    final newDate = DateTime.now();
+    _invalidateWeekProviders(oldDate, newDate);
     setState(() {
-      _selectedDate = DateTime.now();
+      _selectedDate = newDate;
       _savedScrollOffset = null;
       _scrollResetKey++; // Принудительный сброс скролла сетки
     });
@@ -236,6 +240,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
 
   /// Обработчик выбора даты
   void _onDateSelected(DateTime date) {
+    final oldDate = _selectedDate;
+    _invalidateWeekProviders(oldDate, date);
     setState(() {
       _selectedDate = date;
       _savedScrollOffset = null;
@@ -268,6 +274,25 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
         });
       }
     });
+  }
+
+  /// Инвалидация провайдеров недели при смене недели
+  /// Решает проблему кеширования данных для будущих недель
+  void _invalidateWeekProviders(DateTime oldDate, DateTime newDate) {
+    final oldWeekStart = InstitutionWeekParams.getWeekStart(oldDate);
+    final newWeekStart = InstitutionWeekParams.getWeekStart(newDate);
+
+    // Если неделя не изменилась — ничего не делаем
+    if (oldWeekStart.year == newWeekStart.year &&
+        oldWeekStart.month == newWeekStart.month &&
+        oldWeekStart.day == newWeekStart.day) {
+      return;
+    }
+
+    // Инвалидируем только старую неделю — новая загрузится автоматически
+    final oldWeekParams = InstitutionWeekParams(widget.institutionId, oldWeekStart);
+    ref.invalidate(lessonsByInstitutionWeekStreamProvider(oldWeekParams));
+    ref.invalidate(bookingsByInstitutionWeekStreamProvider(oldWeekParams));
   }
 
   @override
@@ -395,6 +420,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
             _WeekSelector(
               selectedDate: _selectedDate,
               onWeekChanged: (weekStart) {
+                final oldDate = _selectedDate;
+                _invalidateWeekProviders(oldDate, weekStart);
                 setState(() => _selectedDate = weekStart);
               },
             ),
@@ -760,6 +787,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       },
       onCellTap: (room, date) {
         // Переключаемся на дневной вид с выбранной датой и кабинетом
+        final oldDate = _selectedDate;
+        _invalidateWeekProviders(oldDate, date);
         setState(() {
           _selectedDate = date;
           _selectedRoomId = room.id;
@@ -995,6 +1024,8 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (date != null) {
+      final oldDate = _selectedDate;
+      _invalidateWeekProviders(oldDate, date);
       setState(() => _selectedDate = date);
       _preloadAdjacentDates();
     }
@@ -1835,6 +1866,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     final buttonTopOffset = gapCenterMinute / 60 * _AllRoomsTimeGrid.hourHeight - 8;
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => widget.onAddLesson(room, hour, gap.start),
       child: Container(
         height: _AllRoomsTimeGrid.hourHeight,
@@ -2491,6 +2523,7 @@ class _CompactDayGridState extends State<_CompactDayGrid> {
     return Row(
       children: rooms.map((room) {
         final content = GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => widget.onRoomTap(room.id, _lastScrollOffset),
           child: Container(
             width: expandColumns ? null : columnWidth,
@@ -2832,29 +2865,39 @@ class _CompactDayGridState extends State<_CompactDayGrid> {
         final gap = _findGapInHour(room, hour, roomLessons, roomBookings, roomSlots);
 
         if (gap != null) {
-          // Вычисляем позицию иконки "+" в середине свободного промежутка
+          // Вычисляем позицию и размер кликабельной области на всё свободное пространство
           final gapStartMinutes = hour * 60 + gap.start;
           final gapEndMinutes = hour * 60 + gap.end;
-          final gapCenterMinutes = (gapStartMinutes + gapEndMinutes) / 2;
+          final gapDuration = gapEndMinutes - gapStartMinutes;
 
-          final topOffset = (gapCenterMinutes - widget.startHour * 60) / 60 * _CompactDayGrid.compactHourHeight - 8;
+          final topOffset = (gapStartMinutes - widget.startHour * 60) / 60 * _CompactDayGrid.compactHourHeight;
+          final height = gapDuration / 60 * _CompactDayGrid.compactHourHeight;
 
           widgets.add(Positioned(
             top: topOffset,
-            left: roomIndex * columnWidth + columnWidth / 2 - 8,
+            left: roomIndex * columnWidth,
+            width: columnWidth,
+            height: height,
             child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () => widget.onAddLesson(room, hour, gap.start),
-              child: Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.add,
-                  size: 12,
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.6),
+              child: Center(
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.add,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.7),
+                  ),
                 ),
               ),
             ),
@@ -3502,6 +3545,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
       children: rooms.map((room) {
         final isSelected = widget.selectedRoomId == room.id;
         final content = GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () {
             // Сохраняем текущую позицию перед переключением
             if (_headerScrollController.hasClients) {
@@ -3568,6 +3612,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
         final hasContent = roomLessons.isNotEmpty || roomBookings.isNotEmpty || roomSlots.isNotEmpty;
 
         final content = GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => widget.onCellTap(room, date),
           child: Container(
             width: expandColumns ? null : roomColumnWidth,
@@ -3774,11 +3819,18 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
   bool _isPaid = false;
   bool _isLoading = false;
   bool _isLoadingPayment = true;
+  bool _isDeducted = false; // Для отменённых занятий: списано ли с баланса
+  String? _currentSubscriptionId; // Отслеживаем текущий subscriptionId для корректного возврата
+  String? _currentTransferPaymentId; // Отслеживаем transferPaymentId для возврата на остаток
 
   @override
   void initState() {
     super.initState();
     _currentStatus = widget.lesson.status;
+    // Для отменённых: используем поле isDeducted из БД
+    _isDeducted = widget.lesson.isDeducted;
+    _currentSubscriptionId = widget.lesson.subscriptionId;
+    _currentTransferPaymentId = widget.lesson.transferPaymentId;
     _loadPaymentStatus();
     // Принудительно обновляем права при открытии
     Future.microtask(() {
@@ -4063,8 +4115,43 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                   ),
                 ],
 
-                // Статусы (только если есть право редактирования)
-                if (canEdit) ...[
+                // Для отменённых занятий — показываем переключатель "Списано"
+                if (_isCancelled && hasStudent) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                    child: SwitchListTile(
+                      title: const Text('Списано с баланса'),
+                      subtitle: Text(
+                        _isDeducted
+                            ? 'Занятие списано с баланса ученика'
+                            : 'Занятие не списано с баланса',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      value: _isDeducted,
+                      onChanged: _isLoading
+                          ? null
+                          : (value) => _handleDeductionToggle(value),
+                      activeColor: AppColors.warning,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Статусы (только если есть право редактирования и занятие не отменено)
+                if (canEdit && !_isCancelled) ...[
                   const SizedBox(height: 16),
 
                   // Статусы (оптимистичное обновление — UI меняется мгновенно)
@@ -4103,12 +4190,34 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                       ],
                     ],
                   ),
-                ], // конец if (canEdit)
+                ], // конец if (canEdit && !_isCancelled)
 
                 const SizedBox(height: 20),
 
-                // Кнопки действий (только если есть хотя бы одно право)
-                if (canEdit || canCancel)
+                // Кнопка удаления для занятий из истории (отменённых и проведённых)
+                if ((_isCancelled || _isCompleted) && canDelete) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: controllerState.isLoading || _isLoading
+                          ? null
+                          : _handleDeleteFromHistory,
+                      icon: const Icon(Icons.delete_forever_rounded, size: 18),
+                      label: const Text('Удалить из истории'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Кнопки действий (только если есть хотя бы одно право и занятие не отменено)
+                if ((canEdit || canCancel) && !_isCancelled)
                   Row(
                     children: [
                       // Редактировать (только если есть право)
@@ -4234,6 +4343,218 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  /// Обработчик переключения списания для отменённых занятий
+  Future<void> _handleDeductionToggle(bool shouldDeduct) async {
+    if (_isLoading) return;
+
+    final lesson = widget.lesson;
+    if (lesson.studentId == null) return;
+
+    // Оптимистичное обновление
+    final previousDeducted = _isDeducted;
+    final previousSubscriptionId = _currentSubscriptionId;
+    final previousTransferPaymentId = _currentTransferPaymentId;
+    setState(() {
+      _isDeducted = shouldDeduct;
+      _isLoading = true;
+    });
+
+    try {
+      final studentRepo = ref.read(studentRepositoryProvider);
+      final subscriptionRepo = ref.read(subscriptionRepositoryProvider);
+      final paymentRepo = ref.read(paymentRepositoryProvider);
+      final lessonRepo = ref.read(lessonRepositoryProvider);
+
+      if (shouldDeduct) {
+        // Списываем занятие с баланса
+        // Приоритет: 1) balance_transfer, 2) subscription, 3) prepaid (долг)
+
+        // 1. Сначала пробуем списать с balance_transfer (остаток занятий)
+        final transferId = await paymentRepo.deductBalanceTransfer(lesson.studentId!);
+        if (transferId != null) {
+          // Сохраняем transfer_payment_id для корректного возврата
+          await lessonRepo.setTransferPaymentId(lesson.id, transferId);
+          _currentTransferPaymentId = transferId;
+          _currentSubscriptionId = null;
+        } else {
+          // 2. Пробуем списать с подписки
+          final subscriptionId = await subscriptionRepo.deductLessonAndGetId(lesson.studentId!);
+
+          if (subscriptionId != null) {
+            // Привязываем занятие к подписке
+            await lessonRepo.setSubscriptionId(lesson.id, subscriptionId);
+            _currentSubscriptionId = subscriptionId;
+            _currentTransferPaymentId = null;
+          } else {
+            // 3. Нет подписки и остатка — списываем в долг
+            await studentRepo.decrementPrepaidCount(lesson.studentId!);
+            _currentSubscriptionId = null;
+            _currentTransferPaymentId = null;
+          }
+        }
+      } else {
+        // Возвращаем занятие на баланс
+        // Проверяем источник в порядке приоритета
+
+        if (_currentTransferPaymentId != null) {
+          // Было списано с balance_transfer — возвращаем туда
+          await paymentRepo.returnBalanceTransferLesson(_currentTransferPaymentId!);
+          await lessonRepo.clearTransferPaymentId(lesson.id);
+          _currentTransferPaymentId = null;
+        } else if (_currentSubscriptionId != null) {
+          // Было списано с подписки — возвращаем туда
+          await subscriptionRepo.returnLesson(
+            lesson.studentId!,
+            subscriptionId: _currentSubscriptionId,
+          );
+          await lessonRepo.clearSubscriptionId(lesson.id);
+          _currentSubscriptionId = null;
+        } else {
+          // Возвращаем в prepaid_lessons_count (был долг)
+          await studentRepo.incrementPrepaidCount(lesson.studentId!);
+        }
+      }
+
+      // Обновляем флаг is_deducted в БД
+      await lessonRepo.setIsDeducted(lesson.id, shouldDeduct);
+
+      // Инвалидируем провайдеры
+      ref.invalidate(studentProvider(lesson.studentId!));
+      ref.invalidate(studentsProvider(widget.institutionId));
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(shouldDeduct ? 'Занятие списано' : 'Занятие возвращено'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Откат при ошибке
+      if (mounted) {
+        setState(() {
+          _isDeducted = previousDeducted;
+          _currentSubscriptionId = previousSubscriptionId;
+          _currentTransferPaymentId = previousTransferPaymentId;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: ${ErrorView.getUserFriendlyMessage(e)}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Удаление занятия из истории с восстановлением счётчиков
+  Future<void> _handleDeleteFromHistory() async {
+    final lesson = widget.lesson;
+
+    // Определяем, нужно ли возвращать занятие на баланс
+    // Для отменённых — проверяем is_deducted
+    // Для проведённых — всегда было списано (при complete)
+    final needsReturn = (_isCancelled && _isDeducted) || _isCompleted;
+    final subscriptionId = _currentSubscriptionId ?? lesson.subscriptionId;
+
+    // Проверяем, есть ли оплата за это занятие
+    final hasPayment = _isPaid;
+
+    String message;
+    if (hasPayment) {
+      message = 'Занятие будет удалено из истории.\nОплата за занятие также будет удалена.';
+      if (needsReturn) {
+        message += '\nСписанное занятие будет возвращено на баланс ученика.';
+      }
+    } else if (needsReturn && lesson.studentId != null) {
+      message = 'Занятие будет удалено из истории.\nСписанное занятие будет возвращено на баланс ученика.';
+    } else {
+      message = 'Занятие будет полностью удалено из истории.';
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить занятие?'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Если есть оплата — удаляем её сначала
+      if (hasPayment) {
+        final paymentController = ref.read(paymentControllerProvider.notifier);
+        await paymentController.deleteByLessonId(lesson.id, studentId: lesson.studentId);
+      }
+
+      // Если занятие было списано — возвращаем на баланс
+      if (needsReturn && lesson.studentId != null) {
+        final studentRepo = ref.read(studentRepositoryProvider);
+        final subscriptionRepo = ref.read(subscriptionRepositoryProvider);
+
+        if (subscriptionId != null) {
+          // Было списано с подписки — возвращаем туда
+          await subscriptionRepo.returnLesson(
+            lesson.studentId!,
+            subscriptionId: subscriptionId,
+          );
+        } else {
+          // Возвращаем в prepaid_lessons_count
+          await studentRepo.incrementPrepaidCount(lesson.studentId!);
+        }
+
+        // Инвалидируем провайдеры ученика
+        ref.invalidate(studentProvider(lesson.studentId!));
+      }
+
+      // Удаляем занятие
+      final lessonController = ref.read(lessonControllerProvider.notifier);
+      await lessonController.delete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
+
+      // Инвалидируем провайдеры
+      ref.invalidate(studentsProvider(widget.institutionId));
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onUpdated();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Занятие удалено из истории'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: ${ErrorView.getUserFriendlyMessage(e)}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -4437,8 +4758,9 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
     final isFuture = lessonDate.isAfter(todayOnly);
 
     // Для сегодняшних — можно выбрать списание
+    // Для проведённых — тоже показываем (сначала вернётся списанное, потом можно снова списать)
     // Для будущих — списание недоступно (только архивация)
-    final canShowDeductOption = isToday && !isCompleted;
+    final canShowDeductOption = isToday;
 
     return Container(
       decoration: BoxDecoration(
@@ -4509,23 +4831,24 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                   const SizedBox(height: 16),
                 ],
 
-                // Предупреждение для проведённых занятий
+                // Информация для проведённых занятий
                 if (isCompleted) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                      border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
                     ),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.warning_amber, color: Colors.orange),
+                        Icon(Icons.info_outline, color: colorScheme.primary),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Занятие уже проведено. Списание баланса недоступно.',
-                            style: TextStyle(color: Colors.orange[800]),
+                            'Списанное при проведении занятие будет автоматически возвращено на баланс.',
+                            style: TextStyle(color: colorScheme.primary),
                           ),
                         ),
                       ],
@@ -7435,7 +7758,9 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
   void initState() {
     super.initState();
     _selectedDates = Set.from(widget.selectedDates);
-    _currentMonth = DateTime(widget.firstDate.year, widget.firstDate.month);
+    // Показываем текущий месяц по умолчанию (не firstDate, который может быть в прошлом)
+    final now = DateTime.now();
+    _currentMonth = DateTime(now.year, now.month);
   }
 
   /// Нормализует дату (убирает время)
@@ -8031,6 +8356,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                     initialStartTime: _startTime,
                     initialEndTime: _endTime,
                     minuteInterval: 5,
+                    defaultDurationMinutes: _selectedLessonType?.defaultDurationMinutes ?? 60,
                   );
                   if (range != null) {
                     setState(() {
@@ -9659,8 +9985,9 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
       context: context,
       builder: (context) => _MultiDatePickerDialog(
         selectedDates: _customDates.toSet(),
-        firstDate: _selectedDate,
-        lastDate: _selectedDate.add(const Duration(days: 365)),
+        // Разрешаем выбирать даты от года назад до года вперёд
+        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
       ),
     );
 

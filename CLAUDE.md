@@ -41,6 +41,10 @@
 | [MODELS.md](./MODELS.md) | Dart модели данных |
 | SESSION_*.md | История сессий разработки |
 
+**Последние сессии:**
+- `SESSION_2026_01_13_BALANCE_TRANSFER.md` — система остатка занятий, улучшения UI
+- `SESSION_2026_01_11_LESSON_HISTORY.md` — история занятий, настройка кабинетов
+
 ---
 
 ## Архитектура
@@ -167,6 +171,9 @@ final canDelete = hasFullAccess ||
 - `repeat_group_id` — связь повторяющихся занятий
 - `lesson_history` — история изменений
 - `lesson_students` — участники групповых занятий
+- `subscription_id` — привязка к подписке (для возврата)
+- `transfer_payment_id` — привязка к balance transfer (для возврата)
+- `is_deducted` — флаг списания (для отменённых занятий)
 
 Файлы:
 - `lib/features/schedule/repositories/lesson_repository.dart`
@@ -175,11 +182,69 @@ final canDelete = hasFullAccess ||
 ### Оплаты (Payments)
 - `payment_method`: `'card'` | `'cash'`
 - `lessons_count` — количество занятий
-- Триггер `handle_payment_insert` добавляет занятия в `prepaid_lessons_count`
+- `has_subscription` — флаг: оплата создаёт подписку
+
+**Механизм учёта занятий:**
+- Если `has_subscription = false` → триггер `handle_payment_insert` добавляет занятия в `prepaid_lessons_count`
+- Если `has_subscription = true` → триггер пропускает (занятия через `subscription.lessons_remaining`)
+
+**Унифицированный экран добавления оплаты:**
+```dart
+import 'package:kabinet/features/payments/screens/payments_screen.dart' show showAddPaymentSheet;
+
+showAddPaymentSheet(
+  context: context,
+  ref: ref,
+  institutionId: institutionId,
+  canAddForAllStudents: true,       // Выбор любого ученика
+  preselectedStudentId: studentId,  // Предвыбор ученика (опционально)
+  onSuccess: () { ... },
+);
+```
+**ВСЕГДА** использовать `showAddPaymentSheet()` — **НЕ** создавать локальные формы оплаты в других экранах!
+
+**Поведение при выборе тарифа:**
+- Сумма, занятия и срок действия **блокируются** (read-only)
+- При сохранении автоматически создаётся подписка (subscription)
+- Иконка замка показывает заблокированные поля
 
 Файлы:
 - `lib/shared/models/payment.dart`
 - `lib/features/payments/repositories/payment_repository.dart`
+- `lib/features/payments/screens/payments_screen.dart` — `showAddPaymentSheet()`, `_AddPaymentSheet`, `_EditPaymentSheet`
+
+### Balance Transfer (Остаток занятий)
+Система переноса остатка занятий из другой школы или начисления администратором.
+
+**Приоритет списания:**
+```
+1. Balance Transfer (остаток) — ПЕРВЫЙ
+2. Subscription (абонемент)
+3. Prepaid/Debt (долг)
+```
+
+**Поля в payments:**
+- `is_balance_transfer` — флаг записи переноса
+- `transfer_lessons_remaining` — остаток занятий (уменьшается при списании)
+
+**Поля в lessons:**
+- `transfer_payment_id` — ID записи переноса (для возврата)
+- `is_deducted` — списано ли занятие (для отменённых)
+
+**RPC функции:**
+```sql
+deduct_balance_transfer(p_student_id UUID) RETURNS UUID  -- Списание (FIFO)
+return_balance_transfer_lesson(p_payment_id UUID)        -- Возврат
+```
+
+**Методы PaymentRepository:**
+```dart
+Future<String?> deductBalanceTransfer(String studentId);
+Future<void> returnBalanceTransferLesson(String paymentId);
+Future<void> createBalanceTransfer({studentId, lessonsCount, comment});
+```
+
+Миграция: `supabase/migrations/20260113_add_balance_transfer.sql`
 
 ### Подписки (Subscriptions)
 - `is_family` — семейный абонемент (общий пул занятий)

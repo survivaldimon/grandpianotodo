@@ -334,25 +334,30 @@ CREATE TABLE lessons (
   teacher_id UUID NOT NULL REFERENCES auth.users(id),
   subject_id UUID REFERENCES subjects(id),  -- Предмет занятия
   lesson_type_id UUID REFERENCES lesson_types(id),
-  
+
   -- Для индивидуальных занятий
   student_id UUID REFERENCES students(id),
-  
+
   -- Для групповых занятий
   group_id UUID REFERENCES student_groups(id),
-  
+
   date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
-  
+
   status lesson_status NOT NULL DEFAULT 'scheduled',
   comment TEXT,
-  
+
+  -- Привязка к источнику занятия (для возврата)
+  subscription_id UUID REFERENCES subscriptions(id),     -- Подписка с которой списано
+  transfer_payment_id UUID REFERENCES payments(id),      -- Balance transfer с которой списано
+  is_deducted BOOLEAN DEFAULT FALSE,                     -- Списано ли (для отменённых занятий)
+
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_by UUID NOT NULL REFERENCES auth.users(id),
   archived_at TIMESTAMPTZ,
-  
+
   -- Либо student_id, либо group_id должен быть заполнен
   CONSTRAINT lesson_participant CHECK (
     (student_id IS NOT NULL AND group_id IS NULL) OR
@@ -437,6 +442,13 @@ CREATE TABLE payments (
   comment TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
 
+  -- Balance Transfer (остаток занятий)
+  is_balance_transfer BOOLEAN NOT NULL DEFAULT FALSE,  -- Флаг записи переноса остатка
+  transfer_lessons_remaining INT,                       -- Остаток занятий (списывается при проведении)
+
+  -- Флаг оплаты с подпиской
+  has_subscription BOOLEAN DEFAULT FALSE,  -- Триггер пропускает такие записи
+
   -- Причина корректировки обязательна для корректирующих записей
   CONSTRAINT correction_requires_reason CHECK (
     is_correction = FALSE OR correction_reason IS NOT NULL
@@ -444,6 +456,11 @@ CREATE TABLE payments (
   -- Способ оплаты только cash или card
   CONSTRAINT check_payment_method CHECK (payment_method IN ('cash', 'card'))
 );
+
+-- Индекс для активных переносов баланса
+CREATE INDEX idx_payments_active_balance_transfers
+ON payments(student_id, is_balance_transfer)
+WHERE is_balance_transfer = TRUE AND transfer_lessons_remaining > 0;
 
 CREATE INDEX idx_payments_student ON payments(student_id);
 CREATE INDEX idx_payments_institution_date ON payments(institution_id, paid_at);
@@ -872,6 +889,79 @@ GRANT EXECUTE ON FUNCTION transfer_institution_ownership(UUID, UUID) TO authenti
 await _client.rpc('transfer_institution_ownership', params: {
   'p_institution_id': institutionId,
   'p_new_owner_id': newOwnerUserId,
+});
+```
+
+### deduct_balance_transfer
+
+Списание 1 занятия с самого старого переноса баланса (FIFO).
+
+```sql
+CREATE OR REPLACE FUNCTION deduct_balance_transfer(p_student_id UUID)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  transfer_id UUID;
+BEGIN
+  -- Находим самую старую запись переноса с остатком (FIFO)
+  SELECT id INTO transfer_id
+  FROM payments
+  WHERE student_id = p_student_id
+    AND is_balance_transfer = TRUE
+    AND transfer_lessons_remaining > 0
+  ORDER BY paid_at ASC
+  LIMIT 1
+  FOR UPDATE;
+
+  -- Если нашли — списываем 1 занятие
+  IF transfer_id IS NOT NULL THEN
+    UPDATE payments
+    SET transfer_lessons_remaining = transfer_lessons_remaining - 1
+    WHERE id = transfer_id;
+  END IF;
+
+  RETURN transfer_id;  -- NULL если переносов нет
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION deduct_balance_transfer(UUID) TO authenticated;
+```
+
+**Вызов из Dart:**
+```dart
+final result = await _client.rpc('deduct_balance_transfer', params: {
+  'p_student_id': studentId,
+}).single();
+return result as String?;  // payment_id или null
+```
+
+### return_balance_transfer_lesson
+
+Возврат 1 занятия на запись переноса баланса.
+
+```sql
+CREATE OR REPLACE FUNCTION return_balance_transfer_lesson(p_payment_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE payments
+  SET transfer_lessons_remaining = transfer_lessons_remaining + 1
+  WHERE id = p_payment_id
+    AND is_balance_transfer = TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION return_balance_transfer_lesson(UUID) TO authenticated;
+```
+
+**Вызов из Dart:**
+```dart
+await _client.rpc('return_balance_transfer_lesson', params: {
+  'p_payment_id': paymentId,
 });
 ```
 

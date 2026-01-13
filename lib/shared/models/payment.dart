@@ -14,6 +14,9 @@ class Payment {
   final bool isCorrection; // Флаг корректирующей записи
   final String? correctionReason; // Причина корректировки (обязательна если isCorrection=true)
   final String paymentMethod; // Способ оплаты: 'cash' (наличные) или 'card' (карта)
+  final bool hasSubscription; // Создаёт ли оплата подписку (если true — триггер не добавляет в prepaid_lessons_count)
+  final bool isBalanceTransfer; // Перенос баланса (остаток занятий из другой школы)
+  final int? transferLessonsRemaining; // Остаток занятий для записи переноса
   final DateTime paidAt;
   final String recordedBy;
   final String? comment;
@@ -35,6 +38,9 @@ class Payment {
     this.isCorrection = false,
     this.correctionReason,
     this.paymentMethod = 'cash',
+    this.hasSubscription = false,
+    this.isBalanceTransfer = false,
+    this.transferLessonsRemaining,
     required this.paidAt,
     required this.recordedBy,
     this.comment,
@@ -68,6 +74,18 @@ class Payment {
   /// Это корректирующая запись с отрицательными значениями?
   bool get isNegative => amount < 0 || lessonsCount < 0;
 
+  /// Это активный перенос баланса (есть остаток)?
+  bool get hasActiveTransfer =>
+      isBalanceTransfer && (transferLessonsRemaining ?? 0) > 0;
+
+  /// Метка типа записи
+  String get typeLabel {
+    if (isBalanceTransfer) return 'Остаток занятий';
+    if (isCorrection) return 'Корректировка';
+    if (hasSubscription) return 'Абонемент';
+    return 'Оплата';
+  }
+
   factory Payment.fromJson(Map<String, dynamic> json) {
     // Подписка приходит как список (one-to-many), берём первую
     Subscription? subscription;
@@ -86,6 +104,9 @@ class Payment {
       isCorrection: json['is_correction'] as bool? ?? false,
       correctionReason: json['correction_reason'] as String?,
       paymentMethod: json['payment_method'] as String? ?? 'cash', // Fallback для старых записей
+      hasSubscription: json['has_subscription'] as bool? ?? false,
+      isBalanceTransfer: json['is_balance_transfer'] as bool? ?? false,
+      transferLessonsRemaining: json['transfer_lessons_remaining'] as int?,
       paidAt: DateTime.parse(json['paid_at'] as String),
       recordedBy: json['recorded_by'] as String,
       comment: json['comment'] as String?,
@@ -113,6 +134,9 @@ class Payment {
         'is_correction': isCorrection,
         'correction_reason': correctionReason,
         'payment_method': paymentMethod,
+        'has_subscription': hasSubscription,
+        'is_balance_transfer': isBalanceTransfer,
+        'transfer_lessons_remaining': transferLessonsRemaining,
         'paid_at': paidAt.toIso8601String(),
         'recorded_by': recordedBy,
         'comment': comment,

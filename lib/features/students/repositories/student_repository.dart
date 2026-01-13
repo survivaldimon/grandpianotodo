@@ -28,10 +28,10 @@ class StudentRepository {
 
       final data = await query.order('name');
 
-      // 2. Загружаем балансы из VIEW (учитывает семейные подписки и legacy_balance)
+      // 2. Загружаем балансы из VIEW (учитывает семейные подписки и balance_transfer)
       final balancesData = await _client
           .from('student_subscription_summary')
-          .select('student_id, active_balance, legacy_balance')
+          .select('student_id, active_balance, transfer_balance')
           .eq('institution_id', institutionId);
 
       // Создаём map для быстрого поиска баланса
@@ -39,7 +39,7 @@ class StudentRepository {
       for (final b in balancesData as List) {
         balanceMap[b['student_id'] as String] = {
           'active_balance': (b['active_balance'] as num?)?.toInt() ?? 0,
-          'legacy_balance': (b['legacy_balance'] as num?)?.toInt() ?? 0,
+          'transfer_balance': (b['transfer_balance'] as num?)?.toInt() ?? 0,
         };
       }
 
@@ -49,9 +49,10 @@ class StudentRepository {
         final balances = balanceMap[studentId];
 
         // Подменяем prepaid_lessons_count на актуальный баланс из VIEW
+        // legacy_balance теперь хранит transfer_balance для отображения остатка занятий
         final studentData = Map<String, dynamic>.from(item);
         studentData['prepaid_lessons_count'] = balances?['active_balance'] ?? 0;
-        studentData['legacy_balance'] = balances?['legacy_balance'] ?? 0;
+        studentData['legacy_balance'] = balances?['transfer_balance'] ?? 0;
 
         return Student.fromJson(studentData);
       }).toList();
@@ -70,20 +71,20 @@ class StudentRepository {
           .eq('id', id)
           .single();
 
-      // 2. Загружаем баланс из VIEW (учитывает семейные подписки и legacy_balance)
+      // 2. Загружаем баланс из VIEW (учитывает семейные подписки и balance_transfer)
       final balanceData = await _client
           .from('student_subscription_summary')
-          .select('active_balance, legacy_balance')
+          .select('active_balance, transfer_balance')
           .eq('student_id', id)
           .maybeSingle();
 
       final activeBalance = (balanceData?['active_balance'] as num?)?.toInt() ?? 0;
-      final legacyBalance = (balanceData?['legacy_balance'] as num?)?.toInt() ?? 0;
+      final transferBalance = (balanceData?['transfer_balance'] as num?)?.toInt() ?? 0;
 
-      // 3. Подменяем prepaid_lessons_count и legacy_balance
+      // 3. Подменяем prepaid_lessons_count и legacy_balance (хранит transfer_balance)
       final studentData = Map<String, dynamic>.from(data);
       studentData['prepaid_lessons_count'] = activeBalance;
-      studentData['legacy_balance'] = legacyBalance;
+      studentData['legacy_balance'] = transferBalance;
 
       return Student.fromJson(studentData);
     } catch (e) {
