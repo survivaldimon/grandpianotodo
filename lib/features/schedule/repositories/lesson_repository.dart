@@ -71,6 +71,32 @@ class LessonRepository {
     }
   }
 
+  /// Получить schedule_id отменённых занятий за день
+  /// Используется для скрытия виртуальных занятий
+  Future<Set<String>> getCancelledScheduleIds(
+    String institutionId,
+    DateTime date,
+  ) async {
+    try {
+      final dateStr = date.toIso8601String().split('T').first;
+
+      final data = await _client
+          .from('lessons')
+          .select('schedule_id')
+          .eq('institution_id', institutionId)
+          .eq('date', dateStr)
+          .eq('status', 'cancelled')
+          .not('schedule_id', 'is', null)
+          .isFilter('archived_at', null);
+
+      return (data as List)
+          .map((item) => item['schedule_id'] as String)
+          .toSet();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки отменённых занятий: $e');
+    }
+  }
+
   /// Получить занятия преподавателя за день
   Future<List<Lesson>> getMyLessonsForDate(DateTime date) async {
     if (_userId == null)
@@ -140,30 +166,35 @@ class LessonRepository {
     required TimeOfDay endTime,
     String? comment,
     String? repeatGroupId,
+    String? status, // 'scheduled', 'completed', 'cancelled'
   }) async {
     if (_userId == null)
       throw const AuthAppException('Пользователь не авторизован');
 
     try {
+      final insertData = <String, dynamic>{
+        'institution_id': institutionId,
+        'room_id': roomId,
+        'teacher_id': teacherId,
+        'subject_id': subjectId,
+        'lesson_type_id': lessonTypeId,
+        'student_id': studentId,
+        'group_id': groupId,
+        'date': date.toIso8601String().split('T').first,
+        'start_time':
+            '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
+        'end_time':
+            '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
+        'comment': comment,
+        'created_by': _userId,
+        'repeat_group_id': repeatGroupId,
+      };
+      if (status != null) {
+        insertData['status'] = status;
+      }
       final data = await _client
           .from('lessons')
-          .insert({
-            'institution_id': institutionId,
-            'room_id': roomId,
-            'teacher_id': teacherId,
-            'subject_id': subjectId,
-            'lesson_type_id': lessonTypeId,
-            'student_id': studentId,
-            'group_id': groupId,
-            'date': date.toIso8601String().split('T').first,
-            'start_time':
-                '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
-            'end_time':
-                '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
-            'comment': comment,
-            'created_by': _userId,
-            'repeat_group_id': repeatGroupId,
-          })
+          .insert(insertData)
           .select()
           .single();
 

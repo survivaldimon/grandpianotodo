@@ -42,6 +42,7 @@
 | SESSION_*.md | История сессий разработки |
 
 **Последние сессии:**
+- `SESSION_2026_01_15_LESSON_SCHEDULES.md` — виртуальные занятия, отмена и списание
 - `SESSION_2026_01_13_BALANCE_TRANSFER.md` — система остатка занятий, улучшения UI
 - `SESSION_2026_01_11_LESSON_HISTORY.md` — история занятий, настройка кабинетов
 
@@ -269,6 +270,49 @@ Future<void> createBalanceTransfer({studentId, lessonsCount, comment});
 Файлы:
 - `lib/features/bookings/models/booking.dart`
 - `lib/features/bookings/repositories/booking_repository.dart`
+
+### Виртуальные занятия (Lesson Schedules)
+Система бесконечно повторяющихся занятий. Одна запись в БД = занятия на все подходящие даты.
+
+**Концепция:**
+- `lesson_schedules` — постоянное расписание (день недели, время, кабинет, ученик)
+- При отображении генерируются "виртуальные" занятия через `toVirtualLesson(date)`
+- Реальная запись в `lessons` создаётся только при проведении/отмене
+
+**Ключевые поля lesson_schedules:**
+- `day_of_week` — день недели (1=Пн, 7=Вс по ISO 8601)
+- `valid_from` / `valid_until` — период действия
+- `is_paused` / `pause_until` — приостановка
+- `replacement_room_id` / `replacement_until` — временная замена кабинета
+
+**RPC функция:**
+```sql
+create_lesson_from_schedule(p_schedule_id UUID, p_date DATE, p_status TEXT)
+RETURNS UUID  -- ID созданного занятия
+```
+
+**Фильтрация виртуальных занятий:**
+Виртуальное занятие скрывается если есть реальное занятие с тем же `schedule_id` на эту дату:
+```dart
+// Проверяем и обычные, и отменённые занятия
+final hasRealLesson = lessonsList.any((l) => l.scheduleId == schedule.id);
+final hasCancelled = cancelledScheduleIds.contains(schedule.id);
+return !hasRealLesson && !hasCancelled;
+```
+
+**Провайдер отменённых schedule_id:**
+```dart
+final cancelledScheduleIdsProvider = FutureProvider.family<Set<String>, InstitutionDateParams>(...);
+```
+
+Файлы:
+- `lib/features/lesson_schedules/models/lesson_schedule.dart`
+- `lib/features/lesson_schedules/repositories/lesson_schedule_repository.dart`
+- `lib/features/lesson_schedules/providers/lesson_schedule_provider.dart`
+
+Миграции:
+- `supabase/migrations/20260115_add_lesson_schedules.sql`
+- `supabase/migrations/20260115_fix_lesson_from_schedule_status.sql`
 
 ---
 

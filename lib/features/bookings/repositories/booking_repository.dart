@@ -330,6 +330,7 @@ class BookingRepository {
   }
 
   /// Создать еженедельное бронирование (постоянное расписание)
+  /// Если isLessonTemplate = true, создаёт шаблон занятия (отображается как занятие)
   Future<Booking> createRecurring({
     required String institutionId,
     required String roomId,
@@ -343,6 +344,7 @@ class BookingRepository {
     DateTime? validFrom,
     DateTime? validUntil,
     String? description,
+    bool isLessonTemplate = false,
   }) async {
     try {
       final userId = _client.auth.currentUser!.id;
@@ -364,6 +366,7 @@ class BookingRepository {
             'valid_from': validFrom?.toIso8601String().split('T').first,
             'valid_until': validUntil?.toIso8601String().split('T').first,
             'description': description,
+            'is_lesson_template': isLessonTemplate,
           })
           .select()
           .single();
@@ -401,6 +404,7 @@ class BookingRepository {
     String? lessonTypeId,
     DateTime? validFrom,
     DateTime? validUntil,
+    bool isLessonTemplate = false,
   }) async {
     try {
       final userId = _client.auth.currentUser!.id;
@@ -419,6 +423,7 @@ class BookingRepository {
           lessonTypeId: lessonTypeId,
           validFrom: validFrom,
           validUntil: validUntil,
+          isLessonTemplate: isLessonTemplate,
         );
         createdBookings.add(booking);
       }
@@ -916,6 +921,111 @@ class BookingRepository {
       yield bookings;
     }
   }
+
+  // ============================================
+  // Массовое создание занятий из расписания
+  // ============================================
+
+  /// Проверить конфликты расписания ученика на указанный период
+  /// Возвращает список дат с конфликтами
+  Future<List<ScheduleConflict>> checkScheduleConflicts({
+    required String studentId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final startStr = startDate.toIso8601String().split('T').first;
+      final endStr = endDate.toIso8601String().split('T').first;
+
+      final data = await _client.rpc('check_schedule_conflicts', params: {
+        'p_student_id': studentId,
+        'p_start_date': startStr,
+        'p_end_date': endStr,
+      });
+
+      return (data as List).map((item) => ScheduleConflict(
+        conflictDate: DateTime.parse(item['conflict_date'] as String),
+        bookingId: item['booking_id'] as String,
+        roomId: item['room_id'] as String,
+        startTime: _parseTime(item['start_time'] as String),
+        endTime: _parseTime(item['end_time'] as String),
+      )).toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка проверки конфликтов расписания: $e');
+    }
+  }
+
+  /// Массово создать занятия из расписания ученика на указанный период
+  /// Пропускает даты с конфликтами
+  Future<CreateLessonsResult> createLessonsFromSchedule({
+    required String studentId,
+    required DateTime startDate,
+    required DateTime endDate,
+    bool skipConflicts = true,
+  }) async {
+    try {
+      final startStr = startDate.toIso8601String().split('T').first;
+      final endStr = endDate.toIso8601String().split('T').first;
+
+      final data = await _client.rpc('create_lessons_from_schedule', params: {
+        'p_student_id': studentId,
+        'p_start_date': startStr,
+        'p_end_date': endStr,
+        'p_skip_conflicts': skipConflicts,
+      });
+
+      // RPC возвращает одну строку с результатами
+      final result = (data as List).first;
+      return CreateLessonsResult(
+        successCount: (result['success_count'] as num?)?.toInt() ?? 0,
+        skippedCount: (result['skipped_count'] as num?)?.toInt() ?? 0,
+        conflictDates: (result['conflict_dates'] as List?)
+            ?.map((d) => DateTime.parse(d as String))
+            .toList() ?? [],
+      );
+    } catch (e) {
+      throw DatabaseException('Ошибка создания занятий из расписания: $e');
+    }
+  }
+
+  /// Парсинг времени из строки "HH:MM:SS"
+  TimeOfDay _parseTime(String timeStr) {
+    final parts = timeStr.split(':');
+    return TimeOfDay(
+      hour: int.parse(parts[0]),
+      minute: int.parse(parts[1]),
+    );
+  }
+}
+
+/// Конфликт в расписании
+class ScheduleConflict {
+  final DateTime conflictDate;
+  final String bookingId;
+  final String roomId;
+  final TimeOfDay startTime;
+  final TimeOfDay endTime;
+
+  const ScheduleConflict({
+    required this.conflictDate,
+    required this.bookingId,
+    required this.roomId,
+    required this.startTime,
+    required this.endTime,
+  });
+}
+
+/// Результат массового создания занятий
+class CreateLessonsResult {
+  final int successCount;
+  final int skippedCount;
+  final List<DateTime> conflictDates;
+
+  const CreateLessonsResult({
+    required this.successCount,
+    required this.skippedCount,
+    required this.conflictDates,
+  });
 }
 
 /// Слот для batch-создания бронирований

@@ -82,7 +82,10 @@
       "Bash(flutter doctor:*)",
       "Bash(sudo apt-get:*)",
       "Bash(~/flutter/bin/flutter analyze:*)",
-      "Bash(/mnt/c/flutter/flutter/bin/flutter analyze:*)"
+      "Bash(/mnt/c/flutter/flutter/bin/flutter analyze:*)",
+      "Bash(/mnt/c/flutter/bin/flutter.bat build:*)",
+      "Bash(flutter clean:*)",
+      "Bash(flutter pub get:*)"
     ]
   }
 }

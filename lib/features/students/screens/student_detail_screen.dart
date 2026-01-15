@@ -22,7 +22,10 @@ import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dar
 import 'package:kabinet/shared/models/lesson_type.dart';
 import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 import 'package:kabinet/features/bookings/models/booking.dart';
-import 'package:kabinet/features/bookings/repositories/booking_repository.dart';
+import 'package:kabinet/features/bookings/repositories/booking_repository.dart' hide DayTimeSlot;
+import 'package:kabinet/features/lesson_schedules/providers/lesson_schedule_provider.dart';
+import 'package:kabinet/features/lesson_schedules/repositories/lesson_schedule_repository.dart';
+import 'package:kabinet/features/lesson_schedules/models/lesson_schedule.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
 import 'package:kabinet/core/widgets/ios_time_picker.dart';
 import 'package:kabinet/core/providers/phone_settings_provider.dart';
@@ -2582,13 +2585,13 @@ class _ScheduleSlotsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bookingsAsync = ref.watch(bookingsByStudentProvider(studentId));
-    final bookings = bookingsAsync.valueOrNull ?? [];
-    final isLoading = bookingsAsync.isLoading && bookingsAsync.valueOrNull == null;
+    final schedulesAsync = ref.watch(lessonSchedulesByStudentProvider(studentId));
+    final schedules = schedulesAsync.valueOrNull ?? [];
+    final isLoading = schedulesAsync.isLoading && schedulesAsync.valueOrNull == null;
 
     // Разделяем на активные и неактивные (на паузе или архивированные)
-    final activeBookings = bookings.where((b) => !b.isPaused && b.archivedAt == null).toList();
-    final inactiveBookings = bookings.where((b) => b.isPaused || b.archivedAt != null).toList();
+    final activeSchedules = schedules.where((s) => !s.isPaused && s.archivedAt == null).toList();
+    final inactiveSchedules = schedules.where((s) => s.isPaused || s.archivedAt != null).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2620,7 +2623,7 @@ class _ScheduleSlotsSection extends ConsumerWidget {
           )
         else ...[
           Builder(builder: (_) {
-            if (activeBookings.isEmpty && inactiveBookings.isEmpty) {
+            if (activeSchedules.isEmpty && inactiveSchedules.isEmpty) {
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -2648,26 +2651,26 @@ class _ScheduleSlotsSection extends ConsumerWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Active bookings
-                ...activeBookings.map((booking) => _BookingSlotCard(
-                  booking: booking,
+                // Активные расписания
+                ...activeSchedules.map((schedule) => _LessonScheduleSlotCard(
+                  schedule: schedule,
                   institutionId: institutionId,
                   canEdit: canEdit,
                 )),
 
-                // Inactive bookings in ExpansionTile
-                if (inactiveBookings.isNotEmpty) ...[
+                // Неактивные расписания в ExpansionTile
+                if (inactiveSchedules.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   ExpansionTile(
                     tilePadding: EdgeInsets.zero,
                     title: Text(
-                      'Архив (${inactiveBookings.length})',
+                      'Архив (${inactiveSchedules.length})',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    children: inactiveBookings.map((booking) => _BookingSlotCard(
-                      booking: booking,
+                    children: inactiveSchedules.map((schedule) => _LessonScheduleSlotCard(
+                      schedule: schedule,
                       institutionId: institutionId,
                       canEdit: canEdit,
                       isInactive: true,
@@ -2694,15 +2697,15 @@ class _ScheduleSlotsSection extends ConsumerWidget {
   }
 }
 
-/// Карточка слота бронирования (постоянного расписания)
-class _BookingSlotCard extends ConsumerWidget {
-  final Booking booking;
+/// Карточка слота постоянного расписания (lesson schedule)
+class _LessonScheduleSlotCard extends ConsumerWidget {
+  final LessonSchedule schedule;
   final String institutionId;
   final bool canEdit;
   final bool isInactive;
 
-  const _BookingSlotCard({
-    required this.booking,
+  const _LessonScheduleSlotCard({
+    required this.schedule,
     required this.institutionId,
     this.canEdit = true,
     this.isInactive = false,
@@ -2738,7 +2741,7 @@ class _BookingSlotCard extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      booking.dayName,
+                      schedule.dayName,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: isInactive
@@ -2758,7 +2761,7 @@ class _BookingSlotCard extends ConsumerWidget {
                   children: [
                     // Time
                     Text(
-                      booking.timeRange,
+                      schedule.timeRange,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: isInactive
@@ -2779,7 +2782,7 @@ class _BookingSlotCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            booking.rooms.isNotEmpty ? booking.rooms.first.name : 'Кабинет',
+                            schedule.room?.name ?? 'Кабинет',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -2787,7 +2790,7 @@ class _BookingSlotCard extends ConsumerWidget {
                           ),
                         ),
                         // Replacement indicator
-                        if (booking.hasReplacement) ...[
+                        if (schedule.hasReplacement) ...[
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -2799,7 +2802,7 @@ class _BookingSlotCard extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '→ ${booking.replacementRoom?.name ?? 'Замена'}',
+                              '→ ${schedule.replacementRoom?.name ?? 'Замена'}',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: Colors.orange.shade700,
                               ),
@@ -2810,7 +2813,7 @@ class _BookingSlotCard extends ConsumerWidget {
                     ),
 
                     // Teacher
-                    if (booking.teacher != null) ...[
+                    if (schedule.teacher?.profile != null) ...[
                       const SizedBox(height: 2),
                       Row(
                         children: [
@@ -2822,7 +2825,7 @@ class _BookingSlotCard extends ConsumerWidget {
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
-                              booking.teacher!.fullName,
+                              schedule.teacher!.profile!.fullName,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -2840,10 +2843,10 @@ class _BookingSlotCard extends ConsumerWidget {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (booking.isPaused)
+                  if (schedule.isPaused)
                     Tooltip(
-                      message: booking.pauseUntil != null
-                          ? 'Пауза до ${DateFormat('dd.MM').format(booking.pauseUntil!)}'
+                      message: schedule.pauseUntil != null
+                          ? 'Пауза до ${DateFormat('dd.MM').format(schedule.pauseUntil!)}'
                           : 'На паузе',
                       child: Icon(
                         Icons.pause_circle,
@@ -2901,7 +2904,7 @@ class _BookingSlotCard extends ConsumerWidget {
                       ),
                       child: Center(
                         child: Text(
-                          booking.dayName,
+                          schedule.dayName,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: Theme.of(context).colorScheme.onPrimaryContainer,
@@ -2915,11 +2918,11 @@ class _BookingSlotCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${booking.dayNameFull}, ${booking.timeRange}',
+                            '${schedule.dayNameFull}, ${schedule.timeRange}',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           Text(
-                            booking.rooms.isNotEmpty ? booking.rooms.first.name : 'Кабинет',
+                            schedule.room?.name ?? 'Кабинет',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
@@ -2935,13 +2938,13 @@ class _BookingSlotCard extends ConsumerWidget {
               // Actions
               if (!isInactive) ...[
                 // Pause/Resume
-                if (booking.isPaused)
+                if (schedule.isPaused)
                   ListTile(
                     leading: const Icon(Icons.play_arrow, color: Colors.green),
                     title: const Text('Возобновить'),
                     onTap: () {
                       Navigator.pop(sheetContext);
-                      _resumeBooking(context, ref);
+                      _resumeSchedule(context, ref);
                     },
                   )
                 else
@@ -2955,7 +2958,7 @@ class _BookingSlotCard extends ConsumerWidget {
                   ),
 
                 // Replacement room
-                if (booking.hasReplacement)
+                if (schedule.hasReplacement)
                   ListTile(
                     leading: const Icon(Icons.undo, color: AppColors.primary),
                     title: const Text('Снять замену кабинета'),
@@ -2980,7 +2983,7 @@ class _BookingSlotCard extends ConsumerWidget {
                   title: const Text('Архивировать'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    _archiveBooking(context, ref);
+                    _archiveSchedule(context, ref);
                   },
                 ),
               ] else ...[
@@ -2990,7 +2993,7 @@ class _BookingSlotCard extends ConsumerWidget {
                   title: const Text('Разархивировать'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    _unarchiveBooking(context, ref);
+                    _unarchiveSchedule(context, ref);
                   },
                 ),
               ],
@@ -3001,7 +3004,7 @@ class _BookingSlotCard extends ConsumerWidget {
                 title: const Text('Удалить', style: TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _deleteBooking(context, ref);
+                  _deleteSchedule(context, ref);
                 },
               ),
             ],
@@ -3011,12 +3014,12 @@ class _BookingSlotCard extends ConsumerWidget {
     );
   }
 
-  void _resumeBooking(BuildContext context, WidgetRef ref) async {
-    final controller = ref.read(bookingControllerProvider.notifier);
-    final result = await controller.resume(booking.id, booking.institutionId);
-    if (result != null && context.mounted) {
+  void _resumeSchedule(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(lessonScheduleControllerProvider.notifier);
+    await controller.resume(schedule.id, schedule.institutionId, schedule.studentId);
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Бронирование возобновлено')),
+        const SnackBar(content: Text('Расписание возобновлено')),
       );
     }
   }
@@ -3027,7 +3030,7 @@ class _BookingSlotCard extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Приостановить бронирование'),
+          title: const Text('Приостановить расписание'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3070,13 +3073,13 @@ class _BookingSlotCard extends ConsumerWidget {
                   ? null
                   : () async {
                       Navigator.pop(dialogContext);
-                      final controller = ref.read(bookingControllerProvider.notifier);
-                      final result = await controller.pause(booking.id, booking.institutionId, pauseUntil);
-                      if (result != null && context.mounted) {
+                      final controller = ref.read(lessonScheduleControllerProvider.notifier);
+                      await controller.pause(schedule.id, schedule.institutionId, schedule.studentId, until: pauseUntil);
+                      if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Бронирование приостановлено до ${DateFormat('dd.MM.yyyy').format(pauseUntil!)}',
+                              'Расписание приостановлено до ${DateFormat('dd.MM.yyyy').format(pauseUntil!)}',
                             ),
                           ),
                         );
@@ -3091,9 +3094,9 @@ class _BookingSlotCard extends ConsumerWidget {
   }
 
   void _clearReplacement(BuildContext context, WidgetRef ref) async {
-    final controller = ref.read(bookingControllerProvider.notifier);
-    final result = await controller.clearReplacement(booking.id, booking.institutionId);
-    if (result != null && context.mounted) {
+    final controller = ref.read(lessonScheduleControllerProvider.notifier);
+    await controller.clearReplacementRoom(schedule.id, schedule.institutionId, schedule.studentId);
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Замена кабинета снята')),
       );
@@ -3124,7 +3127,7 @@ class _BookingSlotCard extends ConsumerWidget {
                     initialValue: selectedRoomId,
                     decoration: const InputDecoration(labelText: 'Новый кабинет'),
                     items: rooms
-                        .where((r) => r.id != booking.primaryRoomId)
+                        .where((r) => r.id != schedule.roomId)
                         .map((r) => DropdownMenuItem(
                               value: r.id,
                               child: Text(r.name),
@@ -3172,14 +3175,15 @@ class _BookingSlotCard extends ConsumerWidget {
                     ? null
                     : () async {
                         Navigator.pop(dialogContext);
-                        final controller = ref.read(bookingControllerProvider.notifier);
-                        final result = await controller.setReplacement(
-                          booking.id,
-                          booking.institutionId,
+                        final controller = ref.read(lessonScheduleControllerProvider.notifier);
+                        await controller.setReplacementRoom(
+                          schedule.id,
+                          schedule.institutionId,
+                          schedule.studentId,
                           selectedRoomId!,
-                          replacementUntil!,
+                          until: replacementUntil,
                         );
-                        if (result != null && context.mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Замена кабинета установлена')),
                           );
@@ -3194,11 +3198,11 @@ class _BookingSlotCard extends ConsumerWidget {
     );
   }
 
-  void _archiveBooking(BuildContext context, WidgetRef ref) async {
+  void _archiveSchedule(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Архивировать бронирование?'),
+        title: const Text('Архивировать расписание?'),
         content: const Text(
           'Слот будет перемещён в архив. Вы сможете разархивировать его позже.',
         ),
@@ -3216,31 +3220,31 @@ class _BookingSlotCard extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      final controller = ref.read(bookingControllerProvider.notifier);
-      final success = await controller.archive(booking.id, booking.institutionId, booking.studentId);
-      if (success && context.mounted) {
+      final controller = ref.read(lessonScheduleControllerProvider.notifier);
+      await controller.archive(schedule.id, schedule.institutionId, schedule.studentId);
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Бронирование архивировано')),
+          const SnackBar(content: Text('Расписание архивировано')),
         );
       }
     }
   }
 
-  void _unarchiveBooking(BuildContext context, WidgetRef ref) async {
-    final controller = ref.read(bookingControllerProvider.notifier);
-    final success = await controller.unarchive(booking.id, booking.institutionId, booking.studentId);
-    if (success && context.mounted) {
+  void _unarchiveSchedule(BuildContext context, WidgetRef ref) async {
+    final controller = ref.read(lessonScheduleControllerProvider.notifier);
+    await controller.restore(schedule.id, schedule.institutionId, schedule.studentId);
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Бронирование разархивировано')),
+        const SnackBar(content: Text('Расписание разархивировано')),
       );
     }
   }
 
-  void _deleteBooking(BuildContext context, WidgetRef ref) async {
+  void _deleteSchedule(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить бронирование?'),
+        title: const Text('Удалить расписание?'),
         content: const Text(
           'Этот слот будет удалён навсегда. Это действие нельзя отменить.',
         ),
@@ -3259,18 +3263,368 @@ class _BookingSlotCard extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      final controller = ref.read(bookingControllerProvider.notifier);
-      final success = await controller.deleteRecurring(booking.id, booking.institutionId, booking.studentId);
-      if (success && context.mounted) {
+      final controller = ref.read(lessonScheduleControllerProvider.notifier);
+      await controller.delete(schedule.id, schedule.institutionId, schedule.studentId);
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Бронирование удалено')),
+          const SnackBar(content: Text('Расписание удалено')),
         );
       }
     }
   }
 }
 
-/// Форма добавления нового слота бронирования (постоянного расписания)
+/// Форма создания занятий из постоянного расписания
+class _CreateLessonsFromScheduleSheet extends ConsumerStatefulWidget {
+  final String studentId;
+  final String institutionId;
+
+  const _CreateLessonsFromScheduleSheet({
+    required this.studentId,
+    required this.institutionId,
+  });
+
+  @override
+  ConsumerState<_CreateLessonsFromScheduleSheet> createState() =>
+      _CreateLessonsFromScheduleSheetState();
+}
+
+class _CreateLessonsFromScheduleSheetState
+    extends ConsumerState<_CreateLessonsFromScheduleSheet> {
+  DateTime _startDate = DateTime.now();
+  DateTime _endDate = DateTime.now().add(const Duration(days: 30));
+  bool _isLoading = false;
+  List<ScheduleConflict> _conflicts = [];
+  bool _hasCheckedConflicts = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Заголовок
+                Row(
+                  children: [
+                    Icon(Icons.calendar_month, color: theme.colorScheme.primary),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Создать занятия из расписания',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Описание
+                Text(
+                  'Будут созданы занятия на основе постоянного расписания ученика.',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+
+                // Период
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DatePickerField(
+                        label: 'С даты',
+                        value: _startDate,
+                        onChanged: (date) {
+                          setState(() {
+                            _startDate = date;
+                            _hasCheckedConflicts = false;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _DatePickerField(
+                        label: 'По дату',
+                        value: _endDate,
+                        onChanged: (date) {
+                          setState(() {
+                            _endDate = date;
+                            _hasCheckedConflicts = false;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Быстрый выбор периода
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _PeriodChip(
+                      label: '1 неделя',
+                      onTap: () => _setEndDate(7),
+                    ),
+                    _PeriodChip(
+                      label: '2 недели',
+                      onTap: () => _setEndDate(14),
+                    ),
+                    _PeriodChip(
+                      label: '1 месяц',
+                      onTap: () => _setEndDate(30),
+                    ),
+                    _PeriodChip(
+                      label: '3 месяца',
+                      onTap: () => _setEndDate(90),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Кнопка проверки конфликтов
+                if (!_hasCheckedConflicts)
+                  OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _checkConflicts,
+                    icon: const Icon(Icons.search),
+                    label: const Text('Проверить конфликты'),
+                  ),
+
+                // Результаты проверки
+                if (_hasCheckedConflicts) ...[
+                  if (_conflicts.isEmpty)
+                    Card(
+                      color: AppColors.success.withValues(alpha: 0.1),
+                      child: const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.check_circle, color: AppColors.success),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text('Конфликтов не найдено'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Card(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.warning, color: AppColors.warning),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Найдено конфликтов: ${_conflicts.length}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Эти даты будут пропущены:',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: _conflicts.take(10).map((c) {
+                                return Chip(
+                                  label: Text(
+                                    '${c.conflictDate.day}.${c.conflictDate.month}',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                );
+                              }).toList(),
+                            ),
+                            if (_conflicts.length > 10)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  '...и ещё ${_conflicts.length - 10}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+
+                  // Кнопка создания
+                  FilledButton.icon(
+                    onPressed: _isLoading ? null : _createLessons,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.add),
+                    label: Text(_isLoading ? 'Создание...' : 'Создать занятия'),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _setEndDate(int days) {
+    setState(() {
+      _endDate = _startDate.add(Duration(days: days));
+      _hasCheckedConflicts = false;
+    });
+  }
+
+  Future<void> _checkConflicts() async {
+    setState(() => _isLoading = true);
+    try {
+      final controller = ref.read(bookingControllerProvider.notifier);
+      final conflicts = await controller.checkScheduleConflicts(
+        studentId: widget.studentId,
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+      setState(() {
+        _conflicts = conflicts;
+        _hasCheckedConflicts = true;
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _createLessons() async {
+    setState(() => _isLoading = true);
+    try {
+      final controller = ref.read(bookingControllerProvider.notifier);
+      final result = await controller.createLessonsFromSchedule(
+        studentId: widget.studentId,
+        institutionId: widget.institutionId,
+        startDate: _startDate,
+        endDate: _endDate,
+        skipConflicts: true,
+      );
+
+      if (mounted && result != null) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Создано занятий: ${result.successCount}'
+              '${result.skippedCount > 0 ? ', пропущено: ${result.skippedCount}' : ''}',
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+}
+
+class _DatePickerField extends StatelessWidget {
+  final String label;
+  final DateTime value;
+  final ValueChanged<DateTime> onChanged;
+
+  const _DatePickerField({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () async {
+        final date = await showDatePicker(
+          context: context,
+          initialDate: value,
+          firstDate: DateTime.now().subtract(const Duration(days: 7)),
+          lastDate: DateTime.now().add(const Duration(days: 365)),
+        );
+        if (date != null) onChanged(date);
+      },
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        child: Text(
+          '${value.day}.${value.month.toString().padLeft(2, '0')}.${value.year}',
+        ),
+      ),
+    );
+  }
+}
+
+class _PeriodChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _PeriodChip({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      label: Text(label),
+      onPressed: onTap,
+    );
+  }
+}
+
+/// Форма добавления нового слота постоянного расписания занятий (lesson_schedules).
+/// Создаёт виртуальные занятия, которые отображаются на каждую соответствующую дату.
+/// Реальное занятие создаётся только при проведении или отмене.
 class _AddBookingSlotSheet extends ConsumerStatefulWidget {
   final String studentId;
   final String institutionId;
@@ -3305,6 +3659,9 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
   // Проверка конфликтов
   bool _isCheckingConflicts = false;
   final Set<int> _conflictingDays = {}; // Дни с конфликтами
+
+  // Дата начала действия расписания
+  DateTime _validFrom = DateTime.now();
 
   static const _defaultStartTime = TimeOfDay(hour: 14, minute: 0);
   static const _defaultEndTime = TimeOfDay(hour: 15, minute: 0);
@@ -3459,7 +3816,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               // Days of week selection
               Text(
@@ -3500,6 +3857,39 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                     _checkConflicts();
                   },
                   validator: (v) => v == null ? 'Выберите кабинет' : null,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Дата начала действия расписания
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _validFrom,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                    locale: const Locale('ru', 'RU'),
+                  );
+                  if (picked != null && mounted) {
+                    setState(() => _validFrom = picked);
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: 'Действует с',
+                    prefixIcon: const Icon(Icons.calendar_today_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                  ),
+                  child: Text(
+                    '${_validFrom.day.toString().padLeft(2, '0')}.${_validFrom.month.toString().padLeft(2, '0')}.${_validFrom.year}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -3757,8 +4147,8 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                       : _conflictingDays.isNotEmpty
                           ? 'Есть конфликты'
                           : _selectedDays.length > 1
-                              ? 'Создать ${_selectedDays.length} слотов'
-                              : 'Создать слот',
+                              ? 'Создать ${_selectedDays.length} занятий'
+                              : 'Создать расписание',
                 ),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
@@ -3940,38 +4330,39 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
     setState(() => _isSubmitting = true);
 
     try {
-      final controller = ref.read(bookingControllerProvider.notifier);
+      final scheduleController = ref.read(lessonScheduleControllerProvider.notifier);
 
+      // Создаём lesson_schedule записи (виртуальные занятия)
       if (_selectedDays.length == 1) {
-        // Single slot
         final day = _selectedDays.first;
-        await controller.createRecurring(
+        await scheduleController.create(
           institutionId: widget.institutionId,
-          studentId: widget.studentId,
-          teacherId: _selectedTeacherId!,
           roomId: _selectedRoomId!,
+          teacherId: _selectedTeacherId!,
+          studentId: widget.studentId,
           subjectId: _selectedSubjectId,
           lessonTypeId: _selectedLessonTypeId,
           dayOfWeek: day,
           startTime: _startTimes[day]!,
           endTime: _endTimes[day]!,
+          validFrom: _validFrom,
         );
       } else {
-        // Multiple slots (batch)
         final slots = _selectedDays.map((day) => DayTimeSlot(
           dayOfWeek: day,
           startTime: _startTimes[day]!,
           endTime: _endTimes[day]!,
         )).toList();
 
-        await controller.createRecurringBatch(
+        await scheduleController.createBatch(
           institutionId: widget.institutionId,
-          studentId: widget.studentId,
-          teacherId: _selectedTeacherId!,
           roomId: _selectedRoomId!,
+          teacherId: _selectedTeacherId!,
+          studentId: widget.studentId,
           subjectId: _selectedSubjectId,
           lessonTypeId: _selectedLessonTypeId,
           slots: slots,
+          validFrom: _validFrom,
         );
       }
 
@@ -3981,8 +4372,8 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
           SnackBar(
             content: Text(
               _selectedDays.length == 1
-                  ? 'Бронирование создано'
-                  : 'Создано ${_selectedDays.length} бронирований',
+                  ? 'Расписание создано'
+                  : 'Создано ${_selectedDays.length} записей расписания',
             ),
           ),
         );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
@@ -29,18 +30,25 @@ class StudentRepository {
       final data = await query.order('name');
 
       // 2. Загружаем балансы из VIEW (учитывает семейные подписки и balance_transfer)
-      final balancesData = await _client
-          .from('student_subscription_summary')
-          .select('student_id, active_balance, transfer_balance')
-          .eq('institution_id', institutionId);
-
-      // Создаём map для быстрого поиска баланса
+      // ВАЖНО: Оборачиваем в try-catch, т.к. VIEW может быть недоступен
+      // для пользователей без прав на payments (RLS)
       final balanceMap = <String, Map<String, int>>{};
-      for (final b in balancesData as List) {
-        balanceMap[b['student_id'] as String] = {
-          'active_balance': (b['active_balance'] as num?)?.toInt() ?? 0,
-          'transfer_balance': (b['transfer_balance'] as num?)?.toInt() ?? 0,
-        };
+      try {
+        final balancesData = await _client
+            .from('student_subscription_summary')
+            .select('student_id, active_balance, transfer_balance')
+            .eq('institution_id', institutionId);
+
+        // Создаём map для быстрого поиска баланса
+        for (final b in balancesData as List) {
+          balanceMap[b['student_id'] as String] = {
+            'active_balance': (b['active_balance'] as num?)?.toInt() ?? 0,
+            'transfer_balance': (b['transfer_balance'] as num?)?.toInt() ?? 0,
+          };
+        }
+      } catch (e) {
+        // Если не удалось загрузить балансы, используем данные из students напрямую
+        debugPrint('WARN: Не удалось загрузить балансы из VIEW: $e');
       }
 
       // 3. Объединяем данные
@@ -72,14 +80,21 @@ class StudentRepository {
           .single();
 
       // 2. Загружаем баланс из VIEW (учитывает семейные подписки и balance_transfer)
-      final balanceData = await _client
-          .from('student_subscription_summary')
-          .select('active_balance, transfer_balance')
-          .eq('student_id', id)
-          .maybeSingle();
+      // ВАЖНО: Оборачиваем в try-catch, т.к. VIEW может быть недоступен для некоторых пользователей
+      int activeBalance = 0;
+      int transferBalance = 0;
+      try {
+        final balanceData = await _client
+            .from('student_subscription_summary')
+            .select('active_balance, transfer_balance')
+            .eq('student_id', id)
+            .maybeSingle();
 
-      final activeBalance = (balanceData?['active_balance'] as num?)?.toInt() ?? 0;
-      final transferBalance = (balanceData?['transfer_balance'] as num?)?.toInt() ?? 0;
+        activeBalance = (balanceData?['active_balance'] as num?)?.toInt() ?? 0;
+        transferBalance = (balanceData?['transfer_balance'] as num?)?.toInt() ?? 0;
+      } catch (e) {
+        debugPrint('WARN: Не удалось загрузить баланс из VIEW: $e');
+      }
 
       // 3. Подменяем prepaid_lessons_count и legacy_balance (хранит transfer_balance)
       final studentData = Map<String, dynamic>.from(data);

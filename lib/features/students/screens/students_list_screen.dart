@@ -21,11 +21,12 @@ import 'package:kabinet/shared/models/subject.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/models/student_group.dart';
 import 'package:kabinet/features/students/widgets/merge_students_dialog.dart';
-import 'package:kabinet/features/bookings/providers/booking_provider.dart';
-import 'package:kabinet/features/bookings/repositories/booking_repository.dart';
+import 'package:kabinet/features/lesson_schedules/providers/lesson_schedule_provider.dart';
+import 'package:kabinet/features/lesson_schedules/repositories/lesson_schedule_repository.dart';
 import 'package:kabinet/features/payments/repositories/payment_repository.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
+import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 import 'package:kabinet/shared/models/lesson_type.dart';
 import 'package:kabinet/core/widgets/ios_time_picker.dart';
 import 'package:kabinet/core/providers/phone_settings_provider.dart';
@@ -1300,6 +1301,11 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
   final Map<int, TimeOfDay> _startTimes = {};
   final Map<int, TimeOfDay> _endTimes = {};
   String? _selectedRoomId;
+  DateTime _validFrom = DateTime.now(); // Дата начала действия расписания
+
+  // Проверка конфликтов
+  bool _isCheckingConflicts = false;
+  final Set<int> _conflictingDays = {};
 
   static const _defaultStartTime = TimeOfDay(hour: 14, minute: 0);
   static const _defaultEndTime = TimeOfDay(hour: 15, minute: 0);
@@ -1338,6 +1344,17 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     if (_setupSchedule && _selectedDays.isNotEmpty && _selectedRoomId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Выберите кабинет для расписания')),
+      );
+      return;
+    }
+
+    // Проверка конфликтов расписания
+    if (_setupSchedule && _conflictingDays.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Есть конфликты в расписании. Измените время или кабинет.'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -1431,45 +1448,107 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     }
   }
 
-  /// Создаёт слоты постоянного расписания для ученика (weekly bookings)
+  /// Создаёт постоянное расписание занятий (lesson_schedules) для ученика.
+  /// Виртуальные занятия отображаются на каждую соответствующую дату.
+  /// Реальное занятие создаётся только при проведении или отмене.
   Future<void> _createScheduleSlots(String studentId) async {
-    final bookingController = ref.read(bookingControllerProvider.notifier);
+    final scheduleController = ref.read(lessonScheduleControllerProvider.notifier);
     final teacherId = _selectedTeacher?.userId ?? widget.currentUserId;
 
     if (teacherId == null || _selectedRoomId == null) return;
 
     try {
       if (_selectedDays.length == 1) {
+        // Один день — создаём одно расписание
         final day = _selectedDays.first;
-        await bookingController.createRecurring(
+        await scheduleController.create(
           institutionId: widget.institutionId,
-          studentId: studentId,
-          teacherId: teacherId,
           roomId: _selectedRoomId!,
+          teacherId: teacherId,
+          studentId: studentId,
           subjectId: _selectedSubject?.id,
+          lessonTypeId: _selectedLessonType?.id,
           dayOfWeek: day,
           startTime: _startTimes[day]!,
           endTime: _endTimes[day]!,
+          validFrom: _validFrom,
         );
       } else {
+        // Несколько дней — batch-создание
         final slots = _selectedDays.map((day) => DayTimeSlot(
           dayOfWeek: day,
           startTime: _startTimes[day]!,
           endTime: _endTimes[day]!,
         )).toList();
 
-        await bookingController.createRecurringBatch(
+        await scheduleController.createBatch(
           institutionId: widget.institutionId,
-          studentId: studentId,
-          teacherId: teacherId,
           roomId: _selectedRoomId!,
+          teacherId: teacherId,
+          studentId: studentId,
           subjectId: _selectedSubject?.id,
+          lessonTypeId: _selectedLessonType?.id,
           slots: slots,
+          validFrom: _validFrom,
         );
       }
     } catch (e) {
       debugPrint('Ошибка создания расписания: $e');
       // Не прерываем — ученик уже создан
+    }
+  }
+
+  /// Проверяет конфликты для всех выбранных дней
+  Future<void> _checkConflicts() async {
+    if (_selectedRoomId == null || _selectedDays.isEmpty) {
+      setState(() {
+        _conflictingDays.clear();
+        _isCheckingConflicts = false;
+      });
+      return;
+    }
+
+    setState(() => _isCheckingConflicts = true);
+
+    final repo = ref.read(bookingRepositoryProvider);
+    final newConflicts = <int>{};
+
+    for (final day in _selectedDays) {
+      final startTime = _startTimes[day] ?? _defaultStartTime;
+      final endTime = _endTimes[day] ?? _defaultEndTime;
+
+      // 1. Проверяем конфликт с другими повторяющимися бронированиями
+      final hasBookingConflict = await repo.hasWeeklyConflict(
+        roomId: _selectedRoomId!,
+        dayOfWeek: day,
+        startTime: startTime,
+        endTime: endTime,
+      );
+
+      if (hasBookingConflict) {
+        newConflicts.add(day);
+        continue;
+      }
+
+      // 2. Проверяем конфликт с ВСЕМИ будущими занятиями для этого дня недели
+      final hasLessonConflict = await repo.hasLessonConflictForDayOfWeek(
+        roomId: _selectedRoomId!,
+        dayOfWeek: day,
+        startTime: startTime,
+        endTime: endTime,
+      );
+
+      if (hasLessonConflict) {
+        newConflicts.add(day);
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _conflictingDays.clear();
+        _conflictingDays.addAll(newConflicts);
+        _isCheckingConflicts = false;
+      });
     }
   }
 
@@ -2059,9 +2138,45 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                   value: r.id,
                   child: Text(r.name),
                 )).toList(),
-                onChanged: (v) => setState(() => _selectedRoomId = v),
+                onChanged: (v) {
+                  setState(() => _selectedRoomId = v);
+                  _checkConflicts();
+                },
               );
             },
+          ),
+          const SizedBox(height: 16),
+
+          // Дата начала действия расписания
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _validFrom,
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+                locale: const Locale('ru', 'RU'),
+              );
+              if (picked != null && mounted) {
+                setState(() => _validFrom = picked);
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Действует с',
+                prefixIcon: const Icon(Icons.calendar_today_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+              ),
+              child: Text(
+                '${_validFrom.day.toString().padLeft(2, '0')}.${_validFrom.month.toString().padLeft(2, '0')}.${_validFrom.year}',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -2097,10 +2212,27 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
       children: List.generate(7, (index) {
         final dayNumber = index + 1;
         final isSelected = _selectedDays.contains(dayNumber);
+        final hasConflict = _conflictingDays.contains(dayNumber);
 
         return FilterChip(
-          label: Text(days[index]),
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(days[index]),
+              if (hasConflict) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 14,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ],
+            ],
+          ),
           selected: isSelected,
+          selectedColor: hasConflict
+              ? Theme.of(context).colorScheme.errorContainer
+              : null,
           onSelected: (selected) {
             setState(() {
               if (selected) {
@@ -2111,8 +2243,10 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                 _selectedDays.remove(dayNumber);
                 _startTimes.remove(dayNumber);
                 _endTimes.remove(dayNumber);
+                _conflictingDays.remove(dayNumber);
               }
             });
+            _checkConflicts();
           },
         );
       }),
@@ -2128,6 +2262,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     const days = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
     final startTime = _startTimes[dayNumber] ?? _defaultStartTime;
     final endTime = _endTimes[dayNumber] ?? _defaultEndTime;
+    final hasConflict = _conflictingDays.contains(dayNumber);
 
     final startMinutes = startTime.hour * 60 + startTime.minute;
     final endMinutes = endTime.hour * 60 + endTime.minute;
@@ -2140,6 +2275,9 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      color: hasConflict
+          ? Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3)
+          : null,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _pickTimeRange(dayNumber),
@@ -2151,7 +2289,9 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
+                  color: hasConflict
+                      ? Theme.of(context).colorScheme.errorContainer
+                      : Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
@@ -2159,7 +2299,9 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     days[dayNumber],
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      color: hasConflict
+                          ? Theme.of(context).colorScheme.onErrorContainer
+                          : Theme.of(context).colorScheme.onPrimaryContainer,
                     ),
                   ),
                 ),
@@ -2177,19 +2319,23 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      durationText,
+                      hasConflict ? 'Конфликт! Время занято' : durationText,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: durationMinutes > 0
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.error,
+                        color: hasConflict
+                            ? Theme.of(context).colorScheme.error
+                            : (durationMinutes > 0
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.error),
                       ),
                     ),
                   ],
                 ),
               ),
               Icon(
-                Icons.edit_outlined,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                hasConflict ? Icons.warning_amber_rounded : Icons.edit_outlined,
+                color: hasConflict
+                    ? Theme.of(context).colorScheme.error
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -2216,6 +2362,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
         _startTimes[dayNumber] = result.start;
         _endTimes[dayNumber] = result.end;
       });
+      _checkConflicts();
     }
   }
 

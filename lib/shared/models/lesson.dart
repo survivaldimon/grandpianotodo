@@ -54,6 +54,13 @@ class Lesson extends BaseModel {
   final String? subscriptionId; // ID подписки для расчёта стоимости
   final String? transferPaymentId; // ID записи переноса баланса, с которой списано
   final bool isDeducted; // Было ли списано с баланса при отмене
+  final String? scheduleId; // ID постоянного расписания (lesson_schedules)
+
+  /// Виртуальное занятие (не существует в БД, создано из lesson_schedule)
+  final bool isVirtual;
+
+  /// Источник виртуального занятия (LessonSchedule, тип dynamic для избежания циклического импорта)
+  final dynamic scheduleSource;
 
   /// Связанные объекты (join)
   final Room? room;
@@ -88,6 +95,9 @@ class Lesson extends BaseModel {
     this.subscriptionId,
     this.transferPaymentId,
     this.isDeducted = false,
+    this.scheduleId,
+    this.isVirtual = false,
+    this.scheduleSource,
     this.room,
     this.teacher,
     this.subject,
@@ -151,6 +161,7 @@ class Lesson extends BaseModel {
         subscriptionId: json['subscription_id'] as String?,
         transferPaymentId: json['transfer_payment_id'] as String?,
         isDeducted: json['is_deducted'] as bool? ?? false,
+        scheduleId: json['schedule_id'] as String?,
         room: json['rooms'] != null
             ? Room.fromJson(json['rooms'] as Map<String, dynamic>)
             : null,
@@ -197,6 +208,7 @@ class Lesson extends BaseModel {
         'subscription_id': subscriptionId,
         'transfer_payment_id': transferPaymentId,
         'is_deducted': isDeducted,
+        'schedule_id': scheduleId,
       };
 
   Lesson copyWith({
@@ -215,6 +227,9 @@ class Lesson extends BaseModel {
     String? subscriptionId,
     String? transferPaymentId,
     bool? isDeducted,
+    String? scheduleId,
+    bool? isVirtual,
+    dynamic scheduleSource,
   }) =>
       Lesson(
         id: id,
@@ -238,6 +253,9 @@ class Lesson extends BaseModel {
         subscriptionId: subscriptionId ?? this.subscriptionId,
         transferPaymentId: transferPaymentId ?? this.transferPaymentId,
         isDeducted: isDeducted ?? this.isDeducted,
+        scheduleId: scheduleId ?? this.scheduleId,
+        isVirtual: isVirtual ?? this.isVirtual,
+        scheduleSource: scheduleSource ?? this.scheduleSource,
         room: room,
         teacher: teacher,
         subject: subject,
