@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
@@ -94,12 +95,19 @@ final filteredStudentsProvider =
   if (params.onlyMyStudents || filter == StudentFilter.myStudents) {
     final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
     if (currentUserId != null) {
-      final bindingsRepo = ref.read(studentBindingsRepositoryProvider);
-      final ids = await bindingsRepo.getTeacherStudentIds(
-        currentUserId,
-        institutionId,
-      );
-      myStudentIds = ids.toSet();
+      try {
+        final bindingsRepo = ref.read(studentBindingsRepositoryProvider);
+        final ids = await bindingsRepo.getTeacherStudentIds(
+          currentUserId,
+          institutionId,
+        );
+        myStudentIds = ids.toSet();
+      } catch (e) {
+        // Если не удалось получить привязки, показываем пустой список
+        // чтобы не блокировать загрузку экрана
+        debugPrint('ERROR: Не удалось получить myStudentIds: $e');
+        myStudentIds = {};
+      }
     }
   }
 

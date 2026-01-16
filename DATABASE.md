@@ -352,6 +352,7 @@ CREATE TABLE lessons (
   subscription_id UUID REFERENCES subscriptions(id),     -- Подписка с которой списано
   transfer_payment_id UUID REFERENCES payments(id),      -- Balance transfer с которой списано
   is_deducted BOOLEAN DEFAULT FALSE,                     -- Списано ли (для отменённых занятий)
+  schedule_id UUID REFERENCES lesson_schedules(id),      -- Виртуальное расписание-источник
 
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -405,6 +406,84 @@ CREATE TABLE lesson_history (
 );
 
 CREATE INDEX idx_lesson_history_lesson ON lesson_history(lesson_id);
+```
+
+### lesson_schedules (виртуальные занятия)
+
+Постоянное расписание занятий. Одна запись = бесконечные виртуальные занятия на все подходящие даты.
+
+```sql
+CREATE TABLE lesson_schedules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+  room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  teacher_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+  group_id UUID REFERENCES student_groups(id) ON DELETE CASCADE,
+  subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL,
+  lesson_type_id UUID REFERENCES lesson_types(id) ON DELETE SET NULL,
+
+  -- Расписание (ISO 8601: 1=Пн, 7=Вс)
+  day_of_week INT NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+
+  -- Период действия
+  valid_from DATE,           -- NULL = с момента создания
+  valid_until DATE,          -- NULL = бессрочно
+
+  -- Пауза
+  is_paused BOOLEAN NOT NULL DEFAULT FALSE,
+  pause_until DATE,
+
+  -- Временная замена кабинета
+  replacement_room_id UUID REFERENCES rooms(id) ON DELETE SET NULL,
+  replacement_until DATE,
+
+  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  archived_at TIMESTAMPTZ,
+
+  CONSTRAINT check_student_xor_group CHECK (
+    NOT (student_id IS NOT NULL AND group_id IS NOT NULL)
+  ),
+  CONSTRAINT check_time_range CHECK (end_time > start_time)
+);
+
+CREATE INDEX idx_lesson_schedules_institution ON lesson_schedules(institution_id) WHERE archived_at IS NULL;
+CREATE INDEX idx_lesson_schedules_student ON lesson_schedules(student_id) WHERE student_id IS NOT NULL AND archived_at IS NULL;
+CREATE INDEX idx_lesson_schedules_day ON lesson_schedules(institution_id, day_of_week) WHERE archived_at IS NULL;
+```
+
+**Связь с lessons:** Поле `lessons.schedule_id` ссылается на `lesson_schedules.id` — показывает из какого расписания создано реальное занятие.
+
+### lesson_schedule_exceptions
+
+Исключения (пропущенные даты) для постоянного расписания.
+
+```sql
+CREATE TABLE lesson_schedule_exceptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  schedule_id UUID NOT NULL REFERENCES lesson_schedules(id) ON DELETE CASCADE,
+  exception_date DATE NOT NULL,
+  reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE(schedule_id, exception_date)
+);
+
+CREATE INDEX idx_schedule_exceptions_date ON lesson_schedule_exceptions(schedule_id, exception_date);
+```
+
+**RPC функции:**
+```sql
+-- Создать реальное занятие из виртуального
+create_lesson_from_schedule(p_schedule_id UUID, p_date DATE, p_status TEXT DEFAULT 'completed')
+RETURNS UUID
+
+-- Добавить исключение (пропуск даты)
+add_schedule_exception(p_schedule_id UUID, p_exception_date DATE, p_reason TEXT DEFAULT NULL)
+RETURNS UUID
 ```
 
 ### payment_plans

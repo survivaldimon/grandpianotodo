@@ -311,6 +311,7 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
   // ============================================
 
   /// Создать еженедельное бронирование
+  /// Если isLessonTemplate = true, создаёт шаблон занятия
   Future<Booking?> createRecurring({
     required String institutionId,
     required String roomId,
@@ -324,6 +325,7 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
     DateTime? validFrom,
     DateTime? validUntil,
     String? description,
+    bool isLessonTemplate = false,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -365,6 +367,7 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
         validFrom: validFrom,
         validUntil: validUntil,
         description: description,
+        isLessonTemplate: isLessonTemplate,
       );
 
       _invalidateWeekly(institutionId);
@@ -381,6 +384,7 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Создать несколько еженедельных бронирований (для нескольких дней)
+  /// Если isLessonTemplate = true, создаёт шаблоны занятий
   Future<List<Booking>?> createRecurringBatch({
     required String institutionId,
     required String roomId,
@@ -391,6 +395,7 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
     String? lessonTypeId,
     DateTime? validFrom,
     DateTime? validUntil,
+    bool isLessonTemplate = false,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -430,6 +435,7 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
         lessonTypeId: lessonTypeId,
         validFrom: validFrom,
         validUntil: validUntil,
+        isLessonTemplate: isLessonTemplate,
       );
 
       _invalidateWeekly(institutionId);
@@ -721,6 +727,55 @@ class BookingController extends StateNotifier<AsyncValue<void>> {
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       return false;
+    }
+  }
+
+  // ============================================
+  // Массовое создание занятий из расписания
+  // ============================================
+
+  /// Проверить конфликты расписания ученика на указанный период
+  Future<List<ScheduleConflict>> checkScheduleConflicts({
+    required String studentId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      return await _repo.checkScheduleConflicts(
+        studentId: studentId,
+        startDate: startDate,
+        endDate: endDate,
+      );
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Массово создать занятия из расписания ученика на указанный период
+  Future<CreateLessonsResult?> createLessonsFromSchedule({
+    required String studentId,
+    required String institutionId,
+    required DateTime startDate,
+    required DateTime endDate,
+    bool skipConflicts = true,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final result = await _repo.createLessonsFromSchedule(
+        studentId: studentId,
+        startDate: startDate,
+        endDate: endDate,
+        skipConflicts: skipConflicts,
+      );
+
+      // Инвалидируем провайдеры занятий
+      _ref.invalidate(bookingsByStudentProvider(studentId));
+
+      state = const AsyncValue.data(null);
+      return result;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
     }
   }
 }

@@ -55,6 +55,9 @@ class Booking extends BaseModel {
   // Описание (для простых броней)
   final String? description;
 
+  // Шаблон занятия (отображается как занятие, при проведении создаёт lesson)
+  final bool isLessonTemplate;
+
   // Joined данные
   final Profile? creator;
   final List<Room> rooms;
@@ -89,6 +92,7 @@ class Booking extends BaseModel {
     this.replacementUntil,
     this.lastGeneratedDate,
     this.description,
+    this.isLessonTemplate = false,
     this.creator,
     this.rooms = const [],
     this.student,
@@ -111,6 +115,10 @@ class Booking extends BaseModel {
 
   /// Это простая бронь кабинета (без ученика)?
   bool get isRoomOnlyBooking => studentId == null;
+
+  /// Это шаблон занятия (отображается как занятие, а не как слот)?
+  bool get isLessonTemplateBooking =>
+      isRecurring && isLessonTemplate && studentId != null;
 
   /// Длительность в минутах
   int get durationMinutes {
@@ -315,6 +323,7 @@ class Booking extends BaseModel {
           ? DateTime.parse(json['last_generated_date'] as String)
           : null,
       description: json['description'] as String?,
+      isLessonTemplate: json['is_lesson_template'] as bool? ?? false,
       creator: json['profiles'] != null
           ? Profile.fromJson(json['profiles'] as Map<String, dynamic>)
           : null,
@@ -359,6 +368,7 @@ class Booking extends BaseModel {
         'replacement_room_id': replacementRoomId,
         'replacement_until': replacementUntil?.toIso8601String().split('T').first,
         'description': description,
+        'is_lesson_template': isLessonTemplate,
       };
 
   Booking copyWith({
@@ -379,6 +389,7 @@ class Booking extends BaseModel {
     DateTime? replacementUntil,
     DateTime? lastGeneratedDate,
     String? description,
+    bool? isLessonTemplate,
     List<Room>? rooms,
     Student? student,
     Profile? teacher,
@@ -411,6 +422,7 @@ class Booking extends BaseModel {
         replacementUntil: replacementUntil ?? this.replacementUntil,
         lastGeneratedDate: lastGeneratedDate ?? this.lastGeneratedDate,
         description: description ?? this.description,
+        isLessonTemplate: isLessonTemplate ?? this.isLessonTemplate,
         creator: creator,
         rooms: rooms ?? this.rooms,
         student: student ?? this.student,

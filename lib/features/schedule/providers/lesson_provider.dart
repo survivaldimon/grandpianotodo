@@ -114,6 +114,14 @@ final lessonsByInstitutionStreamProvider =
   return repo.watchByInstitution(params.institutionId, params.date);
 });
 
+/// Провайдер schedule_id отменённых занятий за день
+/// Используется для скрытия виртуальных занятий когда есть отменённое реальное
+final cancelledScheduleIdsProvider =
+    FutureProvider.family<Set<String>, InstitutionDateParams>((ref, params) {
+  final repo = ref.watch(lessonRepositoryProvider);
+  return repo.getCancelledScheduleIds(params.institutionId, params.date);
+});
+
 /// Параметры для загрузки занятий за неделю
 class InstitutionWeekParams {
   final String institutionId;
@@ -295,6 +303,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
     required TimeOfDay startTime,
     required TimeOfDay endTime,
     String? comment,
+    String? status, // 'scheduled', 'completed', 'cancelled'
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -324,6 +333,7 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         startTime: startTime,
         endTime: endTime,
         comment: comment,
+        status: status,
       );
 
       _invalidateForRoom(roomId, date, institutionId: institutionId);
@@ -993,6 +1003,34 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       // Не критичная ошибка - продолжаем
       debugPrint('Error deducting from student $studentId: $e');
       return null;
+    }
+  }
+
+  /// Списать занятие для уже созданного отменённого занятия
+  /// Используется при отмене виртуальных занятий с опцией списания
+  Future<void> deductForCancelledLesson(
+    String lessonId,
+    String studentId,
+    String institutionId,
+  ) async {
+    try {
+      final transferId = await _deductFromStudent(studentId);
+
+      if (transferId != null) {
+        // Сохраняем transfer_payment_id для корректного возврата
+        await _repo.setTransferPaymentId(lessonId, transferId);
+      }
+
+      // Устанавливаем флаг списания
+      await _repo.setIsDeducted(lessonId, true);
+
+      // Инвалидируем данные
+      _ref.invalidate(studentProvider(studentId));
+      _ref.invalidate(studentsProvider(institutionId));
+      _ref.invalidate(studentLessonStatsProvider(studentId));
+    } catch (e) {
+      debugPrint('Error deducting for cancelled lesson: $e');
+      rethrow;
     }
   }
 
