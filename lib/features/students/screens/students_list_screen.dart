@@ -481,7 +481,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                 ),
               ],
 
-              // Список учеников (valueOrNull для resilient UI)
+              // Список учеников (НИКОГДА не показываем ошибку - используем valueOrNull)
               Expanded(
                 child: Builder(
                   builder: (context) {
@@ -489,51 +489,6 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
 
                     // Показываем loading только при первой загрузке (нет данных)
                     if (students == null) {
-                      // Если есть ошибка при первой загрузке — показываем её
-                      if (studentsAsync.hasError) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 48,
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Не удалось загрузить учеников',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '${studentsAsync.error}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  ref.invalidate(filteredStudentsProvider(
-                                    StudentFilterParams(
-                                      institutionId: widget.institutionId,
-                                      onlyMyStudents: !canManageAllStudents,
-                                    ),
-                                  ));
-                                },
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Повторить'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
                       return const LoadingIndicator();
                     }
 
