@@ -303,7 +303,7 @@ class LessonScheduleRepository {
 
     final insertData = slots.map((slot) => {
           'institution_id': institutionId,
-          'room_id': roomId,
+          'room_id': slot.roomId ?? roomId, // Приоритет у индивидуального кабинета
           'teacher_id': teacherId,
           'student_id': studentId,
           'group_id': groupId,
@@ -476,6 +476,16 @@ class LessonScheduleRepository {
     await _client.from('lesson_schedules').delete().eq('id', id);
   }
 
+  /// Завершить расписание с указанной даты
+  /// Устанавливает valid_until = date - 1 день, чтобы виртуальные занятия
+  /// больше не генерировались начиная с этой даты
+  Future<void> endScheduleFromDate(String scheduleId, DateTime date) async {
+    final validUntil = date.subtract(const Duration(days: 1));
+    await _client.from('lesson_schedules').update({
+      'valid_until': validUntil.toIso8601String().split('T').first,
+    }).eq('id', scheduleId);
+  }
+
   // ============================================================================
   // СОЗДАНИЕ ЗАНЯТИЯ ИЗ РАСПИСАНИЯ
   // ============================================================================
@@ -541,10 +551,12 @@ class DayTimeSlot {
   final int dayOfWeek;
   final TimeOfDay startTime;
   final TimeOfDay endTime;
+  final String? roomId; // Опционально: кабинет для этого конкретного дня
 
   const DayTimeSlot({
     required this.dayOfWeek,
     required this.startTime,
     required this.endTime,
+    this.roomId,
   });
 }

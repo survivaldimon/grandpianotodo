@@ -561,6 +561,54 @@ class LessonRepository {
     }
   }
 
+  /// Получить уникальные серии занятий (repeat_group_id) для ученика
+  /// Возвращает список серий с информацией о первом занятии и количестве
+  /// Показывает только запланированные занятия от сегодня
+  Future<List<Map<String, dynamic>>> getStudentRepeatGroups(String studentId) async {
+    try {
+      // Только от сегодня и только scheduled
+      final today = DateTime.now();
+      final todayStr = DateTime(today.year, today.month, today.day).toIso8601String().split('T').first;
+
+      final data = await _client
+          .from('lessons')
+          .select('''
+            repeat_group_id,
+            room_id,
+            start_time,
+            end_time,
+            date,
+            rooms(*),
+            subjects(*),
+            lesson_types(*)
+          ''')
+          .eq('student_id', studentId)
+          .eq('status', 'scheduled') // Только запланированные
+          .not('repeat_group_id', 'is', null)
+          .isFilter('archived_at', null)
+          .gte('date', todayStr) // От сегодня
+          .order('date', ascending: true);
+
+      // Группируем по repeat_group_id
+      final Map<String, List<Map<String, dynamic>>> grouped = {};
+      for (final item in data as List) {
+        final groupId = item['repeat_group_id'] as String;
+        grouped.putIfAbsent(groupId, () => []).add(Map<String, dynamic>.from(item));
+      }
+
+      // Для каждой группы берём первое занятие + добавляем количество
+      return grouped.entries.map((entry) {
+        final firstLesson = entry.value.first;
+        return {
+          ...firstLesson,
+          'lessons_count': entry.value.length,
+        };
+      }).toList();
+    } catch (e) {
+      throw DatabaseException('Ошибка загрузки серий занятий ученика: $e');
+    }
+  }
+
   /// Получить последующие занятия серии (с указанной даты)
   /// Дополнительно фильтрует по room_id и start_time для точности
   /// (защита от старых данных с дублирующимися repeat_group_id)
@@ -650,6 +698,66 @@ class LessonRepository {
           .gte('date', dateStr);
     } catch (e) {
       throw DatabaseException('Ошибка удаления серии занятий: $e');
+    }
+  }
+
+  /// Удалить ВСЕ занятия серии по repeat_group_id
+  Future<void> deleteByRepeatGroupId(String repeatGroupId) async {
+    try {
+      // Получаем ID занятий для удаления связанных данных
+      final lessonIds = await _client
+          .from('lessons')
+          .select('id')
+          .eq('repeat_group_id', repeatGroupId);
+
+      // Удаляем связанные данные для каждого занятия
+      for (final lesson in lessonIds as List) {
+        final lessonId = lesson['id'];
+        // 1. Удаляем участников
+        await _client
+            .from('lesson_students')
+            .delete()
+            .eq('lesson_id', lessonId);
+        // 2. Удаляем историю
+        await _client.from('lesson_history').delete().eq('lesson_id', lessonId);
+      }
+
+      // Удаляем сами занятия
+      await _client.from('lessons').delete().eq('repeat_group_id', repeatGroupId);
+    } catch (e) {
+      throw DatabaseException('Ошибка удаления серии: $e');
+    }
+  }
+
+  /// Обновить ВСЕ занятия серии по repeat_group_id (без фильтра по дате)
+  Future<void> updateAllByRepeatGroupId(
+    String repeatGroupId, {
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? roomId,
+  }) async {
+    try {
+      final updates = <String, dynamic>{};
+      if (startTime != null) {
+        updates['start_time'] =
+            '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+      }
+      if (endTime != null) {
+        updates['end_time'] =
+            '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+      }
+      if (roomId != null) {
+        updates['room_id'] = roomId;
+      }
+      if (updates.isEmpty) return;
+
+      await _client
+          .from('lessons')
+          .update(updates)
+          .eq('repeat_group_id', repeatGroupId)
+          .isFilter('archived_at', null);
+    } catch (e) {
+      throw DatabaseException('Ошибка обновления серии: $e');
     }
   }
 

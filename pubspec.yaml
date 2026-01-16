@@ -1,7 +1,7 @@
 name: kabinet
 description: "Мобильное приложение для управления расписанием кабинетов"
 publish_to: 'none'
-version: 1.0.0+24
+version: 1.0.0+25
 
 environment:
   sdk: ^3.8.0

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kabinet/core/cache/cache_keys.dart';
+import 'package:kabinet/core/cache/cache_service.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/payments/repositories/payment_repository.dart';
 import 'package:kabinet/features/schedule/repositories/lesson_repository.dart';
@@ -724,9 +726,10 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       _ref.invalidate(lessonProvider(id));
       _ref.invalidate(studentsProvider(institutionId));
 
-      // Инвалидируем статистику занятий ученика
+      // Инвалидируем статистику и серии занятий ученика
       if (lesson.studentId != null) {
         _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+        _ref.invalidate(studentRepeatGroupsProvider(lesson.studentId!));
       } else if (lesson.groupId != null && lesson.lessonStudents != null) {
         for (final ls in lesson.lessonStudents!) {
           _ref.invalidate(studentLessonStatsProvider(ls.studentId));
@@ -811,6 +814,10 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       await _repo.delete(id);
       _invalidateForRoom(roomId, date, institutionId: institutionId);
       _ref.invalidate(studentsProvider(institutionId));
+      // Инвалидируем серии занятий в карточке ученика
+      if (lesson.studentId != null) {
+        _ref.invalidate(studentRepeatGroupsProvider(lesson.studentId!));
+      }
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -858,6 +865,11 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
         _invalidateForRoom(roomId, date, institutionId: institutionId);
       }
 
+      // Инвалидируем серии занятий ученика в карточке
+      if (studentId != null) {
+        _ref.invalidate(studentRepeatGroupsProvider(studentId));
+      }
+
       state = const AsyncValue.data(null);
       return lessons;
     } catch (e, st) {
@@ -882,11 +894,99 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Удалить это и все последующие занятия серии
-  Future<bool> deleteFollowing(String repeatGroupId, DateTime fromDate, String roomId, String institutionId) async {
+  Future<bool> deleteFollowing(String repeatGroupId, DateTime fromDate, String roomId, String institutionId, {String? studentId}) async {
     state = const AsyncValue.loading();
     try {
       await _repo.deleteFollowingLessons(repeatGroupId, fromDate);
       _invalidateForRoom(roomId, fromDate, institutionId: institutionId);
+      // Инвалидируем серии занятий ученика в карточке
+      if (studentId != null) {
+        _ref.invalidate(studentRepeatGroupsProvider(studentId));
+      }
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Удалить всю серию по repeat_group_id
+  Future<bool> deleteRepeatGroup(String repeatGroupId, String institutionId, {String? studentId}) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.deleteByRepeatGroupId(repeatGroupId);
+
+      // Очищаем кеш занятий для всех дат
+      final now = DateTime.now();
+      for (int i = -7; i <= 60; i++) {
+        final date = now.add(Duration(days: i));
+        final cacheKey = CacheKeys.lessons(institutionId, date);
+        await CacheService.delete(cacheKey);
+      }
+
+      // Инвалидируем серии занятий ученика в карточке
+      if (studentId != null) {
+        _ref.invalidate(studentRepeatGroupsProvider(studentId));
+      }
+      _ref.invalidate(studentsProvider(institutionId));
+
+      // Инвалидируем все дневные провайдеры (занятия могут быть в разных днях)
+      for (int i = -7; i <= 60; i++) {
+        final date = now.add(Duration(days: i));
+        _ref.invalidate(lessonsByInstitutionStreamProvider(
+          InstitutionDateParams(institutionId, date),
+        ));
+      }
+
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Обновить всю серию по repeat_group_id
+  Future<bool> updateRepeatGroup(
+    String repeatGroupId,
+    String institutionId, {
+    String? studentId,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? roomId,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.updateAllByRepeatGroupId(
+        repeatGroupId,
+        startTime: startTime,
+        endTime: endTime,
+        roomId: roomId,
+      );
+
+      // Очищаем кеш занятий для всех дат (серия может охватывать много дней)
+      final now = DateTime.now();
+      for (int i = -7; i <= 60; i++) {
+        final date = now.add(Duration(days: i));
+        final cacheKey = CacheKeys.lessons(institutionId, date);
+        await CacheService.delete(cacheKey);
+      }
+
+      // Инвалидируем серии занятий ученика в карточке
+      if (studentId != null) {
+        _ref.invalidate(studentRepeatGroupsProvider(studentId));
+      }
+      _ref.invalidate(studentsProvider(institutionId));
+
+      // Инвалидируем расписание (занятия могут быть в разных днях)
+      for (int i = -7; i <= 60; i++) {
+        final date = now.add(Duration(days: i));
+        _ref.invalidate(lessonsByInstitutionStreamProvider(
+          InstitutionDateParams(institutionId, date),
+        ));
+      }
+
       state = const AsyncValue.data(null);
       return true;
     } catch (e, st) {
@@ -966,9 +1066,10 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       // Инвалидируем список учеников для обновления баланса
       _ref.invalidate(studentsProvider(institutionId));
 
-      // Инвалидируем статистику занятий ученика
+      // Инвалидируем статистику и серии занятий ученика
       if (lesson.studentId != null) {
         _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+        _ref.invalidate(studentRepeatGroupsProvider(lesson.studentId!));
       } else if (lesson.isGroupLesson && lesson.lessonStudents != null) {
         for (final ls in lesson.lessonStudents!) {
           _ref.invalidate(studentLessonStatsProvider(ls.studentId));
@@ -1149,9 +1250,10 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
       // Инвалидируем список учеников для обновления баланса
       _ref.invalidate(studentsProvider(institutionId));
 
-      // Инвалидируем статистику занятий ученика
+      // Инвалидируем статистику и серии занятий ученика
       if (lesson.studentId != null) {
         _ref.invalidate(studentLessonStatsProvider(lesson.studentId!));
+        _ref.invalidate(studentRepeatGroupsProvider(lesson.studentId!));
       }
 
       state = const AsyncValue.data(null);
@@ -1369,4 +1471,12 @@ final lessonStudentsProvider =
     FutureProvider.family<List<LessonStudent>, String>((ref, lessonId) async {
   final repo = ref.watch(lessonRepositoryProvider);
   return repo.getLessonStudents(lessonId);
+});
+
+/// Серии занятий (repeat_group_id) ученика
+/// Возвращает список серий с информацией о первом занятии и количестве в серии
+final studentRepeatGroupsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>((ref, studentId) async {
+  final repo = ref.watch(lessonRepositoryProvider);
+  return repo.getStudentRepeatGroups(studentId);
 });

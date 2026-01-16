@@ -1108,10 +1108,12 @@ class DayTimeSlot {
   final int dayOfWeek;
   final TimeOfDay startTime;
   final TimeOfDay endTime;
+  final String? roomId; // Опционально: кабинет для этого конкретного дня
 
   const DayTimeSlot({
     required this.dayOfWeek,
     required this.startTime,
     required this.endTime,
+    this.roomId,
   });
 }

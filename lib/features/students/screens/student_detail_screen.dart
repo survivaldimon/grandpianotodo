@@ -27,6 +27,7 @@ import 'package:kabinet/features/lesson_schedules/providers/lesson_schedule_prov
 import 'package:kabinet/features/lesson_schedules/repositories/lesson_schedule_repository.dart';
 import 'package:kabinet/features/lesson_schedules/models/lesson_schedule.dart';
 import 'package:kabinet/features/rooms/providers/room_provider.dart';
+import 'package:kabinet/shared/models/room.dart';
 import 'package:kabinet/core/widgets/ios_time_picker.dart';
 import 'package:kabinet/core/providers/phone_settings_provider.dart';
 import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
@@ -2585,13 +2586,23 @@ class _ScheduleSlotsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // lesson_schedules (бесконечные)
     final schedulesAsync = ref.watch(lessonSchedulesByStudentProvider(studentId));
     final schedules = schedulesAsync.valueOrNull ?? [];
-    final isLoading = schedulesAsync.isLoading && schedulesAsync.valueOrNull == null;
+
+    // repeat_group_id серии (конечные)
+    final repeatGroupsAsync = ref.watch(studentRepeatGroupsProvider(studentId));
+    final repeatGroups = repeatGroupsAsync.valueOrNull ?? [];
+
+    final isLoading = (schedulesAsync.isLoading && schedulesAsync.valueOrNull == null) ||
+                      (repeatGroupsAsync.isLoading && repeatGroupsAsync.valueOrNull == null);
 
     // Разделяем на активные и неактивные (на паузе или архивированные)
     final activeSchedules = schedules.where((s) => !s.isPaused && s.archivedAt == null).toList();
     final inactiveSchedules = schedules.where((s) => s.isPaused || s.archivedAt != null).toList();
+
+    // Все серии занятий считаются активными
+    final activeRepeatGroups = repeatGroups;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2623,7 +2634,7 @@ class _ScheduleSlotsSection extends ConsumerWidget {
           )
         else ...[
           Builder(builder: (_) {
-            if (activeSchedules.isEmpty && inactiveSchedules.isEmpty) {
+            if (activeSchedules.isEmpty && inactiveSchedules.isEmpty && activeRepeatGroups.isEmpty) {
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -2651,9 +2662,17 @@ class _ScheduleSlotsSection extends ConsumerWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Активные расписания
+                // Бесконечные расписания (lesson_schedules)
                 ...activeSchedules.map((schedule) => _LessonScheduleSlotCard(
                   schedule: schedule,
+                  institutionId: institutionId,
+                  canEdit: canEdit,
+                )),
+
+                // Серии занятий (repeat_group_id)
+                ...activeRepeatGroups.map((group) => _RepeatGroupSlotCard(
+                  group: group,
+                  studentId: studentId,
                   institutionId: institutionId,
                   canEdit: canEdit,
                 )),
@@ -2937,6 +2956,16 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
 
               // Actions
               if (!isInactive) ...[
+                // Edit
+                ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: const Text('Редактировать'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _showEditSheet(context, ref);
+                  },
+                ),
+
                 // Pause/Resume
                 if (schedule.isPaused)
                   ListTile(
@@ -3010,6 +3039,17 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showEditSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => _EditLessonScheduleSheet(
+        schedule: schedule,
+        institutionId: institutionId,
       ),
     );
   }
@@ -3268,6 +3308,775 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Расписание удалено')),
+        );
+      }
+    }
+  }
+}
+
+/// Карточка серии занятий (repeat_group_id)
+class _RepeatGroupSlotCard extends ConsumerWidget {
+  final Map<String, dynamic> group;
+  final String studentId;
+  final String institutionId;
+  final bool canEdit;
+
+  const _RepeatGroupSlotCard({
+    required this.group,
+    required this.studentId,
+    required this.institutionId,
+    this.canEdit = true,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final groupColor = theme.colorScheme.secondary;
+
+    // Получаем данные из первого занятия серии
+    final dateStr = group['date'] as String?;
+    final startTimeStr = group['start_time'] as String?;
+    final endTimeStr = group['end_time'] as String?;
+    final roomData = group['rooms'] as Map<String, dynamic>?;
+    final lessonsCount = group['lessons_count'] as int? ?? 1;
+
+    // Парсим дату для получения дня недели
+    DateTime? date;
+    if (dateStr != null) {
+      date = DateTime.tryParse(dateStr);
+    }
+
+    // Форматируем время
+    String timeRange = '';
+    if (startTimeStr != null && endTimeStr != null) {
+      final startParts = startTimeStr.split(':');
+      final endParts = endTimeStr.split(':');
+      if (startParts.length >= 2 && endParts.length >= 2) {
+        timeRange = '${startParts[0]}:${startParts[1]} - ${endParts[0]}:${endParts[1]}';
+      }
+    }
+
+    // Получаем название дня недели
+    String dayName = '';
+    if (date != null) {
+      const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+      dayName = days[date.weekday - 1];
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: canEdit ? () => _showOptionsSheet(context, ref) : null,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Day indicator
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: groupColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      dayName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: groupColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Main info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Time
+                    Text(
+                      timeRange,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+
+                    // Room
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.meeting_room,
+                          size: 14,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            roomData?['name'] ?? 'Кабинет',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Lessons count badge
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: groupColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${lessonsCount}x',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: groupColor,
+                      ),
+                    ),
+                  ),
+                  if (canEdit)
+                    Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showOptionsSheet(BuildContext context, WidgetRef ref) {
+    final lessonsCount = group['lessons_count'] as int? ?? 1;
+    final dateStr = group['date'] as String?;
+    final startTimeStr = group['start_time'] as String?;
+    final endTimeStr = group['end_time'] as String?;
+    final roomData = group['rooms'] as Map<String, dynamic>?;
+    final repeatGroupId = group['repeat_group_id'] as String?;
+
+    // Парсим дату
+    DateTime? date;
+    if (dateStr != null) {
+      date = DateTime.tryParse(dateStr);
+    }
+
+    // Форматируем время
+    String timeRange = '';
+    if (startTimeStr != null && endTimeStr != null) {
+      final startParts = startTimeStr.split(':');
+      final endParts = endTimeStr.split(':');
+      if (startParts.length >= 2 && endParts.length >= 2) {
+        timeRange = '${startParts[0]}:${startParts[1]} - ${endParts[0]}:${endParts[1]}';
+      }
+    }
+
+    // День недели
+    String dayNameFull = '';
+    if (date != null) {
+      const daysFull = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+      dayNameFull = daysFull[date.weekday - 1];
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${lessonsCount}x',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$dayNameFull, $timeRange',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          Text(
+                            roomData?['name'] ?? 'Кабинет',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+
+              // Info
+              ListTile(
+                leading: Icon(
+                  Icons.event,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                title: Text('$lessonsCount занятий в серии'),
+              ),
+              if (date != null)
+                ListTile(
+                  leading: Icon(
+                    Icons.calendar_today,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text('Начало: ${DateFormat('dd.MM.yyyy').format(date)}'),
+                ),
+
+              const Divider(height: 1),
+
+              // Edit action
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Редактировать'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showEditSheet(context, ref);
+                },
+              ),
+
+              // Delete action
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Удалить серию', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _confirmDelete(context, ref, repeatGroupId, lessonsCount);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditSheet(BuildContext context, WidgetRef ref) {
+    final repeatGroupId = group['repeat_group_id'] as String?;
+    if (repeatGroupId == null) return;
+
+    final startTimeStr = group['start_time'] as String?;
+    final endTimeStr = group['end_time'] as String?;
+    final roomData = group['rooms'] as Map<String, dynamic>?;
+    final currentRoomId = roomData?['id'] as String?;
+
+    // Парсим текущее время
+    TimeOfDay? startTime;
+    TimeOfDay? endTime;
+    if (startTimeStr != null) {
+      final parts = startTimeStr.split(':');
+      if (parts.length >= 2) {
+        startTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+    }
+    if (endTimeStr != null) {
+      final parts = endTimeStr.split(':');
+      if (parts.length >= 2) {
+        endTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => _EditRepeatGroupSheet(
+        repeatGroupId: repeatGroupId,
+        studentId: studentId,
+        institutionId: institutionId,
+        initialStartTime: startTime ?? const TimeOfDay(hour: 12, minute: 0),
+        initialEndTime: endTime ?? const TimeOfDay(hour: 13, minute: 0),
+        initialRoomId: currentRoomId,
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref, String? repeatGroupId, int lessonsCount) async {
+    if (repeatGroupId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Удалить серию?'),
+        content: Text('Будет удалено $lessonsCount занятий из расписания. Это действие нельзя отменить.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final controller = ref.read(lessonControllerProvider.notifier);
+      final success = await controller.deleteRepeatGroup(
+        repeatGroupId,
+        institutionId,
+        studentId: studentId,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? 'Серия удалена' : 'Ошибка удаления'),
+          ),
+        );
+      }
+    }
+  }
+}
+
+/// Форма редактирования серии занятий
+class _EditRepeatGroupSheet extends ConsumerStatefulWidget {
+  final String repeatGroupId;
+  final String studentId;
+  final String institutionId;
+  final TimeOfDay initialStartTime;
+  final TimeOfDay initialEndTime;
+  final String? initialRoomId;
+
+  const _EditRepeatGroupSheet({
+    required this.repeatGroupId,
+    required this.studentId,
+    required this.institutionId,
+    required this.initialStartTime,
+    required this.initialEndTime,
+    this.initialRoomId,
+  });
+
+  @override
+  ConsumerState<_EditRepeatGroupSheet> createState() => _EditRepeatGroupSheetState();
+}
+
+class _EditRepeatGroupSheetState extends ConsumerState<_EditRepeatGroupSheet> {
+  late TimeOfDay _startTime;
+  late TimeOfDay _endTime;
+  String? _roomId;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTime = widget.initialStartTime;
+    _endTime = widget.initialEndTime;
+    _roomId = widget.initialRoomId;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final roomsAsync = ref.watch(roomsStreamProvider(widget.institutionId));
+    final rooms = roomsAsync.valueOrNull ?? [];
+
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    const Icon(Icons.edit_calendar),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Редактировать серию',
+                      style: theme.textTheme.titleLarge,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Start time
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.access_time),
+                  title: const Text('Время начала'),
+                  subtitle: Text(
+                    '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _selectStartTime(context),
+                ),
+
+                // End time
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.access_time_filled),
+                  title: const Text('Время окончания'),
+                  subtitle: Text(
+                    '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _selectEndTime(context),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Room dropdown
+                DropdownButtonFormField<String>(
+                  value: _roomId,
+                  decoration: const InputDecoration(
+                    labelText: 'Кабинет',
+                    prefixIcon: Icon(Icons.meeting_room),
+                    border: OutlineInputBorder(),
+                  ),
+                  items: rooms.map((room) {
+                    return DropdownMenuItem(
+                      value: room.id,
+                      child: Text(room.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _roomId = value);
+                  },
+                ),
+
+                const SizedBox(height: 24),
+
+                // Save button
+                FilledButton.icon(
+                  onPressed: _isLoading ? null : _save,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: const Text('Сохранить'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectStartTime(BuildContext context) async {
+    final picked = await showIosTimePicker(
+      context: context,
+      initialTime: _startTime,
+    );
+    if (picked != null) {
+      setState(() => _startTime = picked);
+    }
+  }
+
+  Future<void> _selectEndTime(BuildContext context) async {
+    final picked = await showIosTimePicker(
+      context: context,
+      initialTime: _endTime,
+    );
+    if (picked != null) {
+      setState(() => _endTime = picked);
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _isLoading = true);
+
+    final controller = ref.read(lessonControllerProvider.notifier);
+    final success = await controller.updateRepeatGroup(
+      widget.repeatGroupId,
+      widget.institutionId,
+      studentId: widget.studentId,
+      startTime: _startTime,
+      endTime: _endTime,
+      roomId: _roomId,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (context.mounted) {
+      if (success) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Серия обновлена')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка обновления')),
+        );
+      }
+    }
+  }
+}
+
+/// Форма редактирования постоянного расписания (lesson_schedule)
+class _EditLessonScheduleSheet extends ConsumerStatefulWidget {
+  final LessonSchedule schedule;
+  final String institutionId;
+
+  const _EditLessonScheduleSheet({
+    required this.schedule,
+    required this.institutionId,
+  });
+
+  @override
+  ConsumerState<_EditLessonScheduleSheet> createState() => _EditLessonScheduleSheetState();
+}
+
+class _EditLessonScheduleSheetState extends ConsumerState<_EditLessonScheduleSheet> {
+  late TimeOfDay _startTime;
+  late TimeOfDay _endTime;
+  late String? _roomId;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTime = widget.schedule.startTime;
+    _endTime = widget.schedule.endTime;
+    _roomId = widget.schedule.roomId;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final roomsAsync = ref.watch(roomsStreamProvider(widget.institutionId));
+    final rooms = roomsAsync.valueOrNull ?? [];
+
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          widget.schedule.dayName,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Редактировать расписание',
+                            style: theme.textTheme.titleLarge,
+                          ),
+                          Text(
+                            widget.schedule.dayNameFull,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Start time
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.access_time),
+                  title: const Text('Время начала'),
+                  subtitle: Text(
+                    '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _selectStartTime(context),
+                ),
+
+                // End time
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.access_time_filled),
+                  title: const Text('Время окончания'),
+                  subtitle: Text(
+                    '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _selectEndTime(context),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Room dropdown
+                DropdownButtonFormField<String>(
+                  value: _roomId,
+                  decoration: const InputDecoration(
+                    labelText: 'Кабинет',
+                    prefixIcon: Icon(Icons.meeting_room),
+                    border: OutlineInputBorder(),
+                  ),
+                  items: rooms.map((room) {
+                    return DropdownMenuItem(
+                      value: room.id,
+                      child: Text(room.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _roomId = value);
+                  },
+                ),
+
+                const SizedBox(height: 24),
+
+                // Save button
+                FilledButton.icon(
+                  onPressed: _isLoading ? null : _save,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: const Text('Сохранить'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectStartTime(BuildContext context) async {
+    final picked = await showIosTimePicker(
+      context: context,
+      initialTime: _startTime,
+    );
+    if (picked != null) {
+      setState(() => _startTime = picked);
+    }
+  }
+
+  Future<void> _selectEndTime(BuildContext context) async {
+    final picked = await showIosTimePicker(
+      context: context,
+      initialTime: _endTime,
+    );
+    if (picked != null) {
+      setState(() => _endTime = picked);
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final controller = ref.read(lessonScheduleControllerProvider.notifier);
+      final result = await controller.update(
+        widget.schedule.id,
+        institutionId: widget.institutionId,
+        startTime: _startTime,
+        endTime: _endTime,
+        roomId: _roomId,
+      );
+
+      setState(() => _isLoading = false);
+
+      if (context.mounted) {
+        if (result != null) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Расписание обновлено')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ошибка обновления (возможно конфликт времени)')),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
         );
       }
     }
@@ -3648,7 +4457,9 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
   final Map<int, TimeOfDay> _startTimes = {};
   final Map<int, TimeOfDay> _endTimes = {};
 
-  String? _selectedRoomId;
+  // Кабинет для каждого дня (индивидуальный выбор)
+  final Map<int, String?> _roomIds = {};
+
   String? _selectedTeacherId;
   String? _selectedSubjectId;
   String? _selectedLessonTypeId;
@@ -3706,7 +4517,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
   /// Проверяет конфликты для всех выбранных дней
   /// Проверяет: 1) другие повторяющиеся бронирования, 2) ВСЕ будущие занятия
   Future<void> _checkConflicts() async {
-    if (_selectedRoomId == null || _selectedDays.isEmpty) {
+    if (_selectedDays.isEmpty) {
       setState(() {
         _conflictingDays.clear();
         _isCheckingConflicts = false;
@@ -3720,12 +4531,16 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
     final newConflicts = <int>{};
 
     for (final day in _selectedDays) {
+      final roomId = _roomIds[day];
+      // Пропускаем проверку если кабинет не выбран для этого дня
+      if (roomId == null) continue;
+
       final startTime = _startTimes[day] ?? _defaultStartTime;
       final endTime = _endTimes[day] ?? _defaultEndTime;
 
       // 1. Проверяем конфликт с другими повторяющимися бронированиями
       final hasBookingConflict = await repo.hasWeeklyConflict(
-        roomId: _selectedRoomId!,
+        roomId: roomId,
         dayOfWeek: day,
         startTime: startTime,
         endTime: endTime,
@@ -3738,7 +4553,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
 
       // 2. Проверяем конфликт с ВСЕМИ будущими занятиями для этого дня недели
       final hasLessonConflict = await repo.hasLessonConflictForDayOfWeek(
-        roomId: _selectedRoomId!,
+        roomId: roomId,
         dayOfWeek: day,
         startTime: startTime,
         endTime: endTime,
@@ -3827,39 +4642,22 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
               _buildDaysSelector(),
               const SizedBox(height: 16),
 
-              // Time for each selected day
+              // Time for each selected day with individual room selection
               if (_selectedDays.isNotEmpty) ...[
                 Text(
-                  'Время занятий',
+                  'Время и кабинеты',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 8),
-                ..._buildDayTimeRows(),
+                roomsAsync.when(
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, _) => Text('Ошибка: $e'),
+                  data: (rooms) => Column(
+                    children: _buildDayTimeRows(rooms),
+                  ),
+                ),
                 const SizedBox(height: 16),
               ],
-
-              // Room dropdown
-              roomsAsync.when(
-                loading: () => const LinearProgressIndicator(),
-                error: (e, _) => Text('Ошибка: $e'),
-                data: (rooms) => DropdownButtonFormField<String>(
-                  key: ValueKey('room_$_selectedRoomId'),
-                  initialValue: _selectedRoomId,
-                  decoration: const InputDecoration(
-                    labelText: 'Кабинет *',
-                    prefixIcon: Icon(Icons.meeting_room),
-                  ),
-                  items: rooms
-                      .map((r) => DropdownMenuItem(value: r.id, child: Text(r.name)))
-                      .toList(),
-                  onChanged: (v) {
-                    setState(() => _selectedRoomId = v);
-                    _checkConflicts();
-                  },
-                  validator: (v) => v == null ? 'Выберите кабинет' : null,
-                ),
-              ),
-              const SizedBox(height: 16),
 
               // Дата начала действия расписания
               InkWell(
@@ -4127,33 +4925,40 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
               const SizedBox(height: 16),
 
               // Submit button
-              ElevatedButton.icon(
-                onPressed: _selectedDays.isEmpty ||
-                        _isSubmitting ||
-                        _isCheckingConflicts ||
-                        _conflictingDays.isNotEmpty
-                    ? null
-                    : _submit,
-                icon: _isSubmitting || _isCheckingConflicts
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.add),
-                label: Text(
-                  _isCheckingConflicts
-                      ? 'Проверка...'
-                      : _conflictingDays.isNotEmpty
-                          ? 'Есть конфликты'
-                          : _selectedDays.length > 1
-                              ? 'Создать ${_selectedDays.length} занятий'
-                              : 'Создать расписание',
-                ),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
+              Builder(builder: (context) {
+                final hasAllRooms = _selectedDays.isNotEmpty &&
+                    _selectedDays.every((day) => _roomIds[day] != null);
+                final canSubmit = _selectedDays.isNotEmpty &&
+                    hasAllRooms &&
+                    !_isSubmitting &&
+                    !_isCheckingConflicts &&
+                    _conflictingDays.isEmpty;
+
+                return ElevatedButton.icon(
+                  onPressed: canSubmit ? _submit : null,
+                  icon: _isSubmitting || _isCheckingConflicts
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add),
+                  label: Text(
+                    _isCheckingConflicts
+                        ? 'Проверка...'
+                        : _conflictingDays.isNotEmpty
+                            ? 'Есть конфликты'
+                            : !hasAllRooms && _selectedDays.isNotEmpty
+                                ? 'Выберите кабинеты'
+                                : _selectedDays.length > 1
+                                    ? 'Создать ${_selectedDays.length} занятий'
+                                    : 'Создать расписание',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                );
+              }),
             ],
           ),
         ),
@@ -4184,6 +4989,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                 _selectedDays.remove(dayNumber);
                 _startTimes.remove(dayNumber);
                 _endTimes.remove(dayNumber);
+                _roomIds.remove(dayNumber);
                 _conflictingDays.remove(dayNumber);
               }
             });
@@ -4194,16 +5000,17 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
     );
   }
 
-  List<Widget> _buildDayTimeRows() {
+  List<Widget> _buildDayTimeRows(List<Room> rooms) {
     final sortedDays = _selectedDays.toList()..sort();
-    return sortedDays.map((day) => _buildDayTimeRow(day)).toList();
+    return sortedDays.map((day) => _buildDayTimeRow(day, rooms)).toList();
   }
 
-  Widget _buildDayTimeRow(int dayNumber) {
+  Widget _buildDayTimeRow(int dayNumber, List<Room> rooms) {
     const days = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
     final startTime = _startTimes[dayNumber] ?? _defaultStartTime;
     final endTime = _endTimes[dayNumber] ?? _defaultEndTime;
     final hasConflict = _conflictingDays.contains(dayNumber);
+    final selectedRoom = _roomIds[dayNumber];
 
     // Расчёт длительности
     final startMinutes = startTime.hour * 60 + startTime.minute;
@@ -4220,47 +5027,57 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
       color: hasConflict
           ? Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3)
           : null,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _pickTimeRange(dayNumber),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Day label
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: hasConflict
-                      ? Theme.of(context).colorScheme.errorContainer
-                      : Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Text(
-                    days[dayNumber],
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: hasConflict
-                          ? Theme.of(context).colorScheme.onErrorContainer
-                          : Theme.of(context).colorScheme.onPrimaryContainer,
-                    ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Day label
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: hasConflict
+                    ? Theme.of(context).colorScheme.errorContainer
+                    : Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Text(
+                  days[dayNumber],
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: hasConflict
+                        ? Theme.of(context).colorScheme.onErrorContainer
+                        : Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+            ),
+            const SizedBox(width: 12),
 
-              // Time range
-              Expanded(
+            // Time range (tappable)
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _pickTimeRange(dayNumber),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${_formatTime(startTime)} — ${_formatTime(endTime)}',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          '${_formatTime(startTime)} — ${_formatTime(endTime)}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -4276,16 +5093,53 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                   ],
                 ),
               ),
+            ),
 
-              // Conflict or Edit icon
-              Icon(
-                hasConflict ? Icons.warning_amber_rounded : Icons.edit_outlined,
-                color: hasConflict
-                    ? Theme.of(context).colorScheme.error
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
+            // Room dropdown
+            const SizedBox(width: 8),
+            Container(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: DropdownButton<String>(
+                value: selectedRoom,
+                hint: Text(
+                  'Кабинет',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                icon: Icon(
+                  Icons.meeting_room_outlined,
+                  size: 18,
+                  color: selectedRoom != null
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.error,
+                ),
+                selectedItemBuilder: (context) => rooms.map<Widget>((r) {
+                  return Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      r.name,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                items: rooms.map<DropdownMenuItem<String>>((r) => DropdownMenuItem<String>(
+                  value: r.id,
+                  child: Text(r.name),
+                )).toList(),
+                onChanged: (v) {
+                  setState(() => _roomIds[dayNumber] = v);
+                  _checkConflicts();
+                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -4327,6 +5181,15 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
       return;
     }
 
+    // Проверяем что для всех дней выбраны кабинеты
+    final daysWithoutRoom = _selectedDays.where((day) => _roomIds[day] == null).toList();
+    if (daysWithoutRoom.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Выберите кабинет для каждого дня')),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -4337,7 +5200,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
         final day = _selectedDays.first;
         await scheduleController.create(
           institutionId: widget.institutionId,
-          roomId: _selectedRoomId!,
+          roomId: _roomIds[day]!,
           teacherId: _selectedTeacherId!,
           studentId: widget.studentId,
           subjectId: _selectedSubjectId,
@@ -4352,11 +5215,12 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
           dayOfWeek: day,
           startTime: _startTimes[day]!,
           endTime: _endTimes[day]!,
+          roomId: _roomIds[day],
         )).toList();
 
         await scheduleController.createBatch(
           institutionId: widget.institutionId,
-          roomId: _selectedRoomId!,
+          roomId: _roomIds[_selectedDays.first]!, // Fallback, но каждый slot имеет свой roomId
           teacherId: _selectedTeacherId!,
           studentId: widget.studentId,
           subjectId: _selectedSubjectId,

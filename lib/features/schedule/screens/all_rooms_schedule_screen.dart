@@ -5413,6 +5413,7 @@ class _VirtualCancelLessonSheet extends ConsumerStatefulWidget {
 
 class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonSheet> {
   bool _deductFromBalance = false;
+  bool _cancelFollowing = false;
   bool _isLoading = false;
 
   Future<void> _cancel() async {
@@ -5424,23 +5425,40 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
       // studentId берём из schedule или из lesson
       final studentId = widget.schedule.studentId ?? widget.lesson.studentId;
 
-      // Создаём занятие со статусом cancelled
-      final lessonId = await scheduleController.createLessonFromSchedule(
-        widget.schedule.id,
-        widget.lesson.date,
-        widget.institutionId,
-        studentId,
-        status: 'cancelled',
-      );
+      String message;
 
-      // Если выбрано списание — дополнительно списываем с баланса
-      if (_deductFromBalance && studentId != null) {
-        final lessonController = ref.read(lessonControllerProvider.notifier);
-        await lessonController.deductForCancelledLesson(
-          lessonId,
-          studentId,
+      if (_cancelFollowing) {
+        // Отмена всей серии — создаём отменённое занятие + завершаем расписание
+        await scheduleController.cancelScheduleFromDate(
+          widget.schedule.id,
+          widget.lesson.date,
           widget.institutionId,
+          studentId,
+          deductFromBalance: _deductFromBalance,
         );
+        message = 'Серия занятий отменена';
+      } else {
+        // Отмена только этого занятия
+        final lessonId = await scheduleController.createLessonFromSchedule(
+          widget.schedule.id,
+          widget.lesson.date,
+          widget.institutionId,
+          studentId,
+          status: 'cancelled',
+        );
+
+        // Если выбрано списание — дополнительно списываем с баланса
+        if (_deductFromBalance && studentId != null) {
+          final lessonController = ref.read(lessonControllerProvider.notifier);
+          await lessonController.deductForCancelledLesson(
+            lessonId,
+            studentId,
+            widget.institutionId,
+          );
+        }
+        message = _deductFromBalance
+            ? 'Занятие отменено и списано с баланса'
+            : 'Занятие отменено';
       }
 
       if (!mounted) return;
@@ -5454,9 +5472,7 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_deductFromBalance
-              ? 'Занятие отменено и списано с баланса'
-              : 'Занятие отменено'),
+          content: Text(message),
           backgroundColor: Colors.green,
         ),
       );
@@ -5541,6 +5557,32 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
                   ),
                   const SizedBox(height: 8),
                 ],
+
+                // Выбор: только это занятие или вся серия
+                Text(
+                  'Это занятие является частью постоянного расписания',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(
+                      value: false,
+                      label: Text('Только это'),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      label: Text('Это и все последующие'),
+                    ),
+                  ],
+                  selected: {_cancelFollowing},
+                  onSelectionChanged: (selected) {
+                    setState(() => _cancelFollowing = selected.first);
+                  },
+                ),
+                const SizedBox(height: 16),
 
                 // Кнопка отмены
                 SizedBox(

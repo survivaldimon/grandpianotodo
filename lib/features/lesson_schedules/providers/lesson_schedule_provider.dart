@@ -65,6 +65,17 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
     _ref.invalidate(lessonSchedulesByStudentProvider(studentId));
   }
 
+  /// Инвалидация lessonSchedulesForDateProvider для обновления UI расписания
+  void _invalidateScheduleForDates(String institutionId) {
+    final now = DateTime.now();
+    for (int i = -7; i <= 30; i++) {
+      final date = now.add(Duration(days: i));
+      _ref.invalidate(lessonSchedulesForDateProvider(
+        InstitutionDateParams(institutionId, date),
+      ));
+    }
+  }
+
   // ============================================
   // Создание
   // ============================================
@@ -117,6 +128,7 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (studentId != null) {
         _invalidateForStudent(studentId);
       }
+      _invalidateScheduleForDates(institutionId);
 
       state = const AsyncValue.data(null);
       return schedule;
@@ -172,6 +184,7 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (studentId != null) {
         _invalidateForStudent(studentId);
       }
+      _invalidateScheduleForDates(institutionId);
 
       state = const AsyncValue.data(null);
       return schedules;
@@ -245,6 +258,7 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (schedule.studentId != null) {
         _invalidateForStudent(schedule.studentId!);
       }
+      _invalidateScheduleForDates(institutionId);
 
       state = const AsyncValue.data(null);
       return schedule;
@@ -268,6 +282,7 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (studentId != null) {
         _invalidateForStudent(studentId);
       }
+      _invalidateScheduleForDates(institutionId);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -284,6 +299,7 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (studentId != null) {
         _invalidateForStudent(studentId);
       }
+      _invalidateScheduleForDates(institutionId);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -310,6 +326,7 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (studentId != null) {
         _invalidateForStudent(studentId);
       }
+      _invalidateScheduleForDates(institutionId);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -326,6 +343,7 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (studentId != null) {
         _invalidateForStudent(studentId);
       }
+      _invalidateScheduleForDates(institutionId);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -393,6 +411,7 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (studentId != null) {
         _invalidateForStudent(studentId);
       }
+      _invalidateScheduleForDates(institutionId);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -409,6 +428,7 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (studentId != null) {
         _invalidateForStudent(studentId);
       }
+      _invalidateScheduleForDates(institutionId);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -424,9 +444,93 @@ class LessonScheduleController extends StateNotifier<AsyncValue<void>> {
       if (studentId != null) {
         _invalidateForStudent(studentId);
       }
+      _invalidateScheduleForDates(institutionId);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// Отменить расписание начиная с указанной даты
+  /// Создаёт отменённое занятие на эту дату и завершает расписание
+  Future<void> cancelScheduleFromDate(
+    String scheduleId,
+    DateTime date,
+    String institutionId,
+    String? studentId, {
+    bool deductFromBalance = false,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      // 1. Создаём отменённое занятие на эту дату
+      final lessonId = await _repo.createLessonFromSchedule(
+        scheduleId,
+        date,
+        status: 'cancelled',
+      );
+
+      // 2. Если нужно списать с баланса
+      if (deductFromBalance && studentId != null) {
+        await _deductForCancelledLesson(lessonId, studentId, institutionId);
+      }
+
+      // 3. Полностью удаляем расписание из БД
+      await _repo.delete(scheduleId);
+
+      // 4. Инвалидируем провайдеры
+      _invalidateForInstitution(institutionId);
+      _ref.invalidate(lessonScheduleProvider(scheduleId));
+      if (studentId != null) {
+        _invalidateForStudent(studentId);
+        _ref.invalidate(studentsProvider(institutionId));
+      }
+      // Обновляем занятия на этот день
+      _ref.invalidate(lessonsByInstitutionStreamProvider(
+        InstitutionDateParams(institutionId, date),
+      ));
+
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Списать занятие для отменённого занятия
+  Future<void> _deductForCancelledLesson(
+    String lessonId,
+    String studentId,
+    String institutionId,
+  ) async {
+    final paymentRepo = PaymentRepository();
+    final subscriptionRepo = SubscriptionRepository();
+    final studentRepo = StudentRepository();
+    final lessonRepo = LessonRepository();
+
+    try {
+      // 1. Сначала пробуем списать с balance_transfer (остаток занятий)
+      final transferId = await paymentRepo.deductBalanceTransfer(studentId);
+      if (transferId != null) {
+        await lessonRepo.setTransferPaymentId(lessonId, transferId);
+      } else {
+        // 2. Пробуем списать с подписки
+        final subscriptionId = await subscriptionRepo.deductLessonAndGetId(studentId);
+
+        if (subscriptionId == null) {
+          // 3. Нет активной подписки — списываем напрямую (уход в долг)
+          await studentRepo.decrementPrepaidCount(studentId);
+        }
+      }
+
+      // Устанавливаем флаг списания
+      await lessonRepo.setIsDeducted(lessonId, true);
+
+      // Инвалидируем данные
+      _ref.invalidate(studentProvider(studentId));
+      _ref.invalidate(studentsProvider(institutionId));
+    } catch (e) {
+      debugPrint('Error deducting for cancelled lesson: $e');
+      // Не критичная ошибка — продолжаем
     }
   }
 
