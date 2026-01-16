@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
 
@@ -977,14 +980,40 @@ class StatisticsRepository {
 
   /// Realtime стрим статистики занятий ученика (проведено/отменено)
   /// Обновляется при любых изменениях в таблице lessons
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
   Stream<({int completed, int cancelled})> watchStudentLessonStats({
     required String studentId,
-  }) async* {
-    // Подписываемся на изменения в таблице lessons
-    await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
-      // При любом изменении пересчитываем статистику
-      final stats = await getStudentLessonStats(studentId: studentId);
-      yield stats;
+  }) {
+    final controller = StreamController<({int completed, int cancelled})>.broadcast();
+
+    Future<void> loadAndEmit() async {
+      try {
+        final stats = await getStudentLessonStats(studentId: studentId);
+        if (!controller.isClosed) {
+          controller.add(stats);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
     }
+
+    // 1. Сразу загружаем начальные данные
+    loadAndEmit();
+
+    // 2. Подписываемся на изменения с обработкой ошибок
+    final subscription = _client.from('lessons').stream(primaryKey: ['id']).listen(
+      (_) => loadAndEmit(),
+      onError: (e) {
+        debugPrint('[StatisticsRepository] watchStudentLessonStats error: $e');
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      },
+    );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 }

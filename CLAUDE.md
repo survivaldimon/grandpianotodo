@@ -42,9 +42,9 @@
 | SESSION_*.md | История сессий разработки |
 
 **Последние сессии:**
+- `SESSION_2026_01_16_CACHE_PERFORMANCE.md` — cache-first, compute(), sync emit в watch-методах
 - `SESSION_2026_01_15_LESSON_SCHEDULES.md` — виртуальные занятия, отмена и списание
 - `SESSION_2026_01_13_BALANCE_TRANSFER.md` — система остатка занятий, улучшения UI
-- `SESSION_2026_01_11_LESSON_HISTORY.md` — история занятий, настройка кабинетов
 
 ---
 
@@ -62,9 +62,12 @@ lib/features/{feature}/
 
 ### Repository Pattern
 ```
-UI (Screen/Widget) → Provider → Repository → Supabase
+UI (Screen/Widget) → Provider → Repository → Cache (Hive) → Supabase
+                                    ↑              ↓
+                                    └── Realtime обновляет кэш
 ```
 Провайдеры НЕ обращаются к Supabase напрямую.
+Репозитории используют **cache-first** паттерн (см. секцию "Кэширование и Performance").
 
 ### Riverpod паттерны
 - `StreamProvider` — realtime данные
@@ -105,6 +108,164 @@ return ListView(data);
 
 // ❌ НЕПРАВИЛЬНО — данные исчезнут при ошибке
 asyncValue.when(error: (e, _) => ErrorView(...))
+```
+
+---
+
+## Кэширование и Performance
+
+### Персистентный кэш (Hive)
+
+Приложение использует **cache-first** паттерн для мгновенного отображения данных.
+
+**Файлы:**
+- `lib/core/cache/cache_service.dart` — инициализация, TTL, JSON storage
+- `lib/core/cache/cache_keys.dart` — типобезопасные ключи
+
+**TTL-политика:**
+| Данные | TTL | Ключ |
+|--------|-----|------|
+| Справочники (rooms, subjects, lesson_types) | 60 мин | `CacheKeys.rooms(institutionId)` |
+| Ученики | 30 мин | `CacheKeys.students(institutionId)` |
+| Занятия | 15 мин | `CacheKeys.lessons(institutionId, date)` |
+
+**Паттерн cache-first + stale-while-revalidate:**
+```dart
+Future<List<Entity>> getByInstitution(String id, {bool skipCache = false}) async {
+  final cacheKey = CacheKeys.entities(id);
+
+  // 1. Мгновенно из кэша
+  if (!skipCache) {
+    final cached = CacheService.get<List<dynamic>>(cacheKey);
+    if (cached != null) {
+      _refreshInBackground(id, cacheKey); // Обновление в фоне
+      return _parseFromCache(cached);
+    }
+  }
+
+  // 2. Из сети если кэш пуст
+  final data = await _fetchFromNetwork(id);
+  await CacheService.put(cacheKey, data.map(_toCache).toList(), ttlMinutes: 60);
+  return data;
+}
+```
+
+**ОБЯЗАТЕЛЬНО** для новых репозиториев с методами загрузки списков:
+1. Добавить ключ в `CacheKeys`
+2. Реализовать cache-first паттерн
+3. Добавить метод `invalidateCache()`
+
+---
+
+### Isolates (compute())
+
+Парсинг больших списков выполняется в изоляте чтобы не блокировать UI.
+
+**Пороговые значения:**
+| Сущность | Порог |
+|----------|-------|
+| Students | >50 |
+| Lessons | >30 |
+| Payments | >50 |
+
+**Правила:**
+```dart
+// 1. Top-level функция (НЕ метод класса!)
+const int _entityComputeThreshold = 50;
+
+List<Entity> _parseEntitiesIsolate(List<Map<String, dynamic>> jsonList) {
+  return jsonList.map((item) => Entity.fromJson(item)).toList();
+}
+
+// 2. Проверка порога в методе загрузки
+if (dataList.length >= _entityComputeThreshold) {
+  debugPrint('[Repository] Using compute() for ${dataList.length} items');
+  return compute(
+    _parseEntitiesIsolate,
+    dataList.map((e) => Map<String, dynamic>.from(e)).toList(),
+  );
+}
+return dataList.map((item) => Entity.fromJson(item)).toList();
+```
+
+**ОБЯЗАТЕЛЬНО** для новых методов загрузки списков:
+1. Определить порог (обычно 30-50)
+2. Добавить top-level функцию парсинга
+3. Проверять длину списка перед парсингом
+
+---
+
+### StreamProvider и watch-методы (КРИТИЧНО!)
+
+При возврате из background **все StreamProvider'ы пересоздаются**. Если watch-метод не эмитит данные синхронно — UI покажет shimmer вместо данных.
+
+**⚠️ ОБЯЗАТЕЛЬНЫЙ паттерн для watch-методов:**
+```dart
+Stream<List<Entity>> watchByInstitution(String institutionId) {
+  final controller = StreamController<List<Entity>>.broadcast();
+  final cacheKey = CacheKeys.entities(institutionId);
+
+  Future<void> loadAndEmit() async {
+    final data = await getByInstitution(institutionId);
+    if (!controller.isClosed) controller.add(data);
+  }
+
+  // 1. СИНХРОННО эмитим из кэша — UI получает данные МГНОВЕННО
+  final cached = CacheService.get<List<dynamic>>(cacheKey);
+  if (cached != null) {
+    try {
+      final entities = _parseFromCache(cached);
+      controller.add(entities);  // ← СИНХРОННЫЙ эмит!
+      loadAndEmit();  // Обновляем в фоне
+    } catch (e) {
+      loadAndEmit();  // При ошибке парсинга — из сети
+    }
+  } else {
+    loadAndEmit();  // Нет кэша — из сети
+  }
+
+  // 2. Подписка на Realtime
+  final subscription = _client.from('table').stream(primaryKey: ['id']).listen(
+    (_) => loadAndEmit(),
+  );
+
+  controller.onCancel = () => subscription.cancel();
+  return controller.stream;
+}
+```
+
+**Почему это важно:**
+- При возврате из background Supabase Realtime переподключается
+- StreamProvider'ы пересоздаются и получают новые stream'ы
+- Без синхронного эмита UI видит `AsyncValue.loading()` → shimmer
+- С синхронным эмитом UI сразу получает данные из кэша
+
+**Файлы с реализацией:**
+- `lib/features/schedule/repositories/lesson_repository.dart` → `watchByInstitution()`
+- `lib/features/payments/repositories/payment_repository.dart` → `watchByInstitution()`
+
+---
+
+### App Lifecycle (Background/Foreground)
+
+**Файлы:**
+- `lib/core/services/app_lifecycle_service.dart` — обработка lifecycle событий
+- `lib/core/services/connection_manager.dart` — управление соединением
+
+**Что происходит при возврате из background:**
+1. `AppLifecycleService._handleResume()` вызывается
+2. `ConnectionManager.reconnectRealtime()` переподключает Realtime
+3. Supabase Realtime триггерит события → StreamProvider'ы обновляются
+4. Watch-методы эмитят кэшированные данные **синхронно** → UI мгновенный
+
+**Паттерн resilient refresh (в MainShell):**
+```dart
+void _refreshAllData(String institutionId) {
+  // Только критичные провайдеры — НЕ все 26!
+  ref.invalidate(currentInstitutionStreamProvider(institutionId));
+  ref.invalidate(myMembershipProvider(institutionId));
+  // Остальные обновятся через Realtime автоматически
+}
 ```
 
 ---

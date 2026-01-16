@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,9 +64,13 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
           }
           return RefreshIndicator(
             onRefresh: () async {
-              ref.invalidate(roomsProvider(widget.institutionId));
-              _localRooms = null; // Сбрасываем локальный список при refresh
-              await ref.read(roomsProvider(widget.institutionId).future);
+              try {
+                ref.invalidate(roomsProvider(widget.institutionId));
+                _localRooms = null; // Сбрасываем локальный список при refresh
+                await ref.read(roomsProvider(widget.institutionId).future);
+              } catch (e) {
+                debugPrint('[RoomsScreen] refresh error: $e');
+              }
             },
             child: _buildRoomsList(_localRooms ?? rooms),
           );

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
@@ -73,8 +74,12 @@ class _SubjectsScreenState extends ConsumerState<SubjectsScreen> {
 
           return RefreshIndicator(
             onRefresh: () async {
-              ref.invalidate(subjectsListProvider(widget.institutionId));
-              await ref.read(subjectsListProvider(widget.institutionId).future);
+              try {
+                ref.invalidate(subjectsListProvider(widget.institutionId));
+                await ref.read(subjectsListProvider(widget.institutionId).future);
+              } catch (e) {
+                debugPrint('[SubjectsScreen] refresh error: $e');
+              }
             },
             child: ListView.builder(
               padding: AppSizes.paddingAllM,

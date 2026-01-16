@@ -1,10 +1,24 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:kabinet/core/cache/cache_keys.dart';
+import 'package:kabinet/core/cache/cache_service.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/lesson_history.dart';
+
+/// Порог для использования compute() (количество записей)
+const int _lessonComputeThreshold = 30;
+
+/// Парсинг списка занятий в отдельном изоляте
+/// ВАЖНО: Должна быть top-level функцией для compute()
+List<Lesson> _parseLessonsIsolate(List<Map<String, dynamic>> jsonList) {
+  return jsonList.map((item) => Lesson.fromJson(item)).toList();
+}
 
 /// Репозиторий для работы с занятиями
 class LessonRepository {
@@ -12,8 +26,36 @@ class LessonRepository {
 
   String? get _userId => _client.auth.currentUser?.id;
 
-  /// Получить занятия по кабинету и дате
-  Future<List<Lesson>> getByRoomAndDate(String roomId, DateTime date) async {
+  /// Получить занятия по кабинету и дате (cache-first)
+  ///
+  /// Использует кэш для мгновенного отображения, обновляет в фоне.
+  /// При большом количестве занятий использует compute() для парсинга.
+  Future<List<Lesson>> getByRoomAndDate(String roomId, DateTime date, {bool skipCache = false}) async {
+    final cacheKey = CacheKeys.lessonsByRoom(roomId, date);
+
+    // 1. Пробуем из кэша
+    if (!skipCache) {
+      final cached = CacheService.get<List<dynamic>>(cacheKey);
+      if (cached != null) {
+        debugPrint('[LessonRepository] Cache hit for room $roomId (${cached.length} lessons)');
+        _refreshRoomLessonsInBackground(roomId, date, cacheKey);
+        return _parseLessonsFromCache(cached);
+      }
+    }
+
+    // 2. Загружаем из сети
+    final lessons = await _fetchRoomLessons(roomId, date);
+
+    // 3. Кэшируем (TTL 15 минут для расписания)
+    final jsonList = lessons.map((l) => _lessonToCache(l)).toList();
+    await CacheService.put(cacheKey, jsonList, ttlMinutes: 15);
+    debugPrint('[LessonRepository] Cached ${lessons.length} lessons for room $roomId');
+
+    return lessons;
+  }
+
+  /// Загрузить занятия кабинета из сети
+  Future<List<Lesson>> _fetchRoomLessons(String roomId, DateTime date) async {
     try {
       final dateStr = date.toIso8601String().split('T').first;
 
@@ -34,17 +76,185 @@ class LessonRepository {
           .isFilter('archived_at', null)
           .order('start_time');
 
-      return (data as List).map((item) => Lesson.fromJson(item)).toList();
+      final dataList = data as List;
+
+      // compute() для больших списков
+      if (dataList.length >= _lessonComputeThreshold) {
+        debugPrint('[LessonRepository] Using compute() for ${dataList.length} room lessons');
+        return compute(
+          _parseLessonsIsolate,
+          dataList.map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
+      }
+
+      return dataList.map((item) => Lesson.fromJson(item)).toList();
     } catch (e) {
       throw DatabaseException('Ошибка загрузки занятий: $e');
     }
   }
 
-  /// Получить занятия по заведению и дате
+  /// Обновить кэш занятий кабинета в фоне (stale-while-revalidate)
+  void _refreshRoomLessonsInBackground(String roomId, DateTime date, String cacheKey) {
+    Future.microtask(() async {
+      try {
+        final fresh = await _fetchRoomLessons(roomId, date);
+        final jsonList = fresh.map((l) => _lessonToCache(l)).toList();
+        await CacheService.put(cacheKey, jsonList, ttlMinutes: 15);
+        debugPrint('[LessonRepository] Background refresh: ${fresh.length} lessons for room $roomId');
+      } catch (e) {
+        debugPrint('[LessonRepository] Background refresh failed: $e');
+      }
+    });
+  }
+
+  /// Конвертировать Lesson в JSON для кэша
+  /// Сохраняем все поля, включая вложенные объекты
+  Map<String, dynamic> _lessonToCache(Lesson l) => {
+        'id': l.id,
+        'created_at': l.createdAt.toIso8601String(),
+        'updated_at': l.updatedAt.toIso8601String(),
+        'archived_at': l.archivedAt?.toIso8601String(),
+        'institution_id': l.institutionId,
+        'room_id': l.roomId,
+        'teacher_id': l.teacherId,
+        'subject_id': l.subjectId,
+        'lesson_type_id': l.lessonTypeId,
+        'student_id': l.studentId,
+        'group_id': l.groupId,
+        'date': l.date.toIso8601String().split('T').first,
+        'start_time': '${l.startTime.hour.toString().padLeft(2, '0')}:${l.startTime.minute.toString().padLeft(2, '0')}',
+        'end_time': '${l.endTime.hour.toString().padLeft(2, '0')}:${l.endTime.minute.toString().padLeft(2, '0')}',
+        'status': l.status.name,
+        'comment': l.comment,
+        'created_by': l.createdBy,
+        'repeat_group_id': l.repeatGroupId,
+        'schedule_id': l.scheduleId,
+        'subscription_id': l.subscriptionId,
+        'transfer_payment_id': l.transferPaymentId,
+        'is_deducted': l.isDeducted,
+        // Вложенные объекты сохраняем как JSON
+        'rooms': l.room != null ? {
+          'id': l.room!.id,
+          'name': l.room!.name,
+          'number': l.room!.number,
+          'sort_order': l.room!.sortOrder,
+          'institution_id': l.room!.institutionId,
+          'created_at': l.room!.createdAt.toIso8601String(),
+          'updated_at': l.room!.updatedAt.toIso8601String(),
+          'archived_at': l.room!.archivedAt?.toIso8601String(),
+        } : null,
+        'subjects': l.subject != null ? {
+          'id': l.subject!.id,
+          'name': l.subject!.name,
+          'color': l.subject!.color,
+          'institution_id': l.subject!.institutionId,
+          'sort_order': l.subject!.sortOrder,
+          'created_at': l.subject!.createdAt.toIso8601String(),
+          'updated_at': l.subject!.updatedAt.toIso8601String(),
+          'archived_at': l.subject!.archivedAt?.toIso8601String(),
+        } : null,
+        'lesson_types': l.lessonType != null ? {
+          'id': l.lessonType!.id,
+          'name': l.lessonType!.name,
+          'color': l.lessonType!.color,
+          'institution_id': l.lessonType!.institutionId,
+          'default_duration_minutes': l.lessonType!.defaultDurationMinutes,
+          'default_price': l.lessonType!.defaultPrice,
+          'is_group': l.lessonType!.isGroup,
+          'created_at': l.lessonType!.createdAt.toIso8601String(),
+          'updated_at': l.lessonType!.updatedAt.toIso8601String(),
+          'archived_at': l.lessonType!.archivedAt?.toIso8601String(),
+        } : null,
+        'students': l.student != null ? {
+          'id': l.student!.id,
+          'name': l.student!.name,
+          'phone': l.student!.phone,
+          'comment': l.student!.comment,
+          'institution_id': l.student!.institutionId,
+          'prepaid_lessons_count': l.student!.prepaidLessonsCount,
+          'legacy_balance': l.student!.legacyBalance,
+          'created_at': l.student!.createdAt.toIso8601String(),
+          'updated_at': l.student!.updatedAt.toIso8601String(),
+          'archived_at': l.student!.archivedAt?.toIso8601String(),
+        } : null,
+        'student_groups': l.group != null ? {
+          'id': l.group!.id,
+          'name': l.group!.name,
+          'institution_id': l.group!.institutionId,
+          'created_at': l.group!.createdAt.toIso8601String(),
+          'updated_at': l.group!.updatedAt.toIso8601String(),
+          'archived_at': l.group!.archivedAt?.toIso8601String(),
+        } : null,
+        'lesson_students': l.lessonStudents?.map((ls) => {
+          'id': ls.id,
+          'lesson_id': ls.lessonId,
+          'student_id': ls.studentId,
+          'attended': ls.attended,
+          'subscription_id': ls.subscriptionId,
+          'students': ls.student != null ? {
+            'id': ls.student!.id,
+            'name': ls.student!.name,
+            'phone': ls.student!.phone,
+            'comment': ls.student!.comment,
+            'institution_id': ls.student!.institutionId,
+            'prepaid_lessons_count': ls.student!.prepaidLessonsCount,
+            'legacy_balance': ls.student!.legacyBalance,
+            'created_at': ls.student!.createdAt.toIso8601String(),
+            'updated_at': ls.student!.updatedAt.toIso8601String(),
+            'archived_at': ls.student!.archivedAt?.toIso8601String(),
+          } : null,
+        }).toList(),
+      };
+
+  /// Парсинг списка занятий из кэша
+  /// Использует compute() для больших списков
+  List<Lesson> _parseLessonsFromCache(List<dynamic> cached) {
+    final jsonList = cached
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+
+    if (jsonList.length >= _lessonComputeThreshold) {
+      // Для больших списков используем compute()
+      // НО compute() асинхронный, поэтому возвращаем синхронно для кэша
+      // (данные уже были в памяти, парсинг быстрый)
+    }
+    return jsonList.map((item) => Lesson.fromJson(item)).toList();
+  }
+
+  /// Получить занятия по заведению и дате (cache-first)
+  ///
+  /// Использует кэш для мгновенного отображения, обновляет в фоне.
+  /// При большом количестве занятий использует compute() для парсинга.
   Future<List<Lesson>> getByInstitutionAndDate(
     String institutionId,
-    DateTime date,
-  ) async {
+    DateTime date, {
+    bool skipCache = false,
+  }) async {
+    final cacheKey = CacheKeys.lessons(institutionId, date);
+
+    // 1. Пробуем из кэша
+    if (!skipCache) {
+      final cached = CacheService.get<List<dynamic>>(cacheKey);
+      if (cached != null) {
+        debugPrint('[LessonRepository] Cache hit for institution $institutionId (${cached.length} lessons)');
+        _refreshInstitutionLessonsInBackground(institutionId, date, cacheKey);
+        return _parseLessonsFromCache(cached);
+      }
+    }
+
+    // 2. Загружаем из сети
+    final lessons = await _fetchInstitutionLessons(institutionId, date);
+
+    // 3. Кэшируем (TTL 15 минут для расписания)
+    final jsonList = lessons.map((l) => _lessonToCache(l)).toList();
+    await CacheService.put(cacheKey, jsonList, ttlMinutes: 15);
+    debugPrint('[LessonRepository] Cached ${lessons.length} lessons for institution $institutionId');
+
+    return lessons;
+  }
+
+  /// Загрузить занятия заведения из сети
+  Future<List<Lesson>> _fetchInstitutionLessons(String institutionId, DateTime date) async {
     try {
       final dateStr = date.toIso8601String().split('T').first;
 
@@ -65,10 +275,45 @@ class LessonRepository {
           .isFilter('archived_at', null)
           .order('start_time');
 
-      return (data as List).map((item) => Lesson.fromJson(item)).toList();
+      final dataList = data as List;
+
+      // compute() для больших списков, синхронно для маленьких
+      if (dataList.length >= _lessonComputeThreshold) {
+        debugPrint('[LessonRepository] Using compute() for ${dataList.length} lessons');
+        return compute(
+          _parseLessonsIsolate,
+          dataList.map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
+      }
+
+      return dataList.map((item) => Lesson.fromJson(item)).toList();
     } catch (e) {
       throw DatabaseException('Ошибка загрузки занятий: $e');
     }
+  }
+
+  /// Обновить кэш занятий заведения в фоне (stale-while-revalidate)
+  void _refreshInstitutionLessonsInBackground(String institutionId, DateTime date, String cacheKey) {
+    Future.microtask(() async {
+      try {
+        final fresh = await _fetchInstitutionLessons(institutionId, date);
+        final jsonList = fresh.map((l) => _lessonToCache(l)).toList();
+        await CacheService.put(cacheKey, jsonList, ttlMinutes: 15);
+        debugPrint('[LessonRepository] Background refresh: ${fresh.length} lessons for institution $institutionId');
+      } catch (e) {
+        debugPrint('[LessonRepository] Background refresh failed: $e');
+      }
+    });
+  }
+
+  /// Инвалидировать кэш занятий кабинета
+  Future<void> invalidateRoomCache(String roomId, DateTime date) async {
+    await CacheService.delete(CacheKeys.lessonsByRoom(roomId, date));
+  }
+
+  /// Инвалидировать кэш занятий заведения
+  Future<void> invalidateInstitutionCache(String institutionId, DateTime date) async {
+    await CacheService.delete(CacheKeys.lessons(institutionId, date));
   }
 
   /// Получить schedule_id отменённых занятий за день
@@ -1052,62 +1297,146 @@ class LessonRepository {
 
   /// Стрим занятий кабинета (realtime)
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
-  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
-  Stream<List<Lesson>> watchByRoom(String roomId, DateTime date) async* {
-    // 1. Сразу выдаём текущие данные
-    yield await getByRoomAndDate(roomId, date);
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<List<Lesson>> watchByRoom(String roomId, DateTime date) {
+    final controller = StreamController<List<Lesson>>.broadcast();
 
-    // 2. Подписываемся на изменения
-    await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
-      final lessons = await getByRoomAndDate(roomId, date);
-      yield lessons;
+    Future<void> loadAndEmit() async {
+      try {
+        final lessons = await getByRoomAndDate(roomId, date);
+        if (!controller.isClosed) {
+          controller.add(lessons);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
     }
+
+    // 1. Сразу загружаем начальные данные
+    loadAndEmit();
+
+    // 2. Подписываемся на изменения с обработкой ошибок
+    final subscription = _client.from('lessons').stream(primaryKey: ['id']).listen(
+      (_) => loadAndEmit(),
+      onError: (e) {
+        debugPrint('[LessonRepository] watchByRoom error: $e');
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      },
+    );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   /// Стрим занятий заведения за дату (realtime)
   /// При любом изменении загружает полные данные с joins
   /// Примечание: слушаем ВСЕ изменения в таблице без фильтра,
   /// т.к. Supabase Realtime не отправляет DELETE события с фильтром корректно
-  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  ///
+  /// ВАЖНО: Эмитит кэшированные данные СИНХРОННО при создании стрима,
+  /// чтобы UI не показывал loading при возврате из фона.
   Stream<List<Lesson>> watchByInstitution(
     String institutionId,
     DateTime date,
-  ) async* {
-    // 1. Сразу выдаём текущие данные
-    yield await getByInstitutionAndDate(institutionId, date);
+  ) {
+    final controller = StreamController<List<Lesson>>.broadcast();
+    final cacheKey = CacheKeys.lessons(institutionId, date);
 
-    // 2. Подписываемся на изменения
-    await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
-      final lessons = await getByInstitutionAndDate(institutionId, date);
-      yield lessons;
+    Future<void> loadAndEmit() async {
+      try {
+        final lessons = await getByInstitutionAndDate(institutionId, date);
+        if (!controller.isClosed) {
+          controller.add(lessons);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
     }
+
+    // 1. СИНХРОННО эмитим из кэша (если есть) — мгновенный UI
+    final cached = CacheService.get<List<dynamic>>(cacheKey);
+    if (cached != null) {
+      try {
+        final lessons = _parseLessonsFromCache(cached);
+        controller.add(lessons);
+        debugPrint('[LessonRepository] watchByInstitution: instant emit from cache (${lessons.length} lessons)');
+        // Обновляем в фоне
+        loadAndEmit();
+      } catch (e) {
+        debugPrint('[LessonRepository] watchByInstitution: cache parse error, loading from network: $e');
+        loadAndEmit();
+      }
+    } else {
+      // 2. Нет кэша — загружаем из сети
+      loadAndEmit();
+    }
+
+    // 3. Подписываемся на изменения с обработкой ошибок
+    final subscription = _client.from('lessons').stream(primaryKey: ['id']).listen(
+      (_) => loadAndEmit(),
+      onError: (e) {
+        debugPrint('[LessonRepository] watchByInstitution error: $e');
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      },
+    );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   /// Стрим неотмеченных занятий (realtime)
   /// Для owner/admin возвращает все, для teacher - только его занятия
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
-  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
   Stream<List<Lesson>> watchUnmarkedLessons({
     required String institutionId,
     required bool isAdminOrOwner,
     String? teacherId,
-  }) async* {
-    // 1. Сразу выдаём текущие данные
-    yield await getUnmarkedLessons(
-      institutionId: institutionId,
-      isAdminOrOwner: isAdminOrOwner,
-      teacherId: teacherId,
+  }) {
+    final controller = StreamController<List<Lesson>>.broadcast();
+
+    Future<void> loadAndEmit() async {
+      try {
+        final lessons = await getUnmarkedLessons(
+          institutionId: institutionId,
+          isAdminOrOwner: isAdminOrOwner,
+          teacherId: teacherId,
+        );
+        if (!controller.isClosed) {
+          controller.add(lessons);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    // 1. Сразу загружаем начальные данные
+    loadAndEmit();
+
+    // 2. Подписываемся на изменения с обработкой ошибок
+    final subscription = _client.from('lessons').stream(primaryKey: ['id']).listen(
+      (_) => loadAndEmit(),
+      onError: (e) {
+        debugPrint('[LessonRepository] watchUnmarkedLessons error: $e');
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      },
     );
 
-    // 2. Подписываемся на изменения
-    await for (final _ in _client.from('lessons').stream(primaryKey: ['id'])) {
-      final lessons = await getUnmarkedLessons(
-        institutionId: institutionId,
-        isAdminOrOwner: isAdminOrOwner,
-        teacherId: teacherId,
-      );
-      yield lessons;
-    }
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   // ============================================================

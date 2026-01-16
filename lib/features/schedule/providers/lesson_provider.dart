@@ -465,7 +465,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
               }
             }
           } catch (e) {
-            // Не критичная ошибка - занятие проведено, но подписка/долг не списаны
+            // Занятие проведено, но баланс не списан — логируем для отладки
+            debugPrint('[LessonController] Error deducting lesson for student ${lesson.studentId}: $e');
           }
         } else if (lesson.groupId != null && lesson.lessonStudents != null) {
           // Групповое занятие — списываем у каждого присутствовавшего
@@ -497,7 +498,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
                 }
               }
             } catch (e) {
-              // Пропускаем ошибку для конкретного студента
+              // Занятие проведено, но баланс участника не списан — логируем
+              debugPrint('[LessonController] Error deducting (complete) for student ${lessonStudent.studentId}: $e');
             }
           }
           // Инвалидируем группы для обновления баланса в меню
@@ -680,7 +682,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
               }
             }
           } catch (e) {
-            // Не критичная ошибка
+            // Занятие отменено, но баланс не списан — логируем
+            debugPrint('[LessonController] Error deducting (cancel) for student ${lesson.studentId}: $e');
           }
         } else if (lesson.groupId != null && lesson.lessonStudents != null) {
           // Групповое занятие — списываем у каждого участника
@@ -709,7 +712,8 @@ class LessonController extends StateNotifier<AsyncValue<void>> {
                 }
               }
             } catch (e) {
-              // Пропускаем ошибку для конкретного студента
+              // Занятие отменено, но баланс участника не списан — логируем
+              debugPrint('[LessonController] Error deducting (cancel) for group student ${lessonStudent.studentId}: $e');
             }
           }
           _ref.invalidate(studentGroupsProvider(institutionId));

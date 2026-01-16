@@ -296,7 +296,7 @@ class StudentDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 subscriptionsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => ErrorView.inline(e),
+                  error: (_, __) => const SizedBox.shrink(),
                   data: (subscriptions) {
                     if (subscriptions.isEmpty) {
                       return const Card(
@@ -362,7 +362,7 @@ class StudentDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 paymentsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => ErrorView.inline(e),
+                  error: (_, __) => const SizedBox.shrink(),
                   data: (payments) {
                     if (payments.isEmpty) {
                       return const Text(
@@ -1752,7 +1752,7 @@ class _TeachersSection extends ConsumerWidget {
         const SizedBox(height: 8),
         teachersAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => ErrorView.inline(e),
+          error: (_, __) => const SizedBox.shrink(),
           data: (teachers) {
             if (teachers.isEmpty) {
               return const Card(
@@ -1806,7 +1806,7 @@ class _TeachersSection extends ConsumerWidget {
                 const SizedBox(height: 16),
                 membersAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => ErrorView.inline(e),
+                  error: (_, __) => const SizedBox.shrink(),
                   data: (members) {
                     final available = members
                         .where((m) => !existingIds.contains(m.userId))
@@ -1923,7 +1923,7 @@ class _SubjectsSection extends ConsumerWidget {
         const SizedBox(height: 8),
         subjectsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => ErrorView.inline(e),
+          error: (_, __) => const SizedBox.shrink(),
           data: (subjects) {
             if (subjects.isEmpty) {
               return const Card(
@@ -1980,7 +1980,7 @@ class _SubjectsSection extends ConsumerWidget {
                 const SizedBox(height: 16),
                 subjectsListAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => ErrorView.inline(e),
+                  error: (_, __) => const SizedBox.shrink(),
                   data: (subjects) {
                     final available = subjects
                         .where((s) => !existingIds.contains(s.id) && s.archivedAt == null)
@@ -2369,7 +2369,7 @@ class _SelectStudentsForMergeSheetState
             Expanded(
               child: studentsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => ErrorView.inline(e),
+                error: (_, __) => const SizedBox.shrink(),
                 data: (students) {
                   // Фильтруем: исключаем текущего ученика и архивированных
                   var filtered = students

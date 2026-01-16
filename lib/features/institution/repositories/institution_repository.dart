@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
@@ -46,18 +49,41 @@ class InstitutionRepository {
   }
 
   /// Стрим заведения по ID (realtime)
-  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
-  Stream<Institution> watchById(String id) async* {
-    // 1. Сразу выдаём текущие данные
-    yield await getById(id);
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<Institution> watchById(String id) {
+    final controller = StreamController<Institution>.broadcast();
 
-    // 2. Подписываемся на изменения
-    await for (final _ in _client
+    Future<void> loadAndEmit() async {
+      try {
+        final institution = await getById(id);
+        if (!controller.isClosed) {
+          controller.add(institution);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    loadAndEmit();
+
+    final subscription = _client
         .from('institutions')
         .stream(primaryKey: ['id'])
-        .eq('id', id)) {
-      yield await getById(id);
-    }
+        .eq('id', id)
+        .listen(
+          (_) => loadAndEmit(),
+          onError: (e) {
+            debugPrint('[InstitutionRepository] watchById error: $e');
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          },
+        );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   /// Создать заведение
@@ -206,33 +232,63 @@ class InstitutionRepository {
 
   /// Стрим моего членства в заведении (realtime)
   /// Обновляется автоматически при изменении прав
-  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
-  Stream<InstitutionMember?> watchMyMembership(String institutionId) async* {
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<InstitutionMember?> watchMyMembership(String institutionId) {
+    final controller = StreamController<InstitutionMember?>.broadcast();
+
     if (_userId == null) {
-      yield null;
-      return;
+      controller.add(null);
+      controller.close();
+      return controller.stream;
     }
 
-    // 1. Сразу выдаём текущие данные
-    yield await getMyMembership(institutionId);
+    final userId = _userId;
 
-    // 2. Подписываемся на изменения
-    await for (final data in _client
-        .from('institution_members')
-        .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)) {
-      // Находим запись текущего пользователя
-      final myData = data.where((item) =>
-        item['user_id'] == _userId &&
-        item['archived_at'] == null
-      ).firstOrNull;
-
-      if (myData != null) {
-        yield InstitutionMember.fromJson(myData);
-      } else {
-        yield null;
+    Future<void> loadAndEmit() async {
+      try {
+        final member = await getMyMembership(institutionId);
+        if (!controller.isClosed) {
+          controller.add(member);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
       }
     }
+
+    loadAndEmit();
+
+    final subscription = _client
+        .from('institution_members')
+        .stream(primaryKey: ['id'])
+        .eq('institution_id', institutionId)
+        .listen(
+          (data) {
+            // Находим запись текущего пользователя
+            final myData = data.where((item) =>
+              item['user_id'] == userId &&
+              item['archived_at'] == null
+            ).firstOrNull;
+
+            if (!controller.isClosed) {
+              if (myData != null) {
+                controller.add(InstitutionMember.fromJson(myData));
+              } else {
+                controller.add(null);
+              }
+            }
+          },
+          onError: (e) {
+            debugPrint('[InstitutionRepository] watchMyMembership error: $e');
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          },
+        );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   /// Обновить права участника

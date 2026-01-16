@@ -493,69 +493,82 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
 
     setState(() => _isSaving = true);
 
-    final lessonController = ref.read(lessonControllerProvider.notifier);
-    final paymentController = ref.read(paymentControllerProvider.notifier);
+    try {
+      final lessonController = ref.read(lessonControllerProvider.notifier);
+      final paymentController = ref.read(paymentControllerProvider.notifier);
 
-    // Собираем задачи для параллельного выполнения
-    final futures = <Future>[];
-    final affectedStudentIds = <String>{};
+      // Собираем задачи для параллельного выполнения
+      final futures = <Future>[];
+      final affectedStudentIds = <String>{};
 
-    for (final lesson in lessons) {
-      final mark = _marks[lesson.id];
-      if (mark == null || !mark.hasChanges) continue;
+      for (final lesson in lessons) {
+        final mark = _marks[lesson.id];
+        if (mark == null || !mark.hasChanges) continue;
 
-      if (lesson.studentId != null) {
-        affectedStudentIds.add(lesson.studentId!);
+        if (lesson.studentId != null) {
+          affectedStudentIds.add(lesson.studentId!);
+        }
+
+        if (mark.isCompleted) {
+          futures.add(
+            lessonController.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId).then((_) async {
+              // Если оплачено - создать оплату
+              if (mark.isPaid && lesson.studentId != null && lesson.lessonType?.defaultPrice != null) {
+                final lessonTypeName = lesson.lessonType?.name ?? 'Оплата занятия';
+                await paymentController.create(
+                  institutionId: widget.institutionId,
+                  studentId: lesson.studentId!,
+                  amount: lesson.lessonType!.defaultPrice!,
+                  lessonsCount: 1,
+                  comment: 'lesson:${lesson.id}|$lessonTypeName',
+                );
+              }
+            }),
+          );
+        } else if (mark.isCancelled) {
+          futures.add(
+            lessonController.cancel(lesson.id, lesson.roomId, lesson.date, widget.institutionId),
+          );
+        }
       }
 
-      if (mark.isCompleted) {
-        futures.add(
-          lessonController.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId).then((_) async {
-            // Если оплачено - создать оплату
-            if (mark.isPaid && lesson.studentId != null && lesson.lessonType?.defaultPrice != null) {
-              final lessonTypeName = lesson.lessonType?.name ?? 'Оплата занятия';
-              await paymentController.create(
-                institutionId: widget.institutionId,
-                studentId: lesson.studentId!,
-                amount: lesson.lessonType!.defaultPrice!,
-                lessonsCount: 1,
-                comment: 'lesson:${lesson.id}|$lessonTypeName',
-              );
-            }
-          }),
-        );
-      } else if (mark.isCancelled) {
-        futures.add(
-          lessonController.cancel(lesson.id, lesson.roomId, lesson.date, widget.institutionId),
+      // Выполняем все операции параллельно
+      await Future.wait(futures);
+
+      // Инвалидируем провайдеры
+      ref.invalidate(unmarkedLessonsProvider(widget.institutionId));
+      ref.invalidate(unmarkedLessonsStreamProvider(widget.institutionId));
+      ref.invalidate(todayPaymentsTotalProvider(widget.institutionId));
+
+      // Примечание: lessonsByInstitutionStreamProvider и institutionTodayLessonsProvider
+      // используют StreamProvider и обновляются автоматически через Supabase Realtime
+
+      // Инвалидируем подписки затронутых студентов
+      for (final studentId in affectedStudentIds) {
+        ref.invalidate(studentSubscriptionsProvider(studentId));
+        ref.invalidate(subscriptionsStreamProvider(studentId));
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Изменения сохранены'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
-    }
-
-    // Выполняем все операции параллельно
-    await Future.wait(futures);
-
-    // Инвалидируем провайдеры
-    ref.invalidate(unmarkedLessonsProvider(widget.institutionId));
-    ref.invalidate(unmarkedLessonsStreamProvider(widget.institutionId));
-    ref.invalidate(todayPaymentsTotalProvider(widget.institutionId));
-
-    // Примечание: lessonsByInstitutionStreamProvider и institutionTodayLessonsProvider
-    // используют StreamProvider и обновляются автоматически через Supabase Realtime
-
-    // Инвалидируем подписки затронутых студентов
-    for (final studentId in affectedStudentIds) {
-      ref.invalidate(studentSubscriptionsProvider(studentId));
-      ref.invalidate(subscriptionsStreamProvider(studentId));
-    }
-
-    if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Изменения сохранены'),
-          backgroundColor: Colors.green,
-        ),
-      );
+    } catch (e) {
+      debugPrint('[DashboardScreen] _saveAll error: $e');
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка сохранения: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

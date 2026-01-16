@@ -1,20 +1,80 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:kabinet/core/cache/cache_keys.dart';
+import 'package:kabinet/core/cache/cache_service.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/student_group.dart';
 
+/// Порог для использования compute() (количество записей)
+/// При меньшем количестве накладные расходы на изолят не оправданы
+const int _computeThreshold = 50;
+
+/// Парсинг списка учеников в отдельном изоляте
+/// ВАЖНО: Должна быть top-level функцией для compute()
+List<Student> _parseStudentsIsolate(List<Map<String, dynamic>> jsonList) {
+  return jsonList.map((item) => Student.fromJson(item)).toList();
+}
+
 /// Репозиторий для работы с учениками
+///
+/// Использует cache-first паттерн как в Telegram/Instagram:
+/// 1. Сначала показываем кэш (мгновенно)
+/// 2. В фоне обновляем из сети
+/// 3. Realtime обновляет UI при изменениях
 class StudentRepository {
   final SupabaseClient _client = SupabaseConfig.client;
 
-  /// Получить список учеников заведения
+  /// Получить список учеников заведения (cache-first)
+  ///
+  /// Использует кэш для мгновенного отображения, обновляет в фоне.
+  /// Кэш используется только для стандартного запроса (без фильтров).
   Future<List<Student>> getByInstitution(
     String institutionId, {
     bool includeArchived = false,
     bool onlyWithDebt = false,
+    bool skipCache = false,
+  }) async {
+    final cacheKey = CacheKeys.students(institutionId);
+
+    // Cache-first только для стандартного запроса (все активные ученики)
+    final useCache = !skipCache && !includeArchived && !onlyWithDebt;
+
+    // 1. Пробуем из кэша (мгновенно)
+    if (useCache) {
+      final cached = CacheService.get<List<dynamic>>(cacheKey);
+      if (cached != null) {
+        debugPrint('[StudentRepository] Cache hit for $institutionId (${cached.length} students)');
+        // Обновляем в фоне (stale-while-revalidate)
+        _refreshInBackground(institutionId, cacheKey);
+        return cached
+            .map((item) => Student.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+      }
+    }
+
+    // 2. Загружаем из сети
+    final students = await _fetchFromNetwork(institutionId, includeArchived: includeArchived);
+
+    // 3. Сохраняем в кэш (только для стандартного запроса)
+    if (useCache) {
+      final jsonList = students.map((s) => _studentToCache(s)).toList();
+      await CacheService.put(cacheKey, jsonList, ttlMinutes: 30);
+      debugPrint('[StudentRepository] Cached ${students.length} students for $institutionId');
+    }
+
+    return students;
+  }
+
+  /// Загрузить учеников из сети (внутренний метод)
+  ///
+  /// При большом количестве учеников (>50) использует compute()
+  /// для парсинга в отдельном изоляте, не блокируя UI.
+  Future<List<Student>> _fetchFromNetwork(
+    String institutionId, {
+    bool includeArchived = false,
   }) async {
     try {
       // 1. Загружаем учеников
@@ -28,6 +88,7 @@ class StudentRepository {
       }
 
       final data = await query.order('name');
+      final dataList = data as List;
 
       // 2. Загружаем балансы из VIEW (учитывает семейные подписки и balance_transfer)
       // ВАЖНО: Оборачиваем в try-catch, т.к. VIEW может быть недоступен
@@ -51,8 +112,8 @@ class StudentRepository {
         debugPrint('WARN: Не удалось загрузить балансы из VIEW: $e');
       }
 
-      // 3. Объединяем данные
-      return (data as List).map((item) {
+      // 3. Подготавливаем данные с балансами
+      final enrichedData = dataList.map((item) {
         final studentId = item['id'] as String;
         final balances = balanceMap[studentId];
 
@@ -62,11 +123,57 @@ class StudentRepository {
         studentData['prepaid_lessons_count'] = balances?['active_balance'] ?? 0;
         studentData['legacy_balance'] = balances?['transfer_balance'] ?? 0;
 
-        return Student.fromJson(studentData);
+        return studentData;
       }).toList();
+
+      // 4. Парсинг: compute() для больших списков, синхронно для маленьких
+      if (enrichedData.length >= _computeThreshold) {
+        debugPrint('[StudentRepository] Using compute() for ${enrichedData.length} students');
+        return compute(_parseStudentsIsolate, enrichedData);
+      } else {
+        return enrichedData.map((item) => Student.fromJson(item)).toList();
+      }
     } catch (e) {
       throw DatabaseException('Ошибка загрузки учеников: $e');
     }
+  }
+
+  /// Обновить кэш в фоне (stale-while-revalidate)
+  void _refreshInBackground(String institutionId, String cacheKey) {
+    Future.microtask(() async {
+      try {
+        final fresh = await _fetchFromNetwork(institutionId);
+        final jsonList = fresh.map((s) => _studentToCache(s)).toList();
+        await CacheService.put(cacheKey, jsonList, ttlMinutes: 30);
+        debugPrint('[StudentRepository] Background refresh complete for $institutionId');
+      } catch (e) {
+        debugPrint('[StudentRepository] Background refresh failed: $e');
+        // Не бросаем ошибку — пользователь уже видит кэш
+      }
+    });
+  }
+
+  /// Конвертировать Student в JSON для кэша
+  Map<String, dynamic> _studentToCache(Student s) => {
+        'id': s.id,
+        'created_at': s.createdAt.toIso8601String(),
+        'updated_at': s.updatedAt.toIso8601String(),
+        'archived_at': s.archivedAt?.toIso8601String(),
+        'institution_id': s.institutionId,
+        'name': s.name,
+        'phone': s.phone,
+        'comment': s.comment,
+        'prepaid_lessons_count': s.prepaidLessonsCount,
+        'legacy_balance': s.legacyBalance,
+        'merged_from': s.mergedFrom,
+      };
+
+  /// Инвалидировать кэш учеников
+  /// Вызывается после create/update/delete операций
+  Future<void> invalidateCache(String institutionId) async {
+    final cacheKey = CacheKeys.students(institutionId);
+    await CacheService.delete(cacheKey);
+    debugPrint('[StudentRepository] Cache invalidated for $institutionId');
   }
 
   /// Получить ученика по ID
@@ -365,17 +472,33 @@ class StudentRepository {
     // 1. Сразу загружаем начальные данные
     loadAndEmit();
 
-    // 2. Слушаем students
+    // 2. Слушаем students с обработкой ошибок
     studentsSubscription = _client
         .from('students')
         .stream(primaryKey: ['id'])
-        .listen((_) => loadAndEmit());
+        .listen(
+          (_) => loadAndEmit(),
+          onError: (e) {
+            debugPrint('[StudentRepository] watchByInstitution students error: $e');
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          },
+        );
 
-    // 3. Слушаем subscriptions (для обновления баланса при списании занятий)
+    // 3. Слушаем subscriptions (для обновления баланса при списании занятий) с обработкой ошибок
     subscriptionsSubscription = _client
         .from('subscriptions')
         .stream(primaryKey: ['id'])
-        .listen((_) => loadAndEmit());
+        .listen(
+          (_) => loadAndEmit(),
+          onError: (e) {
+            debugPrint('[StudentRepository] watchByInstitution subscriptions error: $e');
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          },
+        );
 
     // Очистка при закрытии стрима
     controller.onCancel = () {

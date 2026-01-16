@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -74,8 +75,12 @@ class _PaymentPlansScreenState extends ConsumerState<PaymentPlansScreen> {
 
           return RefreshIndicator(
             onRefresh: () async {
-              ref.invalidate(paymentPlansProvider(widget.institutionId));
-              await ref.read(paymentPlansProvider(widget.institutionId).future);
+              try {
+                ref.invalidate(paymentPlansProvider(widget.institutionId));
+                await ref.read(paymentPlansProvider(widget.institutionId).future);
+              } catch (e) {
+                debugPrint('[PaymentPlansScreen] refresh error: $e');
+              }
             },
             child: ListView.builder(
               padding: AppSizes.paddingAllM,

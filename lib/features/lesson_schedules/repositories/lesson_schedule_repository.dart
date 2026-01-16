@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/features/lesson_schedules/models/lesson_schedule.dart';
@@ -125,17 +127,41 @@ class LessonScheduleRepository {
   }
 
   /// Realtime поток расписаний заведения
-  Stream<List<LessonSchedule>> watchByInstitution(String institutionId) async* {
-    // Первоначальная загрузка
-    yield await getByInstitution(institutionId);
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<List<LessonSchedule>> watchByInstitution(String institutionId) {
+    final controller = StreamController<List<LessonSchedule>>.broadcast();
 
-    // Подписка на изменения
-    await for (final _ in _client
+    Future<void> loadAndEmit() async {
+      try {
+        final schedules = await getByInstitution(institutionId);
+        if (!controller.isClosed) {
+          controller.add(schedules);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    loadAndEmit();
+
+    final subscription = _client
         .from('lesson_schedules')
         .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)) {
-      yield await getByInstitution(institutionId);
-    }
+        .eq('institution_id', institutionId)
+        .listen(
+          (_) => loadAndEmit(),
+          onError: (e) {
+            debugPrint('[LessonScheduleRepository] watchByInstitution error: $e');
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          },
+        );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   /// Получить расписания ученика
@@ -160,15 +186,41 @@ class LessonScheduleRepository {
   }
 
   /// Realtime поток расписаний ученика
-  Stream<List<LessonSchedule>> watchByStudent(String studentId) async* {
-    yield await getByStudent(studentId);
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<List<LessonSchedule>> watchByStudent(String studentId) {
+    final controller = StreamController<List<LessonSchedule>>.broadcast();
 
-    await for (final _ in _client
+    Future<void> loadAndEmit() async {
+      try {
+        final schedules = await getByStudent(studentId);
+        if (!controller.isClosed) {
+          controller.add(schedules);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    loadAndEmit();
+
+    final subscription = _client
         .from('lesson_schedules')
         .stream(primaryKey: ['id'])
-        .eq('student_id', studentId)) {
-      yield await getByStudent(studentId);
-    }
+        .eq('student_id', studentId)
+        .listen(
+          (_) => loadAndEmit(),
+          onError: (e) {
+            debugPrint('[LessonScheduleRepository] watchByStudent error: $e');
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          },
+        );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   /// Получить расписание по ID

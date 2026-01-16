@@ -1,7 +1,19 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/core/exceptions/app_exceptions.dart';
 import 'package:kabinet/shared/models/payment.dart';
+
+/// Порог для использования compute() (количество записей)
+const int _paymentComputeThreshold = 50;
+
+/// Парсинг списка оплат в отдельном изоляте
+/// ВАЖНО: Должна быть top-level функцией для compute()
+List<Payment> _parsePaymentsIsolate(List<Map<String, dynamic>> jsonList) {
+  return jsonList.map((item) => Payment.fromJson(item)).toList();
+}
 
 /// Репозиторий для работы с оплатами
 class PaymentRepository {
@@ -10,6 +22,8 @@ class PaymentRepository {
   String? get _userId => _client.auth.currentUser?.id;
 
   /// Получить оплаты за период
+  ///
+  /// При большом количестве оплат использует compute() для парсинга.
   Future<List<Payment>> getByPeriod(
     String institutionId, {
     required DateTime from,
@@ -25,13 +39,26 @@ class PaymentRepository {
           .lte('paid_at', to.toIso8601String())
           .order('paid_at', ascending: false);
 
-      return (data as List).map((item) => Payment.fromJson(item)).toList();
+      final dataList = data as List;
+
+      // compute() для больших списков
+      if (dataList.length >= _paymentComputeThreshold) {
+        debugPrint('[PaymentRepository] Using compute() for ${dataList.length} payments');
+        return compute(
+          _parsePaymentsIsolate,
+          dataList.map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
+      }
+
+      return dataList.map((item) => Payment.fromJson(item)).toList();
     } catch (e) {
       throw DatabaseException('Ошибка загрузки оплат: $e');
     }
   }
 
   /// Получить оплаты ученика
+  ///
+  /// При большом количестве оплат использует compute() для парсинга.
   Future<List<Payment>> getByStudent(String studentId) async {
     try {
       final data = await _client
@@ -40,7 +67,18 @@ class PaymentRepository {
           .eq('student_id', studentId)
           .order('paid_at', ascending: false);
 
-      return (data as List).map((item) => Payment.fromJson(item)).toList();
+      final dataList = data as List;
+
+      // compute() для больших списков
+      if (dataList.length >= _paymentComputeThreshold) {
+        debugPrint('[PaymentRepository] Using compute() for ${dataList.length} student payments');
+        return compute(
+          _parsePaymentsIsolate,
+          dataList.map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
+      }
+
+      return dataList.map((item) => Payment.fromJson(item)).toList();
     } catch (e) {
       throw DatabaseException('Ошибка загрузки оплат ученика: $e');
     }
@@ -147,6 +185,8 @@ class PaymentRepository {
   }
 
   /// Получить все оплаты заведения
+  ///
+  /// При большом количестве оплат использует compute() для парсинга.
   Future<List<Payment>> getByInstitution(String institutionId) async {
     try {
       // Добавляем subscriptions с subscription_members для семейных абонементов
@@ -156,7 +196,18 @@ class PaymentRepository {
           .eq('institution_id', institutionId)
           .order('paid_at', ascending: false);
 
-      return (data as List).map((item) => Payment.fromJson(item)).toList();
+      final dataList = data as List;
+
+      // compute() для больших списков
+      if (dataList.length >= _paymentComputeThreshold) {
+        debugPrint('[PaymentRepository] Using compute() for ${dataList.length} institution payments');
+        return compute(
+          _parsePaymentsIsolate,
+          dataList.map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
+      }
+
+      return dataList.map((item) => Payment.fromJson(item)).toList();
     } catch (e) {
       throw DatabaseException('Ошибка загрузки оплат: $e');
     }
@@ -164,18 +215,39 @@ class PaymentRepository {
 
   /// Стрим оплат (realtime)
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
-  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
-  /// Это предотвращает бесконечную загрузку при возврате из фона
-  Stream<List<Payment>> watchByInstitution(String institutionId) async* {
-    // 1. Сразу выдаём текущие данные (без ожидания Realtime)
-    yield await getByInstitution(institutionId);
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<List<Payment>> watchByInstitution(String institutionId) {
+    final controller = StreamController<List<Payment>>.broadcast();
 
-    // 2. Подписываемся на изменения
-    await for (final _ in _client.from('payments').stream(primaryKey: ['id'])) {
-      // При любом изменении загружаем актуальные данные
-      final payments = await getByInstitution(institutionId);
-      yield payments;
+    Future<void> loadAndEmit() async {
+      try {
+        final payments = await getByInstitution(institutionId);
+        if (!controller.isClosed) {
+          controller.add(payments);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
     }
+
+    // 1. Сразу загружаем начальные данные
+    loadAndEmit();
+
+    // 2. Подписываемся на изменения с обработкой ошибок
+    final subscription = _client.from('payments').stream(primaryKey: ['id']).listen(
+      (_) => loadAndEmit(),
+      onError: (e) {
+        debugPrint('[PaymentRepository] watchByInstitution error: $e');
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      },
+    );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   // === Редактирование и удаление оплат ===

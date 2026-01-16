@@ -31,6 +31,10 @@ dependencies:
   collection: ^1.18.0
   shared_preferences: ^2.2.2
 
+  # Cache (Telegram/Instagram-style offline support)
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
   # Network
   connectivity_plus: ^6.1.0
 
@@ -55,6 +59,7 @@ dev_dependencies:
   riverpod_generator: ^2.6.3
   json_serializable: ^6.9.4
   go_router_builder: ^2.7.1
+  # hive_generator удалён — используем JSON storage вместо TypeAdapters
 
 flutter:
   uses-material-design: true

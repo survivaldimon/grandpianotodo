@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
@@ -81,12 +82,20 @@ final membersStreamProvider =
   // 1. Сразу загружаем начальные данные
   loadAndEmit();
 
-  // 2. Подписываемся на realtime изменения
+  // 2. Подписываемся на realtime изменения с обработкой ошибок
   final subscription = client
       .from('institution_members')
       .stream(primaryKey: ['id'])
       .eq('institution_id', institutionId)
-      .listen((_) => loadAndEmit());
+      .listen(
+        (_) => loadAndEmit(),
+        onError: (e) {
+          debugPrint('[MemberProvider] membersStreamProvider error: $e');
+          if (!controller.isClosed) {
+            controller.addError(e);
+          }
+        },
+      );
 
   ref.onDispose(() {
     subscription.cancel();

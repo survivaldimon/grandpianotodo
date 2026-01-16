@@ -6,15 +6,20 @@ import 'package:kabinet/shared/models/subject.dart';
 /// Провайдер для получения предметов преподавателя
 final teacherSubjectsProvider = FutureProvider.family<List<TeacherSubject>, TeacherSubjectsParams>(
   (ref, params) async {
-    final client = SupabaseConfig.client;
+    try {
+      final client = SupabaseConfig.client;
 
-    final data = await client
-        .from('teacher_subjects')
-        .select('*, subjects(*)')
-        .eq('user_id', params.userId)
-        .eq('institution_id', params.institutionId);
+      final data = await client
+          .from('teacher_subjects')
+          .select('*, subjects(*)')
+          .eq('user_id', params.userId)
+          .eq('institution_id', params.institutionId);
 
-    return (data as List).map((item) => TeacherSubject.fromJson(item)).toList();
+      return (data as List).map((item) => TeacherSubject.fromJson(item)).toList();
+    } catch (e) {
+      debugPrint('[TeacherSubjectsProvider] teacherSubjectsProvider error: $e');
+      rethrow;
+    }
   },
 );
 

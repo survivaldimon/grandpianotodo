@@ -71,49 +71,24 @@ class _MainShellState extends ConsumerState<MainShell>
     }
   }
 
-  /// Инвалидация всех ключевых провайдеров при возврате из фона
+  /// Инвалидация критичных провайдеров при возврате из фона
+  ///
+  /// ОПТИМИЗАЦИЯ: Вместо инвалидации всех ~26 провайдеров синхронно,
+  /// инвалидируем только критичные для UI. Остальные обновятся через
+  /// Supabase Realtime автоматически — как в Telegram/Instagram.
   void _refreshAllData(String institutionId) {
-    debugPrint('[MainShell] Refreshing all data for institution: $institutionId');
+    debugPrint('[MainShell] Refreshing critical providers for: $institutionId');
 
-    // Инвалидируем провайдеры заведения
+    // Только критичные провайдеры — для header и прав доступа
+    // Это предотвращает ANR ("App not responding") при возврате из фона
     ref.invalidate(currentInstitutionStreamProvider(institutionId));
-    ref.invalidate(currentInstitutionProvider(institutionId));
     ref.invalidate(myMembershipProvider(institutionId));
 
-    // Инвалидируем провайдеры расписания (для сегодня и ±3 дня)
-    ref.invalidate(unmarkedLessonsProvider(institutionId));
-    ref.invalidate(unmarkedLessonsStreamProvider(institutionId));
-    ref.invalidate(institutionTodayLessonsProvider(institutionId));
+    // НЕ инвалидируем остальные 24 провайдера!
+    // Supabase Realtime сам обновит их через WebSocket когда данные изменятся.
+    // Это экономит ресурсы и предотвращает блокировку главного потока.
 
-    // Инвалидируем занятия и бронирования для диапазона дат
-    final today = DateTime.now();
-    for (int i = -3; i <= 3; i++) {
-      final date = today.add(Duration(days: i));
-      final params = InstitutionDateParams(institutionId, date);
-      ref.invalidate(lessonsByInstitutionStreamProvider(params));
-      ref.invalidate(bookingsByInstitutionDateProvider(params));
-    }
-
-    // Инвалидируем недельные провайдеры (текущая неделя)
-    // Используем новые StreamProvider версии
-    final weekStart = InstitutionWeekParams.getWeekStart(today);
-    final weekParams = InstitutionWeekParams(institutionId, weekStart);
-    ref.invalidate(lessonsByInstitutionWeekStreamProvider(weekParams));
-    ref.invalidate(bookingsByInstitutionWeekStreamProvider(weekParams));
-    // Также инвалидируем старые FutureProvider для совместимости
-    ref.invalidate(lessonsByInstitutionWeekProvider(weekParams));
-    ref.invalidate(bookingsByInstitutionWeekProvider(weekParams));
-
-    // Инвалидируем провайдеры оплат
-    ref.invalidate(paymentsStreamProvider(institutionId));
-
-    // Инвалидируем провайдеры учеников
-    ref.invalidate(studentsProvider(institutionId));
-
-    // Инвалидируем провайдеры участников
-    ref.invalidate(membersStreamProvider(institutionId));
-
-    debugPrint('[MainShell] All providers invalidated');
+    debugPrint('[MainShell] Critical providers invalidated (Realtime handles the rest)');
   }
 
   @override

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
@@ -879,47 +881,120 @@ class BookingRepository {
   // ============================================
 
   /// Стрим бронирований по заведению и дате (realtime)
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
   Stream<List<Booking>> watchByInstitutionAndDate(
     String institutionId,
     DateTime date,
-  ) async* {
-    // 1. Сразу выдаём текущие данные
-    yield await getAllForDate(institutionId, date);
+  ) {
+    final controller = StreamController<List<Booking>>.broadcast();
 
-    // 2. Подписываемся на изменения
-    await for (final _ in _client
+    Future<void> loadAndEmit() async {
+      try {
+        final bookings = await getAllForDate(institutionId, date);
+        if (!controller.isClosed) {
+          controller.add(bookings);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    loadAndEmit();
+
+    final subscription = _client
         .from('bookings')
         .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)) {
-      final bookings = await getAllForDate(institutionId, date);
-      yield bookings;
-    }
+        .eq('institution_id', institutionId)
+        .listen(
+          (_) => loadAndEmit(),
+          onError: (e) {
+            debugPrint('[BookingRepository] watchByInstitutionAndDate error: $e');
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          },
+        );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   /// Стрим еженедельных бронирований заведения
-  Stream<List<Booking>> watchWeeklyByInstitution(String institutionId) async* {
-    yield await getWeeklyByInstitution(institutionId);
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<List<Booking>> watchWeeklyByInstitution(String institutionId) {
+    final controller = StreamController<List<Booking>>.broadcast();
 
-    await for (final _ in _client
+    Future<void> loadAndEmit() async {
+      try {
+        final bookings = await getWeeklyByInstitution(institutionId);
+        if (!controller.isClosed) {
+          controller.add(bookings);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    loadAndEmit();
+
+    final subscription = _client
         .from('bookings')
         .stream(primaryKey: ['id'])
-        .eq('institution_id', institutionId)) {
-      final bookings = await getWeeklyByInstitution(institutionId);
-      yield bookings;
-    }
+        .eq('institution_id', institutionId)
+        .listen(
+          (_) => loadAndEmit(),
+          onError: (e) {
+            debugPrint('[BookingRepository] watchWeeklyByInstitution error: $e');
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          },
+        );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   /// Стрим бронирований ученика
-  Stream<List<Booking>> watchByStudent(String studentId) async* {
-    yield await getByStudent(studentId);
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<List<Booking>> watchByStudent(String studentId) {
+    final controller = StreamController<List<Booking>>.broadcast();
 
-    await for (final _ in _client
+    Future<void> loadAndEmit() async {
+      try {
+        final bookings = await getByStudent(studentId);
+        if (!controller.isClosed) {
+          controller.add(bookings);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
+    }
+
+    loadAndEmit();
+
+    final subscription = _client
         .from('bookings')
         .stream(primaryKey: ['id'])
-        .eq('student_id', studentId)) {
-      final bookings = await getByStudent(studentId);
-      yield bookings;
-    }
+        .eq('student_id', studentId)
+        .listen(
+          (_) => loadAndEmit(),
+          onError: (e) {
+            debugPrint('[BookingRepository] watchByStudent error: $e');
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          },
+        );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   // ============================================

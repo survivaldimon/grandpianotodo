@@ -533,10 +533,7 @@ class _MemberPermissionsScreenState
             padding: EdgeInsets.all(16),
             child: Center(child: CircularProgressIndicator()),
           ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: ErrorView.inline(e),
-          ),
+          error: (_, __) => const SizedBox.shrink(),
           data: (teacherSubjects) {
             if (teacherSubjects.isEmpty) {
               return const Padding(
@@ -621,7 +618,7 @@ class _MemberPermissionsScreenState
                 const SizedBox(height: 16),
                 allSubjectsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => ErrorView.inline(e),
+                  error: (_, __) => const SizedBox.shrink(),
                   data: (allSubjects) {
                     final existingIds = teacherSubjectsAsync.valueOrNull
                             ?.map((ts) => ts.subjectId)

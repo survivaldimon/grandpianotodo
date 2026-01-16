@@ -1572,7 +1572,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 // Ученик / Ученики
                 studentsAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => ErrorView.inline(e),
+                  error: (_, __) => const SizedBox.shrink(),
                   data: (students) {
                     if (students.isEmpty) {
                       return Container(
@@ -1869,7 +1869,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 // Тариф
                 plansAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => ErrorView.inline(e),
+                  error: (_, __) => const SizedBox.shrink(),
                   data: (plans) {
                     // Находим выбранный план по ID
                     final currentPlan = _selectedPlan != null
@@ -2313,7 +2313,13 @@ class _PaymentCard extends ConsumerWidget {
         subtitle: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(planName),
+            Flexible(
+              child: Text(
+                planName,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
             Text('${payment.lessonsCount} занятий'),
           ],
         ),

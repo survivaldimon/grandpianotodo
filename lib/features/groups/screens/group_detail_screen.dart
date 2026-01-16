@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -223,16 +224,25 @@ class _GroupDetailContent extends ConsumerWidget {
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
 
-              final controller = ref.read(groupControllerProvider.notifier);
-              await controller.update(
-                group.id,
-                institutionId: institutionId,
-                name: nameController.text.trim(),
-                comment: commentController.text.trim(),
-              );
+              try {
+                final controller = ref.read(groupControllerProvider.notifier);
+                await controller.update(
+                  group.id,
+                  institutionId: institutionId,
+                  name: nameController.text.trim(),
+                  comment: commentController.text.trim(),
+                );
 
-              if (dialogContext.mounted) {
-                Navigator.pop(dialogContext);
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+              } catch (e) {
+                debugPrint('[GroupDetailScreen] update error: $e');
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+                  );
+                }
               }
             },
             child: const Text('Сохранить'),
@@ -258,21 +268,31 @@ class _GroupDetailContent extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () async {
-              final controller = ref.read(groupControllerProvider.notifier);
-              final success = await controller.archive(group.id, institutionId);
+              try {
+                final controller = ref.read(groupControllerProvider.notifier);
+                final success = await controller.archive(group.id, institutionId);
 
-              if (dialogContext.mounted) {
-                Navigator.pop(dialogContext);
-              }
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
 
-              if (success && context.mounted) {
-                context.pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Группа архивирована'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                if (success && context.mounted) {
+                  context.pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Группа архивирована'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                debugPrint('[GroupDetailScreen] archive error: $e');
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+                  );
+                }
               }
             },
             child: const Text(
@@ -380,11 +400,20 @@ class _MemberTile extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () async {
-              final controller = ref.read(groupControllerProvider.notifier);
-              await controller.removeMember(groupId, student.id, institutionId);
+              try {
+                final controller = ref.read(groupControllerProvider.notifier);
+                await controller.removeMember(groupId, student.id, institutionId);
 
-              if (dialogContext.mounted) {
-                Navigator.pop(dialogContext);
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+              } catch (e) {
+                debugPrint('[GroupDetailScreen] removeMember error: $e');
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+                  );
+                }
               }
             },
             child: const Text(

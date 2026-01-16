@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
@@ -391,17 +393,37 @@ class SubscriptionRepository {
 
   /// Стрим подписок студента (realtime)
   /// Слушаем ВСЕ изменения без фильтра для корректной работы DELETE событий
-  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
-  Stream<List<Subscription>> watchByStudent(String studentId) async* {
-    // 1. Сразу выдаём текущие данные
-    yield await getByStudent(studentId);
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<List<Subscription>> watchByStudent(String studentId) {
+    final controller = StreamController<List<Subscription>>.broadcast();
 
-    // 2. Подписываемся на изменения
-    await for (final _ in _client.from('subscriptions').stream(primaryKey: ['id'])) {
-      // При любом изменении загружаем актуальные данные
-      final subscriptions = await getByStudent(studentId);
-      yield subscriptions;
+    Future<void> loadAndEmit() async {
+      try {
+        final subscriptions = await getByStudent(studentId);
+        if (!controller.isClosed) {
+          controller.add(subscriptions);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
     }
+
+    loadAndEmit();
+
+    final subscription = _client.from('subscriptions').stream(primaryKey: ['id']).listen(
+      (_) => loadAndEmit(),
+      onError: (e) {
+        debugPrint('[SubscriptionRepository] watchByStudent error: $e');
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      },
+    );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 
   /// Получить истекающие подписки заведения (в течение N дней)
@@ -738,15 +760,36 @@ class SubscriptionRepository {
   }
 
   /// Стрим подписок студента включая семейные (realtime)
-  /// ВАЖНО: Сначала выдаём текущие данные, потом подписываемся на изменения
-  Stream<List<Subscription>> watchByStudentIncludingFamily(String studentId) async* {
-    // 1. Сразу выдаём текущие данные
-    yield await getByStudentIncludingFamily(studentId);
+  /// Использует StreamController для устойчивой обработки ошибок Realtime
+  Stream<List<Subscription>> watchByStudentIncludingFamily(String studentId) {
+    final controller = StreamController<List<Subscription>>.broadcast();
 
-    // 2. Подписываемся на изменения в обеих таблицах
-    await for (final _ in _client.from('subscriptions').stream(primaryKey: ['id'])) {
-      final subscriptions = await getByStudentIncludingFamily(studentId);
-      yield subscriptions;
+    Future<void> loadAndEmit() async {
+      try {
+        final subscriptions = await getByStudentIncludingFamily(studentId);
+        if (!controller.isClosed) {
+          controller.add(subscriptions);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      }
     }
+
+    loadAndEmit();
+
+    final subscription = _client.from('subscriptions').stream(primaryKey: ['id']).listen(
+      (_) => loadAndEmit(),
+      onError: (e) {
+        debugPrint('[SubscriptionRepository] watchByStudentIncludingFamily error: $e');
+        if (!controller.isClosed) {
+          controller.addError(e);
+        }
+      },
+    );
+
+    controller.onCancel = () => subscription.cancel();
+    return controller.stream;
   }
 }

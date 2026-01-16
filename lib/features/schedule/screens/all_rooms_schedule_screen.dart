@@ -4902,36 +4902,49 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
 
     setState(() => _isLoading = true);
 
-    // Если занятие ещё не проведено — сначала помечаем как проведённое
-    if (_currentStatus != LessonStatus.completed) {
-      final lessonController = ref.read(lessonControllerProvider.notifier);
-      await lessonController.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
-    }
+    try {
+      // Если занятие ещё не проведено — сначала помечаем как проведённое
+      if (_currentStatus != LessonStatus.completed) {
+        final lessonController = ref.read(lessonControllerProvider.notifier);
+        await lessonController.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
+      }
 
-    // Создаём оплату с lessonId в comment
-    // Формат: lesson:LESSON_ID|LESSON_TYPE_NAME
-    final paymentController = ref.read(paymentControllerProvider.notifier);
-    final lessonTypeName = lesson.lessonType?.name ?? 'Оплата занятия';
-    await paymentController.create(
-      institutionId: widget.institutionId,
-      studentId: lesson.studentId!,
-      amount: lesson.lessonType!.defaultPrice!,
-      lessonsCount: 1,
-      comment: 'lesson:${lesson.id}|$lessonTypeName',
-    );
-
-    if (mounted) {
-      setState(() {
-        _currentStatus = LessonStatus.completed;
-        _isPaid = true;
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Оплата добавлена'),
-          backgroundColor: Colors.green,
-        ),
+      // Создаём оплату с lessonId в comment
+      // Формат: lesson:LESSON_ID|LESSON_TYPE_NAME
+      final paymentController = ref.read(paymentControllerProvider.notifier);
+      final lessonTypeName = lesson.lessonType?.name ?? 'Оплата занятия';
+      await paymentController.create(
+        institutionId: widget.institutionId,
+        studentId: lesson.studentId!,
+        amount: lesson.lessonType!.defaultPrice!,
+        lessonsCount: 1,
+        comment: 'lesson:${lesson.id}|$lessonTypeName',
       );
+
+      if (mounted) {
+        setState(() {
+          _currentStatus = LessonStatus.completed;
+          _isPaid = true;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Оплата добавлена'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[AllRoomsScheduleScreen] _handlePayment error: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -4940,23 +4953,36 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
 
     setState(() => _isLoading = true);
 
-    // Удаляем оплату по lessonId
-    final paymentController = ref.read(paymentControllerProvider.notifier);
-    final success = await paymentController.deleteByLessonId(
-      lesson.id,
-      studentId: lesson.studentId,
-    );
+    try {
+      // Удаляем оплату по lessonId
+      final paymentController = ref.read(paymentControllerProvider.notifier);
+      final success = await paymentController.deleteByLessonId(
+        lesson.id,
+        studentId: lesson.studentId,
+      );
 
-    if (mounted) {
-      setState(() {
-        _isPaid = !success;
-        _isLoading = false;
-      });
-      if (success) {
+      if (mounted) {
+        setState(() {
+          _isPaid = !success;
+          _isLoading = false;
+        });
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Оплата удалена'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[AllRoomsScheduleScreen] _handleRemovePayment error: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Оплата удалена'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: Text('Ошибка удаления оплаты: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -6311,7 +6337,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
             if (_isGroupLesson)
               groupsAsync.when(
                 loading: () => const CircularProgressIndicator(),
-                error: (e, _) => ErrorView.inline(e),
+                error: (_, __) => const SizedBox.shrink(),
                 data: (groups) {
                   return DropdownButtonFormField<String?>(
                     key: ValueKey('group_$_selectedGroupId'),
@@ -6333,7 +6359,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
             else
               studentsAsync.when(
                 loading: () => const CircularProgressIndicator(),
-                error: (e, _) => ErrorView.inline(e),
+                error: (_, __) => const SizedBox.shrink(),
                 data: (students) {
                   return DropdownButtonFormField<String?>(
                     key: ValueKey('student_$_selectedStudentId'),
@@ -7871,7 +7897,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                     icon: Icons.person,
                     child: membersAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => ErrorView.inline(e),
+                      error: (_, __) => const SizedBox.shrink(),
                       data: (members) => _buildCheckboxList<InstitutionMember>(
                         items: members.where((m) => !m.isArchived).toList(),
                         selectedIds: _selectedTeachers,
@@ -7893,7 +7919,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                     icon: Icons.category,
                     child: lessonTypesAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => ErrorView.inline(e),
+                      error: (_, __) => const SizedBox.shrink(),
                       data: (types) => _buildCheckboxList<LessonType>(
                         items: types,
                         selectedIds: _selectedLessonTypes,
@@ -7911,7 +7937,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                     icon: Icons.music_note,
                     child: subjectsAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => ErrorView.inline(e),
+                      error: (_, __) => const SizedBox.shrink(),
                       data: (subjects) => _buildCheckboxList<Subject>(
                         items: subjects,
                         selectedIds: _selectedSubjects,
@@ -7962,7 +7988,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
   Widget _buildStudentsSection(AsyncValue<List<Student>> studentsAsync) {
     return studentsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorView.inline(e),
+      error: (_, __) => const SizedBox.shrink(),
       data: (students) {
         // Фильтруем только активных и сортируем по алфавиту
         final activeStudents = students
@@ -9084,7 +9110,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
                   return studentsAsync.when(
                     loading: () => const CircularProgressIndicator(),
-                    error: (e, _) => ErrorView.inline(e),
+                    error: (_, __) => const SizedBox.shrink(),
                     data: (allStudents) {
                       final myStudentIds = myStudentIdsAsync.valueOrNull ?? <String>{};
 
@@ -9160,7 +9186,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
               if (_isGroupLesson)
                 groupsAsync.when(
                   loading: () => const CircularProgressIndicator(),
-                  error: (e, _) => ErrorView.inline(e),
+                  error: (_, __) => const SizedBox.shrink(),
                   data: (groups) {
                     final currentGroup = _selectedGroup != null
                         ? groups.where((g) => g.id == _selectedGroup!.id).firstOrNull
@@ -10253,6 +10279,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             if (mounted) {
               setState(() => _selectedRoom = newRoom);
             }
+          }).catchError((e) {
+            debugPrint('[AllRoomsScheduleScreen] roomsProvider error: $e');
           });
         },
       ),
@@ -10308,6 +10336,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             if (mounted) {
               setState(() => _selectedStudent = newStudent);
             }
+          }).catchError((e) {
+            debugPrint('[AllRoomsScheduleScreen] studentsProvider error: $e');
           });
         },
       ),
@@ -10328,6 +10358,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             if (mounted) {
               setState(() => _selectedSubject = newSubject);
             }
+          }).catchError((e) {
+            debugPrint('[AllRoomsScheduleScreen] subjectsProvider error: $e');
           });
         },
       ),
@@ -10359,6 +10391,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 }
               });
             }
+          }).catchError((e) {
+            debugPrint('[AllRoomsScheduleScreen] lessonTypesProvider error: $e');
           });
         },
       ),
@@ -10416,6 +10450,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                   if (mounted) {
                     setState(() => _selectedGroup = newGroup);
                   }
+                }).catchError((e) {
+                  debugPrint('[AllRoomsScheduleScreen] groupsProvider error: $e');
                 });
               }
             },
