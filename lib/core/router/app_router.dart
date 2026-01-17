@@ -28,6 +28,13 @@ import 'package:kabinet/features/subjects/screens/subjects_screen.dart';
 import 'package:kabinet/features/profile/screens/profile_screen.dart';
 import 'package:kabinet/features/institution/screens/teacher_onboarding_screen.dart';
 
+// Navigator keys для каждой ветки (сохранение состояния навигации)
+final _dashboardNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'dashboard');
+final _scheduleNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'schedule');
+final _studentsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'students');
+final _paymentsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'payments');
+final _settingsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'settings');
+
 /// Провайдер роутера
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuthenticated = ref.watch(isAuthenticatedProvider);
@@ -76,7 +83,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ResetPasswordScreen(),
       ),
 
-      // Institutions
+      // Institutions list
       GoRoute(
         path: '/institutions',
         builder: (context, state) {
@@ -107,162 +114,200 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // Main App Shell
-      ShellRoute(
-        builder: (context, state, child) => MainShell(child: child),
+      // Main App: /institutions/:institutionId/...
+      // StatefulShellRoute вложен внутрь GoRoute с параметром
+      GoRoute(
+        path: '/institutions/:institutionId',
+        redirect: (context, state) {
+          // Редирект на dashboard ТОЛЬКО если путь точно /institutions/:id (без суффикса)
+          final fullPath = state.uri.path;
+          final institutionId = state.pathParameters['institutionId'];
+          final basePath = '/institutions/$institutionId';
+          if (fullPath == basePath || fullPath == '$basePath/') {
+            return '$basePath/dashboard';
+          }
+          return null;
+        },
         routes: [
-          // Dashboard
-          GoRoute(
-            path: '/institutions/:institutionId',
-            redirect: (context, state) =>
-                '/institutions/${state.pathParameters['institutionId']}/dashboard',
-          ),
-          GoRoute(
-            path: '/institutions/:institutionId/dashboard',
-            builder: (context, state) => DashboardScreen(
-              institutionId: state.pathParameters['institutionId']!,
+          // StatefulShellRoute с сохранением состояния навигации
+          // Пути внутри branches НЕ содержат параметров — это требование go_router
+          StatefulShellRoute.indexedStack(
+            builder: (context, state, navigationShell) => MainShell(
+              navigationShell: navigationShell,
             ),
-          ),
-
-          // Schedule (расписание всех кабинетов)
-          GoRoute(
-            path: '/institutions/:institutionId/schedule',
-            builder: (context, state) => AllRoomsScheduleScreen(
-              institutionId: state.pathParameters['institutionId']!,
-            ),
-          ),
-
-          // Rooms (настройки кабинетов - для редактирования из Настроек)
-          GoRoute(
-            path: '/institutions/:institutionId/rooms',
-            pageBuilder: (context, state) => CupertinoPage(
-              child: RoomsScreen(
-                institutionId: state.pathParameters['institutionId']!,
-              ),
-            ),
-          ),
-
-          // Students
-          GoRoute(
-            path: '/institutions/:institutionId/students',
-            builder: (context, state) => StudentsListScreen(
-              institutionId: state.pathParameters['institutionId']!,
-            ),
-            routes: [
-              GoRoute(
-                path: ':studentId',
-                pageBuilder: (context, state) => CupertinoPage(
-                  child: StudentDetailScreen(
-                    studentId: state.pathParameters['studentId']!,
-                    institutionId: state.pathParameters['institutionId']!,
+            branches: [
+              // Branch 0: Dashboard
+              StatefulShellBranch(
+                navigatorKey: _dashboardNavigatorKey,
+                routes: [
+                  GoRoute(
+                    path: 'dashboard',
+                    name: 'dashboard',
+                    builder: (context, state) => DashboardScreen(
+                      institutionId: state.pathParameters['institutionId']!,
+                    ),
                   ),
-                ),
+                ],
+              ),
+
+              // Branch 1: Schedule
+              StatefulShellBranch(
+                navigatorKey: _scheduleNavigatorKey,
+                routes: [
+                  GoRoute(
+                    path: 'schedule',
+                    name: 'schedule',
+                    builder: (context, state) => AllRoomsScheduleScreen(
+                      institutionId: state.pathParameters['institutionId']!,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Branch 2: Students (+ Groups)
+              StatefulShellBranch(
+                navigatorKey: _studentsNavigatorKey,
+                routes: [
+                  GoRoute(
+                    path: 'students',
+                    name: 'students',
+                    builder: (context, state) => StudentsListScreen(
+                      institutionId: state.pathParameters['institutionId']!,
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: ':studentId',
+                        pageBuilder: (context, state) => CupertinoPage(
+                          child: StudentDetailScreen(
+                            studentId: state.pathParameters['studentId']!,
+                            institutionId: state.pathParameters['institutionId']!,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'groups',
+                    pageBuilder: (context, state) => CupertinoPage(
+                      child: GroupsScreen(
+                        institutionId: state.pathParameters['institutionId']!,
+                      ),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: ':groupId',
+                        pageBuilder: (context, state) => CupertinoPage(
+                          child: GroupDetailScreen(
+                            institutionId: state.pathParameters['institutionId']!,
+                            groupId: state.pathParameters['groupId']!,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              // Branch 3: Payments
+              StatefulShellBranch(
+                navigatorKey: _paymentsNavigatorKey,
+                routes: [
+                  GoRoute(
+                    path: 'payments',
+                    name: 'payments',
+                    builder: (context, state) => PaymentsScreen(
+                      institutionId: state.pathParameters['institutionId']!,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Branch 4: Settings (+ все вложенные экраны)
+              StatefulShellBranch(
+                navigatorKey: _settingsNavigatorKey,
+                routes: [
+                  GoRoute(
+                    path: 'settings',
+                    name: 'settings',
+                    builder: (context, state) => SettingsScreen(
+                      institutionId: state.pathParameters['institutionId']!,
+                    ),
+                  ),
+                  // Members
+                  GoRoute(
+                    path: 'members',
+                    pageBuilder: (context, state) => CupertinoPage(
+                      child: MembersScreen(
+                        institutionId: state.pathParameters['institutionId']!,
+                      ),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: ':memberId/permissions',
+                        pageBuilder: (context, state) => CupertinoPage(
+                          child: MemberPermissionsScreen(
+                            institutionId: state.pathParameters['institutionId']!,
+                            memberId: state.pathParameters['memberId']!,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Rooms
+                  GoRoute(
+                    path: 'rooms',
+                    pageBuilder: (context, state) => CupertinoPage(
+                      child: RoomsScreen(
+                        institutionId: state.pathParameters['institutionId']!,
+                      ),
+                    ),
+                  ),
+                  // Statistics
+                  GoRoute(
+                    path: 'statistics',
+                    pageBuilder: (context, state) => CupertinoPage(
+                      child: StatisticsScreen(
+                        institutionId: state.pathParameters['institutionId']!,
+                      ),
+                    ),
+                  ),
+                  // Lesson Types
+                  GoRoute(
+                    path: 'lesson-types',
+                    pageBuilder: (context, state) => CupertinoPage(
+                      child: LessonTypesScreen(
+                        institutionId: state.pathParameters['institutionId']!,
+                      ),
+                    ),
+                  ),
+                  // Payment Plans
+                  GoRoute(
+                    path: 'payment-plans',
+                    pageBuilder: (context, state) => CupertinoPage(
+                      child: PaymentPlansScreen(
+                        institutionId: state.pathParameters['institutionId']!,
+                      ),
+                    ),
+                  ),
+                  // Subjects
+                  GoRoute(
+                    path: 'subjects',
+                    pageBuilder: (context, state) => CupertinoPage(
+                      child: SubjectsScreen(
+                        institutionId: state.pathParameters['institutionId']!,
+                      ),
+                    ),
+                  ),
+                  // Profile
+                  GoRoute(
+                    path: 'profile',
+                    pageBuilder: (context, state) => const CupertinoPage(
+                      child: ProfileScreen(),
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
-
-          // Payments
-          GoRoute(
-            path: '/institutions/:institutionId/payments',
-            builder: (context, state) => PaymentsScreen(
-              institutionId: state.pathParameters['institutionId']!,
-            ),
-          ),
-
-          // Settings
-          GoRoute(
-            path: '/institutions/:institutionId/settings',
-            builder: (context, state) => SettingsScreen(
-              institutionId: state.pathParameters['institutionId']!,
-            ),
-          ),
-
-          // Members
-          GoRoute(
-            path: '/institutions/:institutionId/members',
-            pageBuilder: (context, state) => CupertinoPage(
-              child: MembersScreen(
-                institutionId: state.pathParameters['institutionId']!,
-              ),
-            ),
-          ),
-
-          // Member Permissions
-          GoRoute(
-            path: '/institutions/:institutionId/members/:memberId/permissions',
-            pageBuilder: (context, state) => CupertinoPage(
-              child: MemberPermissionsScreen(
-                institutionId: state.pathParameters['institutionId']!,
-                memberId: state.pathParameters['memberId']!,
-              ),
-            ),
-          ),
-
-          // Groups
-          GoRoute(
-            path: '/institutions/:institutionId/groups',
-            pageBuilder: (context, state) => CupertinoPage(
-              child: GroupsScreen(
-                institutionId: state.pathParameters['institutionId']!,
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/institutions/:institutionId/groups/:groupId',
-            pageBuilder: (context, state) => CupertinoPage(
-              child: GroupDetailScreen(
-                institutionId: state.pathParameters['institutionId']!,
-                groupId: state.pathParameters['groupId']!,
-              ),
-            ),
-          ),
-
-          // Statistics
-          GoRoute(
-            path: '/institutions/:institutionId/statistics',
-            pageBuilder: (context, state) => CupertinoPage(
-              child: StatisticsScreen(
-                institutionId: state.pathParameters['institutionId']!,
-              ),
-            ),
-          ),
-
-          // Lesson Types
-          GoRoute(
-            path: '/institutions/:institutionId/lesson-types',
-            pageBuilder: (context, state) => CupertinoPage(
-              child: LessonTypesScreen(
-                institutionId: state.pathParameters['institutionId']!,
-              ),
-            ),
-          ),
-
-          // Payment Plans
-          GoRoute(
-            path: '/institutions/:institutionId/payment-plans',
-            pageBuilder: (context, state) => CupertinoPage(
-              child: PaymentPlansScreen(
-                institutionId: state.pathParameters['institutionId']!,
-              ),
-            ),
-          ),
-
-          // Subjects
-          GoRoute(
-            path: '/institutions/:institutionId/subjects',
-            pageBuilder: (context, state) => CupertinoPage(
-              child: SubjectsScreen(
-                institutionId: state.pathParameters['institutionId']!,
-              ),
-            ),
-          ),
-
-          // Profile
-          GoRoute(
-            path: '/institutions/:institutionId/profile',
-            pageBuilder: (context, state) => const CupertinoPage(
-              child: ProfileScreen(),
-            ),
           ),
         ],
       ),

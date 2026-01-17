@@ -94,6 +94,9 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     required Map<String, Set<String>> teacherBindings,
   }) {
     return payments.where((p) {
+      // Исключаем записи переноса баланса (остаток занятий)
+      if (p.isBalanceTransfer) return false;
+
       // Фильтр по ученикам
       if (_selectedStudentIds.isNotEmpty && !_selectedStudentIds.contains(p.studentId)) {
         return false;
@@ -761,9 +764,11 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     double? visibleTotal;
     if (paymentsAsync.hasValue) {
       final allPayments = paymentsAsync.value!;
-      List<Payment> accessFiltered = allPayments;
+      // Исключаем записи переноса баланса (остаток занятий)
+      final paymentsWithoutTransfers = allPayments.where((p) => !p.isBalanceTransfer).toList();
+      List<Payment> accessFiltered = paymentsWithoutTransfers;
       if (!canViewAllPayments) {
-        accessFiltered = allPayments.where((p) {
+        accessFiltered = paymentsWithoutTransfers.where((p) {
           if (myStudentIds.contains(p.studentId)) return true;
           if (p.subscription?.members != null) {
             return p.subscription!.members!.any(
@@ -1072,6 +1077,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     final sortedDates = groupedPayments.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return ListView.builder(
+      key: const PageStorageKey('payments_list'),
       padding: AppSizes.paddingHorizontalM,
       itemCount: sortedDates.length,
       itemBuilder: (context, index) {

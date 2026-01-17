@@ -301,6 +301,67 @@ final canDelete = hasFullAccess ||
 
 ---
 
+## Навигация (go_router)
+
+### StatefulShellRoute — сохранение состояния вкладок
+
+Для сохранения navigation stack между вкладками (как Instagram/Telegram) используется `StatefulShellRoute.indexedStack`.
+
+**Файлы:**
+- `lib/core/router/app_router.dart` — конфигурация роутера
+- `lib/features/dashboard/screens/main_shell.dart` — оболочка с NavigationBar
+
+**Структура:**
+```dart
+GoRoute(
+  path: '/institutions/:institutionId',
+  redirect: ...,
+  routes: [
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) => MainShell(navigationShell: navigationShell),
+      branches: [
+        StatefulShellBranch(navigatorKey: _dashboardKey, routes: [...]),
+        StatefulShellBranch(navigatorKey: _scheduleKey, routes: [...]),
+        // ...
+      ],
+    ),
+  ],
+)
+```
+
+### goBranch vs goNamed/go (КРИТИЧНО!)
+
+| Метод | Сохраняет stack? | Когда использовать |
+|-------|------------------|-------------------|
+| `goBranch(index)` | ✅ Да | Переключение между вкладками |
+| `goBranch(index, initialLocation: true)` | ❌ Сбрасывает | Повторное нажатие на активную вкладку |
+| `goNamed()` / `go()` | ❌ Сбрасывает | Deep links, навигация внутри вкладки |
+
+```dart
+// ✅ ПРАВИЛЬНО — сохраняет stack
+widget.navigationShell.goBranch(index);
+
+// ❌ НЕПРАВИЛЬНО — сбрасывает stack к корню
+context.goNamed('students', pathParameters: {'institutionId': id});
+```
+
+### Redirect с параметрами (GOTCHA!)
+
+В redirect внутри вложенного GoRoute **НЕЛЬЗЯ** использовать `state.matchedLocation` — он возвращает только часть пути, совпавшую с этим route.
+
+```dart
+// ❌ НЕПРАВИЛЬНО — matchedLocation всегда /institutions/:id (без суффикса!)
+if (state.matchedLocation == '/institutions/$id') // ВСЕГДА true!
+
+// ✅ ПРАВИЛЬНО — uri.path содержит ПОЛНЫЙ путь навигации
+final fullPath = state.uri.path;
+if (fullPath == '/institutions/$id' || fullPath == '/institutions/$id/') {
+  return '/institutions/$id/dashboard';
+}
+```
+
+---
+
 ## UI паттерны
 
 ### Тёмная тема
