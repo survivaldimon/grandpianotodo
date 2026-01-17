@@ -42,9 +42,9 @@
 | SESSION_*.md | История сессий разработки |
 
 **Последние сессии:**
+- `SESSION_2026_01_17_BUGFIXES.md` — исправление багов учёта занятий, cache invalidation
 - `SESSION_2026_01_16_CACHE_PERFORMANCE.md` — cache-first, compute(), sync emit в watch-методах
 - `SESSION_2026_01_15_LESSON_SCHEDULES.md` — виртуальные занятия, отмена и списание
-- `SESSION_2026_01_13_BALANCE_TRANSFER.md` — система остатка занятий, улучшения UI
 
 ---
 
@@ -154,6 +154,21 @@ Future<List<Entity>> getByInstitution(String id, {bool skipCache = false}) async
 1. Добавить ключ в `CacheKeys`
 2. Реализовать cache-first паттерн
 3. Добавить метод `invalidateCache()`
+
+### ⚠️ Cache + Provider Invalidation (КРИТИЧНО!)
+
+При CRUD операциях в контроллерах **ОБЯЗАТЕЛЬНО** очищать кэш ПЕРЕД инвалидацией провайдера:
+
+```dart
+// ✅ ПРАВИЛЬНО
+await _repo.invalidateCache(institutionId);  // 1. Очистить кэш
+_ref.invalidate(entityProvider(institutionId)); // 2. Инвалидировать провайдер
+
+// ❌ НЕПРАВИЛЬНО — провайдер загрузит старые данные из кэша!
+_ref.invalidate(entityProvider(institutionId));
+```
+
+**Почему:** При `invalidate()` провайдер перезагружается и вызывает репозиторий. Если кэш не очищен — репозиторий вернёт старые данные из кэша (cache-first паттерн).
 
 ---
 
@@ -319,6 +334,30 @@ final canDelete = hasFullAccess ||
 - `ConsumerStatefulWidget` + `setState()` для UI
 - `onUpdated()` callback при закрытии
 
+### DropdownButtonFormField
+**ВСЕГДА** используй `isExpanded: true` для предотвращения overflow:
+```dart
+DropdownButtonFormField<T>(
+  isExpanded: true,
+  // ...
+  child: Text(text, overflow: TextOverflow.ellipsis),
+)
+```
+
+### Асинхронные операции в initState
+Для операций требующих `ref.read()` используй `addPostFrameCallback`:
+```dart
+@override
+void initState() {
+  super.initState();
+  if (needsAsyncInit) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _asyncOperation();
+    });
+  }
+}
+```
+
 ---
 
 ## Бизнес-сущности
@@ -411,7 +450,14 @@ Future<void> createBalanceTransfer({studentId, lessonsCount, comment});
 ### Подписки (Subscriptions)
 - `is_family` — семейный абонемент (общий пул занятий)
 - `subscription_members` — участники семейного абонемента
-- VIEW `student_subscription_summary` — расчёт баланса
+- VIEW `student_subscription_summary` — расчёт баланса (с `security_invoker = on`)
+
+**Автопривязка долговых занятий:**
+При создании подписки `linkDebtLessons()` автоматически:
+1. Находит занятия ученика без `subscription_id` со статусом `completed`
+2. Привязывает их к новой подписке
+3. Уменьшает `lessons_remaining` на количество привязанных
+4. **Сбрасывает долг** — увеличивает `prepaid_lessons_count` (иначе двойной учёт!)
 
 Файлы:
 - `lib/shared/models/subscription.dart`

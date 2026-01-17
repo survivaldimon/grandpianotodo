@@ -141,6 +141,13 @@ class SubscriptionRepository {
           .update({'subscription_id': subscriptionId})
           .inFilter('id', lessonIds);
 
+      // Сбрасываем долг для привязанных занятий
+      // Каждое долговое занятие уменьшило prepaid_lessons_count на 1
+      // Теперь нужно вернуть эти занятия (увеличить prepaid на количество привязанных)
+      for (int i = 0; i < lessonIds.length; i++) {
+        await _client.rpc('increment_student_prepaid', params: {'student_id': studentId});
+      }
+
       return lessonIds.length;
     } catch (e) {
       // Если ошибка - продолжаем без привязки

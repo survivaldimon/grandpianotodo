@@ -4903,23 +4903,48 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     setState(() => _isLoading = true);
 
     try {
-      // Если занятие ещё не проведено — сначала помечаем как проведённое
-      if (_currentStatus != LessonStatus.completed) {
-        final lessonController = ref.read(lessonControllerProvider.notifier);
-        await lessonController.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
-      }
-
-      // Создаём оплату с lessonId в comment
-      // Формат: lesson:LESSON_ID|LESSON_TYPE_NAME
       final paymentController = ref.read(paymentControllerProvider.notifier);
       final lessonTypeName = lesson.lessonType?.name ?? 'Оплата занятия';
-      await paymentController.create(
-        institutionId: widget.institutionId,
-        studentId: lesson.studentId!,
-        amount: lesson.lessonType!.defaultPrice!,
-        lessonsCount: 1,
-        comment: 'lesson:${lesson.id}|$lessonTypeName',
-      );
+
+      // Если занятие привязано к подписке — возвращаем занятие в абонемент
+      if (lesson.subscriptionId != null) {
+        final subscriptionRepo = ref.read(subscriptionRepositoryProvider);
+        final lessonRepo = ref.read(lessonRepositoryProvider);
+
+        // 1. Возвращаем занятие в подписку (+1 к lessons_remaining)
+        await subscriptionRepo.returnLesson(
+          lesson.studentId!,
+          subscriptionId: lesson.subscriptionId,
+        );
+
+        // 2. Отвязываем занятие от подписки
+        await lessonRepo.clearSubscriptionId(lesson.id);
+
+        // 3. Создаём payment для истории (lessons_count = 0, не влияет на баланс)
+        await paymentController.create(
+          institutionId: widget.institutionId,
+          studentId: lesson.studentId!,
+          amount: lesson.lessonType!.defaultPrice!,
+          lessonsCount: 0,
+          comment: 'lesson:${lesson.id}|$lessonTypeName (возврат в абонемент)',
+        );
+      } else {
+        // Обычная логика для занятий БЕЗ привязки к подписке
+        if (_currentStatus != LessonStatus.completed) {
+          final lessonController = ref.read(lessonControllerProvider.notifier);
+          await lessonController.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId);
+        }
+
+        // Создаём оплату с lessonId в comment
+        // Формат: lesson:LESSON_ID|LESSON_TYPE_NAME
+        await paymentController.create(
+          institutionId: widget.institutionId,
+          studentId: lesson.studentId!,
+          amount: lesson.lessonType!.defaultPrice!,
+          lessonsCount: 1,
+          comment: 'lesson:${lesson.id}|$lessonTypeName',
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -6473,7 +6498,10 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                     ),
                     ...lessonTypes.map((lt) => DropdownMenuItem<String?>(
                       value: lt.id,
-                      child: Text('${lt.name} (${lt.defaultDurationMinutes} мин)'),
+                      child: Text(
+                        '${lt.name} (${lt.defaultDurationMinutes} мин)',
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     )),
                   ],
                   onChanged: (lessonTypeId) {
@@ -8710,6 +8738,13 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     // Предзаполненный тип занятия из слота
     _selectedLessonType = widget.preselectedLessonType;
 
+    // Автозаполнение типа занятия если ученик предзаполнен, а тип нет
+    if (_selectedStudent != null && _selectedLessonType == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _autoFillLessonTypeFromStudent(_selectedStudent!.id);
+      });
+    }
+
     // Слушатель для двухэтапного закрытия
     _sheetController.addListener(_onSheetSizeChanged);
   }
@@ -9350,6 +9385,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<Subject?>(
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Предмет',
                           prefixIcon: Icon(Icons.music_note),
@@ -9403,6 +9439,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<LessonType?>(
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Тип занятия',
                           prefixIcon: Icon(Icons.category),
@@ -9415,7 +9452,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           ),
                           ...lessonTypes.map((lt) => DropdownMenuItem<LessonType?>(
                             value: lt,
-                            child: Text('${lt.name} (${lt.defaultDurationMinutes} мин)'),
+                            child: Text(
+                              '${lt.name} (${lt.defaultDurationMinutes} мин)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           )),
                         ],
                         onChanged: (lessonType) {

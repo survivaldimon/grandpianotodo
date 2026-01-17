@@ -47,6 +47,7 @@ class LessonTypeController extends StateNotifier<AsyncValue<void>> {
         isGroup: isGroup,
         color: color,
       );
+      await _repo.invalidateCache(institutionId);
       _ref.invalidate(lessonTypesProvider(institutionId));
       state = const AsyncValue.data(null);
       return lessonType;
@@ -76,6 +77,7 @@ class LessonTypeController extends StateNotifier<AsyncValue<void>> {
         isGroup: isGroup,
         color: color,
       );
+      await _repo.invalidateCache(institutionId);
       _ref.invalidate(lessonTypesProvider(institutionId));
       _ref.invalidate(lessonTypeProvider(id));
       state = const AsyncValue.data(null);
@@ -91,6 +93,7 @@ class LessonTypeController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await _repo.archive(id);
+      await _repo.invalidateCache(institutionId);
       _ref.invalidate(lessonTypesProvider(institutionId));
       state = const AsyncValue.data(null);
       return true;
@@ -105,6 +108,7 @@ class LessonTypeController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await _repo.delete(id);
+      await _repo.invalidateCache(institutionId);
       _ref.invalidate(lessonTypesProvider(institutionId));
       state = const AsyncValue.data(null);
       return true;
