@@ -18,10 +18,11 @@ import 'package:kabinet/features/students/providers/student_provider.dart';
 final currentInstitutionIdProvider = StateProvider<String?>((ref) => null);
 
 /// Главная оболочка приложения с нижней навигацией
+/// Использует StatefulNavigationShell для сохранения состояния навигации между вкладками
 class MainShell extends ConsumerStatefulWidget {
-  final Widget child;
+  final StatefulNavigationShell navigationShell;
 
-  const MainShell({super.key, required this.child});
+  const MainShell({super.key, required this.navigationShell});
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -36,7 +37,9 @@ class _MainShellState extends ConsumerState<MainShell>
   late AnimationController _animationController;
   Animation<Offset> _slideAnimation = const AlwaysStoppedAnimation(Offset.zero);
   int _lastKnownIndex = -1; // -1 означает "ещё не определён"
-  String? _lastLocation; // Для отслеживания смены маршрута
+
+  /// История переключений вкладок (для back button как в Instagram)
+  final List<int> _tabHistory = [0];
 
   @override
   void initState() {
@@ -45,6 +48,12 @@ class _MainShellState extends ConsumerState<MainShell>
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
+
+    // Инициализируем индекс из navigationShell
+    _lastKnownIndex = widget.navigationShell.currentIndex;
+    if (!_tabHistory.contains(_lastKnownIndex)) {
+      _tabHistory.add(_lastKnownIndex);
+    }
 
     // Настраиваем callback для обновления данных при возврате из фона
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -72,56 +81,31 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   /// Инвалидация критичных провайдеров при возврате из фона
-  ///
-  /// ОПТИМИЗАЦИЯ: Вместо инвалидации всех ~26 провайдеров синхронно,
-  /// инвалидируем только критичные для UI. Остальные обновятся через
-  /// Supabase Realtime автоматически — как в Telegram/Instagram.
   void _refreshAllData(String institutionId) {
     debugPrint('[MainShell] Refreshing critical providers for: $institutionId');
 
     // Только критичные провайдеры — для header и прав доступа
-    // Это предотвращает ANR ("App not responding") при возврате из фона
     ref.invalidate(currentInstitutionStreamProvider(institutionId));
     ref.invalidate(myMembershipProvider(institutionId));
-
-    // НЕ инвалидируем остальные 24 провайдера!
-    // Supabase Realtime сам обновит их через WebSocket когда данные изменятся.
-    // Это экономит ресурсы и предотвращает блокировку главного потока.
 
     debugPrint('[MainShell] Critical providers invalidated (Realtime handles the rest)');
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _checkRouteChange();
-  }
+  void didUpdateWidget(MainShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
 
-  void _checkRouteChange() {
-    final location = GoRouterState.of(context).matchedLocation;
+    // Анимация при программном переключении вкладки (через deep link)
+    final oldIndex = oldWidget.navigationShell.currentIndex;
+    final newIndex = widget.navigationShell.currentIndex;
 
-    // Если маршрут не изменился - ничего не делаем
-    if (location == _lastLocation) return;
-    _lastLocation = location;
-
-    // Определяем индекс вкладки
-    int newIndex = 0;
-    if (location.contains('/schedule')) {
-      newIndex = 1;
-    } else if (location.contains('/students')) {
-      newIndex = 2;
-    } else if (location.contains('/payments')) {
-      newIndex = 3;
-    } else if (location.contains('/settings') || location.contains('/statistics')) {
-      newIndex = 4;
-    }
-
-    // Запускаем анимацию после завершения текущего фрейма
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _animateToTab(newIndex);
+    if (oldIndex != newIndex) {
+      _animateToTab(newIndex);
+      // Добавляем в историю если это не повтор
+      if (_tabHistory.isEmpty || _tabHistory.last != newIndex) {
+        _tabHistory.add(newIndex);
       }
-    });
+    }
   }
 
   @override
@@ -146,14 +130,12 @@ class _MainShellState extends ConsumerState<MainShell>
     final previousIndex = _lastKnownIndex;
     _lastKnownIndex = newIndex;
 
-    // Определяем направление:
-    // Если идём на вкладку с бо́льшим индексом (вправо) - страница въезжает справа
-    // Если идём на вкладку с меньшим индексом (влево) - страница въезжает слева
+    // Определяем направление анимации
     final goingToHigherIndex = newIndex > previousIndex;
 
     setState(() {
       _slideAnimation = Tween<Offset>(
-        begin: Offset(goingToHigherIndex ? 0.3 : -0.3, 0.0), // Меньшее смещение = быстрее
+        begin: Offset(goingToHigherIndex ? 0.3 : -0.3, 0.0),
         end: Offset.zero,
       ).animate(CurvedAnimation(
         parent: _animationController,
@@ -161,17 +143,39 @@ class _MainShellState extends ConsumerState<MainShell>
       ));
     });
 
-    // Запускаем анимацию с начала
     _animationController.forward(from: 0.0);
   }
 
+  /// Обработка нажатия на вкладку
+  void _onTabSelected(int index, String? institutionId) {
+    if (institutionId == null) return;
+
+    final currentIndex = widget.navigationShell.currentIndex;
+
+    // Повторное нажатие на активную вкладку - сброс к корню (как Instagram)
+    if (index == currentIndex) {
+      // initialLocation: true сбрасывает stack к корневому экрану
+      widget.navigationShell.goBranch(index, initialLocation: true);
+      return;
+    }
+
+    // Добавляем в историю если это не повтор
+    if (_tabHistory.isEmpty || _tabHistory.last != index) {
+      _tabHistory.add(index);
+    }
+
+    // Переключение с анимацией
+    _animateToTab(index);
+
+    // goBranch сохраняет navigation stack внутри branch (в отличие от goNamed)
+    widget.navigationShell.goBranch(index);
+  }
+
   void _startMembershipCheck(String institutionId) {
-    // Отменяем предыдущий таймер если ID изменился
     if (_lastInstitutionId != institutionId) {
       _checkTimer?.cancel();
       _lastInstitutionId = institutionId;
 
-      // Проверяем каждые 10 секунд
       _checkTimer = Timer.periodic(const Duration(seconds: 10), (_) {
         _checkMembership(institutionId);
       });
@@ -181,10 +185,7 @@ class _MainShellState extends ConsumerState<MainShell>
   Future<void> _checkMembership(String institutionId) async {
     if (_isShowingDeletedDialog) return;
 
-    // Инвалидируем и проверяем членство
     ref.invalidate(myMembershipProvider(institutionId));
-
-    // Даём время на загрузку
     await Future.delayed(const Duration(milliseconds: 500));
 
     if (!mounted) return;
@@ -232,97 +233,86 @@ class _MainShellState extends ConsumerState<MainShell>
 
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).matchedLocation;
+    final currentIndex = widget.navigationShell.currentIndex;
+    final routerState = GoRouterState.of(context);
 
-    // Определяем текущий индекс на основе маршрута
-    int currentIndex = 0;
-    if (location.contains('/schedule')) {
-      currentIndex = 1;
-    } else if (location.contains('/students')) {
-      currentIndex = 2;
-    } else if (location.contains('/payments')) {
-      currentIndex = 3;
-    } else if (location.contains('/settings') ||
-        location.contains('/statistics')) {
-      currentIndex = 4;
-    }
+    // Извлекаем institutionId из pathParameters
+    String? institutionId = routerState.pathParameters['institutionId'];
 
-    // Извлекаем institutionId из маршрута
-    final uri = Uri.parse(location);
-    final segments = uri.pathSegments;
-    String? institutionId;
-    for (int i = 0; i < segments.length; i++) {
-      if (segments[i] == 'institutions' && i + 1 < segments.length) {
-        institutionId = segments[i + 1];
-        break;
+    // Fallback: извлекаем из URL если pathParameters пустой
+    if (institutionId == null) {
+      final location = routerState.matchedLocation;
+      final uri = Uri.parse(location);
+      final segments = uri.pathSegments;
+      for (int i = 0; i < segments.length; i++) {
+        if (segments[i] == 'institutions' && i + 1 < segments.length) {
+          institutionId = segments[i + 1];
+          break;
+        }
       }
     }
 
     // Запускаем периодическую проверку членства
     if (institutionId != null) {
       _startMembershipCheck(institutionId);
-      // Обновляем ID заведения в сервисах для инвалидации при resumed/reconnect
       AppLifecycleService.instance.setCurrentInstitution(institutionId);
-      // Сохраняем ID для ConnectionManager
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(currentInstitutionIdProvider.notifier).state = institutionId;
       });
     }
 
-    return Scaffold(
-      body: SlideTransition(
-        position: _slideAnimation,
-        child: widget.child,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          if (institutionId == null) return;
-          switch (index) {
-            case 0:
-              context.go('/institutions/$institutionId/dashboard');
-              break;
-            case 1:
-              context.go('/institutions/$institutionId/schedule');
-              break;
-            case 2:
-              context.go('/institutions/$institutionId/students');
-              break;
-            case 3:
-              context.go('/institutions/$institutionId/payments');
-              break;
-            case 4:
-              context.go('/institutions/$institutionId/settings');
-              break;
+    // PopScope для обработки back button (как Instagram)
+    return PopScope(
+      // Разрешаем выход только если мы на Dashboard и история пуста
+      canPop: _tabHistory.length <= 1 && currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          // Если есть история - возвращаемся к предыдущей вкладке
+          if (_tabHistory.length > 1) {
+            _tabHistory.removeLast();
+            final previousTab = _tabHistory.last;
+            _animateToTab(previousTab);
+            // goBranch сохраняет navigation stack внутри branch
+            widget.navigationShell.goBranch(previousTab);
           }
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: AppStrings.dashboard,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: AppStrings.schedule,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: AppStrings.students,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.payments_outlined),
-            selectedIcon: Icon(Icons.payments),
-            label: AppStrings.payments,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: AppStrings.settings,
-          ),
-        ],
+        }
+      },
+      child: Scaffold(
+        body: SlideTransition(
+          position: _slideAnimation,
+          child: widget.navigationShell,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: currentIndex,
+          onDestinationSelected: (index) => _onTabSelected(index, institutionId),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: AppStrings.dashboard,
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.calendar_month_outlined),
+              selectedIcon: Icon(Icons.calendar_month),
+              label: AppStrings.schedule,
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.people_outline),
+              selectedIcon: Icon(Icons.people),
+              label: AppStrings.students,
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.payments_outlined),
+              selectedIcon: Icon(Icons.payments),
+              label: AppStrings.payments,
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings),
+              label: AppStrings.settings,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -531,6 +531,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                         ref.invalidate(_studentTeacherNamesProvider(widget.institutionId));
                       },
                       child: ListView.builder(
+                        key: const PageStorageKey('students_list'),
                         padding: AppSizes.paddingHorizontalM,
                         itemCount: filteredStudents.length,
                         itemBuilder: (context, index) {

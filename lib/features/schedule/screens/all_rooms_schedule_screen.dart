@@ -10090,8 +10090,28 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
           await Future.wait(futures);
           createdCount = _weekdayTimes.length;
+        } else if (_repeatType == RepeatType.daily) {
+          // Для daily — создаём schedule для КАЖДОГО дня недели (1-7)
+          final futures = List.generate(7, (index) {
+            final dayOfWeek = index + 1; // 1=Пн, 2=Вт, ..., 7=Вс
+            return scheduleController.create(
+              institutionId: widget.institutionId,
+              roomId: _selectedRoom!.id,
+              teacherId: teacherId,
+              studentId: _isGroupLesson ? null : _selectedStudent!.id,
+              groupId: _isGroupLesson ? _selectedGroup!.id : null,
+              subjectId: _selectedSubject?.id,
+              lessonTypeId: _selectedLessonType?.id,
+              dayOfWeek: dayOfWeek,
+              startTime: _startTime,
+              endTime: _endTime,
+              validFrom: DateTime.now(),
+            );
+          });
+          await Future.wait(futures);
+          createdCount = 7;
         } else {
-          // Для daily/weekly — создаём один schedule с днём недели из выбранной даты
+          // Для weekly — создаём один schedule с днём недели из выбранной даты
           await scheduleController.create(
             institutionId: widget.institutionId,
             roomId: _selectedRoom!.id,

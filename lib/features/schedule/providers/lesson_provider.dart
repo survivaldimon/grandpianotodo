@@ -11,6 +11,7 @@ import 'package:kabinet/features/students/repositories/student_repository.dart';
 import 'package:kabinet/features/subscriptions/repositories/subscription_repository.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
+import 'package:kabinet/features/lesson_schedules/providers/lesson_schedule_provider.dart';
 
 /// Провайдер репозитория занятий
 final lessonRepositoryProvider = Provider<LessonRepository>((ref) {
@@ -122,6 +123,90 @@ final cancelledScheduleIdsProvider =
     FutureProvider.family<Set<String>, InstitutionDateParams>((ref, params) {
   final repo = ref.watch(lessonRepositoryProvider);
   return repo.getCancelledScheduleIds(params.institutionId, params.date);
+});
+
+/// Комбинированный провайдер занятий на дату (реальные + виртуальные)
+/// Используется везде: dashboard, schedule screen, и другие места
+final combinedLessonsForDateProvider =
+    Provider.family<List<Lesson>, InstitutionDateParams>((ref, params) {
+  // 1. Реальные занятия
+  final realLessonsAsync = ref.watch(lessonsByInstitutionStreamProvider(params));
+  final realLessons = realLessonsAsync.valueOrNull ?? [];
+
+  // 2. Виртуальные занятия из lesson_schedules
+  final virtualSchedules = ref.watch(lessonSchedulesForDateProvider(params));
+
+  // 3. Отменённые schedule_id (для фильтрации)
+  final cancelledScheduleIdsAsync = ref.watch(cancelledScheduleIdsProvider(params));
+  final cancelledScheduleIds = cancelledScheduleIdsAsync.valueOrNull ?? {};
+
+  // 4. Фильтруем виртуальные (исключаем дубликаты и отменённые)
+  final filteredVirtualSchedules = virtualSchedules.where((schedule) {
+    final hasRealLesson = realLessons.any((l) => l.scheduleId == schedule.id);
+    final hasCancelled = cancelledScheduleIds.contains(schedule.id);
+    return !hasRealLesson && !hasCancelled;
+  }).toList();
+
+  // 5. Конвертируем в Lesson и комбинируем
+  final virtualLessons = filteredVirtualSchedules
+      .map((s) => s.toVirtualLesson(params.date))
+      .toList();
+
+  // 6. Объединяем и сортируем по времени
+  final allLessons = [...realLessons, ...virtualLessons];
+  allLessons.sort((a, b) {
+    final aMinutes = a.startTime.hour * 60 + a.startTime.minute;
+    final bMinutes = b.startTime.hour * 60 + b.startTime.minute;
+    return aMinutes.compareTo(bMinutes);
+  });
+
+  return allLessons;
+});
+
+/// Сокращение для занятий на сегодня (реальные + виртуальные)
+final combinedTodayLessonsProvider =
+    Provider.family<List<Lesson>, String>((ref, institutionId) {
+  return ref.watch(combinedLessonsForDateProvider(
+    InstitutionDateParams(institutionId, DateTime.now()),
+  ));
+});
+
+/// Комбинированный провайдер неотмеченных занятий (реальные + виртуальные)
+/// Реальные неотмеченные — за все прошлые дни + сегодня
+/// Виртуальные неотмеченные — только за сегодня (прошлое время)
+final combinedUnmarkedLessonsProvider =
+    Provider.family<List<Lesson>, String>((ref, institutionId) {
+  final currentTime = TimeOfDay.now();
+
+  // 1. Реальные неотмеченные занятия (за все дни) из существующего провайдера
+  final realUnmarkedAsync = ref.watch(unmarkedLessonsStreamProvider(institutionId));
+  final realUnmarked = realUnmarkedAsync.valueOrNull ?? [];
+
+  // 2. Виртуальные занятия на сегодня (только виртуальные, неотмеченные)
+  final todayLessons = ref.watch(combinedTodayLessonsProvider(institutionId));
+  final todayVirtualUnmarked = todayLessons.where((lesson) {
+    // Только виртуальные занятия
+    if (!lesson.isVirtual) return false;
+    // Только scheduled
+    if (lesson.status != LessonStatus.scheduled) return false;
+    // Время занятия должно уже пройти
+    final lessonEndMinutes = lesson.endTime.hour * 60 + lesson.endTime.minute;
+    final currentMinutes = currentTime.hour * 60 + currentTime.minute;
+    return lessonEndMinutes <= currentMinutes;
+  }).toList();
+
+  // 3. Объединяем (реальные + виртуальные)
+  final allUnmarked = [...realUnmarked, ...todayVirtualUnmarked];
+
+  // 4. Сортируем по дате и времени
+  allUnmarked.sort((a, b) {
+    final dateCompare = a.date.compareTo(b.date);
+    if (dateCompare != 0) return dateCompare;
+    return (a.startTime.hour * 60 + a.startTime.minute)
+        .compareTo(b.startTime.hour * 60 + b.startTime.minute);
+  });
+
+  return allUnmarked;
 });
 
 /// Параметры для загрузки занятий за неделю

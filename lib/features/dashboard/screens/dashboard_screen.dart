@@ -50,10 +50,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
   void _refreshData() {
     ref.invalidate(currentInstitutionProvider(widget.institutionId));
-    ref.invalidate(institutionTodayLessonsProvider(widget.institutionId));
+    // combinedTodayLessonsProvider зависит от lessonsByInstitutionStreamProvider,
+    // который обновляется автоматически через Realtime
+    ref.invalidate(combinedTodayLessonsProvider(widget.institutionId));
+    ref.invalidate(combinedUnmarkedLessonsProvider(widget.institutionId));
     ref.invalidate(studentsWithDebtProvider(widget.institutionId));
     ref.invalidate(todayPaymentsTotalProvider(widget.institutionId));
-    ref.invalidate(unmarkedLessonsStreamProvider(widget.institutionId));
     ref.invalidate(expiringSubscriptionsProvider(
       ExpiringSubscriptionsParams(widget.institutionId, days: 7),
     ));
@@ -63,10 +65,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   Widget build(BuildContext context) {
     final today = DateTime.now();
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
-    final lessonsAsync = ref.watch(institutionTodayLessonsProvider(widget.institutionId));
+    // Комбинированный провайдер (реальные + виртуальные занятия)
+    final lessons = ref.watch(combinedTodayLessonsProvider(widget.institutionId));
     final debtorsAsync = ref.watch(studentsWithDebtProvider(widget.institutionId));
     final todayPaymentsAsync = ref.watch(todayPaymentsTotalProvider(widget.institutionId));
-    final unmarkedLessonsAsync = ref.watch(unmarkedLessonsStreamProvider(widget.institutionId));
+    // Неотмеченные занятия (реальные + виртуальные)
+    final unmarkedLessons = ref.watch(combinedUnmarkedLessonsProvider(widget.institutionId));
     final expiringSubscriptionsAsync = ref.watch(
       expiringSubscriptionsProvider(ExpiringSubscriptionsParams(widget.institutionId, days: 7)),
     );
@@ -99,6 +103,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           _refreshData();
         },
         child: ListView(
+          key: const PageStorageKey('dashboard_list'),
           padding: AppSizes.paddingAllM,
           children: [
             // Дата
@@ -116,46 +121,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               const SizedBox(height: 12),
             ],
 
-            // Занятия сегодня
-            lessonsAsync.when(
-              data: (lessons) => _DashboardCard(
-                title: 'Занятия сегодня',
-                trailing: lessons.length.toString(),
-                icon: Icons.event_note,
-                onTap: () => context.go('/institutions/${widget.institutionId}/schedule'),
-              ),
-              loading: () => const _DashboardCard(
-                title: 'Занятия сегодня',
-                trailing: '...',
-                icon: Icons.event_note,
-                onTap: null,
-              ),
-              error: (_, __) => _DashboardCard(
-                title: 'Занятия сегодня',
-                trailing: '—',
-                icon: Icons.event_note,
-                onTap: () => context.go('/institutions/${widget.institutionId}/schedule'),
-              ),
+            // Занятия сегодня (реальные + виртуальные)
+            _DashboardCard(
+              title: 'Занятия сегодня',
+              trailing: lessons.length.toString(),
+              icon: Icons.event_note,
+              onTap: () => context.go('/institutions/${widget.institutionId}/schedule'),
             ),
             const SizedBox(height: 12),
 
-            // Неотмеченные занятия (без моргания при обновлении)
+            // Неотмеченные занятия (реальные + виртуальные)
             Builder(builder: (context) {
-              final lessons = unmarkedLessonsAsync.valueOrNull;
-
-              // Показываем loading только при первой загрузке (когда данных ещё нет)
-              if (lessons == null) {
-                return const _DashboardCard(
-                  title: AppStrings.unmarkedLessons,
-                  trailing: '...',
-                  icon: Icons.pending_actions,
-                  onTap: null,
-                );
-              }
-
-              final subtitle = lessons.isEmpty
+              final subtitle = unmarkedLessons.isEmpty
                   ? AppStrings.noUnmarkedLessons
-                  : lessons.take(2).map((l) {
+                  : unmarkedLessons.take(2).map((l) {
                       final date = AppDateUtils.formatDayMonth(l.date);
                       final time =
                           '${l.startTime.hour.toString().padLeft(2, '0')}:${l.startTime.minute.toString().padLeft(2, '0')}';
@@ -163,51 +142,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                     }).join(', ');
               return _DashboardCard(
                 title: AppStrings.unmarkedLessons,
-                trailing: lessons.length.toString(),
+                trailing: unmarkedLessons.length.toString(),
                 subtitle: subtitle,
                 icon: Icons.pending_actions,
-                iconColor: lessons.isEmpty ? AppColors.success : AppColors.error,
-                onTap: lessons.isEmpty
+                iconColor: unmarkedLessons.isEmpty ? AppColors.success : AppColors.error,
+                onTap: unmarkedLessons.isEmpty
                     ? null
-                    : () => _showUnmarkedLessonsSheet(context, ref, lessons),
+                    : () => _showUnmarkedLessonsSheet(context, ref, unmarkedLessons),
               );
             }),
             const SizedBox(height: 12),
 
-            // Ближайшее занятие
-            lessonsAsync.when(
-              data: (lessons) {
-                final nextLesson = _getNextLesson(lessons, today);
-                if (nextLesson == null) {
-                  return const _DashboardCard(
-                    title: 'Ближайшее занятие',
-                    subtitle: 'Нет запланированных занятий',
-                    icon: Icons.schedule,
-                    onTap: null,
-                  );
-                }
-                return _DashboardCard(
+            // Ближайшее занятие (реальные + виртуальные)
+            Builder(builder: (context) {
+              final nextLesson = _getNextLesson(lessons, today);
+              if (nextLesson == null) {
+                return const _DashboardCard(
                   title: 'Ближайшее занятие',
-                  subtitle: _formatNextLesson(nextLesson),
+                  subtitle: 'Нет запланированных занятий',
                   icon: Icons.schedule,
-                  onTap: () {
-                    context.go('/institutions/${widget.institutionId}/schedule');
-                  },
+                  onTap: null,
                 );
-              },
-              loading: () => const _DashboardCard(
+              }
+              return _DashboardCard(
                 title: 'Ближайшее занятие',
-                subtitle: 'Загрузка...',
+                subtitle: _formatNextLesson(nextLesson),
                 icon: Icons.schedule,
-                onTap: null,
-              ),
-              error: (_, __) => const _DashboardCard(
-                title: 'Ближайшее занятие',
-                subtitle: 'Ошибка загрузки',
-                icon: Icons.schedule,
-                onTap: null,
-              ),
-            ),
+                onTap: () {
+                  context.go('/institutions/${widget.institutionId}/schedule');
+                },
+              );
+            }),
             const SizedBox(height: 12),
 
             // Должники
@@ -537,7 +502,8 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
 
       // Инвалидируем провайдеры
       ref.invalidate(unmarkedLessonsProvider(widget.institutionId));
-      ref.invalidate(unmarkedLessonsStreamProvider(widget.institutionId));
+      ref.invalidate(combinedUnmarkedLessonsProvider(widget.institutionId));
+      ref.invalidate(combinedTodayLessonsProvider(widget.institutionId));
       ref.invalidate(todayPaymentsTotalProvider(widget.institutionId));
 
       // Примечание: lessonsByInstitutionStreamProvider и institutionTodayLessonsProvider
@@ -574,7 +540,8 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final lessonsAsync = ref.watch(unmarkedLessonsStreamProvider(widget.institutionId));
+    // Комбинированный провайдер неотмеченных занятий (реальные + виртуальные)
+    final lessons = ref.watch(combinedUnmarkedLessonsProvider(widget.institutionId));
 
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
@@ -591,20 +558,9 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                 const Icon(Icons.pending_actions, color: AppColors.error),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: lessonsAsync.when(
-                    skipLoadingOnRefresh: true,
-                    data: (lessons) => Text(
-                      '${AppStrings.unmarkedLessons} (${lessons.length})',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    loading: () => Text(
-                      '${AppStrings.unmarkedLessons} (...)',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    error: (_, __) => Text(
-                      AppStrings.unmarkedLessons,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+                  child: Text(
+                    '${AppStrings.unmarkedLessons} (${lessons.length})',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
                 IconButton(
@@ -616,36 +572,18 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
           ),
           const Divider(height: 1),
 
-          // Lesson list (без мигания при Realtime обновлениях)
+          // Lesson list
           Expanded(
-            child: Builder(
-              builder: (context) {
-                final lessons = lessonsAsync.valueOrNull;
-                final error = lessonsAsync.error;
-
-                // Показываем ошибку если есть (и нет закешированных данных)
-                if (error != null && lessons == null) {
-                  return ErrorView.fromException(error);
-                }
-
-                // Показываем loading только при первой загрузке
-                if (lessons == null) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                // Показываем данные (даже если идёт фоновая загрузка)
-                if (lessons.isEmpty) {
-                  return Center(
+            child: lessons.isEmpty
+                ? Center(
                     child: Text(
                       AppStrings.noUnmarkedLessons,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppColors.textSecondary,
                           ),
                     ),
-                  );
-                }
-
-                return ListView.separated(
+                  )
+                : ListView.separated(
                   controller: scrollController,
                   itemCount: lessons.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
@@ -665,9 +603,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                       onPaidChanged: (v) => _updateMark(lesson.id, paid: v),
                     );
                   },
-                );
-              },
-            ),
+                ),
           ),
 
           // Save button
@@ -684,22 +620,18 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                   ),
                 ],
               ),
-              child: lessonsAsync.when(
-                data: (lessons) => SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : () => _saveAll(lessons),
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Сохранить'),
-                  ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : () => _saveAll(lessons),
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Сохранить'),
                 ),
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
               ),
             ),
         ],
