@@ -4,6 +4,7 @@ import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
 import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/features/profile/providers/profile_provider.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
 /// Экран профиля пользователя
@@ -12,6 +13,7 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final profileAsync = ref.watch(currentProfileProvider);
     final controllerState = ref.watch(profileControllerProvider);
 
@@ -19,7 +21,7 @@ class ProfileScreen extends ConsumerWidget {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, l10n)),
             backgroundColor: Colors.red,
           ),
         );
@@ -28,7 +30,7 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Профиль'),
+        title: Text(l10n.profile),
       ),
       body: Builder(
         builder: (context) {
@@ -65,10 +67,10 @@ class ProfileScreen extends ConsumerWidget {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.person),
-                  title: const Text('Имя'),
+                  title: Text(l10n.name),
                   subtitle: Text(profile.fullName),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showEditNameDialog(context, ref, profile.fullName),
+                  onTap: () => _showEditNameDialog(context, ref, profile.fullName, l10n),
                 ),
               ),
 
@@ -86,9 +88,9 @@ class ProfileScreen extends ConsumerWidget {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.calendar_today),
-                  title: const Text('Дата регистрации'),
+                  title: Text(l10n.registrationDate),
                   subtitle: Text(
-                    DateFormat('dd MMMM yyyy', 'ru').format(profile.createdAt),
+                    DateFormat('dd MMMM yyyy', Localizations.localeOf(context).languageCode).format(profile.createdAt),
                   ),
                 ),
               ),
@@ -105,31 +107,31 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showEditNameDialog(BuildContext context, WidgetRef ref, String currentName) {
+  void _showEditNameDialog(BuildContext context, WidgetRef ref, String currentName, AppLocalizations l10n) {
     final nameController = TextEditingController(text: currentName);
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Изменить имя'),
+        title: Text(l10n.editName),
         content: Form(
           key: formKey,
           child: TextFormField(
             controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'ФИО',
-              hintText: 'Иванов Иван Иванович',
+            decoration: InputDecoration(
+              labelText: l10n.personName,
+              hintText: l10n.personNameHint,
             ),
             textCapitalization: TextCapitalization.words,
-            validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя' : null,
+            validator: (v) => v == null || v.trim().isEmpty ? l10n.enterPersonName : null,
             autofocus: true,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -140,15 +142,15 @@ class ProfileScreen extends ConsumerWidget {
                   Navigator.pop(context);
                   ref.invalidate(currentProfileProvider);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Имя обновлено'),
+                    SnackBar(
+                      content: Text(l10n.personNameUpdated),
                       backgroundColor: Colors.green,
                     ),
                   );
                 }
               }
             },
-            child: const Text('Сохранить'),
+            child: Text(l10n.save),
           ),
         ],
       ),

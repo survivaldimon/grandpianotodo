@@ -6,6 +6,7 @@ import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/groups/providers/group_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/students/providers/student_bindings_provider.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/student_group.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
@@ -24,15 +25,16 @@ class GroupDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final groupAsync = ref.watch(groupProvider(groupId));
 
     return groupAsync.when(
       loading: () => Scaffold(
-        appBar: AppBar(title: const Text('Группа')),
+        appBar: AppBar(title: Text(l10n.group)),
         body: const Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Scaffold(
-        appBar: AppBar(title: const Text('Группа')),
+        appBar: AppBar(title: Text(l10n.group)),
         body: ErrorView.fromException(
           e,
           onRetry: () => ref.invalidate(groupProvider(groupId)),
@@ -57,6 +59,7 @@ class _GroupDetailContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final members = group.members ?? [];
 
     return Scaffold(
@@ -75,23 +78,23 @@ class _GroupDetailContent extends ConsumerWidget {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'edit',
                 child: Row(
                   children: [
-                    Icon(Icons.edit, size: 20),
-                    SizedBox(width: 8),
-                    Text('Редактировать'),
+                    const Icon(Icons.edit, size: 20),
+                    const SizedBox(width: 8),
+                    Text(l10n.edit),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'archive',
                 child: Row(
                   children: [
-                    Icon(Icons.archive, size: 20, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Text('Архивировать', style: TextStyle(color: Colors.orange)),
+                    const Icon(Icons.archive, size: 20, color: Colors.orange),
+                    const SizedBox(width: 8),
+                    Text(l10n.archive, style: const TextStyle(color: Colors.orange)),
                   ],
                 ),
               ),
@@ -130,7 +133,7 @@ class _GroupDetailContent extends ConsumerWidget {
             child: Row(
               children: [
                 Text(
-                  'УЧАСТНИКИ (${members.length})',
+                  l10n.participantsCount(members.length),
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.bold,
@@ -140,7 +143,7 @@ class _GroupDetailContent extends ConsumerWidget {
                 TextButton.icon(
                   onPressed: () => _showAddMemberDialog(context, ref),
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Добавить'),
+                  label: Text(l10n.add),
                 ),
               ],
             ),
@@ -148,21 +151,21 @@ class _GroupDetailContent extends ConsumerWidget {
 
           // Список участников
           if (members.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32),
+            Padding(
+              padding: const EdgeInsets.all(32),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.people_outline, size: 48, color: AppColors.textTertiary),
-                    SizedBox(height: 16),
+                    const Icon(Icons.people_outline, size: 48, color: AppColors.textTertiary),
+                    const SizedBox(height: 16),
                     Text(
-                      'Нет участников',
-                      style: TextStyle(color: AppColors.textSecondary),
+                      l10n.noParticipants,
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
-                      'Добавьте учеников в группу',
-                      style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+                      l10n.addStudentsToGroup,
+                      style: const TextStyle(color: AppColors.textTertiary, fontSize: 12),
                     ),
                   ],
                 ),
@@ -182,6 +185,7 @@ class _GroupDetailContent extends ConsumerWidget {
   }
 
   void _showEditDialog(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final nameController = TextEditingController(text: group.name);
     final commentController = TextEditingController(text: group.comment ?? '');
     final formKey = GlobalKey<FormState>();
@@ -189,7 +193,7 @@ class _GroupDetailContent extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Редактировать группу'),
+        title: Text(l10n.editGroup),
         content: Form(
           key: formKey,
           child: Column(
@@ -197,11 +201,11 @@ class _GroupDetailContent extends ConsumerWidget {
             children: [
               TextFormField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Название группы'),
+                decoration: InputDecoration(labelText: l10n.groupName),
                 autofocus: true,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Введите название';
+                    return l10n.enterName;
                   }
                   return null;
                 },
@@ -209,7 +213,7 @@ class _GroupDetailContent extends ConsumerWidget {
               const SizedBox(height: 16),
               TextFormField(
                 controller: commentController,
-                decoration: const InputDecoration(labelText: 'Комментарий'),
+                decoration: InputDecoration(labelText: l10n.commentOptional),
                 maxLines: 2,
               ),
             ],
@@ -218,7 +222,7 @@ class _GroupDetailContent extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -240,12 +244,12 @@ class _GroupDetailContent extends ConsumerWidget {
                 debugPrint('[GroupDetailScreen] update error: $e');
                 if (dialogContext.mounted) {
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+                    SnackBar(content: Text('${l10n.error}: $e'), backgroundColor: Colors.red),
                   );
                 }
               }
             },
-            child: const Text('Сохранить'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -253,18 +257,16 @@ class _GroupDetailContent extends ConsumerWidget {
   }
 
   void _showArchiveDialog(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Архивировать группу?'),
-        content: Text(
-          'Группа "${group.name}" будет перемещена в архив. '
-          'Вы сможете восстановить её позже.',
-        ),
+        title: Text(l10n.archiveGroupConfirmation),
+        content: Text(l10n.archiveGroupMessage(group.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -279,8 +281,8 @@ class _GroupDetailContent extends ConsumerWidget {
                 if (success && context.mounted) {
                   context.pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Группа архивирована'),
+                    SnackBar(
+                      content: Text(l10n.groupArchived),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -290,14 +292,14 @@ class _GroupDetailContent extends ConsumerWidget {
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext);
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+                    SnackBar(content: Text('${l10n.error}: $e'), backgroundColor: Colors.red),
                   );
                 }
               }
             },
-            child: const Text(
-              'Архивировать',
-              style: TextStyle(color: Colors.orange),
+            child: Text(
+              l10n.archive,
+              style: const TextStyle(color: Colors.orange),
             ),
           ),
         ],
@@ -334,6 +336,7 @@ class _MemberTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final hasDebt = student.prepaidLessonsCount < 0;
     final balance = student.prepaidLessonsCount;
 
@@ -359,7 +362,7 @@ class _MemberTile extends ConsumerWidget {
             ),
             const SizedBox(width: 4),
             Text(
-              '$balance занятий',
+              l10n.lessonsCountLabel(balance),
               style: TextStyle(
                 color: hasDebt ? AppColors.error : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -375,7 +378,7 @@ class _MemberTile extends ConsumerWidget {
                 color: AppColors.error.withValues(alpha: 0.7),
               ),
               onPressed: () => _showRemoveDialog(context, ref),
-              tooltip: 'Удалить из группы',
+              tooltip: l10n.removeFromGroup,
             ),
             const Icon(Icons.chevron_right),
           ],
@@ -388,15 +391,16 @@ class _MemberTile extends ConsumerWidget {
   }
 
   void _showRemoveDialog(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить из группы?'),
-        content: Text('Удалить ${student.name} из группы?'),
+        title: Text(l10n.removeStudentFromGroupQuestion),
+        content: Text(l10n.removeStudentFromGroupMessage(student.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -411,14 +415,14 @@ class _MemberTile extends ConsumerWidget {
                 debugPrint('[GroupDetailScreen] removeMember error: $e');
                 if (dialogContext.mounted) {
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+                    SnackBar(content: Text('${l10n.error}: $e'), backgroundColor: Colors.red),
                   );
                 }
               }
             },
-            child: const Text(
-              'Удалить',
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              l10n.delete,
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -460,6 +464,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
     final allStudents = studentsAsync.valueOrNull ?? [];
 
@@ -520,15 +525,15 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Добавить участников',
-                        style: TextStyle(
+                      Text(
+                        l10n.addParticipants,
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        'Выберите учеников для группы',
+                        l10n.selectStudentsForGroup,
                         style: TextStyle(
                           fontSize: 14,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -551,7 +556,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Поиск ученика...',
+                hintText: l10n.searchStudent,
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -601,10 +606,10 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Создать нового ученика',
-                          style: TextStyle(
+                          l10n.createNewStudent,
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             color: AppColors.success,
                           ),
@@ -632,7 +637,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Выбрано: ${selectedStudents.length}',
+                    l10n.selectedCount(selectedStudents.length),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -686,10 +691,10 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                             const SizedBox(height: 16),
                             Text(
                               _searchQuery.isNotEmpty
-                                  ? 'Ничего не найдено'
+                                  ? l10n.nothingFound
                                   : availableStudents.isEmpty
-                                      ? 'Все ученики уже в группе'
-                                      : 'Нет доступных учеников',
+                                      ? l10n.allStudentsInGroup
+                                      : l10n.noAvailableStudents,
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -702,7 +707,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                                   _searchController.clear();
                                   setState(() => _searchQuery = '');
                                 },
-                                child: const Text('Сбросить поиск'),
+                                child: Text(l10n.resetSearch),
                               ),
                             ],
                           ],
@@ -729,7 +734,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                             title: Text(student.name),
                             subtitle: student.balance != 0
                                 ? Text(
-                                    'Баланс: ${student.balance}',
+                                    l10n.balanceColon(student.balance),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: student.balance < 0
@@ -797,8 +802,8 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                       )
                     : Text(
                         _selectedIds.isEmpty
-                            ? 'Выберите учеников'
-                            : 'Добавить (${_selectedIds.length})',
+                            ? l10n.selectStudents
+                            : l10n.addCount(_selectedIds.length),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -813,6 +818,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
   }
 
   Future<void> _addSelectedMembers() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _isAdding = true);
 
     try {
@@ -832,8 +838,8 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
           SnackBar(
             content: Text(
               _selectedIds.length == 1
-                  ? 'Ученик добавлен в группу'
-                  : 'Добавлено учеников: ${_selectedIds.length}',
+                  ? l10n.studentAddedToGroup
+                  : l10n.studentsAddedCount(_selectedIds.length),
             ),
             backgroundColor: AppColors.success,
           ),
@@ -847,6 +853,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
   }
 
   void _showCreateStudentDialog() {
+    final l10n = AppLocalizations.of(context);
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -867,7 +874,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                 child: const Icon(Icons.person_add, color: AppColors.success, size: 20),
               ),
               const SizedBox(width: 12),
-              const Text('Новый ученик'),
+              Text(l10n.newStudent),
             ],
           ),
           content: Form(
@@ -877,21 +884,21 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
               children: [
                 TextFormField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'ФИО *',
-                    hintText: 'Иванов Иван',
+                  decoration: InputDecoration(
+                    labelText: '${l10n.fullName} *',
+                    hintText: l10n.fullNameHint,
                   ),
                   textCapitalization: TextCapitalization.words,
                   autofocus: true,
                   validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Введите имя' : null,
+                      v == null || v.trim().isEmpty ? l10n.enterPersonName : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Телефон',
-                    hintText: '+7 (777) 123-45-67',
+                  decoration: InputDecoration(
+                    labelText: l10n.phone,
+                    hintText: l10n.phoneHint,
                   ),
                   keyboardType: TextInputType.phone,
                 ),
@@ -901,7 +908,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
           actions: [
             TextButton(
               onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Отмена'),
+              child: Text(l10n.cancel),
             ),
             ElevatedButton(
               onPressed: isLoading
@@ -941,7 +948,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                           Navigator.pop(dialogContext);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Ученик "${student.name}" создан и выбран'),
+                              content: Text(l10n.studentCreatedAndSelected(student.name)),
                               backgroundColor: AppColors.success,
                             ),
                           );
@@ -956,7 +963,7 @@ class _AddMemberSheetState extends ConsumerState<_AddMemberSheet> {
                       width: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Создать'),
+                  : Text(l10n.create),
             ),
           ],
         ),

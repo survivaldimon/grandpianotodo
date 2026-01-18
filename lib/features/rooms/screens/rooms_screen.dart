@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
@@ -26,13 +26,14 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final roomsAsync = ref.watch(roomsProvider(widget.institutionId));
     final rooms = roomsAsync.valueOrNull ?? [];
     final hasRooms = rooms.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.rooms),
+        title: Text(l10n.rooms),
       ),
       floatingActionButton: hasRooms
           ? FloatingActionButton(
@@ -53,12 +54,12 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
           if (rooms.isEmpty) {
             return EmptyState(
               icon: Icons.door_front_door_outlined,
-              title: 'Нет кабинетов',
-              subtitle: 'Добавьте первый кабинет',
+              title: l10n.noRooms,
+              subtitle: l10n.addRoomFirst,
               action: ElevatedButton.icon(
                 onPressed: () => _showAddRoomDialog(context, ref),
                 icon: const Icon(Icons.add),
-                label: const Text('Добавить кабинет'),
+                label: Text(l10n.addRoom),
               ),
             );
           }
@@ -72,14 +73,14 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                 debugPrint('[RoomsScreen] refresh error: $e');
               }
             },
-            child: _buildRoomsList(_localRooms ?? rooms),
+            child: _buildRoomsList(l10n, _localRooms ?? rooms),
           );
         },
       ),
     );
   }
 
-  Widget _buildRoomsList(List<Room> rooms) {
+  Widget _buildRoomsList(AppLocalizations l10n, List<Room> rooms) {
     return ReorderableListView.builder(
       padding: AppSizes.paddingAllM,
       itemCount: rooms.length,
@@ -119,14 +120,14 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
                 icon: Icons.edit,
-                label: 'Изменить',
+                label: l10n.edit,
               ),
               SlidableAction(
                 onPressed: (_) => _showDeleteConfirmation(context, room),
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
                 icon: Icons.delete,
-                label: 'Удалить',
+                label: l10n.delete,
               ),
             ],
           ),
@@ -145,7 +146,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                   color: AppColors.primary,
                 ),
               ),
-              title: Text(room.number != null ? 'Кабинет ${room.number}' : room.name),
+              title: Text(room.number != null ? l10n.roomWithNumber(room.number!) : room.name),
               subtitle: room.number != null ? Text(room.name) : null,
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -174,25 +175,26 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   }
 
   void _showOptions(BuildContext context, Room room) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
-      builder: (context) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Редактировать'),
+              title: Text(l10n.edit),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 _showEditDialog(context, room);
               },
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+              title: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 _showDeleteConfirmation(context, room);
               },
             ),
@@ -215,20 +217,19 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   }
 
   void _showDeleteConfirmation(BuildContext context, Room room) {
+    final l10n = AppLocalizations.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final roomName = room.number != null ? "№${room.number} ${room.name}" : room.name;
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить кабинет?'),
-        content: Text(
-          'Кабинет "${room.number != null ? "№${room.number} ${room.name}" : room.name}" '
-          'будет удалён. Это действие нельзя отменить.',
-        ),
+        title: Text(l10n.deleteRoomQuestion),
+        content: Text(l10n.deleteRoomMessage(roomName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -238,15 +239,15 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
               if (success) {
                 _localRooms = null; // Сбрасываем локальный список
                 scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Кабинет удалён'),
+                  SnackBar(
+                    content: Text(l10n.roomDeleted),
                     backgroundColor: AppColors.error,
                   ),
                 );
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -292,22 +293,24 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
+    final l10n = AppLocalizations.of(context);
 
     try {
       final controller = ref.read(roomControllerProvider.notifier);
       final room = await controller.create(
         institutionId: widget.institutionId,
         name: _nameController.text.isEmpty
-            ? 'Кабинет ${_numberController.text}'
+            ? l10n.roomWithNumber(_numberController.text)
             : _nameController.text.trim(),
         number: _numberController.text.trim(),
       );
 
       if (room != null && mounted) {
         Navigator.pop(context);
+        final displayName = room.number != null ? "№${room.number}" : room.name;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Кабинет "${room.number != null ? "№${room.number}" : room.name}" создан'),
+            content: Text(l10n.roomCreatedMessage(displayName)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -321,6 +324,7 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -371,15 +375,15 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Новый кабинет',
-                            style: TextStyle(
+                          Text(
+                            l10n.newRoom,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Заполните данные кабинета',
+                            l10n.fillRoomData,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -396,8 +400,8 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                 TextFormField(
                   controller: _numberController,
                   decoration: InputDecoration(
-                    labelText: 'Номер кабинета *',
-                    hintText: 'Например: 101',
+                    labelText: l10n.roomNumberRequired,
+                    hintText: l10n.roomNumberHint,
                     prefixIcon: const Icon(Icons.tag),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -409,7 +413,7 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                   ],
-                  validator: (v) => v == null || v.isEmpty ? 'Введите номер кабинета' : null,
+                  validator: (v) => v == null || v.isEmpty ? l10n.enterRoomNumber : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -417,8 +421,8 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название (опционально)',
-                    hintText: 'Например: Фортепианный',
+                    labelText: l10n.roomNameOptional,
+                    hintText: l10n.roomNameHint,
                     prefixIcon: const Icon(Icons.label_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -446,9 +450,9 @@ class _AddRoomSheetState extends ConsumerState<_AddRoomSheet> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Создать кабинет',
-                            style: TextStyle(
+                        : Text(
+                            l10n.createRoom,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -503,6 +507,7 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
+    final l10n = AppLocalizations.of(context);
 
     try {
       final controller = ref.read(roomControllerProvider.notifier);
@@ -510,7 +515,7 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
         widget.room.id,
         institutionId: widget.institutionId,
         name: _nameController.text.isEmpty
-            ? 'Кабинет ${_numberController.text}'
+            ? l10n.roomWithNumber(_numberController.text)
             : _nameController.text.trim(),
         number: _numberController.text.trim(),
       );
@@ -518,8 +523,8 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
       if (success && mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Кабинет обновлён'),
+          SnackBar(
+            content: Text(l10n.roomUpdated),
             backgroundColor: AppColors.success,
           ),
         );
@@ -533,6 +538,7 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -583,15 +589,15 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Редактировать кабинет',
-                            style: TextStyle(
+                          Text(
+                            l10n.editRoomTitle,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Измените данные кабинета',
+                            l10n.changeRoomData,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -608,8 +614,8 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                 TextFormField(
                   controller: _numberController,
                   decoration: InputDecoration(
-                    labelText: 'Номер кабинета *',
-                    hintText: 'Например: 101',
+                    labelText: l10n.roomNumberRequired,
+                    hintText: l10n.roomNumberHint,
                     prefixIcon: const Icon(Icons.tag),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -621,7 +627,7 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                   ],
-                  validator: (v) => v == null || v.isEmpty ? 'Введите номер кабинета' : null,
+                  validator: (v) => v == null || v.isEmpty ? l10n.enterRoomNumber : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -629,8 +635,8 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название (опционально)',
-                    hintText: 'Например: Фортепианный',
+                    labelText: l10n.roomNameOptional,
+                    hintText: l10n.roomNameHint,
                     prefixIcon: const Icon(Icons.label_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -658,9 +664,9 @@ class _EditRoomSheetState extends ConsumerState<_EditRoomSheet> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Сохранить',
-                            style: TextStyle(
+                        : Text(
+                            l10n.save,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),

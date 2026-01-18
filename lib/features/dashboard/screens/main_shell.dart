@@ -3,16 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/services/app_lifecycle_service.dart';
 import 'package:kabinet/core/services/connection_manager.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
-import 'package:kabinet/features/bookings/providers/booking_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
-import 'package:kabinet/features/institution/providers/member_provider.dart';
-import 'package:kabinet/features/payments/providers/payment_provider.dart';
-import 'package:kabinet/features/schedule/providers/lesson_provider.dart';
-import 'package:kabinet/features/students/providers/student_provider.dart';
 
 /// Провайдер ID текущего заведения
 final currentInstitutionIdProvider = StateProvider<String?>((ref) => null);
@@ -206,26 +201,27 @@ class _MainShellState extends ConsumerState<MainShell>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        icon: const Icon(
-          Icons.warning_amber_rounded,
-          size: 48,
-          color: AppColors.warning,
-        ),
-        title: const Text('Заведение удалено'),
-        content: const Text(
-          'Это заведение было удалено владельцем. Вы будете перенаправлены на главный экран.',
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.go('/institutions');
-            },
-            child: const Text('ОК'),
+      builder: (dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext);
+        return AlertDialog(
+          icon: const Icon(
+            Icons.warning_amber_rounded,
+            size: 48,
+            color: AppColors.warning,
           ),
-        ],
-      ),
+          title: Text(l10n.institutionDeleted),
+          content: Text(l10n.institutionDeletedMessage),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.go('/institutions');
+              },
+              child: Text(l10n.ok),
+            ),
+          ],
+        );
+      },
     ).then((_) {
       _isShowingDeletedDialog = false;
     });
@@ -285,31 +281,31 @@ class _MainShellState extends ConsumerState<MainShell>
         bottomNavigationBar: NavigationBar(
           selectedIndex: currentIndex,
           onDestinationSelected: (index) => _onTabSelected(index, institutionId),
-          destinations: const [
+          destinations: [
             NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: AppStrings.dashboard,
+              icon: const Icon(Icons.home_outlined),
+              selectedIcon: const Icon(Icons.home),
+              label: AppLocalizations.of(context).dashboard,
             ),
             NavigationDestination(
-              icon: Icon(Icons.calendar_month_outlined),
-              selectedIcon: Icon(Icons.calendar_month),
-              label: AppStrings.schedule,
+              icon: const Icon(Icons.calendar_month_outlined),
+              selectedIcon: const Icon(Icons.calendar_month),
+              label: AppLocalizations.of(context).schedule,
             ),
             NavigationDestination(
-              icon: Icon(Icons.people_outline),
-              selectedIcon: Icon(Icons.people),
-              label: AppStrings.students,
+              icon: const Icon(Icons.people_outline),
+              selectedIcon: const Icon(Icons.people),
+              label: AppLocalizations.of(context).students,
             ),
             NavigationDestination(
-              icon: Icon(Icons.payments_outlined),
-              selectedIcon: Icon(Icons.payments),
-              label: AppStrings.payments,
+              icon: const Icon(Icons.payments_outlined),
+              selectedIcon: const Icon(Icons.payments),
+              label: AppLocalizations.of(context).payments,
             ),
             NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings),
-              label: AppStrings.settings,
+              icon: const Icon(Icons.settings_outlined),
+              selectedIcon: const Icon(Icons.settings),
+              label: AppLocalizations.of(context).settings,
             ),
           ],
         ),

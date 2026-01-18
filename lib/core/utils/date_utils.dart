@@ -1,25 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+/// Кэш форматтеров по локали
+class _DateFormatters {
+  final DateFormat dayMonth;
+  final DateFormat dayMonthYear;
+  final DateFormat shortDate;
+  final DateFormat time;
+  final DateFormat weekday;
+  final DateFormat shortWeekday;
+
+  _DateFormatters(String locale)
+      : dayMonth = DateFormat('d MMMM', locale),
+        dayMonthYear = DateFormat('d MMMM yyyy', locale),
+        shortDate = DateFormat('dd.MM.yyyy', locale),
+        time = DateFormat('HH:mm', locale),
+        weekday = DateFormat('EEEE', locale),
+        shortWeekday = DateFormat('EE', locale);
+}
+
 /// Утилиты для работы с датами
 class AppDateUtils {
   AppDateUtils._();
 
-  static final DateFormat _dayMonth = DateFormat('d MMMM', 'ru');
-  static final DateFormat _dayMonthYear = DateFormat('d MMMM yyyy', 'ru');
-  static final DateFormat _shortDate = DateFormat('dd.MM.yyyy', 'ru');
-  static final DateFormat _time = DateFormat('HH:mm', 'ru');
-  static final DateFormat _weekday = DateFormat('EEEE', 'ru');
-  static final DateFormat _shortWeekday = DateFormat('EE', 'ru');
+  /// Кэш форматтеров по локали
+  static final Map<String, _DateFormatters> _formattersCache = {};
 
-  /// Форматировать дату: "15 января"
-  static String formatDayMonth(DateTime date) => _dayMonth.format(date);
+  /// Дефолтная локаль (для обратной совместимости)
+  static const String _defaultLocale = 'ru';
 
-  /// Форматировать дату: "15 января 2025"
-  static String formatDayMonthYear(DateTime date) => _dayMonthYear.format(date);
+  static _DateFormatters _getFormatters(String locale) {
+    return _formattersCache.putIfAbsent(
+      locale,
+      () => _DateFormatters(locale),
+    );
+  }
+
+  /// Форматировать дату: "15 января" / "January 15"
+  static String formatDayMonth(DateTime date, [String locale = _defaultLocale]) =>
+      _getFormatters(locale).dayMonth.format(date);
+
+  /// Форматировать дату: "15 января 2025" / "January 15, 2025"
+  static String formatDayMonthYear(DateTime date, [String locale = _defaultLocale]) =>
+      _getFormatters(locale).dayMonthYear.format(date);
 
   /// Форматировать дату: "15.01.2025"
-  static String formatShortDate(DateTime date) => _shortDate.format(date);
+  static String formatShortDate(DateTime date, [String locale = _defaultLocale]) =>
+      _getFormatters(locale).shortDate.format(date);
 
   /// Форматировать время: "14:30"
   static String formatTime(TimeOfDay time) {
@@ -29,13 +56,16 @@ class AppDateUtils {
   }
 
   /// Форматировать DateTime время: "14:30"
-  static String formatDateTime(DateTime date) => _time.format(date);
+  static String formatDateTime(DateTime date, [String locale = _defaultLocale]) =>
+      _getFormatters(locale).time.format(date);
 
-  /// День недели: "понедельник"
-  static String formatWeekday(DateTime date) => _weekday.format(date);
+  /// День недели: "понедельник" / "Monday"
+  static String formatWeekday(DateTime date, [String locale = _defaultLocale]) =>
+      _getFormatters(locale).weekday.format(date);
 
-  /// Короткий день недели: "Пн"
-  static String formatShortWeekday(DateTime date) => _shortWeekday.format(date);
+  /// Короткий день недели: "Пн" / "Mon"
+  static String formatShortWeekday(DateTime date, [String locale = _defaultLocale]) =>
+      _getFormatters(locale).shortWeekday.format(date);
 
   /// Получить начало дня
   static DateTime startOfDay(DateTime date) {

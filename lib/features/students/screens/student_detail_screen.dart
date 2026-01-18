@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
@@ -15,7 +15,6 @@ import 'package:kabinet/features/students/providers/student_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/payments/repositories/payment_repository.dart';
 import 'package:kabinet/features/payments/screens/payments_screen.dart' show showAddPaymentSheet;
-import 'package:kabinet/features/payment_plans/providers/payment_plan_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
@@ -32,7 +31,6 @@ import 'package:kabinet/core/widgets/ios_time_picker.dart';
 import 'package:kabinet/core/providers/phone_settings_provider.dart';
 import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/shared/models/payment.dart';
-import 'package:kabinet/shared/models/payment_plan.dart';
 import 'package:kabinet/shared/models/student.dart';
 import 'package:kabinet/shared/models/subscription.dart';
 import 'package:go_router/go_router.dart';
@@ -122,55 +120,58 @@ class StudentDetailScreen extends ConsumerWidget {
                       _showMergeWithDialog(context, ref, student);
                     }
                   },
-                  itemBuilder: (context) => [
-                    // Объединить с... (только для неархивированных)
+                  itemBuilder: (context) {
+                    final l10n = AppLocalizations.of(context);
+                    return [
+                    // Merge with... (only for non-archived)
                     if (!student.isArchived && canEditStudent)
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'merge',
                         child: Row(
                           children: [
-                            Icon(Icons.merge, color: AppColors.primary),
-                            SizedBox(width: 8),
-                            Text('Объединить с...'),
+                            const Icon(Icons.merge, color: AppColors.primary),
+                            const SizedBox(width: 8),
+                            Text(l10n.mergeWith),
                           ],
                         ),
                       ),
                     if (canArchive) ...[
                       if (student.isArchived)
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'restore',
                           child: Row(
                             children: [
-                              Icon(Icons.unarchive, color: Colors.green),
-                              SizedBox(width: 8),
-                              Text('Разархивировать', style: TextStyle(color: Colors.green)),
+                              const Icon(Icons.unarchive, color: Colors.green),
+                              const SizedBox(width: 8),
+                              Text(l10n.unarchive, style: const TextStyle(color: Colors.green)),
                             ],
                           ),
                         )
                       else
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'archive',
                           child: Row(
                             children: [
-                              Icon(Icons.archive, color: Colors.orange),
-                              SizedBox(width: 8),
-                              Text('Архивировать', style: TextStyle(color: Colors.orange)),
+                              const Icon(Icons.archive, color: Colors.orange),
+                              const SizedBox(width: 8),
+                              Text(l10n.archive, style: const TextStyle(color: Colors.orange)),
                             ],
                           ),
                         ),
-                      // Удалить навсегда — доступно всегда (и для архивированных, и для активных)
-                      const PopupMenuItem(
+                      // Delete forever - available always (both archived and active)
+                      PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_forever, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Удалить навсегда', style: TextStyle(color: Colors.red)),
+                            const Icon(Icons.delete_forever, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text(l10n.deleteForever, style: const TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
                     ],
-                  ],
+                  ];
+                  },
                 ),
             ],
           ),
@@ -198,24 +199,29 @@ class StudentDetailScreen extends ConsumerWidget {
                         const Icon(Icons.archive, color: Colors.orange),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Ученик архивирован',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange,
-                                ),
-                              ),
-                              Text(
-                                DateFormat('dd.MM.yyyy').format(student.archivedAt!),
-                                style: TextStyle(
-                                  color: Colors.orange.shade700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
+                          child: Builder(
+                            builder: (context) {
+                              final l10n = AppLocalizations.of(context);
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l10n.studentInArchive,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                  Text(
+                                    DateFormat('dd.MM.yyyy').format(student.archivedAt!),
+                                    style: TextStyle(
+                                      color: Colors.orange.shade700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -223,7 +229,7 @@ class StudentDetailScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                 ],
-                // Секция объединённых учеников (если есть)
+                // Merged students section (if any)
                 if (student.isMerged) ...[
                   _MergedStudentsCard(mergedFrom: student.mergedFrom!),
                   const SizedBox(height: 16),
@@ -249,19 +255,29 @@ class StudentDetailScreen extends ConsumerWidget {
                           const SizedBox(height: 12),
                         ],
                         if (student.comment != null) ...[
-                          Text(
-                            'Комментарий:',
-                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
+                          Builder(
+                            builder: (context) {
+                              final l10n = AppLocalizations.of(context);
+                              return Text(
+                                '${l10n.comment}:',
+                                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                              );
+                            },
                           ),
                           const SizedBox(height: 4),
                           Text(student.comment!),
                         ],
                         if (student.phone == null && student.comment == null)
-                          const Text(
-                            'Нет дополнительной информации',
-                            style: TextStyle(color: AppColors.textSecondary),
+                          Builder(
+                            builder: (context) {
+                              final l10n = AppLocalizations.of(context);
+                              return Text(
+                                l10n.noPhone,
+                                style: const TextStyle(color: AppColors.textSecondary),
+                              );
+                            },
                           ),
                       ],
                     ),
@@ -290,9 +306,14 @@ class StudentDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
 
                 // Subscriptions section
-                Text(
-                  'Абонементы',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Builder(
+                  builder: (context) {
+                    final l10n = AppLocalizations.of(context);
+                    return Text(
+                      l10n.subscriptions,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 subscriptionsAsync.when(
@@ -300,12 +321,17 @@ class StudentDetailScreen extends ConsumerWidget {
                   error: (_, __) => const SizedBox.shrink(),
                   data: (subscriptions) {
                     if (subscriptions.isEmpty) {
-                      return const Card(
+                      return Card(
                         child: Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Text(
-                            'Нет абонементов',
-                            style: TextStyle(color: AppColors.textSecondary),
+                          padding: const EdgeInsets.all(16),
+                          child: Builder(
+                            builder: (context) {
+                              final l10n = AppLocalizations.of(context);
+                              return Text(
+                                l10n.noSubscriptions,
+                                style: const TextStyle(color: AppColors.textSecondary),
+                              );
+                            },
                           ),
                         ),
                       );
@@ -356,9 +382,14 @@ class StudentDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
 
                 // Payments history
-                Text(
-                  'История оплат',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Builder(
+                  builder: (context) {
+                    final l10n = AppLocalizations.of(context);
+                    return Text(
+                      l10n.paymentHistory,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 paymentsAsync.when(
@@ -366,9 +397,14 @@ class StudentDetailScreen extends ConsumerWidget {
                   error: (_, __) => const SizedBox.shrink(),
                   data: (payments) {
                     if (payments.isEmpty) {
-                      return const Text(
-                        'Нет оплат',
-                        style: TextStyle(color: AppColors.textSecondary),
+                      return Builder(
+                        builder: (context) {
+                          final l10n = AppLocalizations.of(context);
+                          return Text(
+                            l10n.noPayments,
+                            style: const TextStyle(color: AppColors.textSecondary),
+                          );
+                        },
                       );
                     }
                     return Column(
@@ -441,17 +477,16 @@ class StudentDetailScreen extends ConsumerWidget {
   }
 
   void _confirmArchive(BuildContext context, WidgetRef ref, Student student) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Архивировать ученика?'),
-        content: Text(
-          'Вы уверены, что хотите архивировать "${student.name}"? Ученик будет перемещен в архив.',
-        ),
+        title: Text(l10n.archiveStudentQuestion),
+        content: Text(l10n.archiveStudentMessage(student.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -461,13 +496,13 @@ class StudentDetailScreen extends ConsumerWidget {
                 Navigator.pop(context);
                 context.pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ученик архивирован')),
+                  SnackBar(content: Text(l10n.studentArchived)),
                 );
               }
             },
-            child: const Text(
-              'Архивировать',
-              style: TextStyle(color: Colors.orange),
+            child: Text(
+              l10n.archive,
+              style: const TextStyle(color: Colors.orange),
             ),
           ),
         ],
@@ -476,17 +511,16 @@ class StudentDetailScreen extends ConsumerWidget {
   }
 
   void _confirmRestore(BuildContext context, WidgetRef ref, Student student) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Разархивировать ученика?'),
-        content: Text(
-          'Вы уверены, что хотите вернуть "${student.name}" из архива?',
-        ),
+        title: Text(l10n.restoreStudentQuestion),
+        content: Text(l10n.restoreStudentMessage(student.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -495,16 +529,16 @@ class StudentDetailScreen extends ConsumerWidget {
               if (success && context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ученик восстановлен из архива'),
+                  SnackBar(
+                    content: Text(l10n.studentUnarchived),
                     backgroundColor: Colors.green,
                   ),
                 );
               }
             },
-            child: const Text(
-              'Разархивировать',
-              style: TextStyle(color: Colors.green),
+            child: Text(
+              l10n.unarchive,
+              style: const TextStyle(color: Colors.green),
             ),
           ),
         ],
@@ -513,79 +547,42 @@ class StudentDetailScreen extends ConsumerWidget {
   }
 
   void _confirmDeleteCompletely(BuildContext context, WidgetRef ref, Student student) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 12),
-            Text('Удалить навсегда?'),
+            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            const SizedBox(width: 12),
+            Text(l10n.deleteStudentQuestion),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Вы собираетесь ПОЛНОСТЬЮ УДАЛИТЬ ученика "${student.name}" и все связанные данные:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            const Text('• Все занятия из расписания'),
-            const Text('• Все оплаты'),
-            const Text('• Все подписки (включая семейные)'),
-            const Text('• Связи с преподавателями и предметами'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.red, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Это действие НЕОБРАТИМО!',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        content: Text(l10n.deleteStudentMessage(student.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
               final controller = ref.read(studentControllerProvider.notifier);
               final success = await controller.deleteCompletely(studentId, institutionId);
               if (success && context.mounted) {
-                Navigator.pop(context); // Закрыть диалог
-                context.pop(); // Вернуться к списку учеников
+                Navigator.pop(context); // Close dialog
+                context.pop(); // Return to students list
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ученик и все данные удалены'),
+                  SnackBar(
+                    content: Text(l10n.studentDeleted),
                     backgroundColor: Colors.red,
                   ),
                 );
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text(
-              'Удалить навсегда',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            child: Text(
+              l10n.deleteForever,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -641,21 +638,21 @@ class StudentDetailScreen extends ConsumerWidget {
   }
 
   void _showFreezeDialog(BuildContext context, WidgetRef ref, Subscription subscription) {
+    final l10n = AppLocalizations.of(context);
     final daysController = TextEditingController(text: '14');
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Заморозить абонемент'),
+        title: Text(l10n.freezeSubscription),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'При заморозке срок действия абонемента приостанавливается. '
-                'После разморозки срок будет продлён на количество дней заморозки.',
+                l10n.freezeSubscriptionDescription,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -663,16 +660,16 @@ class StudentDetailScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               TextFormField(
                 controller: daysController,
-                decoration: const InputDecoration(
-                  labelText: 'Количество дней',
+                decoration: InputDecoration(
+                  labelText: l10n.daysCount,
                   hintText: '14',
                 ),
                 keyboardType: TextInputType.number,
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Введите количество';
+                  if (v == null || v.isEmpty) return l10n.enterQuantityValidation;
                   final num = int.tryParse(v);
                   if (num == null || num <= 0 || num > 90) {
-                    return 'Введите число от 1 до 90';
+                    return l10n.enterNumberFrom1To90;
                   }
                   return null;
                 },
@@ -683,7 +680,7 @@ class StudentDetailScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -697,12 +694,12 @@ class StudentDetailScreen extends ConsumerWidget {
                 if (result != null && context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Абонемент заморожен')),
+                    SnackBar(content: Text(l10n.subscriptionFrozen)),
                   );
                 }
               }
             },
-            child: const Text('Заморозить'),
+            child: Text(l10n.freeze),
           ),
         ],
       ),
@@ -710,32 +707,34 @@ class StudentDetailScreen extends ConsumerWidget {
   }
 
   void _unfreezeSubscription(BuildContext context, WidgetRef ref, Subscription subscription) async {
+    final l10n = AppLocalizations.of(context);
     final controller = ref.read(subscriptionControllerProvider.notifier);
     final result = await controller.unfreeze(subscription.id, studentId);
     if (result != null && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Абонемент разморожен. Срок продлён до ${DateFormat('dd.MM.yyyy').format(result.expiresAt)}'),
+          content: Text(l10n.subscriptionUnfrozen(DateFormat('dd.MM.yyyy').format(result.expiresAt))),
         ),
       );
     }
   }
 
   void _showExtendDialog(BuildContext context, WidgetRef ref, Subscription subscription) {
+    final l10n = AppLocalizations.of(context);
     final daysController = TextEditingController(text: '7');
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Продлить срок'),
+        title: Text(l10n.extendSubscription),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Текущий срок: до ${DateFormat('dd.MM.yyyy').format(subscription.expiresAt)}',
+                l10n.currentTermUntil(DateFormat('dd.MM.yyyy').format(subscription.expiresAt)),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -743,16 +742,16 @@ class StudentDetailScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               TextFormField(
                 controller: daysController,
-                decoration: const InputDecoration(
-                  labelText: 'Продлить на дней',
+                decoration: InputDecoration(
+                  labelText: l10n.extendForDays,
                   hintText: '7',
                 ),
                 keyboardType: TextInputType.number,
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Введите количество';
+                  if (v == null || v.isEmpty) return l10n.enterQuantityValidation;
                   final num = int.tryParse(v);
                   if (num == null || num <= 0 || num > 365) {
-                    return 'Введите число от 1 до 365';
+                    return l10n.enterNumberFrom1To365;
                   }
                   return null;
                 },
@@ -763,7 +762,7 @@ class StudentDetailScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -778,13 +777,13 @@ class StudentDetailScreen extends ConsumerWidget {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Срок продлён до ${DateFormat('dd.MM.yyyy').format(result.expiresAt)}'),
+                      content: Text(l10n.termExtendedUntil(DateFormat('dd.MM.yyyy').format(result.expiresAt))),
                     ),
                   );
                 }
               }
             },
-            child: const Text('Продлить'),
+            child: Text(l10n.extend),
           ),
         ],
       ),
@@ -814,6 +813,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final avgCostAsync = ref.watch(studentAvgCostProvider(studentId));
     final formatter = NumberFormat('#,###', 'ru_RU');
 
@@ -831,7 +831,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                   child: Column(
                     children: [
                       Text(
-                        AppStrings.prepaidLessons.toUpperCase(),
+                        l10n.prepaidLessons.toUpperCase(),
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -846,7 +846,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                             ),
                       ),
                       Text(
-                        'занятий',
+                        l10n.lessonsUnit,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -855,7 +855,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                       if (student.hasLegacyBalance) ...[
                         const SizedBox(height: 8),
                         Text(
-                          'Абонементы: ${student.subscriptionBalance}',
+                          l10n.subscriptionBalanceLabel(student.subscriptionBalance),
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: AppColors.textSecondary,
                                 fontSize: 11,
@@ -872,7 +872,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Остаток: ${student.legacyBalance}',
+                              l10n.legacyBalanceShort(student.legacyBalance),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppColors.warning,
                                     fontSize: 11,
@@ -900,7 +900,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Добавить занятия',
+                                  l10n.addLessonsAction,
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                         color: Theme.of(context).colorScheme.primary,
                                         fontSize: 11,
@@ -940,7 +940,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                         return Column(
                           children: [
                             Text(
-                              'СР. СТОИМОСТЬ',
+                              l10n.avgCost,
                               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                     color: AppColors.textSecondary,
                                   ),
@@ -955,7 +955,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                                   ),
                             ),
                             Text(
-                              'нет данных',
+                              l10n.noDataAvailable,
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppColors.textSecondary,
                                   ),
@@ -966,7 +966,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                       return Column(
                         children: [
                           Text(
-                            stats.isApproximate ? 'СР. СТОИМОСТЬ ≈' : 'СР. СТОИМОСТЬ',
+                            stats.isApproximate ? l10n.avgCostApprox : l10n.avgCost,
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                   color: AppColors.textSecondary,
                                 ),
@@ -981,7 +981,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                                 ),
                           ),
                           Text(
-                            'за занятие',
+                            l10n.perLesson,
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: AppColors.textSecondary,
                                 ),
@@ -1004,7 +1004,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                       child: OutlinedButton.icon(
                         onPressed: onManageLessons,
                         icon: const Icon(Icons.event_note),
-                        label: const Text('Управление'),
+                        label: Text(l10n.manageLessonsAction),
                       ),
                     ),
                   if (onManageLessons != null && onAddPayment != null)
@@ -1014,7 +1014,7 @@ class _BalanceAndCostCard extends ConsumerWidget {
                       child: ElevatedButton.icon(
                         onPressed: onAddPayment,
                         icon: const Icon(Icons.add),
-                        label: const Text(AppStrings.addPayment),
+                        label: Text(l10n.addPayment),
                       ),
                     ),
                 ],
@@ -1035,6 +1035,7 @@ class _LessonStatsCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final statsAsync = ref.watch(studentLessonStatsProvider(studentId));
 
     return statsAsync.when(
@@ -1066,7 +1067,7 @@ class _LessonStatsCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Статистика занятий',
+                  l10n.lessonStatisticsTitle,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -1098,7 +1099,7 @@ class _LessonStatsCard extends ConsumerWidget {
                                   ),
                             ),
                             Text(
-                              'Проведено',
+                              l10n.conductedLabel,
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppColors.success,
                                   ),
@@ -1132,7 +1133,7 @@ class _LessonStatsCard extends ConsumerWidget {
                                   ),
                             ),
                             Text(
-                              'Отменено',
+                              l10n.cancelledLabel,
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppColors.error,
                                   ),
@@ -1170,7 +1171,8 @@ class _PaymentItem extends StatelessWidget {
     final amountStr = '${formatter.format(payment.amount.toInt())} ₸';
 
     // Проверяем, есть ли скидка в комментарии
-    final hasDiscount = payment.comment?.contains('Скидка:') ?? false;
+    final l10n = AppLocalizations.of(context);
+    final hasDiscount = payment.comment?.contains('${l10n.discountLabel}:') ?? false;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1234,14 +1236,14 @@ class _PaymentItem extends StatelessWidget {
                             color: AppColors.warning.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.discount, size: 12, color: AppColors.warning),
-                              SizedBox(width: 2),
+                              const Icon(Icons.discount, size: 12, color: AppColors.warning),
+                              const SizedBox(width: 2),
                               Text(
-                                'Скидка',
-                                style: TextStyle(
+                                l10n.discountLabel,
+                                style: const TextStyle(
                                   color: AppColors.warning,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w500,
@@ -1255,7 +1257,7 @@ class _PaymentItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${payment.lessonsCount} занятий • $dateStr',
+                    l10n.paymentLessonsWithDate(payment.lessonsCount, dateStr),
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 13,
@@ -1285,9 +1287,9 @@ class _PaymentItem extends StatelessWidget {
                   color: AppColors.warning.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Text(
-                  'Корр.',
-                  style: TextStyle(
+                child: Text(
+                  l10n.correctionLabel,
+                  style: const TextStyle(
                     color: AppColors.warning,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -1302,6 +1304,7 @@ class _PaymentItem extends StatelessWidget {
 
   /// Отображение записи переноса баланса (balance_transfer)
   Widget _buildBalanceTransferItem(BuildContext context, String dateStr) {
+    final l10n = AppLocalizations.of(context);
     final remaining = payment.transferLessonsRemaining ?? 0;
     final total = payment.lessonsCount;
     final isExhausted = remaining <= 0;
@@ -1339,7 +1342,7 @@ class _PaymentItem extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'Остаток занятий',
+                        l10n.legacyBalanceTitle,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -1401,9 +1404,9 @@ class _PaymentItem extends StatelessWidget {
                   color: Colors.grey.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Text(
-                  'Исчерпан',
-                  style: TextStyle(
+                child: Text(
+                  l10n.exhaustedStatus,
+                  style: const TextStyle(
                     color: Colors.grey,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -1434,6 +1437,7 @@ class _SubscriptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final status = subscription.status;
     final Color statusColor;
     final Color cardColor;
@@ -1479,7 +1483,7 @@ class _SubscriptionCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    subscription.statusDisplayName,
+                    subscription.getLocalizedStatusName(l10n),
                     style: TextStyle(
                       color: statusColor,
                       fontSize: 12,
@@ -1513,9 +1517,9 @@ class _SubscriptionCard extends StatelessWidget {
                       color: AppColors.warning.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
-                      'Скоро истекает',
-                      style: TextStyle(
+                    child: Text(
+                      l10n.expiringSoon,
+                      style: const TextStyle(
                         color: AppColors.warning,
                         fontSize: 12,
                       ),
@@ -1531,18 +1535,18 @@ class _SubscriptionCard extends StatelessWidget {
                       color: Colors.purple.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.family_restroom,
                           size: 14,
                           color: Colors.purple,
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
-                          'Групповой',
-                          style: TextStyle(
+                          l10n.groupSubscription,
+                          style: const TextStyle(
                             color: Colors.purple,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -1565,7 +1569,7 @@ class _SubscriptionCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${subscription.lessonsRemaining} / ${subscription.lessonsTotal} занятий',
+                  l10n.subscriptionLessonsProgress(subscription.lessonsRemaining, subscription.lessonsTotal),
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -1584,14 +1588,14 @@ class _SubscriptionCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 if (status == SubscriptionStatus.frozen && subscription.frozenUntil != null)
                   Text(
-                    'Заморожен до ${DateFormat('dd.MM.yyyy').format(subscription.frozenUntil!)}',
+                    l10n.frozenUntilDate(DateFormat('dd.MM.yyyy').format(subscription.frozenUntil!)),
                     style: const TextStyle(color: AppColors.info),
                   )
                 else
                   Text(
                     status == SubscriptionStatus.expired
-                        ? 'Истёк $expiresStr'
-                        : 'Действует до $expiresStr',
+                        ? l10n.expiredDate(expiresStr)
+                        : l10n.validUntilDate(expiresStr),
                     style: TextStyle(
                       color: status == SubscriptionStatus.expired
                           ? AppColors.error
@@ -1601,7 +1605,7 @@ class _SubscriptionCard extends StatelessWidget {
                 if (status == SubscriptionStatus.active && subscription.daysUntilExpiration >= 0) ...[
                   const SizedBox(width: 8),
                   Text(
-                    '(${subscription.daysUntilExpiration} дн.)',
+                    l10n.daysRemainingShort(subscription.daysUntilExpiration),
                     style: TextStyle(
                       color: subscription.isExpiringSoon
                           ? AppColors.warning
@@ -1677,7 +1681,7 @@ class _SubscriptionCard extends StatelessWidget {
                     OutlinedButton.icon(
                       onPressed: onFreeze,
                       icon: const Icon(Icons.ac_unit, size: 18, color: AppColors.info),
-                      label: const Text('Заморозить'),
+                      label: Text(l10n.freeze),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.info,
                         side: BorderSide(color: AppColors.info.withValues(alpha: 0.5)),
@@ -1688,7 +1692,7 @@ class _SubscriptionCard extends StatelessWidget {
                     ElevatedButton.icon(
                       onPressed: onUnfreeze,
                       icon: const Icon(Icons.play_arrow, size: 18),
-                      label: const Text('Разморозить'),
+                      label: Text(l10n.unfreezeAction),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.success,
                         foregroundColor: Colors.white,
@@ -1699,7 +1703,7 @@ class _SubscriptionCard extends StatelessWidget {
                     OutlinedButton.icon(
                       onPressed: onExtend,
                       icon: const Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
-                      label: const Text('Продлить'),
+                      label: Text(l10n.extend),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
@@ -1730,6 +1734,7 @@ class _TeachersSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final teachersAsync = ref.watch(studentTeachersProvider(studentId));
 
     return Column(
@@ -1739,14 +1744,14 @@ class _TeachersSection extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Преподаватели',
+              l10n.teachersSection,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             if (canEdit)
               IconButton(
                 icon: const Icon(Icons.add, size: 20),
                 onPressed: () => _showAddTeacherDialog(context, ref),
-                tooltip: 'Добавить преподавателя',
+                tooltip: l10n.addTeacherTooltip,
               ),
           ],
         ),
@@ -1756,12 +1761,12 @@ class _TeachersSection extends ConsumerWidget {
           error: (_, __) => const SizedBox.shrink(),
           data: (teachers) {
             if (teachers.isEmpty) {
-              return const Card(
+              return Card(
                 child: Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: Text(
-                    'Нет привязанных преподавателей',
-                    style: TextStyle(color: AppColors.textSecondary),
+                    l10n.noLinkedTeachers,
+                    style: const TextStyle(color: AppColors.textSecondary),
                   ),
                 ),
               );
@@ -1770,7 +1775,7 @@ class _TeachersSection extends ConsumerWidget {
               spacing: 8,
               runSpacing: 8,
               children: teachers.map((binding) {
-                final name = binding.teacher?.fullName ?? 'Неизвестный';
+                final name = binding.teacher?.fullName ?? l10n.unknownName;
                 return Chip(
                   avatar: const Icon(Icons.person, size: 18),
                   label: Text(name),
@@ -1786,6 +1791,7 @@ class _TeachersSection extends ConsumerWidget {
   }
 
   void _showAddTeacherDialog(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (dialogContext) => Consumer(
@@ -1801,7 +1807,7 @@ class _TeachersSection extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Добавить преподавателя',
+                  l10n.addTeacherTitle,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
@@ -1813,9 +1819,9 @@ class _TeachersSection extends ConsumerWidget {
                         .where((m) => !existingIds.contains(m.userId))
                         .toList();
                     if (available.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('Все преподаватели уже добавлены'),
+                      return Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(l10n.allTeachersAdded),
                       );
                     }
                     return ListView.builder(
@@ -1839,7 +1845,7 @@ class _TeachersSection extends ConsumerWidget {
                                 );
                             if (dialogContext.mounted) {
                               ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                const SnackBar(content: Text('Преподаватель добавлен')),
+                                SnackBar(content: Text(l10n.teacherAdded)),
                               );
                             }
                           },
@@ -1857,15 +1863,16 @@ class _TeachersSection extends ConsumerWidget {
   }
 
   void _removeTeacher(BuildContext context, WidgetRef ref, String userId) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить преподавателя?'),
-        content: const Text('Преподаватель будет отвязан от этого ученика.'),
+        title: Text(l10n.removeTeacherQuestion),
+        content: Text(l10n.removeTeacherMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -1875,11 +1882,11 @@ class _TeachersSection extends ConsumerWidget {
                   .removeTeacher(studentId, userId);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Преподаватель удалён')),
+                  SnackBar(content: Text(l10n.teacherRemoved)),
                 );
               }
             },
-            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -1901,6 +1908,7 @@ class _SubjectsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final subjectsAsync = ref.watch(studentSubjectsProvider(studentId));
 
     return Column(
@@ -1910,14 +1918,14 @@ class _SubjectsSection extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Предметы',
+              l10n.subjectsSection,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             if (canEdit)
               IconButton(
                 icon: const Icon(Icons.add, size: 20),
                 onPressed: () => _showAddSubjectDialog(context, ref),
-                tooltip: 'Добавить предмет',
+                tooltip: l10n.addSubjectTooltip,
               ),
           ],
         ),
@@ -1927,12 +1935,12 @@ class _SubjectsSection extends ConsumerWidget {
           error: (_, __) => const SizedBox.shrink(),
           data: (subjects) {
             if (subjects.isEmpty) {
-              return const Card(
+              return Card(
                 child: Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: Text(
-                    'Нет привязанных предметов',
-                    style: TextStyle(color: AppColors.textSecondary),
+                    l10n.noLinkedSubjects,
+                    style: const TextStyle(color: AppColors.textSecondary),
                   ),
                 ),
               );
@@ -1941,7 +1949,7 @@ class _SubjectsSection extends ConsumerWidget {
               spacing: 8,
               runSpacing: 8,
               children: subjects.map((binding) {
-                final name = binding.subject?.name ?? 'Неизвестный';
+                final name = binding.subject?.name ?? l10n.unknownName;
                 final color = binding.subject?.color != null
                     ? Color(int.parse('0xFF${binding.subject!.color!.replaceAll('#', '')}'))
                     : AppColors.primary;
@@ -1960,6 +1968,7 @@ class _SubjectsSection extends ConsumerWidget {
   }
 
   void _showAddSubjectDialog(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (dialogContext) => Consumer(
@@ -1975,7 +1984,7 @@ class _SubjectsSection extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Добавить предмет',
+                  l10n.addSubjectTitle,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
@@ -1987,9 +1996,9 @@ class _SubjectsSection extends ConsumerWidget {
                         .where((s) => !existingIds.contains(s.id) && s.archivedAt == null)
                         .toList();
                     if (available.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('Все предметы уже добавлены'),
+                      return Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(l10n.allSubjectsAdded),
                       );
                     }
                     return ListView.builder(
@@ -2017,7 +2026,7 @@ class _SubjectsSection extends ConsumerWidget {
                                 );
                             if (dialogContext.mounted) {
                               ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                const SnackBar(content: Text('Предмет добавлен')),
+                                SnackBar(content: Text(l10n.subjectAdded)),
                               );
                             }
                           },
@@ -2035,15 +2044,16 @@ class _SubjectsSection extends ConsumerWidget {
   }
 
   void _removeSubject(BuildContext context, WidgetRef ref, String subjectId) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить предмет?'),
-        content: const Text('Предмет будет отвязан от этого ученика.'),
+        title: Text(l10n.removeSubjectQuestion),
+        content: Text(l10n.removeSubjectMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -2053,11 +2063,11 @@ class _SubjectsSection extends ConsumerWidget {
                   .removeSubject(studentId, subjectId);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Предмет удалён')),
+                  SnackBar(content: Text(l10n.subjectRemoved)),
                 );
               }
             },
-            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -2079,6 +2089,7 @@ class _LessonTypesSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final lessonTypesAsync = ref.watch(studentLessonTypesProvider(studentId));
     final allLessonTypesAsync = ref.watch(lessonTypesProvider(institutionId));
 
@@ -2093,16 +2104,16 @@ class _LessonTypesSection extends ConsumerWidget {
               children: [
                 const Icon(Icons.category, color: AppColors.primary),
                 const SizedBox(width: 8),
-                const Text(
-                  'Типы занятий',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Text(
+                  l10n.lessonTypesSection,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 if (canEdit)
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
                     onPressed: () => _showAddLessonTypeDialog(context, ref, allLessonTypesAsync),
-                    tooltip: 'Добавить тип занятия',
+                    tooltip: l10n.addLessonTypeTooltip,
                   ),
               ],
             ),
@@ -2111,7 +2122,7 @@ class _LessonTypesSection extends ConsumerWidget {
               data: (lessonTypes) {
                 if (lessonTypes.isEmpty) {
                   return Text(
-                    'Нет привязанных типов занятий',
+                    l10n.noLinkedLessonTypes,
                     style: TextStyle(color: Colors.grey[600]),
                   );
                 }
@@ -2136,7 +2147,7 @@ class _LessonTypesSection extends ConsumerWidget {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Text('Ошибка: $e', style: const TextStyle(color: Colors.red)),
+              error: (e, _) => Text(l10n.errorFormat(e.toString()), style: const TextStyle(color: Colors.red)),
             ),
           ],
         ),
@@ -2149,6 +2160,7 @@ class _LessonTypesSection extends ConsumerWidget {
     WidgetRef ref,
     AsyncValue<List<LessonType>> allLessonTypesAsync,
   ) {
+    final l10n = AppLocalizations.of(context);
     final existingIds = ref.read(studentLessonTypesProvider(studentId)).valueOrNull
         ?.map((e) => e.lessonTypeId)
         .toSet() ?? {};
@@ -2177,22 +2189,22 @@ class _LessonTypesSection extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Добавить тип занятия',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              Text(
+                l10n.addLessonTypeTitle,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               Expanded(
                 child: allLessonTypesAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Ошибка: $e')),
+                  error: (e, _) => Center(child: Text(l10n.errorFormat(e.toString()))),
                   data: (allLessonTypes) {
                     final available = allLessonTypes
                         .where((lt) => !existingIds.contains(lt.id))
                         .toList();
                     if (available.isEmpty) {
-                      return const Center(
-                        child: Text('Все типы занятий уже добавлены'),
+                      return Center(
+                        child: Text(l10n.allLessonTypesAdded),
                       );
                     }
                     return ListView.builder(
@@ -2217,7 +2229,7 @@ class _LessonTypesSection extends ConsumerWidget {
                                 );
                             if (dialogContext.mounted) {
                               ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                const SnackBar(content: Text('Тип занятия добавлен')),
+                                SnackBar(content: Text(l10n.lessonTypeAdded)),
                               );
                             }
                           },
@@ -2235,15 +2247,16 @@ class _LessonTypesSection extends ConsumerWidget {
   }
 
   void _removeLessonType(BuildContext context, WidgetRef ref, String lessonTypeId) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить тип занятия?'),
-        content: const Text('Тип занятия будет отвязан от этого ученика.'),
+        title: Text(l10n.removeLessonTypeQuestion),
+        content: Text(l10n.removeLessonTypeMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -2253,11 +2266,11 @@ class _LessonTypesSection extends ConsumerWidget {
                   .removeLessonType(studentId, lessonTypeId);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Тип занятия удалён')),
+                  SnackBar(content: Text(l10n.lessonTypeRemoved)),
                 );
               }
             },
-            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -2291,6 +2304,7 @@ class _SelectStudentsForMergeSheetState
   Widget build(BuildContext context) {
     final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -2327,13 +2341,13 @@ class _SelectStudentsForMergeSheetState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Объединить с...',
+                          l10n.mergeWithAction,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          'Выберите учеников для объединения с "${widget.currentStudent.name}"',
+                          l10n.selectStudentsToMerge(widget.currentStudent.name),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -2354,7 +2368,7 @@ class _SelectStudentsForMergeSheetState
               padding: const EdgeInsets.all(16),
               child: TextField(
                 decoration: InputDecoration(
-                  hintText: 'Поиск учеников...',
+                  hintText: l10n.searchStudentsHint,
                   prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -2386,8 +2400,8 @@ class _SelectStudentsForMergeSheetState
                   }
 
                   if (filtered.isEmpty) {
-                    return const Center(
-                      child: Text('Нет учеников для объединения'),
+                    return Center(
+                      child: Text(l10n.noStudentsToMerge),
                     );
                   }
 
@@ -2425,7 +2439,7 @@ class _SelectStudentsForMergeSheetState
                         subtitle: Row(
                           children: [
                             Text(
-                              'Баланс: ${student.balance}',
+                              l10n.balanceValue(student.balance),
                               style: TextStyle(
                                 color: student.hasDebt
                                     ? AppColors.error
@@ -2460,7 +2474,7 @@ class _SelectStudentsForMergeSheetState
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Отмена'),
+                        child: Text(l10n.cancel),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -2480,8 +2494,8 @@ class _SelectStudentsForMergeSheetState
                         icon: const Icon(Icons.arrow_forward),
                         label: Text(
                           _selectedIds.isEmpty
-                              ? 'Выберите учеников'
-                              : 'Далее (${_selectedIds.length})',
+                              ? l10n.selectStudentsValidation
+                              : l10n.nextWithCount(_selectedIds.length),
                         ),
                       ),
                     ),
@@ -2505,6 +2519,7 @@ class _MergedStudentsCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final namesAsync = ref.watch(mergedStudentNamesProvider(mergedFrom));
 
     return Container(
@@ -2522,7 +2537,7 @@ class _MergedStudentsCard extends ConsumerWidget {
               const Icon(Icons.merge, size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
               Text(
-                'Групповая карточка',
+                l10n.groupCard,
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.primary,
@@ -2543,7 +2558,7 @@ class _MergedStudentsCard extends ConsumerWidget {
               ),
             ),
             error: (_, __) => Text(
-              'Не удалось загрузить имена',
+              l10n.failedToLoadNames,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.error,
               ),
@@ -2586,6 +2601,7 @@ class _ScheduleSlotsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     // lesson_schedules (бесконечные)
     final schedulesAsync = ref.watch(lessonSchedulesByStudentProvider(studentId));
     final schedules = schedulesAsync.valueOrNull ?? [];
@@ -2611,14 +2627,14 @@ class _ScheduleSlotsSection extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Постоянное расписание',
+              l10n.permanentScheduleSection,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             if (canEdit)
               IconButton(
                 icon: const Icon(Icons.add, size: 20),
                 onPressed: () => _showAddScheduleSlotSheet(context, ref),
-                tooltip: 'Добавить слот',
+                tooltip: l10n.addScheduleSlot,
               ),
           ],
         ),
@@ -2647,7 +2663,7 @@ class _ScheduleSlotsSection extends ConsumerWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Нет постоянного расписания',
+                          l10n.noPermanentSchedule,
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
@@ -2683,7 +2699,7 @@ class _ScheduleSlotsSection extends ConsumerWidget {
                   ExpansionTile(
                     tilePadding: EdgeInsets.zero,
                     title: Text(
-                      'Архив (${inactiveSchedules.length})',
+                      l10n.archiveSlots(inactiveSchedules.length),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -2733,6 +2749,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     // Используем цвет темы (цвет преподавателя хранится в InstitutionMember, не в Profile)
     final teacherColor = theme.colorScheme.primary;
 
@@ -2801,7 +2818,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            schedule.room?.name ?? 'Кабинет',
+                            schedule.room?.name ?? l10n.roomDefault,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -2821,7 +2838,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '→ ${schedule.replacementRoom?.name ?? 'Замена'}',
+                              '→ ${schedule.replacementRoom?.name ?? l10n.replacementRoom}',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: Colors.orange.shade700,
                               ),
@@ -2865,8 +2882,8 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                   if (schedule.isPaused)
                     Tooltip(
                       message: schedule.pauseUntil != null
-                          ? 'Пауза до ${DateFormat('dd.MM').format(schedule.pauseUntil!)}'
-                          : 'На паузе',
+                          ? l10n.pauseUntilDateFormat(DateFormat('dd.MM').format(schedule.pauseUntil!))
+                          : l10n.onPause,
                       child: Icon(
                         Icons.pause_circle,
                         size: 20,
@@ -2901,6 +2918,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
   }
 
   void _showSlotOptionsSheet(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (sheetContext) => SafeArea(
@@ -2941,7 +2959,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           Text(
-                            schedule.room?.name ?? 'Кабинет',
+                            schedule.room?.name ?? l10n.roomDefault,
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
@@ -2959,7 +2977,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                 // Edit
                 ListTile(
                   leading: const Icon(Icons.edit),
-                  title: const Text('Редактировать'),
+                  title: Text(l10n.editAction),
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _showEditSheet(context, ref);
@@ -2970,7 +2988,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                 if (schedule.isPaused)
                   ListTile(
                     leading: const Icon(Icons.play_arrow, color: Colors.green),
-                    title: const Text('Возобновить'),
+                    title: Text(l10n.resumeScheduleAction),
                     onTap: () {
                       Navigator.pop(sheetContext);
                       _resumeSchedule(context, ref);
@@ -2979,7 +2997,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                 else
                   ListTile(
                     leading: Icon(Icons.pause, color: Colors.orange.shade600),
-                    title: const Text('Приостановить'),
+                    title: Text(l10n.pauseScheduleAction),
                     onTap: () {
                       Navigator.pop(sheetContext);
                       _showPauseDialog(context, ref);
@@ -2990,7 +3008,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                 if (schedule.hasReplacement)
                   ListTile(
                     leading: const Icon(Icons.undo, color: AppColors.primary),
-                    title: const Text('Снять замену кабинета'),
+                    title: Text(l10n.clearReplacementRoom),
                     onTap: () {
                       Navigator.pop(sheetContext);
                       _clearReplacement(context, ref);
@@ -2999,7 +3017,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                 else
                   ListTile(
                     leading: const Icon(Icons.swap_horiz, color: AppColors.primary),
-                    title: const Text('Временная замена кабинета'),
+                    title: Text(l10n.temporaryRoomReplacementAction),
                     onTap: () {
                       Navigator.pop(sheetContext);
                       _showReplacementDialog(context, ref);
@@ -3009,7 +3027,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                 // Archive
                 ListTile(
                   leading: const Icon(Icons.archive, color: Colors.orange),
-                  title: const Text('Архивировать'),
+                  title: Text(l10n.archiveSchedule),
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _archiveSchedule(context, ref);
@@ -3019,7 +3037,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                 // Unarchive
                 ListTile(
                   leading: const Icon(Icons.unarchive, color: Colors.green),
-                  title: const Text('Разархивировать'),
+                  title: Text(l10n.unarchiveSchedule),
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _unarchiveSchedule(context, ref);
@@ -3030,7 +3048,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
               // Delete
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                title: Text(l10n.deleteScheduleAction, style: const TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _deleteSchedule(context, ref);
@@ -3055,27 +3073,29 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
   }
 
   void _resumeSchedule(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final controller = ref.read(lessonScheduleControllerProvider.notifier);
     await controller.resume(schedule.id, schedule.institutionId, schedule.studentId);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Расписание возобновлено')),
+        SnackBar(content: Text(l10n.scheduleResumedMessage)),
       );
     }
   }
 
   void _showPauseDialog(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     DateTime? pauseUntil;
     showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Приостановить расписание'),
+          title: Text(l10n.pauseScheduleTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('До какой даты приостановить?'),
+              Text(l10n.pauseScheduleUntilQuestion),
               const SizedBox(height: 16),
               InkWell(
                 onTap: () async {
@@ -3090,14 +3110,14 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                   }
                 },
                 child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Дата возобновления',
-                    suffixIcon: Icon(Icons.calendar_today),
+                  decoration: InputDecoration(
+                    labelText: l10n.resumeDate,
+                    suffixIcon: const Icon(Icons.calendar_today),
                   ),
                   child: Text(
                     pauseUntil != null
                         ? DateFormat('dd.MM.yyyy').format(pauseUntil!)
-                        : 'Выберите дату',
+                        : l10n.selectDatePlaceholder,
                   ),
                 ),
               ),
@@ -3106,7 +3126,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Отмена'),
+              child: Text(l10n.cancel),
             ),
             ElevatedButton(
               onPressed: pauseUntil == null
@@ -3119,13 +3139,13 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Расписание приостановлено до ${DateFormat('dd.MM.yyyy').format(pauseUntil!)}',
+                              l10n.schedulePausedUntilMessage(DateFormat('dd.MM.yyyy').format(pauseUntil!)),
                             ),
                           ),
                         );
                       }
                     },
-              child: const Text('Приостановить'),
+              child: Text(l10n.pauseAction),
             ),
           ],
         ),
@@ -3134,16 +3154,18 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
   }
 
   void _clearReplacement(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final controller = ref.read(lessonScheduleControllerProvider.notifier);
     await controller.clearReplacementRoom(schedule.id, schedule.institutionId, schedule.studentId);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Замена кабинета снята')),
+        SnackBar(content: Text(l10n.replacementRoomCleared)),
       );
     }
   }
 
   void _showReplacementDialog(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     String? selectedRoomId;
     DateTime? replacementUntil;
 
@@ -3154,18 +3176,18 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
           final roomsAsync = ref.watch(roomsStreamProvider(institutionId));
 
           return AlertDialog(
-            title: const Text('Временная замена кабинета'),
+            title: Text(l10n.temporaryRoomReplacementTitle),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Room dropdown
                 roomsAsync.when(
                   loading: () => const CircularProgressIndicator(),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => Text(l10n.errorFormat(e.toString())),
                   data: (rooms) => DropdownButtonFormField<String>(
                     key: ValueKey('tempRoom_$selectedRoomId'),
                     initialValue: selectedRoomId,
-                    decoration: const InputDecoration(labelText: 'Новый кабинет'),
+                    decoration: InputDecoration(labelText: l10n.newRoom),
                     items: rooms
                         .where((r) => r.id != schedule.roomId)
                         .map((r) => DropdownMenuItem(
@@ -3192,14 +3214,14 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                     }
                   },
                   child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'До какой даты',
-                      suffixIcon: Icon(Icons.calendar_today),
+                    decoration: InputDecoration(
+                      labelText: l10n.untilDateLabel,
+                      suffixIcon: const Icon(Icons.calendar_today),
                     ),
                     child: Text(
                       replacementUntil != null
                           ? DateFormat('dd.MM.yyyy').format(replacementUntil!)
-                          : 'Выберите дату',
+                          : l10n.selectDatePlaceholder,
                     ),
                   ),
                 ),
@@ -3208,7 +3230,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Отмена'),
+                child: Text(l10n.cancel),
               ),
               ElevatedButton(
                 onPressed: selectedRoomId == null || replacementUntil == null
@@ -3225,11 +3247,11 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
                         );
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Замена кабинета установлена')),
+                            SnackBar(content: Text(l10n.replacementRoomSet)),
                           );
                         }
                       },
-                child: const Text('Применить'),
+                child: Text(l10n.apply),
               ),
             ],
           );
@@ -3239,21 +3261,20 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
   }
 
   void _archiveSchedule(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Архивировать расписание?'),
-        content: const Text(
-          'Слот будет перемещён в архив. Вы сможете разархивировать его позже.',
-        ),
+        title: Text(l10n.archiveScheduleQuestion),
+        content: Text(l10n.archiveScheduleMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Архивировать'),
+            child: Text(l10n.archive),
           ),
         ],
       ),
@@ -3264,39 +3285,39 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
       await controller.archive(schedule.id, schedule.institutionId, schedule.studentId);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Расписание архивировано')),
+          SnackBar(content: Text(l10n.scheduleArchivedMessage)),
         );
       }
     }
   }
 
   void _unarchiveSchedule(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final controller = ref.read(lessonScheduleControllerProvider.notifier);
     await controller.restore(schedule.id, schedule.institutionId, schedule.studentId);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Расписание разархивировано')),
+        SnackBar(content: Text(l10n.scheduleUnarchivedMessage)),
       );
     }
   }
 
   void _deleteSchedule(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить расписание?'),
-        content: const Text(
-          'Этот слот будет удалён навсегда. Это действие нельзя отменить.',
-        ),
+        title: Text(l10n.deleteScheduleQuestion),
+        content: Text(l10n.deleteScheduleMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -3307,7 +3328,7 @@ class _LessonScheduleSlotCard extends ConsumerWidget {
       await controller.delete(schedule.id, schedule.institutionId, schedule.studentId);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Расписание удалено')),
+          SnackBar(content: Text(l10n.scheduleDeletedMessage)),
         );
       }
     }
@@ -3331,6 +3352,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final groupColor = theme.colorScheme.secondary;
 
     // Получаем данные из первого занятия серии
@@ -3359,7 +3381,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
     // Получаем название дня недели
     String dayName = '';
     if (date != null) {
-      const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+      final days = [l10n.mondayShort2, l10n.tuesdayShort2, l10n.wednesdayShort2, l10n.thursdayShort2, l10n.fridayShort2, l10n.saturdayShort2, l10n.sundayShort2];
       dayName = days[date.weekday - 1];
     }
 
@@ -3420,7 +3442,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            roomData?['name'] ?? 'Кабинет',
+                            roomData?['name'] ?? l10n.roomDefault,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -3467,6 +3489,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
   }
 
   void _showOptionsSheet(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final lessonsCount = group['lessons_count'] as int? ?? 1;
     final dateStr = group['date'] as String?;
     final startTimeStr = group['start_time'] as String?;
@@ -3493,7 +3516,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
     // День недели
     String dayNameFull = '';
     if (date != null) {
-      const daysFull = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+      final daysFull = [l10n.mondayFull, l10n.tuesdayFull, l10n.wednesdayFull, l10n.thursdayFull, l10n.fridayFull, l10n.saturdayFull, l10n.sundayFull];
       dayNameFull = daysFull[date.weekday - 1];
     }
 
@@ -3537,7 +3560,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           Text(
-                            roomData?['name'] ?? 'Кабинет',
+                            roomData?['name'] ?? l10n.roomDefault,
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
@@ -3556,7 +3579,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
                   Icons.event,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
-                title: Text('$lessonsCount занятий в серии'),
+                title: Text(l10n.lessonsInSeries(lessonsCount)),
               ),
               if (date != null)
                 ListTile(
@@ -3564,7 +3587,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
                     Icons.calendar_today,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  title: Text('Начало: ${DateFormat('dd.MM.yyyy').format(date)}'),
+                  title: Text(l10n.seriesStartDate(DateFormat('dd.MM.yyyy').format(date))),
                 ),
 
               const Divider(height: 1),
@@ -3572,7 +3595,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
               // Edit action
               ListTile(
                 leading: const Icon(Icons.edit),
-                title: const Text('Редактировать'),
+                title: Text(l10n.editAction),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _showEditSheet(context, ref);
@@ -3582,7 +3605,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
               // Delete action
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Удалить серию', style: TextStyle(color: Colors.red)),
+                title: Text(l10n.deleteSeriesAction, style: const TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _confirmDelete(context, ref, repeatGroupId, lessonsCount);
@@ -3635,22 +3658,23 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref, String? repeatGroupId, int lessonsCount) async {
+    final l10n = AppLocalizations.of(context);
     if (repeatGroupId == null) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить серию?'),
-        content: Text('Будет удалено $lessonsCount занятий из расписания. Это действие нельзя отменить.'),
+        title: Text(l10n.deleteSeriesQuestion),
+        content: Text(l10n.deleteSeriesMessage(lessonsCount)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -3666,7 +3690,7 @@ class _RepeatGroupSlotCard extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success ? 'Серия удалена' : 'Ошибка удаления'),
+            content: Text(success ? l10n.seriesDeleted : l10n.deletionError),
           ),
         );
       }
@@ -3713,6 +3737,7 @@ class _EditRepeatGroupSheetState extends ConsumerState<_EditRepeatGroupSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final roomsAsync = ref.watch(roomsStreamProvider(widget.institutionId));
     final rooms = roomsAsync.valueOrNull ?? [];
 
@@ -3734,7 +3759,7 @@ class _EditRepeatGroupSheetState extends ConsumerState<_EditRepeatGroupSheet> {
                     const Icon(Icons.edit_calendar),
                     const SizedBox(width: 8),
                     Text(
-                      'Редактировать серию',
+                      l10n.editSeriesSheetTitle,
                       style: theme.textTheme.titleLarge,
                     ),
                   ],
@@ -3745,7 +3770,7 @@ class _EditRepeatGroupSheetState extends ConsumerState<_EditRepeatGroupSheet> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.access_time),
-                  title: const Text('Время начала'),
+                  title: Text(l10n.startTimeLabel),
                   subtitle: Text(
                     '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
                     style: theme.textTheme.bodyLarge?.copyWith(
@@ -3760,7 +3785,7 @@ class _EditRepeatGroupSheetState extends ConsumerState<_EditRepeatGroupSheet> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.access_time_filled),
-                  title: const Text('Время окончания'),
+                  title: Text(l10n.endTimeLabel),
                   subtitle: Text(
                     '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
                     style: theme.textTheme.bodyLarge?.copyWith(
@@ -3776,10 +3801,10 @@ class _EditRepeatGroupSheetState extends ConsumerState<_EditRepeatGroupSheet> {
                 // Room dropdown
                 DropdownButtonFormField<String>(
                   value: _roomId,
-                  decoration: const InputDecoration(
-                    labelText: 'Кабинет',
-                    prefixIcon: Icon(Icons.meeting_room),
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.roomFieldLabel,
+                    prefixIcon: const Icon(Icons.meeting_room),
+                    border: const OutlineInputBorder(),
                   ),
                   items: rooms.map((room) {
                     return DropdownMenuItem(
@@ -3804,7 +3829,7 @@ class _EditRepeatGroupSheetState extends ConsumerState<_EditRepeatGroupSheet> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.save),
-                  label: const Text('Сохранить'),
+                  label: Text(l10n.save),
                 ),
               ],
             ),
@@ -3850,14 +3875,15 @@ class _EditRepeatGroupSheetState extends ConsumerState<_EditRepeatGroupSheet> {
     setState(() => _isLoading = false);
 
     if (context.mounted) {
+      final l10n = AppLocalizations.of(context);
       if (success) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Серия обновлена')),
+          SnackBar(content: Text(l10n.seriesUpdated)),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка обновления')),
+          SnackBar(content: Text(l10n.updateError)),
         );
       }
     }
@@ -3895,6 +3921,7 @@ class _EditLessonScheduleSheetState extends ConsumerState<_EditLessonScheduleShe
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final roomsAsync = ref.watch(roomsStreamProvider(widget.institutionId));
     final rooms = roomsAsync.valueOrNull ?? [];
 
@@ -3936,7 +3963,7 @@ class _EditLessonScheduleSheetState extends ConsumerState<_EditLessonScheduleShe
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Редактировать расписание',
+                            l10n.editScheduleTitle,
                             style: theme.textTheme.titleLarge,
                           ),
                           Text(
@@ -3956,7 +3983,7 @@ class _EditLessonScheduleSheetState extends ConsumerState<_EditLessonScheduleShe
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.access_time),
-                  title: const Text('Время начала'),
+                  title: Text(l10n.startTimeLabel),
                   subtitle: Text(
                     '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
                     style: theme.textTheme.bodyLarge?.copyWith(
@@ -3971,7 +3998,7 @@ class _EditLessonScheduleSheetState extends ConsumerState<_EditLessonScheduleShe
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.access_time_filled),
-                  title: const Text('Время окончания'),
+                  title: Text(l10n.endTimeLabel),
                   subtitle: Text(
                     '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
                     style: theme.textTheme.bodyLarge?.copyWith(
@@ -3987,10 +4014,10 @@ class _EditLessonScheduleSheetState extends ConsumerState<_EditLessonScheduleShe
                 // Room dropdown
                 DropdownButtonFormField<String>(
                   value: _roomId,
-                  decoration: const InputDecoration(
-                    labelText: 'Кабинет',
-                    prefixIcon: Icon(Icons.meeting_room),
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.roomFieldLabel,
+                    prefixIcon: const Icon(Icons.meeting_room),
+                    border: const OutlineInputBorder(),
                   ),
                   items: rooms.map((room) {
                     return DropdownMenuItem(
@@ -4015,7 +4042,7 @@ class _EditLessonScheduleSheetState extends ConsumerState<_EditLessonScheduleShe
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.save),
-                  label: const Text('Сохранить'),
+                  label: Text(l10n.save),
                 ),
               ],
             ),
@@ -4061,22 +4088,24 @@ class _EditLessonScheduleSheetState extends ConsumerState<_EditLessonScheduleShe
       setState(() => _isLoading = false);
 
       if (context.mounted) {
+        final l10n = AppLocalizations.of(context);
         if (result != null) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Расписание обновлено')),
+            SnackBar(content: Text(l10n.scheduleUpdatedMessage)),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ошибка обновления (возможно конфликт времени)')),
+            SnackBar(content: Text(l10n.scheduleUpdateError)),
           );
         }
       }
     } catch (e) {
       setState(() => _isLoading = false);
       if (context.mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(content: Text(l10n.errorFormat(e.toString()))),
         );
       }
     }
@@ -4105,6 +4134,13 @@ class _CreateLessonsFromScheduleSheetState
   bool _isLoading = false;
   List<ScheduleConflict> _conflicts = [];
   bool _hasCheckedConflicts = false;
+  late AppLocalizations l10n;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    l10n = AppLocalizations.of(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4127,10 +4163,10 @@ class _CreateLessonsFromScheduleSheetState
                   children: [
                     Icon(Icons.calendar_month, color: theme.colorScheme.primary),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Создать занятия из расписания',
-                        style: TextStyle(
+                        l10n.createLessonsFromScheduleTitle,
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -4146,7 +4182,7 @@ class _CreateLessonsFromScheduleSheetState
 
                 // Описание
                 Text(
-                  'Будут созданы занятия на основе постоянного расписания ученика.',
+                  l10n.createLessonsFromScheduleDescription,
                   style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 16),
@@ -4156,7 +4192,7 @@ class _CreateLessonsFromScheduleSheetState
                   children: [
                     Expanded(
                       child: _DatePickerField(
-                        label: 'С даты',
+                        label: l10n.fromDateLabel,
                         value: _startDate,
                         onChanged: (date) {
                           setState(() {
@@ -4169,7 +4205,7 @@ class _CreateLessonsFromScheduleSheetState
                     const SizedBox(width: 16),
                     Expanded(
                       child: _DatePickerField(
-                        label: 'По дату',
+                        label: l10n.toDateLabel,
                         value: _endDate,
                         onChanged: (date) {
                           setState(() {
@@ -4188,19 +4224,19 @@ class _CreateLessonsFromScheduleSheetState
                   spacing: 8,
                   children: [
                     _PeriodChip(
-                      label: '1 неделя',
+                      label: l10n.oneWeek,
                       onTap: () => _setEndDate(7),
                     ),
                     _PeriodChip(
-                      label: '2 недели',
+                      label: l10n.twoWeeks,
                       onTap: () => _setEndDate(14),
                     ),
                     _PeriodChip(
-                      label: '1 месяц',
+                      label: l10n.oneMonth,
                       onTap: () => _setEndDate(30),
                     ),
                     _PeriodChip(
-                      label: '3 месяца',
+                      label: l10n.threeMonths,
                       onTap: () => _setEndDate(90),
                     ),
                   ],
@@ -4212,7 +4248,7 @@ class _CreateLessonsFromScheduleSheetState
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _checkConflicts,
                     icon: const Icon(Icons.search),
-                    label: const Text('Проверить конфликты'),
+                    label: Text(l10n.checkConflictsAction),
                   ),
 
                 // Результаты проверки
@@ -4220,14 +4256,14 @@ class _CreateLessonsFromScheduleSheetState
                   if (_conflicts.isEmpty)
                     Card(
                       color: AppColors.success.withValues(alpha: 0.1),
-                      child: const Padding(
-                        padding: EdgeInsets.all(12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
                         child: Row(
                           children: [
-                            Icon(Icons.check_circle, color: AppColors.success),
-                            SizedBox(width: 8),
+                            const Icon(Icons.check_circle, color: AppColors.success),
+                            const SizedBox(width: 8),
                             Expanded(
-                              child: Text('Конфликтов не найдено'),
+                              child: Text(l10n.noConflictsFound),
                             ),
                           ],
                         ),
@@ -4247,16 +4283,16 @@ class _CreateLessonsFromScheduleSheetState
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Найдено конфликтов: ${_conflicts.length}',
+                                    l10n.foundConflictsCount(_conflicts.length),
                                     style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 8),
-                            const Text(
-                              'Эти даты будут пропущены:',
-                              style: TextStyle(fontSize: 12),
+                            Text(
+                              l10n.theseDatesWillBeSkipped,
+                              style: const TextStyle(fontSize: 12),
                             ),
                             const SizedBox(height: 4),
                             Wrap(
@@ -4276,7 +4312,7 @@ class _CreateLessonsFromScheduleSheetState
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
-                                  '...и ещё ${_conflicts.length - 10}',
+                                  l10n.andMore(_conflicts.length - 10),
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textSecondary,
@@ -4302,7 +4338,7 @@ class _CreateLessonsFromScheduleSheetState
                             ),
                           )
                         : const Icon(Icons.add),
-                    label: Text(_isLoading ? 'Создание...' : 'Создать занятия'),
+                    label: Text(_isLoading ? l10n.creatingMessage : l10n.createLessonsAction),
                   ),
                 ],
 
@@ -4357,8 +4393,9 @@ class _CreateLessonsFromScheduleSheetState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Создано занятий: ${result.successCount}'
-              '${result.skippedCount > 0 ? ', пропущено: ${result.skippedCount}' : ''}',
+              result.skippedCount > 0
+                  ? l10n.lessonsCreatedSkippedCount(result.successCount, result.skippedCount)
+                  : l10n.lessonsCreatedResult(result.successCount),
             ),
             backgroundColor: AppColors.success,
           ),
@@ -4367,7 +4404,7 @@ class _CreateLessonsFromScheduleSheetState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(l10n.errorWithParam(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -4576,6 +4613,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final roomsAsync = ref.watch(roomsStreamProvider(widget.institutionId));
     final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
@@ -4621,12 +4659,12 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
 
               // Title
               Text(
-                'Добавить постоянное расписание',
+                l10n.addPermanentScheduleTitle,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
-                'Выберите дни недели и время занятий',
+                l10n.addPermanentScheduleDescription,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -4635,7 +4673,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
 
               // Days of week selection
               Text(
-                'Дни недели',
+                l10n.daysOfWeek,
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
@@ -4645,13 +4683,13 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
               // Time for each selected day with individual room selection
               if (_selectedDays.isNotEmpty) ...[
                 Text(
-                  'Время и кабинеты',
+                  l10n.timeAndRoomsLabel,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 8),
                 roomsAsync.when(
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Ошибка: $e'),
+                  error: (e, _) => Text(l10n.errorWithParam(e.toString())),
                   data: (rooms) => Column(
                     children: _buildDayTimeRows(rooms),
                   ),
@@ -4676,7 +4714,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                 borderRadius: BorderRadius.circular(12),
                 child: InputDecorator(
                   decoration: InputDecoration(
-                    labelText: 'Действует с',
+                    labelText: l10n.validFromLabel,
                     prefixIcon: const Icon(Icons.calendar_today_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -4695,7 +4733,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
               // Teacher dropdown (приоритет привязанным преподавателям)
               membersAsync.when(
                 loading: () => const LinearProgressIndicator(),
-                error: (e, _) => Text('Ошибка: $e'),
+                error: (e, _) => Text(l10n.errorWithParam(e.toString())),
                 data: (members) {
                   // Если преподаватель не выбран
                   if (_selectedTeacherId == null && members.isNotEmpty) {
@@ -4731,9 +4769,9 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                   return DropdownButtonFormField<String>(
                     key: ValueKey('teacher_$_selectedTeacherId'),
                     initialValue: _selectedTeacherId,
-                    decoration: const InputDecoration(
-                      labelText: 'Преподаватель *',
-                      prefixIcon: Icon(Icons.person),
+                    decoration: InputDecoration(
+                      labelText: l10n.teacherRequiredLabel,
+                      prefixIcon: const Icon(Icons.person),
                     ),
                     items: sortedMembers
                         .map((m) => DropdownMenuItem(
@@ -4752,7 +4790,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                                     ),
                                   Flexible(
                                     child: Text(
-                                      m.profile?.fullName ?? 'Преподаватель',
+                                      m.profile?.fullName ?? l10n.teacherDefault,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -4761,7 +4799,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                             ))
                         .toList(),
                     onChanged: (v) => setState(() => _selectedTeacherId = v),
-                    validator: (v) => v == null ? 'Выберите преподавателя' : null,
+                    validator: (v) => v == null ? l10n.selectTeacherError : null,
                   );
                 },
               ),
@@ -4794,12 +4832,12 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                   return DropdownButtonFormField<String>(
                     key: ValueKey('subject_$_selectedSubjectId'),
                     initialValue: _selectedSubjectId,
-                    decoration: const InputDecoration(
-                      labelText: 'Предмет (опционально)',
-                      prefixIcon: Icon(Icons.book),
+                    decoration: InputDecoration(
+                      labelText: l10n.subjectOptionalLabel,
+                      prefixIcon: const Icon(Icons.book),
                     ),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('Не указано')),
+                      DropdownMenuItem(value: null, child: Text(l10n.notSpecifiedLabel)),
                       ...sortedSubjects.map((s) => DropdownMenuItem(
                         value: s.id,
                         child: Row(
@@ -4854,12 +4892,12 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                   return DropdownButtonFormField<String>(
                     key: ValueKey('lessonType_$_selectedLessonTypeId'),
                     initialValue: _selectedLessonTypeId,
-                    decoration: const InputDecoration(
-                      labelText: 'Тип занятия (опционально)',
-                      prefixIcon: Icon(Icons.category),
+                    decoration: InputDecoration(
+                      labelText: l10n.lessonTypeOptionalLabel,
+                      prefixIcon: const Icon(Icons.category),
                     ),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('Не указано')),
+                      DropdownMenuItem(value: null, child: Text(l10n.notSpecifiedLabel)),
                       ...sortedTypes.map((t) => DropdownMenuItem(
                         value: t.id,
                         child: Row(
@@ -4898,7 +4936,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Проверка конфликтов...',
+                      l10n.checkingConflictsLabel,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.outline,
                       ),
@@ -4915,7 +4953,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Конфликты: ${_conflictingDays.length} (измените время)',
+                      l10n.conflictsChangeTime(_conflictingDays.length),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.error,
                       ),
@@ -4945,14 +4983,14 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                       : const Icon(Icons.add),
                   label: Text(
                     _isCheckingConflicts
-                        ? 'Проверка...'
+                        ? l10n.checkingLabel
                         : _conflictingDays.isNotEmpty
-                            ? 'Есть конфликты'
+                            ? l10n.hasConflictsError
                             : !hasAllRooms && _selectedDays.isNotEmpty
-                                ? 'Выберите кабинеты'
+                                ? l10n.selectRoomsError
                                 : _selectedDays.length > 1
-                                    ? 'Создать ${_selectedDays.length} занятий'
-                                    : 'Создать расписание',
+                                    ? l10n.createCountSchedules(_selectedDays.length)
+                                    : l10n.createScheduleLabel,
                   ),
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
@@ -4967,7 +5005,8 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
   }
 
   Widget _buildDaysSelector() {
-    const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    final l10n = AppLocalizations.of(context);
+    final days = [l10n.mondayShort2, l10n.tuesdayShort2, l10n.wednesdayShort2, l10n.thursdayShort2, l10n.fridayShort2, l10n.saturdayShort2, l10n.sundayShort2];
 
     return Wrap(
       spacing: 8,
@@ -5006,7 +5045,8 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
   }
 
   Widget _buildDayTimeRow(int dayNumber, List<Room> rooms) {
-    const days = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    final l10n = AppLocalizations.of(context);
+    final days = ['', l10n.mondayShort2, l10n.tuesdayShort2, l10n.wednesdayShort2, l10n.thursdayShort2, l10n.fridayShort2, l10n.saturdayShort2, l10n.sundayShort2];
     final startTime = _startTimes[dayNumber] ?? _defaultStartTime;
     final endTime = _endTimes[dayNumber] ?? _defaultEndTime;
     final hasConflict = _conflictingDays.contains(dayNumber);
@@ -5018,9 +5058,9 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
     final durationMinutes = endMinutes - startMinutes;
     final durationText = durationMinutes > 0
         ? (durationMinutes >= 60
-            ? '${durationMinutes ~/ 60} ч${durationMinutes % 60 > 0 ? ' ${durationMinutes % 60} мин' : ''}'
-            : '$durationMinutes мин')
-        : 'Некорректно';
+            ? l10n.durationFormat(durationMinutes ~/ 60, durationMinutes % 60)
+            : l10n.minutesOnly(durationMinutes))
+        : l10n.invalidTimeError;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -5081,7 +5121,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      hasConflict ? 'Конфликт! Время занято' : durationText,
+                      hasConflict ? l10n.conflictTimeOccupiedMessage : durationText,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: hasConflict
                             ? Theme.of(context).colorScheme.error
@@ -5102,7 +5142,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
               child: DropdownButton<String>(
                 value: selectedRoom,
                 hint: Text(
-                  'Кабинет',
+                  l10n.roomLabel,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.error,
                   ),
@@ -5173,10 +5213,11 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Выберите хотя бы один день недели')),
+        SnackBar(content: Text(l10n.selectAtLeastOneDay)),
       );
       return;
     }
@@ -5185,7 +5226,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
     final daysWithoutRoom = _selectedDays.where((day) => _roomIds[day] == null).toList();
     if (daysWithoutRoom.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Выберите кабинет для каждого дня')),
+        SnackBar(content: Text(l10n.selectRoomForEachDay)),
       );
       return;
     }
@@ -5236,8 +5277,8 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
           SnackBar(
             content: Text(
               _selectedDays.length == 1
-                  ? 'Расписание создано'
-                  : 'Создано ${_selectedDays.length} записей расписания',
+                  ? l10n.scheduleCreatedMessage
+                  : l10n.schedulesCreatedMessage(_selectedDays.length),
             ),
           ),
         );
@@ -5246,7 +5287,7 @@ class _AddBookingSlotSheetState extends ConsumerState<_AddBookingSlotSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithParam(e.toString())),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -5281,6 +5322,13 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
   bool _isLoading = true;
   bool _isProcessing = false;
   String? _loadError;
+  late AppLocalizations l10n;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    l10n = AppLocalizations.of(context);
+  }
 
   @override
   void initState() {
@@ -5326,20 +5374,19 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить все занятия?'),
+        title: Text(l10n.deleteAllLessonsQuestion),
         content: Text(
-          'Вы уверены, что хотите удалить ${_futureLessons!.length} будущих занятий "${widget.student.name}"?\n\n'
-          'Баланс абонементов не изменится.',
+          l10n.deleteAllLessonsConfirm(_futureLessons!.length, widget.student.name),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -5357,14 +5404,14 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
         Navigator.pop(context);
         widget.onCompleted();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Удалено $count занятий')),
+          SnackBar(content: Text(l10n.deletedCountLessons(count))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithParam(e.toString())),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -5380,7 +5427,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
 
     if (teachers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Нет доступных преподавателей')),
+        SnackBar(content: Text(l10n.noAvailableTeachersError)),
       );
       return;
     }
@@ -5408,7 +5455,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
 
     if (teachers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Нет доступных преподавателей')),
+        SnackBar(content: Text(l10n.noAvailableTeachersError)),
       );
       return;
     }
@@ -5422,7 +5469,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Выберите преподавателя',
+              l10n.selectTeacherLabel,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -5436,7 +5483,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
-              title: Text(member.profile?.fullName ?? 'Без имени'),
+              title: Text(member.profile?.fullName ?? l10n.noNameLabel),
               onTap: () => Navigator.pop(context, member.userId),
             )),
           ],
@@ -5465,14 +5512,14 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
         Navigator.pop(context);
         widget.onCompleted();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Переназначено ${_scheduleSlots!.length} слотов')),
+          SnackBar(content: Text(l10n.reassignedSlotsMessage(_scheduleSlots!.length))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithParam(e.toString())),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -5488,7 +5535,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
       initialDate: DateTime.now().add(const Duration(days: 7)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      helpText: 'Приостановить до',
+      helpText: l10n.pauseUntilMessage,
     );
 
     if (pauseUntil == null) return;
@@ -5510,14 +5557,14 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
         Navigator.pop(context);
         widget.onCompleted();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Приостановлено ${_scheduleSlots!.length} слотов')),
+          SnackBar(content: Text(l10n.pausedSlotsMessage(_scheduleSlots!.length))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithParam(e.toString())),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -5530,20 +5577,19 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Деактивировать расписание?'),
+        title: Text(l10n.deactivateScheduleQuestion),
         content: Text(
-          'Деактивировать ${_scheduleSlots!.length} слотов постоянного расписания?\n\n'
-          'Слоты останутся в архиве и могут быть восстановлены.',
+          l10n.deactivateScheduleConfirm(_scheduleSlots!.length),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.orange),
-            child: const Text('Деактивировать'),
+            child: Text(l10n.deactivateAction),
           ),
         ],
       ),
@@ -5568,20 +5614,26 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
         Navigator.pop(context);
         widget.onCompleted();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Деактивировано ${_scheduleSlots!.length} слотов')),
+          SnackBar(content: Text(l10n.deactivatedSlotsMessage(_scheduleSlots!.length))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithParam(e.toString())),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
         setState(() => _isProcessing = false);
       }
     }
+  }
+
+  String _getSlotWord(int count) {
+    if (count == 1) return l10n.slotWord;
+    if (count >= 2 && count <= 4) return l10n.slotsWordFew;
+    return l10n.slotsWordMany;
   }
 
   @override
@@ -5612,7 +5664,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
 
               // Заголовок
               Text(
-                'Управление занятиями',
+                l10n.manageLessonsHeader,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
@@ -5643,7 +5695,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Ошибка загрузки: $_loadError',
+                          l10n.loadingErrorLabel(_loadError!),
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onErrorContainer,
                           ),
@@ -5666,8 +5718,8 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text('Нет запланированных занятий'),
+                      Expanded(
+                        child: Text(l10n.noScheduledLessonsLabel),
                       ),
                     ],
                   ),
@@ -5688,7 +5740,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Найдено ${_futureLessons!.length} будущих занятий',
+                          l10n.foundFutureLessons(_futureLessons!.length),
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
                             color: Theme.of(context).colorScheme.primary,
@@ -5710,8 +5762,8 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                       backgroundColor: AppColors.primary,
                       child: Icon(Icons.swap_horiz, color: Colors.white),
                     ),
-                    title: const Text('Переназначить преподавателя'),
-                    subtitle: const Text('Выбрать нового преподавателя для всех занятий'),
+                    title: Text(l10n.reassignTeacher),
+                    subtitle: Text(l10n.reassignTeacherSubtitleLabel),
                     onTap: _showReassignDialog,
                   ),
                   const Divider(),
@@ -5722,11 +5774,11 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                       backgroundColor: Colors.red,
                       child: Icon(Icons.delete_sweep, color: Colors.white),
                     ),
-                    title: const Text(
-                      'Удалить все занятия',
-                      style: TextStyle(color: Colors.red),
+                    title: Text(
+                      l10n.deleteAllLessonsLabel,
+                      style: const TextStyle(color: Colors.red),
                     ),
-                    subtitle: const Text('Баланс абонементов не изменится'),
+                    subtitle: Text(l10n.subscriptionBalanceWontChange),
                     onTap: _deleteFutureLessons,
                   ),
                 ],
@@ -5747,7 +5799,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Постоянное расписание',
+                      l10n.permanentScheduleLabel,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],
@@ -5773,7 +5825,7 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${_scheduleSlots!.length} ${_scheduleSlots!.length == 1 ? 'слот' : _scheduleSlots!.length < 5 ? 'слота' : 'слотов'}',
+                              l10n.slotsCountLabel(_scheduleSlots!.length, _getSlotWord(_scheduleSlots!.length)),
                               style: TextStyle(
                                 fontWeight: FontWeight.w500,
                                 color: Theme.of(context).colorScheme.secondary,
@@ -5804,8 +5856,8 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                       backgroundColor: Theme.of(context).colorScheme.secondary,
                       child: const Icon(Icons.swap_horiz, color: Colors.white),
                     ),
-                    title: const Text('Переназначить преподавателя'),
-                    subtitle: const Text('Для всех слотов расписания'),
+                    title: Text(l10n.reassignTeacher),
+                    subtitle: Text(l10n.forAllScheduleSlots),
                     onTap: _showReassignSlotsDialog,
                   ),
                   const Divider(),
@@ -5816,11 +5868,11 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                       backgroundColor: AppColors.warning,
                       child: Icon(Icons.pause, color: Colors.white),
                     ),
-                    title: const Text(
-                      'Приостановить',
-                      style: TextStyle(color: AppColors.warning),
+                    title: Text(
+                      l10n.pauseAllSlots,
+                      style: const TextStyle(color: AppColors.warning),
                     ),
-                    subtitle: const Text('Временно приостановить все слоты'),
+                    subtitle: Text(l10n.temporaryPauseAllSlots),
                     onTap: _pauseAllSlots,
                   ),
                   const Divider(),
@@ -5831,11 +5883,11 @@ class _BulkLessonActionsSheetState extends ConsumerState<_BulkLessonActionsSheet
                       backgroundColor: Colors.orange,
                       child: Icon(Icons.archive, color: Colors.white),
                     ),
-                    title: const Text(
-                      'Деактивировать',
-                      style: TextStyle(color: Colors.orange),
+                    title: Text(
+                      l10n.deactivateAllSlots,
+                      style: const TextStyle(color: Colors.orange),
                     ),
-                    subtitle: const Text('Отключить постоянное расписание'),
+                    subtitle: Text(l10n.disablePermanentSchedule),
                     onTap: _deactivateAllSlots,
                   ),
                 ],
@@ -5873,6 +5925,13 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
   List<LessonConflict>? _conflicts;
   bool _isChecking = false;
   bool _isReassigning = false;
+  late AppLocalizations l10n;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    l10n = AppLocalizations.of(context);
+  }
 
   Future<void> _checkConflicts() async {
     if (_selectedTeacherId == null) return;
@@ -5902,7 +5961,7 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
           _isChecking = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка проверки: $e')),
+          SnackBar(content: Text(l10n.errorWithParam(e.toString()))),
         );
       }
     }
@@ -5925,7 +5984,7 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
 
       if (lessonsToReassign.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Нет занятий для переназначения')),
+          SnackBar(content: Text(l10n.noLessonsToReassignError)),
         );
         setState(() => _isReassigning = false);
         return;
@@ -5935,7 +5994,7 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Переназначено ${lessonsToReassign.length} занятий')),
+          SnackBar(content: Text(l10n.reassignedLessonsMessage(lessonsToReassign.length))),
         );
         widget.onReassigned();
       }
@@ -5943,7 +6002,7 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithParam(e.toString())),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -5982,7 +6041,7 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
               const SizedBox(height: 16),
 
               Text(
-                'Переназначить преподавателя',
+                l10n.reassignTeacherHeader,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
@@ -5991,15 +6050,15 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
               DropdownButtonFormField<String>(
                 key: ValueKey('reassignTeacher_$_selectedTeacherId'),
                 initialValue: _selectedTeacherId,
-                decoration: const InputDecoration(
-                  labelText: 'Новый преподаватель',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.newTeacherFieldLabel,
+                  border: const OutlineInputBorder(),
                 ),
                 items: widget.teachers
                     .map((member) {
                       return DropdownMenuItem(
                         value: member.userId,
-                        child: Text(member.profile?.fullName ?? 'Неизвестный'),
+                        child: Text(member.profile?.fullName ?? l10n.unknownName),
                       );
                     })
                     .toList(),
@@ -6036,7 +6095,7 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
                         const Icon(Icons.check_circle, color: Colors.green),
                         const SizedBox(width: 8),
                         Text(
-                          'Все ${widget.lessons.length} занятий можно переназначить',
+                          l10n.allLessonsCanReassign(widget.lessons.length),
                           style: const TextStyle(color: Colors.green),
                         ),
                       ],
@@ -6058,7 +6117,7 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Найдено $conflictCount конфликтов',
+                                l10n.foundConflictsCount(conflictCount),
                                 style: const TextStyle(
                                   color: Colors.orange,
                                   fontWeight: FontWeight.w500,
@@ -6069,7 +6128,7 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Можно переназначить: ${widget.lessons.length - conflictCount} занятий',
+                          l10n.canReassignLessons(widget.lessons.length - conflictCount),
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                             fontSize: 13,
@@ -6099,7 +6158,7 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
                   ))),
                   if (_conflicts!.length > 5)
                     Text(
-                      '...и ещё ${_conflicts!.length - 5} конфликтов',
+                      l10n.andMoreConflicts(_conflicts!.length - 5),
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -6118,8 +6177,8 @@ class _ReassignTeacherSheetState extends ConsumerState<_ReassignTeacherSheet> {
                       onPressed: canReassign ? _reassignLessons : null,
                       child: Text(
                         conflictCount > 0
-                            ? 'Переназначить ${widget.lessons.length - conflictCount} занятий'
-                            : 'Переназначить все занятия',
+                            ? l10n.reassignLessonsCount(widget.lessons.length - conflictCount)
+                            : l10n.reassignAllLessonsLabel,
                       ),
                     ),
                   ),
@@ -6216,13 +6275,14 @@ class _LessonHistorySectionState extends ConsumerState<_LessonHistorySection> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final grouped = _groupByMonth(_lessons);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'История занятий',
+          l10n.lessonHistorySection,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 12),
@@ -6230,7 +6290,7 @@ class _LessonHistorySectionState extends ConsumerState<_LessonHistorySection> {
           const Center(child: CircularProgressIndicator())
         else if (_lessons.isEmpty)
           Text(
-            'Нет завершённых занятий',
+            l10n.noCompletedLessons,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -6267,7 +6327,7 @@ class _LessonHistorySectionState extends ConsumerState<_LessonHistorySection> {
                     : TextButton.icon(
                         onPressed: _loadMore,
                         icon: const Icon(Icons.expand_more),
-                        label: const Text('Показать ещё'),
+                        label: Text(l10n.showMore),
                       ),
               ),
             ),
@@ -6289,6 +6349,7 @@ class _LessonHistoryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isCompleted = lesson.status == LessonStatus.completed;
     final statusColor = isCompleted ? Colors.green : AppColors.warning;
     final statusIcon =
@@ -6313,7 +6374,7 @@ class _LessonHistoryItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      lesson.subject?.name ?? 'Без предмета',
+                      lesson.subject?.name ?? l10n.noSubjectLabel,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                     const SizedBox(height: 4),
@@ -6367,9 +6428,16 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
   late final TextEditingController _commentController;
   final _lessonsController = TextEditingController();
   final _lessonsCommentController = TextEditingController();
+  late AppLocalizations l10n;
 
   bool _isSaving = false;
   bool _showLessonsSection = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    l10n = AppLocalizations.of(context);
+  }
 
   @override
   void initState() {
@@ -6410,7 +6478,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
         Navigator.pop(context);
         widget.onSaved?.call();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ученик обновлен')),
+          SnackBar(content: Text(l10n.studentUpdated)),
         );
       }
     } finally {
@@ -6422,7 +6490,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
     final lessonsCount = int.tryParse(_lessonsController.text.trim()) ?? 0;
     if (lessonsCount == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Введите количество занятий')),
+        SnackBar(content: Text(l10n.enterQuantity)),
       );
       return;
     }
@@ -6449,8 +6517,8 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
           SnackBar(
             content: Text(
               lessonsCount > 0
-                  ? 'Добавлено $lessonsCount занятий'
-                  : 'Списано ${lessonsCount.abs()} занятий',
+                  ? l10n.lessonsAddedCount(lessonsCount)
+                  : l10n.lessonsDeductedCount(lessonsCount.abs()),
             ),
             backgroundColor: lessonsCount > 0 ? Colors.green : Colors.orange,
           ),
@@ -6459,7 +6527,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(l10n.errorWithParam(e.toString())), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -6520,7 +6588,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Редактировать',
+                            l10n.editStudentTitle,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
@@ -6539,7 +6607,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                 const SizedBox(height: 24),
 
                 // === Секция: Основная информация ===
-                _buildSectionHeader('Основная информация', Icons.person_outline),
+                _buildSectionHeader(l10n.basicInfoSection, Icons.person_outline),
                 const SizedBox(height: 12),
 
                 // ФИО
@@ -6547,13 +6615,13 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                   controller: _nameController,
                   textCapitalization: TextCapitalization.words,
                   decoration: InputDecoration(
-                    labelText: 'ФИО',
+                    labelText: l10n.fullNameField,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     prefixIcon: const Icon(Icons.badge_outlined),
                   ),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя' : null,
+                  validator: (v) => v == null || v.trim().isEmpty ? l10n.enterNameValidation : null,
                 ),
                 const SizedBox(height: 12),
 
@@ -6562,7 +6630,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    labelText: 'Телефон',
+                    labelText: l10n.phoneField,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -6576,7 +6644,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                   controller: _commentController,
                   maxLines: 2,
                   decoration: InputDecoration(
-                    labelText: 'Комментарий',
+                    labelText: l10n.commentField,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -6587,7 +6655,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                 const SizedBox(height: 24),
 
                 // === Секция: Остаток занятий ===
-                _buildSectionHeader('Остаток занятий', Icons.sync_alt),
+                _buildSectionHeader(l10n.legacyBalanceSection, Icons.sync_alt),
                 const SizedBox(height: 8),
 
                 // Текущий баланс
@@ -6621,13 +6689,13 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Текущий остаток',
+                              l10n.currentBalance,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
                             Text(
-                              '${widget.student.legacyBalance} занятий',
+                              l10n.balanceLessonsCount(widget.student.legacyBalance),
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: widget.student.legacyBalance > 0
@@ -6643,7 +6711,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                         FilledButton.tonalIcon(
                           onPressed: () => setState(() => _showLessonsSection = true),
                           icon: const Icon(Icons.edit, size: 18),
-                          label: const Text('Изменить'),
+                          label: Text(l10n.changeBalance),
                         ),
                     ],
                   ),
@@ -6666,7 +6734,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                           children: [
                             Expanded(
                               child: Text(
-                                'Изменить остаток',
+                                l10n.changeBalanceTitle,
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   color: Colors.orange.shade800,
                                   fontWeight: FontWeight.w600,
@@ -6691,8 +6759,8 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                           controller: _lessonsController,
                           keyboardType: const TextInputType.numberWithOptions(signed: true),
                           decoration: InputDecoration(
-                            labelText: 'Количество',
-                            hintText: '+5 или -3',
+                            labelText: l10n.quantityField,
+                            hintText: l10n.quantityHint,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -6705,7 +6773,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                         TextFormField(
                           controller: _lessonsCommentController,
                           decoration: InputDecoration(
-                            labelText: 'Причина (опционально)',
+                            labelText: l10n.reasonOptional,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -6729,7 +6797,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                                     ),
                                   )
                                 : const Icon(Icons.check),
-                            label: const Text('Применить'),
+                            label: Text(l10n.applyAction),
                             style: FilledButton.styleFrom(
                               backgroundColor: Colors.orange,
                             ),
@@ -6759,7 +6827,7 @@ class _EditStudentSheetState extends ConsumerState<_EditStudentSheet> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Сохранить изменения'),
+                      : Text(l10n.saveChangesAction),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -6809,6 +6877,13 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
   final _lessonsController = TextEditingController(text: '1');
   final _commentController = TextEditingController();
   bool _isLoading = false;
+  late AppLocalizations l10n;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    l10n = AppLocalizations.of(context);
+  }
 
   @override
   void dispose() {
@@ -6823,7 +6898,7 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
     final lessonsCount = int.tryParse(_lessonsController.text.trim()) ?? 0;
     if (lessonsCount == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Количество занятий не может быть 0')),
+        SnackBar(content: Text(l10n.quantityCannotBeZero)),
       );
       return;
     }
@@ -6848,8 +6923,8 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
           SnackBar(
             content: Text(
               lessonsCount > 0
-                  ? 'Добавлено $lessonsCount занятий'
-                  : 'Списано ${lessonsCount.abs()} занятий',
+                  ? l10n.lessonsAddedCount(lessonsCount)
+                  : l10n.lessonsDeductedCount(lessonsCount.abs()),
             ),
             backgroundColor: lessonsCount > 0 ? Colors.green : Colors.orange,
           ),
@@ -6860,7 +6935,7 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithParam(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -6902,7 +6977,7 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Добавить занятия',
+                      l10n.addLessonsTitle,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
@@ -6910,7 +6985,7 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Остаток занятий: ${widget.student.legacyBalance}',
+                l10n.legacyBalanceLabel(widget.student.legacyBalance),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -6923,8 +6998,8 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
                 keyboardType: const TextInputType.numberWithOptions(signed: true),
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
-                  labelText: 'Количество занятий',
-                  hintText: 'Положительное или отрицательное число',
+                  labelText: l10n.lessonsQuantityField,
+                  hintText: l10n.quantityPlaceholder,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -6932,14 +7007,14 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Введите количество';
+                    return l10n.enterQuantity;
                   }
                   final count = int.tryParse(value.trim());
                   if (count == null) {
-                    return 'Введите целое число';
+                    return l10n.enterInteger;
                   }
                   if (count == 0) {
-                    return 'Количество не может быть 0';
+                    return l10n.quantityCannotBeZero;
                   }
                   return null;
                 },
@@ -6952,8 +7027,8 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
                 textInputAction: TextInputAction.done,
                 maxLines: 2,
                 decoration: InputDecoration(
-                  labelText: 'Комментарий (необязательно)',
-                  hintText: 'Например: Перенос с другого абонемента',
+                  labelText: l10n.commentOptionalField,
+                  hintText: l10n.commentHint,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -6972,7 +7047,7 @@ class _AddLessonsSheetState extends State<_AddLessonsSheet> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.check),
-                label: const Text('Сохранить'),
+                label: Text(l10n.save),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),

@@ -1,0 +1,3651 @@
+{
+  "@@locale": "en",
+  "appName": "Kabinet",
+  "loading": "Loading...",
+  "error": "Error",
+  "retry": "Retry",
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "archive": "Archive",
+  "restore": "Restore",
+  "edit": "Edit",
+  "add": "Add",
+  "create": "Create",
+  "search": "Search",
+  "noData": "No data",
+  "confirm": "Confirm",
+  "yes": "Yes",
+  "no": "No",
+  "close": "Close",
+  "done": "Done",
+  "next": "Next",
+  "back": "Back",
+  "apply": "Apply",
+  "reset": "Reset",
+  "all": "All",
+  "select": "Select",
+  "copy": "Copy",
+  "copied": "Copied",
+  "share": "Share",
+  "more": "More",
+  "less": "Less",
+  "show": "Show",
+  "hide": "Hide",
+  "optional": "Optional",
+  "required": "Required",
+  "or": "or",
+  "and": "and",
+  "from": "from",
+  "to": "to",
+  "tenge": "KZT",
+  "login": "Sign In",
+  "register": "Sign Up",
+  "logout": "Sign Out",
+  "email": "Email",
+  "password": "Password",
+  "confirmPassword": "Confirm password",
+  "fullName": "Full name",
+  "forgotPassword": "Forgot password?",
+  "resetPassword": "Reset password",
+  "resetPasswordTitle": "Password Recovery",
+  "resetPasswordMessage": "Enter the email you used to register. We'll send you a link to reset your password.",
+  "resetPasswordSuccess": "Email sent! Check your inbox.",
+  "noAccount": "Don't have an account?",
+  "hasAccount": "Already have an account?",
+  "loginWithGoogle": "Sign in with Google",
+  "loginWithApple": "Sign in with Apple",
+  "newPassword": "New password",
+  "setNewPassword": "Set new password",
+  "setNewPasswordDescription": "Set a new password",
+  "savePassword": "Save password",
+  "passwordChangeError": "Password change error: {error}",
+  "@passwordChangeError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "passwordChanged": "Password changed successfully",
+  "registrationSuccess": "Registration successful!",
+  "passwordRequirements": "Min. 8 characters, uppercase letter, special character",
+  "institutions": "Institutions",
+  "createInstitution": "Create institution",
+  "joinInstitution": "Join",
+  "institutionName": "Institution name",
+  "inviteCode": "Invite code",
+  "institutionNameHint": "For example: Music School No. 1",
+  "inviteCodeHint": "For example: ABC12345",
+  "inviteCodeDescription": "Enter the invite code that the institution administrator sent you",
+  "joinedInstitution": "You joined \"{name}\"",
+  "@joinedInstitution": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "owner": "Owner",
+  "member": "Member",
+  "admin": "Administrator",
+  "teacher": "Teacher",
+  "noInstitutions": "No institutions",
+  "createOrJoin": "Create new or join existing",
+  "dashboard": "Dashboard",
+  "rooms": "Rooms",
+  "students": "Students",
+  "payments": "Payments",
+  "settings": "Settings",
+  "statistics": "Statistics",
+  "groups": "Groups",
+  "schedule": "Schedule",
+  "room": "Room",
+  "roomName": "Room name",
+  "roomNumber": "Room number",
+  "addRoom": "Add room",
+  "editRoom": "Edit room",
+  "deleteRoom": "Delete room",
+  "noRooms": "No rooms",
+  "addRoomFirst": "Add a room first",
+  "roomDeleted": "Room deleted",
+  "roomUpdated": "Room updated",
+  "roomCreated": "Room created",
+  "roomColor": "Room color",
+  "roomOccupied": "Room is occupied at this time",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "tomorrow": "Tomorrow",
+  "lesson": "Lesson",
+  "lessons": "Lessons",
+  "newLesson": "New lesson",
+  "editLesson": "Edit lesson",
+  "deleteLesson": "Delete lesson",
+  "lessonType": "Lesson type",
+  "subject": "Subject",
+  "date": "Date",
+  "time": "Time",
+  "startTime": "Start time",
+  "endTime": "End time",
+  "duration": "Duration",
+  "minutes": "min",
+  "comment": "Comment",
+  "noLessons": "No lessons",
+  "noLessonsToday": "No lessons today",
+  "lessonsToday": "Lessons today",
+  "nextLesson": "Next lesson",
+  "selectDate": "Select date",
+  "selectTime": "Select time",
+  "selectRoom": "Select room",
+  "selectStudent": "Select student",
+  "selectSubject": "Select subject",
+  "selectTeacher": "Select teacher",
+  "selectLessonType": "Select lesson type",
+  "repeatLesson": "Repeat lesson",
+  "repeatWeekly": "Every week",
+  "repeatCount": "Number of repeats",
+  "quickAdd": "Quick add",
+  "scheduled": "Scheduled",
+  "completed": "Completed",
+  "cancelled": "Cancelled",
+  "rescheduled": "Rescheduled",
+  "markCompleted": "Mark as completed",
+  "markCancelled": "Cancel lesson",
+  "unmarkedLessons": "Unmarked lessons",
+  "noUnmarkedLessons": "No unmarked lessons",
+  "lessonCompleted": "Lesson completed",
+  "lessonCancelled": "Lesson cancelled",
+  "lessonDeleted": "Lesson deleted",
+  "lessonCreated": "Lesson created",
+  "lessonUpdated": "Lesson updated",
+  "student": "Student",
+  "studentName": "Student name",
+  "phone": "Phone",
+  "addStudent": "Add student",
+  "editStudent": "Edit student",
+  "deleteStudent": "Delete student",
+  "archiveStudent": "Archive student",
+  "unarchiveStudent": "Unarchive",
+  "prepaidLessons": "Prepaid lessons",
+  "debt": "Debt",
+  "individualLesson": "Individual",
+  "groupLesson": "Group",
+  "noStudents": "No students",
+  "addStudentFirst": "Add your first student",
+  "studentDeleted": "Student deleted",
+  "studentArchived": "Student archived",
+  "studentUnarchived": "Student unarchived",
+  "studentUpdated": "Student updated",
+  "studentCreated": "Student added",
+  "showArchived": "Show archived",
+  "hideArchived": "Hide archived",
+  "mergeStudents": "Merge students",
+  "mergeWith": "Merge with...",
+  "parentName": "Parent name",
+  "parentPhone": "Parent phone",
+  "notes": "Notes",
+  "debtors": "Debtors",
+  "noDebtors": "No debtors",
+  "group": "Group",
+  "groupName": "Group name",
+  "addGroup": "Add group",
+  "editGroup": "Edit group",
+  "deleteGroup": "Delete group",
+  "archiveGroup": "Archive group",
+  "members": "Members",
+  "addMember": "Add member",
+  "noGroups": "No groups",
+  "groupDeleted": "Group deleted",
+  "groupArchived": "Group archived",
+  "groupUpdated": "Group updated",
+  "groupCreated": "Group created",
+  "selectStudents": "Select students",
+  "minTwoStudents": "Select at least 2 students",
+  "participants": "Participants",
+  "participantsCount": "PARTICIPANTS ({count})",
+  "@participantsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addParticipants": "Add participants",
+  "selectStudentsForGroup": "Select students for group",
+  "searchStudent": "Search student...",
+  "createNewStudent": "Create new student",
+  "allStudentsInGroup": "All students already in group",
+  "noAvailableStudents": "No available students",
+  "resetSearch": "Reset search",
+  "balanceColon": "Balance: {count}",
+  "@balanceColon": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "removeFromGroup": "Remove from group",
+  "removeStudentFromGroupQuestion": "Remove from group?",
+  "removeStudentFromGroupMessage": "Remove {name} from group?",
+  "@removeStudentFromGroupMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "studentAddedToGroup": "Student added to group",
+  "studentsAddedCount": "Students added: {count}",
+  "@studentsAddedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "newStudent": "New student",
+  "studentCreatedAndSelected": "Student \"{name}\" created and selected",
+  "@studentCreatedAndSelected": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveGroupConfirmation": "Archive group?",
+  "archiveGroupMessage": "Group \"{name}\" will be archived. You can restore it later.",
+  "@archiveGroupMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noParticipants": "No participants",
+  "addStudentsToGroup": "Add students to group",
+  "createFirstGroup": "Create your first student group",
+  "createGroup": "Create group",
+  "newGroup": "New group",
+  "nothingFound": "Nothing found",
+  "lessonsCountLabel": "{count} lessons",
+  "@lessonsCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectedColon": "Selected: {count}",
+  "@selectedColon": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addCount": "Add ({count})",
+  "@addCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "payment": "Payment",
+  "addPayment": "Add payment",
+  "editPayment": "Edit payment",
+  "deletePayment": "Delete payment",
+  "amount": "Amount",
+  "lessonsCount": "Number of lessons",
+  "paymentPlan": "Payment plan",
+  "paidAt": "Payment date",
+  "correction": "Correction",
+  "correctionReason": "Correction reason",
+  "noPayments": "No payments",
+  "paymentDeleted": "Payment deleted",
+  "paymentUpdated": "Payment updated",
+  "paymentCreated": "Payment added",
+  "paymentMethod": "Payment method",
+  "cash": "Cash",
+  "card": "Card",
+  "transfer": "Transfer",
+  "todayPayments": "Paid today",
+  "paymentHistory": "Payment history",
+  "balanceTransfer": "Balance transfer",
+  "balanceTransferComment": "Transfer comment",
+  "filterStudents": "Students",
+  "filterSubjects": "Subjects",
+  "filterTeachers": "Teachers",
+  "filterPlans": "Plans",
+  "filterMethod": "Method",
+  "resetFilters": "Reset filters",
+  "periodWeek": "Week",
+  "periodMonth": "Month",
+  "periodQuarter": "Quarter",
+  "periodYear": "Year",
+  "periodCustom": "Custom",
+  "total": "Total:",
+  "totalOwnStudents": "Total (your students):",
+  "noAccessToPayments": "No access to view payments",
+  "noPaymentsForPeriod": "No payments for this period",
+  "noPaymentsOwnForPeriod": "No payments for your students in this period",
+  "noPaymentsWithFilters": "No payments with selected filters",
+  "familySubscriptionOption": "Group subscription",
+  "familySubscriptionDescription": "One subscription for multiple students",
+  "selectParticipants": "Select participants",
+  "participantsOf": "{count} of {total}",
+  "@participantsOf": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "minTwoParticipants": "Minimum 2 participants",
+  "minTwoParticipantsRequired": "Select at least 2 participants for group subscription",
+  "mergeIntoCard": "Merge into one card",
+  "mergeIntoCardDescription": "Creates a group student card",
+  "groupCardName": "Group card name",
+  "groupCardNameHint": "For example: Petrov Family",
+  "selectStudentRequired": "Select a student",
+  "selectStudentAndPlan": "Select student and plan",
+  "addStudentsFirst": "Add students first",
+  "customOption": "Custom option",
+  "discount": "Discount",
+  "discountSize": "Discount amount",
+  "wasPrice": "Was: {price} ₸",
+  "@wasPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "totalPrice": "Total: {price} ₸",
+  "@totalPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "enterAmount": "Enter amount",
+  "invalidAmount": "Invalid amount",
+  "lessonsCountField": "Lessons",
+  "enterValue": "Enter",
+  "invalidNumber": "Number",
+  "validityDays": "Days",
+  "invalidValue": "Invalid value",
+  "commentOptional": "Comment (optional)",
+  "addPaymentWithAmount": "Add payment {amount} ₸",
+  "@addPaymentWithAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "cardMergedAndPaymentAdded": "Card merged and payment added",
+  "groupSubscriptionAdded": "Group subscription added",
+  "paymentAdded": "Payment added",
+  "deletePaymentConfirmation": "Payment of {amount} ₸ will be deleted. Student balance will decrease by {lessons} lessons.",
+  "@deletePaymentConfirmation": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      },
+      "lessons": {
+        "type": "int"
+      }
+    }
+  },
+  "noEditPermission": "No edit permission",
+  "canEditOwnStudentsOnly": "You can only edit payments for your own students",
+  "paymentFrom": "Payment from {date}",
+  "@paymentFrom": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "saveChanges": "Save changes",
+  "deletePaymentButton": "Delete payment",
+  "subscriptionMembers": "Subscription members",
+  "selectedCount": "Selected: {count}",
+  "@selectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loadingError": "Loading error: {error}",
+  "@loadingError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noStudentsYet": "No students",
+  "discountNote": "Discount: {amount} ₸",
+  "@discountNote": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "subscription": "Subscription",
+  "subscriptions": "Subscriptions",
+  "expiringSubscriptions": "Expiring subscriptions",
+  "noSubscriptions": "No subscriptions",
+  "lessonsRemaining": "Lessons remaining",
+  "validUntil": "Valid until",
+  "expired": "Expired",
+  "active": "Active",
+  "familySubscription": "Family subscription",
+  "statusActive": "Active",
+  "statusFrozen": "Frozen",
+  "statusExpired": "Expired",
+  "statusExhausted": "Exhausted",
+  "minutesShort": "{minutes} min",
+  "@minutesShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "hourOne": "1 hour",
+  "hourOneHalf": "1.5 hours",
+  "hoursShort": "{hours} h",
+  "@hoursShort": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursMinutesShort": "{hours} h {minutes} min",
+  "@hoursMinutesShort": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "currencyName": "tenge",
+  "networkErrorMessage": "Network error. Check your internet connection.",
+  "timeoutErrorMessage": "Request timed out. Please try again.",
+  "sessionExpiredMessage": "Session expired. Please sign in again.",
+  "errorOccurredMessage": "An error occurred",
+  "errorMessage": "Error: {message}",
+  "@errorMessage": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "profile": "Profile",
+  "name": "Name",
+  "registrationDate": "Registration date",
+  "editName": "Edit name",
+  "personName": "Full name",
+  "personNameHint": "John Smith",
+  "enterPersonName": "Enter name",
+  "personNameUpdated": "Name updated",
+  "subjects": "Subjects",
+  "lessonTypes": "Lesson Types",
+  "paymentPlans": "Payment Plans",
+  "teamMembers": "Team members",
+  "inviteMembers": "Invite member",
+  "theme": "Theme",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "language": "Language",
+  "languageSystem": "System",
+  "languageRu": "Russian",
+  "languageEn": "English",
+  "account": "Account",
+  "general": "General",
+  "data": "Data",
+  "workingHours": "Working hours",
+  "workStart": "Work start",
+  "workEnd": "Work end",
+  "phoneCountry": "Phone country code",
+  "changesSaved": "Changes saved",
+  "inviteCodeCopied": "Invite code copied",
+  "shareInviteCode": "Share invite code",
+  "generateNewCode": "Generate new code",
+  "permissions": "Permissions",
+  "editPermissions": "Edit permissions",
+  "removeMember": "Remove member",
+  "leaveInstitution": "Leave institution",
+  "booking": "Booking",
+  "bookings": "Bookings",
+  "addBooking": "Add booking",
+  "deleteBooking": "Delete booking",
+  "bookingDeleted": "Booking deleted",
+  "bookingCreated": "Booking created",
+  "permanentSchedule": "Permanent schedule",
+  "oneTimeBooking": "One-time booking",
+  "slot": "Slot",
+  "slots": "Slots",
+  "freeSlot": "Free slot",
+  "occupiedSlot": "Occupied slot",
+  "lessonSchedule": "Permanent lesson",
+  "lessonSchedules": "Permanent lessons",
+  "addLessonSchedule": "Add permanent lesson",
+  "editLessonSchedule": "Edit permanent lesson",
+  "deleteLessonSchedule": "Delete permanent lesson",
+  "pauseLessonSchedule": "Pause",
+  "resumeLessonSchedule": "Resume",
+  "pauseUntil": "Pause until",
+  "paused": "Paused",
+  "dayOfWeek": "Day of week",
+  "validFrom": "Valid from",
+  "replaceRoom": "Temporary room replacement",
+  "replaceUntil": "Replace until",
+  "totalLessons": "Total lessons",
+  "totalPayments": "Total payments",
+  "totalStudents": "Total students",
+  "period": "Period",
+  "thisWeek": "This week",
+  "thisMonth": "This month",
+  "lastMonth": "Last month",
+  "customPeriod": "Custom period",
+  "income": "Income",
+  "lessonsCompleted": "Completed",
+  "lessonsCancelled": "Cancelled",
+  "bySubject": "By subject",
+  "byTeacher": "By teacher",
+  "byStudent": "By student",
+  "filters": "Filters",
+  "filterBy": "Filter by",
+  "sortBy": "Sort by",
+  "dateRange": "Date range",
+  "status": "Status",
+  "clearFilters": "Clear filters",
+  "applyFilters": "Apply filters",
+  "noResults": "No results found",
+  "teachers": "Teachers",
+  "monday": "Monday",
+  "tuesday": "Tuesday",
+  "wednesday": "Wednesday",
+  "thursday": "Thursday",
+  "friday": "Friday",
+  "saturday": "Saturday",
+  "sunday": "Sunday",
+  "mondayShort": "Mon",
+  "tuesdayShort": "Tue",
+  "wednesdayShort": "Wed",
+  "thursdayShort": "Thu",
+  "fridayShort": "Fri",
+  "saturdayShort": "Sat",
+  "sundayShort": "Sun",
+  "errorOccurred": "An error occurred",
+  "networkError": "Network error. Check your connection.",
+  "unknownError": "Unknown error",
+  "invalidEmail": "Invalid email",
+  "weakPassword": "Password is too weak",
+  "emailInUse": "Email is already in use",
+  "invalidCredentials": "Invalid email or password",
+  "fieldRequired": "This field is required",
+  "passwordsDoNotMatch": "Passwords do not match",
+  "minPasswordLength": "Minimum 8 characters",
+  "passwordNeedsUppercase": "At least one uppercase letter required",
+  "passwordNeedsSpecialChar": "At least one special character required (!@#$%^&*)",
+  "invalidPhoneNumber": "Invalid phone number",
+  "enterPositiveNumber": "Enter a positive number",
+  "enterPositiveInteger": "Enter a positive integer",
+  "sessionExpired": "Session expired. Please sign in again.",
+  "noServerConnection": "No connection to server",
+  "errorOccurredTitle": "An error occurred",
+  "timeoutError": "Request timed out. Please try again.",
+  "noConnection": "No connection to server",
+  "timeout": "Request timed out. Please try again.",
+  "notFound": "Not found",
+  "accessDenied": "Access denied",
+  "errorWithMessage": "Error: {message}",
+  "confirmDelete": "Confirm deletion",
+  "confirmArchive": "Confirm archiving",
+  "confirmCancel": "Confirm cancellation",
+  "confirmLogout": "Sign out?",
+  "confirmLeave": "Leave institution?",
+  "deleteConfirmation": "Are you sure you want to delete?",
+  "archiveConfirmation": "Are you sure you want to archive?",
+  "actionCannotBeUndone": "This action cannot be undone",
+  "deleteQuestion": "Delete {item}?",
+  "archiveQuestion": "Archive {item}?",
+  "lessonsCountPlural": "{count, plural, =0{no lessons} =1{1 lesson} other{{count} lessons}}",
+  "studentsCountPlural": "{count, plural, =0{no students} =1{1 student} other{{count} students}}",
+  "paymentsCountPlural": "{count, plural, =0{no payments} =1{1 payment} other{{count} payments}}",
+  "daysCountPlural": "{count, plural, =0{0 days} =1{1 day} other{{count} days}}",
+  "minutesCountPlural": "{count, plural, =0{0 minutes} =1{1 minute} other{{count} minutes}}",
+  "membersCountPlural": "{count, plural, =0{no members} =1{1 member} other{{count} members}}",
+  "prepaidLessonsBalance": "{count, plural, =0{No prepaid lessons} =1{1 prepaid lesson} other{{count} prepaid lessons}}",
+  "lessonsRemainingPlural": "{count, plural, =0{No lessons remaining} =1{1 lesson remaining} other{{count} lessons remaining}}",
+  "colorPicker": "Select color",
+  "selectColor": "Select color",
+  "defaultColor": "Default color",
+  "dateMissed": "Date missed",
+  "slotPaused": "Slot paused",
+  "exclusionAdded": "Exclusion added",
+  "history": "History",
+  "deleteFromHistory": "Delete from history",
+  "noHistory": "No history",
+  "sendLink": "Send link",
+  "linkSent": "Link sent",
+  "dangerZone": "Danger zone",
+  "archiveInstitution": "Archive institution",
+  "leaveInstitutionAction": "Leave institution",
+  "institutionCanBeRestored": "Institution can be restored later",
+  "youWillNoLongerBeMember": "You will no longer be a member",
+  "archiveInstitutionQuestion": "Archive institution?",
+  "leaveInstitutionQuestion": "Leave institution?",
+  "archiveInstitutionMessage": "Institution \"{name}\" will be moved to archive. You can restore it later from the institutions list.",
+  "leaveInstitutionMessage": "Are you sure you want to leave \"{name}\"? To return, you will need a new invite code.",
+  "institutionArchived": "Institution archived",
+  "institutionDeleted": "Institution deleted",
+  "institutionDeletedMessage": "This institution was deleted by the owner. You will be redirected to the main screen.",
+  "ok": "OK",
+  "youLeftInstitution": "You left the institution",
+  "generateNewCodeQuestion": "Generate new code?",
+  "generateNewCodeMessage": "The old code will stop working. Anyone who hasn't joined with the old code won't be able to do so.",
+  "generate": "Generate",
+  "newCodeGenerated": "New code: {code}",
+  "nameUpdated": "Name updated",
+  "enterName": "Enter name",
+  "workingHoursUpdated": "Working hours updated",
+  "workingHoursDescription": "This time will be displayed in the schedule grid",
+  "start": "Start",
+  "end": "End",
+  "byLocale": "Based on device locale",
+  "todayWithDate": "Today, {date}",
+  "@todayWithDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "noScheduledLessons": "No scheduled lessons",
+  "urgent": "Urgent",
+  "daysShort": "d.",
+  "lessonPayment": "Lesson payment",
+  "saveError": "Save error: {error}",
+  "@saveError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "completeProfileSetup": "Complete profile setup",
+  "selectColorAndSubjects": "Select color and subjects",
+  "fillIn": "Fill in",
+  "paid": "Paid",
+  "archivedInstitutions": "Archived institutions",
+  "archiveEmpty": "Archive empty",
+  "restoreInstitutionQuestion": "Restore institution?",
+  "restoreInstitutionMessage": "Institution \"{name}\" will be restored and appear in the main list.",
+  "@restoreInstitutionMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "institutionRestored": "Institution restored",
+  "archivedOn": "Archived {date}",
+  "@archivedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "noMembers": "No members",
+  "noName": "No name",
+  "you": "You",
+  "adminBadge": "Admin",
+  "changeColor": "Change color",
+  "colorUpdated": "Color updated",
+  "colorReset": "Color reset",
+  "directions": "Subjects",
+  "changeRole": "Change role",
+  "roleName": "Role name",
+  "roleNameHint": "For example: Teacher, Administrator",
+  "accessRights": "Access rights",
+  "manageLessons": "Manage lessons",
+  "transferOwnershipQuestion": "Transfer ownership?",
+  "transferOwnershipWarning": "You are about to transfer ownership rights to:",
+  "transferWarningTitle": "Warning!",
+  "transferWarningPoints": "• You will lose owner rights\n• New owner can delete the institution\n• This action cannot be undone by yourself",
+  "ownershipTransferred": "Ownership transferred to {name}",
+  "@ownershipTransferred": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeMemberQuestion": "Remove member?",
+  "removeMemberConfirmation": "Are you sure you want to remove {name} from the institution?",
+  "@removeMemberConfirmation": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "futureLessonsCount": "Future lessons: {count}",
+  "@futureLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noFutureLessonsToManage": "No future lessons to manage",
+  "deleteAllFutureLessons": "Delete all future lessons",
+  "deleteAllFutureLessonsDescription": "Lessons will be deleted without changing student balances",
+  "reassignTeacher": "Reassign teacher",
+  "reassignTeacherDescription": "Transfer all lessons to another teacher",
+  "deleteLessonsQuestion": "Delete lessons?",
+  "deleteLessonsCount": "{count} lessons of the teacher will be deleted:",
+  "@deleteLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteLessonsWarning": "Student subscription balances will not change.\nThis action cannot be undone.",
+  "lessonsDeletedCount": "Lessons deleted: {count}",
+  "@lessonsDeletedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignLessons": "Reassign lessons",
+  "reassignLessonsFrom": "{count} lessons from {name}",
+  "@reassignLessonsFrom": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "selectNewTeacher": "Select new teacher:",
+  "noOtherTeachers": "No other teachers",
+  "checkingConflicts": "Checking conflicts...",
+  "conflictsFound": "{count} conflicts found",
+  "@conflictsFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noConflictsFound": "No conflicts found",
+  "andMoreConflicts": "...and {count} more conflicts",
+  "@andMoreConflicts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skipConflicts": "Skip conflicts",
+  "reassign": "Reassign",
+  "conflictCheckError": "Check error: {error}",
+  "@conflictCheckError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noLessonsToReassign": "No lessons to reassign",
+  "reassignedCount": "Lessons reassigned: {count}",
+  "@reassignedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skippedConflicts": "skipped: {count}",
+  "@skippedConflicts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noSubjectsAvailable": "No subjects available",
+  "subjectsUpdated": "Subjects updated",
+  "errorWithDetails": "Error: {error}",
+  "@errorWithDetails": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "newRoom": "New room",
+  "editRoomTitle": "Edit room",
+  "roomNumberRequired": "Room number *",
+  "roomNumberHint": "E.g.: 101",
+  "roomNameOptional": "Name (optional)",
+  "roomNameHint": "For example: Piano room",
+  "enterRoomNumber": "Enter room number",
+  "fillRoomData": "Fill in room details",
+  "changeRoomData": "Change room details",
+  "createRoom": "Create room",
+  "roomWithNumber": "Room {number}",
+  "@roomWithNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "roomCreatedMessage": "Room \"{name}\" created",
+  "@roomCreatedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteRoomQuestion": "Delete room?",
+  "deleteRoomMessage": "Room \"{name}\" will be deleted. This action cannot be undone.",
+  "@deleteRoomMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@_STUDENTS_LIST": {},
+  "myStudents": "My",
+  "withDebt": "With debt",
+  "searchByName": "Search by name...",
+  "direction": "Subject",
+  "activity": "Activity",
+  "noStudentsByFilters": "No students match the filters",
+  "tryDifferentQuery": "Try a different search",
+  "archivedStudentsHere": "Archived students will appear here",
+  "noStudentsWithDebt": "No students with debt",
+  "allStudentsPositiveBalance": "All students have a positive balance",
+  "noLinkedStudents": "No linked students",
+  "noLinkedStudentsHint": "No students are linked to you yet",
+  "addFirstStudent": "Add your first student",
+  "noLessons7Days": "No lessons for 7+ days",
+  "noLessons14Days": "No lessons for 14+ days",
+  "noLessons30Days": "No lessons for 30+ days",
+  "noLessons60Days": "No lessons for 60+ days",
+  "@_GROUPS_LIST": {},
+  "groupNameHint": "E.g.: Vocal group",
+  "studentsCount": "{count, plural, =1{1 student} other{{count} students}}",
+  "@studentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeCount": "Merge ({count})",
+  "@mergeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_ADD_STUDENT_FORM": {},
+  "fillStudentData": "Fill in student details",
+  "fullNameRequired": "Full name *",
+  "fullNameHint": "John Doe",
+  "enterStudentName": "Enter student name",
+  "phoneHint": "+1 (555) 123-4567",
+  "noAvailableTeachers": "No available teachers",
+  "additionalInfo": "Additional information...",
+  "remainingLessons": "Remaining lessons",
+  "fromOtherSchool": "When transferring from another school",
+  "lessonsUnit": "lessons",
+  "remainingLessonsHint": "Deducted first, does not affect revenue",
+  "createStudent": "Create student",
+  "selectRoomForSchedule": "Select a room for the schedule",
+  "scheduleConflictsError": "There are schedule conflicts. Change the time or room.",
+  "initialBalanceComment": "Initial balance",
+  "studentCreatedWithSchedule": "Student \"{name}\" created with schedule",
+  "@studentCreatedWithSchedule": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "studentCreatedSimple": "Student \"{name}\" created",
+  "@studentCreatedSimple": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@_SCHEDULE_SETUP": {},
+  "setupPermanentSchedule": "Set up permanent schedule",
+  "selectDaysAndTime": "Select days and lesson times",
+  "roomForLessons": "Room for lessons",
+  "daysOfWeekLabel": "Days of week",
+  "lessonTimeLabel": "Lesson time",
+  "durationHoursMinutes": "{hours} h {minutes} min",
+  "@durationHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "durationHours": "{hours} h",
+  "@durationHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "durationMinutes": "{minutes} min",
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "incorrect": "Invalid",
+  "conflictTimeOccupied": "Conflict! Time is occupied",
+  "@_BALANCE": {},
+  "lessonsBalance": "{count} lessons",
+  "@lessonsBalance": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_LESSON_TYPES": {},
+  "noLessonTypes": "No lesson types",
+  "addFirstLessonType": "Add your first lesson type",
+  "addType": "Add type",
+  "deleteLessonTypeQuestion": "Delete lesson type?",
+  "lessonTypeWillBeDeleted": "Type \"{name}\" will be deleted",
+  "@lessonTypeWillBeDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lessonTypeDeleted": "Lesson type deleted",
+  "newLessonType": "New lesson type",
+  "fillLessonTypeData": "Fill in type details",
+  "nameRequired": "Name *",
+  "nameHintExample": "E.g.: Individual",
+  "enterNameValidation": "Enter name",
+  "other": "Other",
+  "customDuration": "Custom duration",
+  "defaultPrice": "Default price",
+  "groupLessonSwitch": "Group lesson",
+  "multipleStudents": "Multiple students at once",
+  "oneStudent": "One student",
+  "createType": "Create type",
+  "lessonTypeCreated": "Type \"{name}\" created",
+  "@lessonTypeCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "editLessonType": "Edit type",
+  "changeLessonTypeData": "Change lesson type details",
+  "durationValidationError": "Duration must be between 5 and 480 minutes",
+  "color": "Color",
+  "lessonTypeUpdated": "Lesson type updated",
+  "@_PERMISSIONS": {},
+  "permissionsSaved": "Permissions saved",
+  "permissionSectionInstitution": "Institution Management",
+  "permissionManageInstitution": "Edit institution",
+  "permissionManageInstitutionDesc": "Change name, settings",
+  "permissionManageMembers": "Manage members",
+  "permissionManageMembersDesc": "Add, remove, change permissions",
+  "permissionArchiveData": "Archive data",
+  "permissionArchiveDataDesc": "Archive students, groups",
+  "permissionSectionReferences": "References",
+  "permissionManageRooms": "Manage rooms",
+  "permissionManageRoomsDesc": "Create, edit, delete",
+  "permissionManageSubjects": "Manage subjects",
+  "permissionManageSubjectsDesc": "Create, edit, delete",
+  "permissionManageLessonTypes": "Manage lesson types",
+  "permissionManageLessonTypesDesc": "Create, edit, delete",
+  "permissionManagePaymentPlans": "Manage payment plans",
+  "permissionManagePaymentPlansDesc": "Create, edit, delete",
+  "permissionSectionStudents": "Students & Groups",
+  "permissionManageOwnStudents": "Manage own students",
+  "permissionManageOwnStudentsDesc": "Create, edit own students",
+  "permissionManageAllStudents": "Manage all students",
+  "permissionManageAllStudentsDesc": "Manage other teachers' students",
+  "permissionManageGroups": "Manage groups",
+  "permissionManageGroupsDesc": "Create, edit groups",
+  "permissionSectionSchedule": "Schedule",
+  "permissionViewAllSchedule": "View all schedule",
+  "permissionViewAllScheduleDesc": "View other teachers' lessons",
+  "permissionCreateLessons": "Create lessons",
+  "permissionCreateLessonsDesc": "Add new lessons to schedule",
+  "permissionEditOwnLessons": "Edit own lessons",
+  "permissionEditOwnLessonsDesc": "Modify own lessons",
+  "permissionEditAllLessons": "Edit all lessons",
+  "permissionEditAllLessonsDesc": "Modify other teachers' lessons",
+  "permissionDeleteOwnLessons": "Delete own lessons",
+  "permissionDeleteOwnLessonsDesc": "Remove own lessons from schedule",
+  "permissionDeleteAllLessons": "Delete all lessons",
+  "permissionDeleteAllLessonsDesc": "Remove other teachers' lessons",
+  "permissionSectionFinance": "Finance",
+  "permissionViewOwnStudentsPayments": "View own students' payments",
+  "permissionViewOwnStudentsPaymentsDesc": "View payments from own students",
+  "permissionViewAllPayments": "View all payments",
+  "permissionViewAllPaymentsDesc": "View payments from all students",
+  "permissionAddPaymentsForOwnStudents": "Add payments for own students",
+  "permissionAddPaymentsForOwnStudentsDesc": "Accept payments from own students",
+  "permissionAddPaymentsForAllStudents": "Add payments for all students",
+  "permissionAddPaymentsForAllStudentsDesc": "Accept payments from any students",
+  "permissionManageOwnStudentsPayments": "Edit own students' payments",
+  "permissionManageOwnStudentsPaymentsDesc": "Modify and delete own students' payments",
+  "permissionManageAllPayments": "Edit all payments",
+  "permissionManageAllPaymentsDesc": "Modify and delete any payments",
+  "permissionViewStatistics": "View statistics",
+  "permissionViewStatisticsDesc": "Access statistics section",
+  "statusSection": "STATUS",
+  "adminHasAllPermissions": "Administrator",
+  "grantFullPermissions": "Grant all permissions",
+  "allPermissionsEnabledForAdmin": "Enabled for administrator",
+  "@_TEACHER_ONBOARDING": {},
+  "skip": "Skip",
+  "welcome": "Welcome!",
+  "selectColorForLessons": "Choose a color for your\nlessons in the schedule",
+  "yourDirections": "Your directions",
+  "selectSubjectsYouTeach": "Select subjects you teach",
+  "noSubjectsInInstitution": "No subjects in institution yet",
+  "ownerCanAddInSettings": "The owner can add them in settings",
+  "@_PAYMENT_PLANS": {},
+  "noPaymentPlans": "No payment plans",
+  "addFirstPaymentPlan": "Add your first payment plan",
+  "addPlan": "Add plan",
+  "addPaymentPlan": "Add plan",
+  "paymentPlanNameHint": "E.g.: 8-lesson subscription",
+  "enterNameField": "Enter name",
+  "lessonsRequired": "Lessons *",
+  "invalidValueError": "Invalid value",
+  "createPaymentPlan": "Create plan",
+  "deletePaymentPlanQuestion": "Delete payment plan?",
+  "paymentPlanWillBeDeleted": "Plan \"{name}\" will be deleted",
+  "@paymentPlanWillBeDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentPlanDeleted": "Payment plan deleted",
+  "paymentPlanCreated": "Plan \"{name}\" created",
+  "@paymentPlanCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newPaymentPlan": "New payment plan",
+  "fillPaymentPlanData": "Fill in plan details",
+  "planNameHint": "E.g.: 8-lesson subscription",
+  "lessonsCountRequired": "Lessons *",
+  "priceRequired": "Price *",
+  "validityDaysRequired": "Validity (days) *",
+  "enterValidityDays": "Enter validity",
+  "createPlan": "Create plan",
+  "paymentPlanUpdated": "Payment plan updated",
+  "editPaymentPlan": "Edit payment plan",
+  "changePaymentPlanData": "Change plan details",
+  "pricePerLesson": "{price} ₸/lesson",
+  "@pricePerLesson": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "validityDaysShort": "{days} d.",
+  "@validityDaysShort": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@_SUBJECTS": {},
+  "noSubjects": "No subjects",
+  "addFirstSubject": "Add your first subject",
+  "deleteSubjectQuestion": "Delete subject?",
+  "subjectWillBeDeleted": "Subject \"{name}\" will be deleted",
+  "@subjectWillBeDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "subjectDeleted": "Subject deleted",
+  "subjectCreated": "Subject \"{name}\" created",
+  "@subjectCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newSubject": "New subject",
+  "fillSubjectData": "Enter subject name",
+  "subjectNameHint": "E.g.: Piano",
+  "addSubject": "Add subject",
+  "createSubject": "Create subject",
+  "enterSubjectName": "Enter subject name",
+  "subjectNameRequired": "Name *",
+  "subjectUpdated": "Subject updated",
+  "editSubject": "Edit subject",
+  "changeSubjectData": "Change subject details",
+  "@_STATISTICS": {},
+  "noAccessToStatistics": "No access to statistics",
+  "statisticsNoAccess": "No access to statistics",
+  "statsTabGeneral": "General",
+  "statsTotal": "Lessons",
+  "statsFinances": "Finances",
+  "statsAvgLessonApprox": "≈",
+  "statsAvgLesson": "Avg. lesson",
+  "statsDiscounts": "Discounts",
+  "statsPaidLessonsOf": "{paid} of {total}",
+  "@statsPaidLessonsOf": {
+    "placeholders": {
+      "paid": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "statsPaymentsWithDiscount": "{count} with discount",
+  "@statsPaymentsWithDiscount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "statsWorkload": "Workload",
+  "statsLessonHours": "Hours of lessons",
+  "statsActiveStudents": "Active students",
+  "statsPaymentMethods": "Payment methods",
+  "statsCardPayments": "Card ({count}) — {percent}%",
+  "@statsCardPayments": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "statsCashPayments": "Cash ({count}) — {percent}%",
+  "@statsCashPayments": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "statsAvgLessonShort": "Avg:",
+  "statsLessonStats": "Lesson statistics",
+  "contactOwner": "Contact the institution owner",
+  "tabGeneral": "General",
+  "tabSubjects": "Subjects",
+  "tabTeachers": "Teachers",
+  "tabStudents": "Students",
+  "tabPlans": "Plans",
+  "lessonsTotal": "Total",
+  "lessonsScheduled": "Scheduled",
+  "paymentsLabel": "Payments",
+  "avgLesson": "Avg. lesson",
+  "discounts": "Discounts",
+  "workload": "Workload",
+  "hoursOfLessons": "Hours of lessons",
+  "activeStudentsCount": "Active students",
+  "paymentMethodCard": "Card",
+  "paymentMethodCash": "Cash",
+  "noDataForPeriod": "No data for period",
+  "lessonStatistics": "Lesson statistics",
+  "cancellationRate": "Cancellation rate",
+  "topByLessons": "Top by lessons",
+  "lessonsShort": "les.",
+  "byStudents": "By students",
+  "purchases": "Purchases",
+  "sumLabel": "Sum",
+  "avgLessonCost": "Average lesson cost",
+  "paymentsWithDiscount": "Payments with discount",
+  "discountSum": "Discount sum",
+  "byPlans": "By plans",
+  "purchasesShort": "purch.",
+  "cancellationRatePercent": "Cancellation rate: {rate}%",
+  "@cancellationRatePercent": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentMethods": "Payment methods",
+  "cardPaymentsCount": "Card ({count})",
+  "@cardPaymentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cashPaymentsCount": "Cash ({count})",
+  "@cashPaymentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsCountShort": "{count} les.",
+  "@lessonsCountShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_MERGE_STUDENTS": {},
+  "mergeStudentsCount": "Merge {count} students",
+  "@mergeStudentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeStudentsTitle": "Merge {count} students",
+  "mergeStudentsWarning": "A new card will be created. Original cards will be archived.",
+  "fromLegacyBalance": "From legacy",
+  "cardCreatedWithName": "Card \"{name}\" created",
+  "@cardCreatedWithName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@mergeStudentsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeWarning": "A new card will be created. Original cards will be archived.",
+  "studentsToMerge": "Students to merge",
+  "totalBalance": "Total balance",
+  "fromLegacy": "From legacy",
+  "newCardData": "New card data",
+  "fullNameLabel": "Full name",
+  "merge": "Merge",
+  "cardCreated": "Card \"{name}\" created",
+  "@cardCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "mergeError": "Error while merging",
+  "@_TIME_PICKER": {},
+  "lessonTime": "Lesson time",
+  "invalid": "Invalid",
+  "durationFormat": "{hours}h {mins}m",
+  "@durationFormat": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "mins": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursOnly": "{hours}h",
+  "@hoursOnly": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "minutesOnly": "{mins}m",
+  "@minutesOnly": {
+    "placeholders": {
+      "mins": {
+        "type": "int"
+      }
+    }
+  },
+  "@_COLOR_PICKER": {},
+  "quickSelect": "Quick select",
+  "palette": "Palette",
+  "@_STUDENT_DETAIL": {},
+  "unarchive": "Unarchive",
+  "deleteForever": "Delete forever",
+  "studentInArchive": "Student is archived",
+  "unarchiveToCreateLessons": "Unarchive to create lessons",
+  "contactInfo": "Contact information",
+  "noPhone": "Phone not specified",
+  "phoneCopied": "Phone copied",
+  "lessonStatisticsTitle": "Lesson statistics",
+  "noLessonsYet": "No lessons yet",
+  "balance": "Balance",
+  "subscriptionsSection": "Subscriptions",
+  "noActiveSubscriptions": "No active subscriptions",
+  "paymentsSection": "Payments",
+  "noPaymentsHistory": "No payment history",
+  "showMoreCount": "Show more ({count})",
+  "@showMoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permanentScheduleSection": "Permanent schedule",
+  "noPermanentSchedule": "No permanent schedule",
+  "addScheduleSlot": "Add slot",
+  "createLessonsFromSchedule": "Create lessons from schedule",
+  "repeatGroupsSection": "Lesson series",
+  "noRepeatGroups": "No lesson series",
+  "lessonHistorySection": "Lesson history",
+  "manageLessonsTitle": "Manage lessons",
+  "archivedSection": "Archived",
+  "archived": "Archived",
+  "inRoom": "in room {room}",
+  "@inRoom": {
+    "placeholders": {
+      "room": {
+        "type": "String"
+      }
+    }
+  },
+  "temporaryRoomUntil": "Temporarily {room} until {date}",
+  "@temporaryRoomUntil": {
+    "placeholders": {
+      "room": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "schedulePausedUntil": "Paused until {date}",
+  "@schedulePausedUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "resumeScheduleAction": "Resume",
+  "pauseScheduleAction": "Pause",
+  "clearReplacementRoom": "Clear room replacement",
+  "temporaryRoomReplacementAction": "Temporary room replacement",
+  "archiveSchedule": "Archive",
+  "unarchiveSchedule": "Unarchive",
+  "deleteScheduleAction": "Delete",
+  "scheduleResumedMessage": "Schedule resumed",
+  "pauseScheduleTitle": "Pause schedule",
+  "pauseScheduleUntilQuestion": "Until which date to pause?",
+  "resumeDate": "Resume date",
+  "selectDatePlaceholder": "Select date",
+  "pauseAction": "Pause",
+  "schedulePausedUntilMessage": "Schedule paused until {date}",
+  "@schedulePausedUntilMessage": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "replacementRoomCleared": "Room replacement cleared",
+  "temporaryRoomReplacementTitle": "Temporary room replacement",
+  "untilDateLabel": "Until date",
+  "replacementRoomSet": "Room replacement set",
+  "archiveScheduleQuestion": "Archive schedule?",
+  "archiveScheduleMessage": "Slot will be moved to archive. You can unarchive it later.",
+  "scheduleArchivedMessage": "Schedule archived",
+  "scheduleUnarchivedMessage": "Schedule unarchived",
+  "deleteScheduleQuestion": "Delete schedule?",
+  "deleteScheduleMessage": "This slot will be deleted forever. This action cannot be undone.",
+  "scheduleDeletedMessage": "Schedule deleted",
+  "editScheduleTitle": "Edit schedule",
+  "startTimeLabel": "Start time",
+  "endTimeLabel": "End time",
+  "roomFieldLabel": "Room",
+  "scheduleUpdatedMessage": "Schedule updated",
+  "scheduleUpdateError": "Update error (possible time conflict)",
+  "lessonsInSeries": "{count} lessons in series",
+  "@lessonsInSeries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesStartDate": "Start: {date}",
+  "@seriesStartDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "editAction": "Edit",
+  "deleteSeriesAction": "Delete series",
+  "editSeriesSheetTitle": "Edit series",
+  "deleteSeriesQuestion": "Delete series?",
+  "deleteSeriesMessage": "{count} lessons will be deleted from schedule. This action cannot be undone.",
+  "@deleteSeriesMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesDeleted": "Series deleted",
+  "deletionError": "Deletion error",
+  "seriesUpdated": "Series updated",
+  "updateError": "Update error",
+  "createLessonsFromScheduleTitle": "Create lessons from schedule",
+  "createLessonsDescription": "Lessons will be created based on the student's permanent schedule.",
+  "fromDateField": "From date",
+  "toDateField": "To date",
+  "oneWeek": "1 week",
+  "twoWeeks": "2 weeks",
+  "oneMonth": "1 month",
+  "threeMonths": "3 months",
+  "checkConflicts": "Check conflicts",
+  "noConflictsMessage": "No conflicts found",
+  "conflictsFoundCount": "Conflicts found: {count}",
+  "@conflictsFoundCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "datesWillBeSkipped": "These dates will be skipped:",
+  "andMoreCount": "...and {count} more",
+  "@andMoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createLessonsAction": "Create lessons",
+  "creatingLessons": "Creating...",
+  "lessonsCreatedSkipped": "Lessons created: {success}, skipped: {skipped}",
+  "@lessonsCreatedSkipped": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "addPermanentScheduleTitle": "Add permanent schedule",
+  "selectDaysAndTimeDescription": "Select days of week and lesson times",
+  "daysOfWeek": "Days of week",
+  "timeAndRooms": "Time and rooms",
+  "validFromField": "Valid from",
+  "teacherRequired": "Teacher *",
+  "selectTeacherValidation": "Select teacher",
+  "subjectOptional": "Subject (optional)",
+  "notSpecifiedOption": "Not specified",
+  "lessonTypeOptional": "Lesson type (optional)",
+  "checkingConflictsStatus": "Checking conflicts...",
+  "conflictsCountChange": "Conflicts: {count} (change time)",
+  "@conflictsCountChange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hasConflicts": "Has conflicts",
+  "selectRoomsValidation": "Select rooms",
+  "createSchedulesCountAction": "Create {count} schedules",
+  "@createSchedulesCountAction": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createScheduleAction": "Create schedule",
+  "selectAtLeastOneDayValidation": "Select at least one day of week",
+  "selectRoomForEachDayValidation": "Select room for each day",
+  "schedulesCreatedCount": "Created {count} schedule entries",
+  "@schedulesCreatedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleCreated": "Schedule created",
+  "conflictTimeMessage": "Conflict! Time is occupied",
+  "manageLessonsSection": "Manage lessons",
+  "futureLessonsFound": "Found {count} future lessons",
+  "@futureLessonsFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noScheduledLessonsMessage": "No scheduled lessons",
+  "loadingErrorMessage": "Loading error: {error}",
+  "@loadingErrorMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "reassignTeacherTitle": "Reassign teacher",
+  "reassignTeacherSubtitle": "Select new teacher for all lessons",
+  "deleteAllFutureLessonsTitle": "Delete all lessons",
+  "deleteAllFutureLessonsSubtitle": "Subscription balance will not change",
+  "deleteAllLessonsQuestion": "Delete all lessons?",
+  "deleteAllLessonsMessage": "Are you sure you want to delete {count} future lessons for \"{name}\"?\n\nSubscription balance will not change.",
+  "@deleteAllLessonsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deletedLessonsCount": "Deleted {count} lessons",
+  "@deletedLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noAvailableTeachersMessage": "No available teachers",
+  "selectTeacherTitle": "Select teacher",
+  "reassignedSlotsCount": "Reassigned {count} slots",
+  "@reassignedSlotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pausedSlotsCount": "Paused {count} slots",
+  "@pausedSlotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deactivateScheduleQuestion": "Deactivate schedule?",
+  "deactivateSlotsMessage": "Deactivate {count} permanent schedule slots?\n\nSlots will remain in archive and can be restored.",
+  "@deactivateSlotsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deactivateAction": "Deactivate",
+  "deactivatedSlotsCount": "Deactivated {count} slots",
+  "@deactivatedSlotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleSlotsDays": "{count} {slots}",
+  "@scheduleSlotsDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "slots": {
+        "type": "String"
+      }
+    }
+  },
+  "slotWord": "slot",
+  "slotsWordFew": "slots",
+  "slotsWordMany": "slots",
+  "pauseAllSlots": "Pause",
+  "pauseAllSlotsSubtitle": "Temporarily pause all slots",
+  "deactivateAllSlots": "Deactivate",
+  "deactivateAllSlotsSubtitle": "Disable permanent schedule",
+  "newTeacherLabel": "New teacher",
+  "allLessonsCanBeReassigned": "All {count} lessons can be reassigned",
+  "@allLessonsCanBeReassigned": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "canReassignCount": "Can reassign: {count} lessons",
+  "@canReassignCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignCount": "Reassign {count} lessons",
+  "@reassignCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignAllLessons": "Reassign all lessons",
+  "noCompletedLessons": "No completed lessons",
+  "noSubjectLabel": "No subject",
+  "showMore": "Show more",
+  "editStudentTitle": "Edit",
+  "basicInfoSection": "Basic information",
+  "fullNameField": "Full name",
+  "phoneField": "Phone",
+  "commentField": "Comment",
+  "legacyBalanceSection": "Lesson balance",
+  "currentBalance": "Current balance",
+  "balanceLessonsCount": "{count} lessons",
+  "@balanceLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "changeBalance": "Change",
+  "changeBalanceTitle": "Change balance",
+  "quantityField": "Quantity",
+  "quantityHint": "+5 or -3",
+  "reasonOptional": "Reason (optional)",
+  "applyAction": "Apply",
+  "saveChangesAction": "Save changes",
+  "lessonsAddedCount": "Added {count} lessons",
+  "@lessonsAddedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsDeductedCount": "Deducted {count} lessons",
+  "@lessonsDeductedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addLessonsTitle": "Add lessons",
+  "legacyBalanceLabel": "Lesson balance: {count}",
+  "@legacyBalanceLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsQuantityField": "Number of lessons",
+  "quantityPlaceholder": "Positive or negative number",
+  "enterQuantity": "Enter quantity",
+  "enterInteger": "Enter integer",
+  "quantityCannotBeZero": "Quantity cannot be 0",
+  "commentOptionalField": "Comment (optional)",
+  "commentHint": "E.g.: Transfer from another subscription",
+  "archiveStudentQuestion": "Archive student?",
+  "archiveStudentMessage": "Student \"{name}\" will be moved to archive. You can restore them later.",
+  "@archiveStudentMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "restoreStudentQuestion": "Restore student?",
+  "restoreStudentMessage": "Student \"{name}\" will be restored from archive.",
+  "@restoreStudentMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteStudentQuestion": "Delete student forever?",
+  "deleteStudentMessage": "Student \"{name}\" will be permanently deleted along with all data (lessons, payments, subscriptions).\n\nThis action CANNOT be undone!",
+  "@deleteStudentMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "teacherDefault": "Teacher",
+  "unknownName": "Unknown",
+  "roomDefault": "Room",
+  "checking": "Checking...",
+  "freezeSubscription": "Freeze subscription",
+  "freezeSubscriptionDescription": "When frozen, the subscription validity period is paused. After unfreezing, the period will be extended by the number of frozen days.",
+  "daysCount": "Number of days",
+  "enterQuantityValidation": "Enter quantity",
+  "enterNumberFrom1To90": "Enter a number from 1 to 90",
+  "freeze": "Freeze",
+  "subscriptionFrozen": "Subscription frozen",
+  "subscriptionUnfrozen": "Subscription unfrozen. Extended until {date}",
+  "@subscriptionUnfrozen": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "extendSubscription": "Extend term",
+  "currentTermUntil": "Current term: until {date}",
+  "@currentTermUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "extendForDays": "Extend for days",
+  "enterNumberFrom1To365": "Enter a number from 1 to 365",
+  "extend": "Extend",
+  "termExtendedUntil": "Term extended until {date}",
+  "@termExtendedUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "subscriptionBalanceLabel": "Subscriptions: {count}",
+  "@subscriptionBalanceLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "legacyBalanceShort": "Balance: {count}",
+  "@legacyBalanceShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addLessonsAction": "Add lessons",
+  "avgCost": "AVG COST",
+  "avgCostApprox": "AVG COST ≈",
+  "noDataAvailable": "no data",
+  "perLesson": "per lesson",
+  "manageLessonsAction": "Manage",
+  "conductedLabel": "Conducted",
+  "cancelledLabel": "Cancelled",
+  "discountLabel": "Discount",
+  "correctionLabel": "Corr.",
+  "legacyBalanceTitle": "Lesson balance",
+  "exhaustedStatus": "Exhausted",
+  "expiringSoon": "Expiring soon",
+  "groupSubscription": "Group",
+  "frozenUntilDate": "Frozen until {date}",
+  "@frozenUntilDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "expiredDate": "Expired {date}",
+  "@expiredDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "validUntilDate": "Valid until {date}",
+  "@validUntilDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "unfreezeAction": "Unfreeze",
+  "teachersSection": "Teachers",
+  "addTeacherTooltip": "Add teacher",
+  "noLinkedTeachers": "No linked teachers",
+  "addTeacherTitle": "Add teacher",
+  "allTeachersAdded": "All teachers already added",
+  "teacherAdded": "Teacher added",
+  "removeTeacherQuestion": "Remove teacher?",
+  "removeTeacherMessage": "Teacher will be unlinked from this student.",
+  "teacherRemoved": "Teacher removed",
+  "subjectsSection": "Subjects",
+  "addSubjectTooltip": "Add subject",
+  "noLinkedSubjects": "No linked subjects",
+  "addSubjectTitle": "Add subject",
+  "allSubjectsAdded": "All subjects already added",
+  "subjectAdded": "Subject added",
+  "removeSubjectQuestion": "Remove subject?",
+  "removeSubjectMessage": "Subject will be unlinked from this student.",
+  "subjectRemoved": "Subject removed",
+  "lessonTypesSection": "Lesson types",
+  "addLessonTypeTooltip": "Add lesson type",
+  "noLinkedLessonTypes": "No linked lesson types",
+  "addLessonTypeTitle": "Add lesson type",
+  "allLessonTypesAdded": "All lesson types already added",
+  "lessonTypeAdded": "Lesson type added",
+  "removeLessonTypeQuestion": "Remove lesson type?",
+  "removeLessonTypeMessage": "Lesson type will be unlinked from this student.",
+  "lessonTypeRemoved": "Lesson type removed",
+  "mergeWithAction": "Merge with...",
+  "selectStudentsToMerge": "Select students to merge with \"{name}\"",
+  "@selectStudentsToMerge": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "searchStudentsHint": "Search students...",
+  "noStudentsToMerge": "No students to merge",
+  "balanceValue": "Balance: {count}",
+  "@balanceValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectStudentsValidation": "Select students",
+  "nextWithCount": "Next ({count})",
+  "@nextWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupCard": "Group card",
+  "failedToLoadNames": "Failed to load names",
+  "archiveSlots": "Archive ({count})",
+  "@archiveSlots": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "replacementRoom": "Replacement",
+  "pauseUntilDateFormat": "Paused until {date}",
+  "@pauseUntilDateFormat": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "onPause": "On pause",
+  "mondayShort2": "Mon",
+  "tuesdayShort2": "Tue",
+  "wednesdayShort2": "Wed",
+  "thursdayShort2": "Thu",
+  "fridayShort2": "Fri",
+  "saturdayShort2": "Sat",
+  "sundayShort2": "Sun",
+  "mondayFull": "Monday",
+  "tuesdayFull": "Tuesday",
+  "wednesdayFull": "Wednesday",
+  "thursdayFull": "Thursday",
+  "fridayFull": "Friday",
+  "saturdayFull": "Saturday",
+  "sundayFull": "Sunday",
+  "seriesStartDateLabel": "Start: {date}",
+  "@seriesStartDateLabel": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "editSeriesAction": "Edit",
+  "deleteSeriesLessons": "{count} lessons will be deleted from schedule. This action cannot be undone.",
+  "@deleteSeriesLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "editSeriesTitle": "Edit series",
+  "saveSeries": "Save",
+  "invalidTimeError": "Invalid",
+  "roomFieldHint": "Room",
+  "pauseScheduleUntilDate": "Until what date to pause?",
+  "resumeDateLabel": "Resume date",
+  "selectDateHint": "Select date",
+  "pauseUntilMessage": "Pause until",
+  "selectRoomLabel": "New room",
+  "untilDateQuestion": "Until date",
+  "applyRoomReplacement": "Apply",
+  "archiveScheduleConfirm": "Slot will be moved to archive. You can unarchive it later.",
+  "deleteScheduleConfirm": "This slot will be deleted forever. This action cannot be undone.",
+  "errorWithParam": "Error: {error}",
+  "@errorWithParam": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "createLessonsFromScheduleDescription": "Lessons will be created based on the student's permanent schedule.",
+  "fromDateLabel": "From date",
+  "toDateLabel2": "To date",
+  "checkConflictsAction": "Check conflicts",
+  "noConflictsFoundMessage": "No conflicts found",
+  "conflictsCountMessage": "Conflicts found: {count}",
+  "@conflictsCountMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "datesWillBeSkippedMessage": "These dates will be skipped:",
+  "andMoreLabel": "...and {count} more",
+  "@andMoreLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creatingMessage": "Creating...",
+  "lessonsCreatedResult": "Lessons created: {count}",
+  "@lessonsCreatedResult": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addPermanentScheduleDescription": "Select days of week and lesson times",
+  "timeAndRoomsLabel": "Time and rooms",
+  "validFromLabel": "Valid from",
+  "teacherRequiredLabel": "Teacher *",
+  "selectTeacherError": "Select teacher",
+  "subjectOptionalLabel": "Subject (optional)",
+  "notSpecifiedLabel": "Not specified",
+  "lessonTypeOptionalLabel": "Lesson type (optional)",
+  "checkingConflictsMessage": "Checking conflicts...",
+  "conflictsChangeTime": "Conflicts: {count} (change time)",
+  "@conflictsChangeTime": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hasConflictsError": "Has conflicts",
+  "selectRoomsError": "Select rooms",
+  "checkingLabel": "Checking...",
+  "createCountSchedules": "Create {count} schedules",
+  "@createCountSchedules": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createScheduleLabel": "Create schedule",
+  "selectAtLeastOneDay": "Select at least one day of week",
+  "selectRoomForEachDay": "Select room for each day",
+  "scheduleCreatedMessage": "Schedule created",
+  "schedulesCreatedMessage": "Created {count} schedule entries",
+  "@schedulesCreatedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "conflictTimeOccupiedMessage": "Conflict! Time is occupied",
+  "roomLabel": "Room",
+  "deleteAllLessonsConfirm": "Are you sure you want to delete {count} future lessons for \"{name}\"?\n\nSubscription balance will not change.",
+  "@deleteAllLessonsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deletedCountLessons": "Deleted {count} lessons",
+  "@deletedCountLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noAvailableTeachersError": "No available teachers",
+  "selectTeacherLabel": "Select teacher",
+  "noNameLabel": "No name",
+  "reassignedSlotsMessage": "Reassigned {count} slots",
+  "@reassignedSlotsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pausedSlotsMessage": "Paused {count} slots",
+  "@pausedSlotsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deactivateScheduleConfirm": "Deactivate {count} permanent schedule slots?\n\nSlots will remain in archive and can be restored.",
+  "@deactivateScheduleConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deactivatedSlotsMessage": "Deactivated {count} slots",
+  "@deactivatedSlotsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "manageLessonsHeader": "Manage lessons",
+  "loadingErrorLabel": "Loading error: {error}",
+  "@loadingErrorLabel": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noScheduledLessonsLabel": "No scheduled lessons",
+  "foundFutureLessons": "Found {count} future lessons",
+  "@foundFutureLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignTeacherSubtitleLabel": "Select new teacher for all lessons",
+  "deleteAllLessonsLabel": "Delete all lessons",
+  "subscriptionBalanceWontChange": "Subscription balance will not change",
+  "permanentScheduleLabel": "Permanent schedule",
+  "slotsCountLabel": "{count} {slots}",
+  "@slotsCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "slots": {
+        "type": "String"
+      }
+    }
+  },
+  "forAllScheduleSlots": "For all schedule slots",
+  "temporaryPauseAllSlots": "Temporarily pause all slots",
+  "disablePermanentSchedule": "Disable permanent schedule",
+  "noLessonsToReassignError": "No lessons to reassign",
+  "reassignedLessonsMessage": "Reassigned {count} lessons",
+  "@reassignedLessonsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignTeacherHeader": "Reassign teacher",
+  "newTeacherFieldLabel": "New teacher",
+  "allLessonsCanReassign": "All {count} lessons can be reassigned",
+  "@allLessonsCanReassign": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "foundConflictsCount": "Found conflicts: {count}",
+  "@foundConflictsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "canReassignLessons": "Can reassign: {count} lessons",
+  "@canReassignLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignLessonsCount": "Reassign {count} lessons",
+  "@reassignLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignAllLessonsLabel": "Reassign all lessons",
+  "lessonHistoryHeader": "Lesson history",
+  "noCompletedLessonsLabel": "No completed lessons",
+  "showMoreAction": "Show more",
+  "noSubjectPlaceholder": "No subject",
+  "studentUpdatedMessage": "Student updated",
+  "enterLessonsCountValidation": "Enter number of lessons",
+  "lessonsAddedMessage": "Added {count} lessons",
+  "@lessonsAddedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsDeductedMessage": "Deducted {count} lessons",
+  "@lessonsDeductedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "editStudentHeader": "Edit",
+  "basicInfoHeader": "Basic information",
+  "fullNameFieldLabel": "Full name",
+  "enterNameError": "Enter name",
+  "phoneFieldLabel": "Phone",
+  "commentFieldLabel": "Comment",
+  "legacyBalanceHeader": "Lesson balance",
+  "currentBalanceLabel": "Current balance",
+  "changeBalanceAction": "Change",
+  "changeBalanceHeader": "Change balance",
+  "quantityFieldLabel": "Quantity",
+  "reasonOptionalLabel": "Reason (optional)",
+  "applyChangeAction": "Apply",
+  "quantityCannotBeZeroError": "Number of lessons cannot be 0",
+  "addLessonsHeader": "Add lessons",
+  "legacyBalanceDisplay": "Lesson balance: {count}",
+  "@legacyBalanceDisplay": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsQuantityFieldLabel": "Number of lessons",
+  "positiveOrNegativeHint": "Positive or negative number",
+  "enterQuantityError": "Enter quantity",
+  "enterIntegerError": "Enter integer",
+  "commentOptionalLabel": "Comment (optional)",
+  "transferFromSubscriptionHint": "E.g.: Transfer from another subscription",
+  "saveAction": "Save",
+  "@_SCHEDULE_SCREEN_ADDITIONS": {},
+  "roomWithNumberTitle": "Room {number}",
+  "@roomWithNumberTitle": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "filtersTooltip": "Filters",
+  "addTooltip": "Add",
+  "compactView": "Compact",
+  "detailedView": "Detailed",
+  "dayView": "Day",
+  "weekView": "Week",
+  "lessonDefault": "Lesson",
+  "booked": "Booked",
+  "studentDefault": "Student",
+  "hour": "Hour",
+  "typeLabel": "Type",
+  "statusUpdateError": "Failed to update status",
+  "skipDateTitle": "Skip date",
+  "deleteLessonQuestion": "Delete lesson?",
+  "deductFromBalanceTitle": "Deduct lesson from balance",
+  "lessonWillBeDeducted": "Lesson will be deducted from prepaid",
+  "cancelLessonTitle": "Cancel lesson",
+  "addGuest": "Add guest",
+  "pay": "Pay",
+  "removeParticipantQuestion": "Remove participant?",
+  "remove": "Remove",
+  "forMultipleStudents": "For multiple students",
+  "defaultRooms": "Default rooms",
+  "restoreRoomFilter": "Restore room filter",
+  "showAllRooms": "Show all rooms",
+  "book": "Book",
+  "deleteBookingQuestion": "Delete booking?",
+  "deleteBookingMessage": "Booking will be deleted and rooms will be freed.",
+  "endLabel": "End",
+  "createLessonsForPeriod": "Create lessons for period",
+  "createMultipleLessonsFromSlot": "Create multiple lessons from this slot",
+  "addExceptionTitle": "Add exception",
+  "slotWillNotWorkOnDate": "Slot will not work on selected date",
+  "pause": "Pause",
+  "temporarilyDeactivateSlot": "Temporarily deactivate slot",
+  "resume": "Resume",
+  "deactivate": "Deactivate",
+  "completelyDisableSlot": "Completely disable slot",
+  "deactivateSlot": "Deactivate slot",
+  "sixMonths": "6 months",
+  "oneYear": "1 year",
+  "notSelected": "Not selected",
+  "createCompletedLesson": "Create real lesson with status \"Completed\"",
+  "createCancelledLesson": "Create real lesson with status \"Cancelled\"",
+  "skipThisDateLabel": "Skip this date",
+  "addExceptionWithoutLesson": "Add exception without creating lesson",
+  "pauseSchedule": "Pause schedule",
+  "temporarilyDeactivate": "Temporarily deactivate",
+  "resumeSchedule": "Resume schedule",
+  "completelyDisableSchedule": "Completely disable schedule",
+  "deactivateSchedule": "Deactivate schedule",
+  "scheduleWillBeDisabled": "Schedule will be completely disabled. This action can be undone.",
+  "@_SCHEDULE_SCREEN_LOCALIZATION": {},
+  "skipLabel": "Skip",
+  "lessonWillNotShowOnDate": "Lesson will not appear on {date}.\n\nThis will not create a lesson history entry.",
+  "@lessonWillNotShowOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "dateSkipped": "Date skipped",
+  "lessonDeducted": "Lesson deducted",
+  "lessonReturned": "Lesson returned",
+  "lessonDeletedWithPayment": "Lesson will be deleted from history.\nPayment for the lesson will also be deleted.",
+  "lessonDeletedWithReturn": "Lesson will be deleted from history.\nDeducted lesson will be returned to student balance.",
+  "lessonDeletedCompletely": "Lesson will be completely deleted from history.",
+  "lessonDeletedFromHistory": "Lesson deleted from history",
+  "lessonPaymentDefault": "Lesson payment",
+  "paymentAddedMessage": "Payment added",
+  "paymentDeletedMessage": "Payment deleted",
+  "paymentDeleteError": "Payment deletion error: {error}",
+  "@paymentDeleteError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelledLessonsCount": "Cancelled {count} lessons",
+  "@cancelledLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonCancelledMessage": "Lesson cancelled",
+  "lessonWillBeCancelledNoDeduction": "Lesson will be cancelled and archived without balance deduction",
+  "deductedLessonWillBeReturned": "Deducted lesson will be automatically returned to balance.",
+  "whoToDeductLesson": "Who to deduct lesson from:",
+  "balanceLabel": "Balance: {count}",
+  "@balanceLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonIsPartOfSeries": "This lesson is part of a series ({count} lessons)",
+  "@lessonIsPartOfSeries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "onlyThis": "Only this",
+  "thisAndFollowing": "This and following",
+  "deductionAppliesToTodayOnly": "Deduction applies only to today's lesson",
+  "allSeriesLessonsWillBeArchived": "All series lessons will be archived without deduction",
+  "cancelLessonsCount": "Cancel {count} lessons",
+  "@cancelLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cancelLessonAction": "Cancel lesson",
+  "lessonSeriesCancelled": "Lesson series cancelled",
+  "lessonCancelledAndDeducted": "Lesson cancelled and deducted from balance",
+  "lessonIsPartOfPermanentSchedule": "This lesson is part of permanent schedule",
+  "thisAndAllFollowing": "This and all following",
+  "participantsLabel": "Participants",
+  "noParticipantsMessage": "No participants",
+  "unknownStudent": "Unknown",
+  "paymentLabel": "Payment",
+  "removeFromLessonTooltip": "Remove from lesson",
+  "paymentRecorded": "Payment recorded: {count} {students}",
+  "@paymentRecorded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "students": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentErrorMessage": "Payment error: {error}",
+  "@paymentErrorMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "studentSingular": "student",
+  "studentFew": "students",
+  "studentMany": "students",
+  "removeStudentFromLessonConfirm": "Remove {name} from this lesson?",
+  "@removeStudentFromLessonConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeParticipantFromLesson": "Remove participant from this lesson?",
+  "allStudentsAlreadyAdded": "All students already added",
+  "editLessonTitle": "Edit lesson",
+  "dateLabel": "Date",
+  "timeLabel": "Time",
+  "roomLabel2": "Room",
+  "roomWithNumberLabel": "Room {number}",
+  "@roomWithNumberLabel": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "groupLabel": "Group",
+  "studentFieldLabel": "Student",
+  "subjectLabel": "Subject",
+  "notSelectedOption": "Not selected",
+  "lessonTypeLabel": "Lesson type",
+  "minLessonDuration": "Minimum lesson duration is 15 minutes",
+  "lessonUpdatedMessage": "Lesson updated",
+  "repeatNone": "No repeat",
+  "repeatDaily": "Every day",
+  "repeatWeeklyOption": "Every week",
+  "repeatWeekdays": "By weekdays",
+  "repeatCustom": "Custom dates",
+  "editScopeThisOnly": "Only this lesson",
+  "editScopeThisAndFollowing": "This and following",
+  "editScopeAll": "All lessons in series",
+  "editScopeSelected": "Selected",
+  "roomAddedMessage": "Room \"{name}\" added",
+  "@roomAddedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newRoomTitle": "New room",
+  "fillRoomDataMessage": "Fill in room details",
+  "enterRoomNumberValidation": "Enter room number",
+  "roomNameOptionalLabel": "Name (optional)",
+  "roomNameHintExample": "E.g.: Piano room",
+  "createRoomAction": "Create room",
+  "selectStudentTitle": "Select student",
+  "noOwnStudentsMessage": "You have no students",
+  "showAllStudents": "Show all ({count})",
+  "@showAllStudents": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "otherStudentsSection": "Other students",
+  "hideAction": "Hide",
+  "studentAddedMessage": "Student \"{name}\" added",
+  "@studentAddedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newStudentTitle": "New student",
+  "quickAddMessage": "Quick add",
+  "enterStudentNameValidation": "Enter student name",
+  "phoneLabel": "Phone",
+  "createStudentAction": "Create student",
+  "subjectAddedMessage": "Subject \"{name}\" added",
+  "@subjectAddedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newSubjectTitle": "New subject",
+  "addSubjectForLessons": "Add a subject for lessons",
+  "subjectNameLabel": "Subject name",
+  "enterSubjectNameValidation": "Enter subject name",
+  "createSubjectAction": "Create subject",
+  "durationValidation": "Duration must be between 5 and 480 minutes",
+  "lessonTypeAddedMessage": "Lesson type \"{name}\" added",
+  "@lessonTypeAddedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newLessonTypeTitle": "New lesson type",
+  "configureLessonParams": "Configure lesson parameters",
+  "nameLabel": "Name",
+  "lessonTypeNameHint": "E.g.: Individual lesson",
+  "enterNameRequired": "Enter name",
+  "durationLabel": "Duration",
+  "otherOption": "Other",
+  "customDurationLabel": "Custom duration",
+  "enterMinutes": "Enter minutes",
+  "minutesUnit": "min",
+  "priceOptionalLabel": "Price (optional)",
+  "priceHint": "E.g.: 5000",
+  "createTypeAction": "Create type",
+  "filtersTitle": "Filters",
+  "teachersFilter": "Teachers",
+  "lessonTypesFilter": "Lesson types",
+  "directionsFilter": "Subjects",
+  "applyFiltersAction": "Apply filters",
+  "showAllAction": "Show all",
+  "studentsFilter": "Students",
+  "noStudentsMessage": "No students",
+  "deletedLabel": "Deleted",
+  "temporarilyShowingAll": "Temporarily showing all",
+  "notConfigured": "Not configured",
+  "allRoomsLabel": "All rooms",
+  "noDataLabel": "No data",
+  "selectDatesTitle": "Select dates",
+  "lessonSegment": "Lesson",
+  "bookingSegment": "Booking",
+  "roomRequired": "Room *",
+  "noRoomsMessage": "No rooms",
+  "addRoomTooltip": "Add room",
+  "dateRequired": "Date *",
+  "timeRequired": "Time *",
+  "roomsLabel": "Rooms",
+  "roomAbbr": "Room {number}",
+  "@roomAbbr": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "selectAtLeastOneRoom": "Select at least one room",
+  "descriptionOptional": "Description (optional)",
+  "descriptionHint": "Event, meeting, etc.",
+  "studentSegment": "Student",
+  "groupSegment": "Group",
+  "studentRequired": "Student *",
+  "selectStudentHint": "Select student",
+  "addStudentTooltip": "Add student",
+  "groupRequired": "Group *",
+  "noGroupsMessage": "No groups",
+  "createGroupTooltip": "Create group",
+  "teacherLabel": "Teacher",
+  "addSubjectTooltip2": "Add subject",
+  "addLessonTypeTooltip2": "Add lesson type",
+  "repeatLabel": "Repeat",
+  "lessonsCountQuestion": "Number of lessons:",
+  "mondayAbbr": "Mon",
+  "tuesdayAbbr": "Tue",
+  "wednesdayAbbr": "Wed",
+  "thursdayAbbr": "Thu",
+  "fridayAbbr": "Fri",
+  "saturdayAbbr": "Sat",
+  "sundayAbbr": "Sun",
+  "selectDatesInCalendar": "Select dates in calendar",
+  "selectedDatesCount": "Selected: {count} dates",
+  "@selectedDatesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkingConflictsLabel": "Checking conflicts...",
+  "willCreateLessonsCount": "Will create {count} lessons",
+  "@willCreateLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "conflictsWillBeSkipped": "Conflicts: {count} (will be skipped)",
+  "@conflictsWillBeSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createSchedulesCount": "Create {count} schedules",
+  "@createSchedulesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createLessonsCount": "Create {count} lessons",
+  "@createLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createLessonLabel": "Create lesson",
+  "minBookingDuration": "Minimum booking duration is 15 minutes",
+  "roomsBookedMessage": "Rooms booked",
+  "invalidLabel": "Invalid",
+  "minLessonDurationMessage": "Minimum lesson duration is 15 minutes",
+  "permanentSchedulesCreated": "Created {count} permanent schedules",
+  "@permanentSchedulesCreated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permanentScheduleCreated": "Permanent schedule created",
+  "allDatesOccupied": "All dates occupied",
+  "lessonsCreatedSkippedCount": "Created {created} lessons (skipped: {skipped})",
+  "@lessonsCreatedSkippedCount": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsCreatedCount": "Created {count} lessons",
+  "@lessonsCreatedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupLessonCreated": "Group lesson created",
+  "lessonCreatedMessage": "Lesson created",
+  "groupNameLabel": "Group name",
+  "bookedLabel": "Booked",
+  "unknownUser": "Unknown user",
+  "deletingLabel": "Deleting...",
+  "deleteBookingAction": "Delete booking",
+  "bookingDeletedMessage": "Booking deleted",
+  "bookingDeleteError": "Deletion error",
+  "bookRoomsTitle": "Book rooms",
+  "selectRoomsLabel": "Select rooms",
+  "selectMinOneRoom": "Select at least one room",
+  "descriptionOptionalLabel": "Description (optional)",
+  "descriptionHintExample": "E.g.: Rehearsal, Event",
+  "bookingError": "Booking error",
+  "notSpecified": "Not specified",
+  "temporaryRoomUntilMessage": "Temporarily in room {room} until {date}",
+  "@temporaryRoomUntilMessage": {
+    "placeholders": {
+      "room": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "createLessonOnDate": "Create lesson on {date}",
+  "@createLessonOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "pausedUntilDate": "Paused until {date}",
+  "@pausedUntilDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "indefinitePause": "Indefinite pause",
+  "slotWillNotWorkOnDateFull": "Slot will not work on {date}.\n\nThis will allow creating another lesson at this time.",
+  "@slotWillNotWorkOnDateFull": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "exceptionAddedMessage": "Exception added",
+  "pauseUntilLabel": "Pause until",
+  "slotPausedUntil": "Slot paused until {date}",
+  "@slotPausedUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "slotResumedMessage": "Slot resumed",
+  "slotDeactivateConfirm": "Slot will be completely disabled and will not appear in schedule.\n\nYou can reactivate it in the student card.",
+  "slotDeactivatedMessage": "Slot deactivated",
+  "createLessonsForPeriodTitle": "Create lessons for period",
+  "studentNameLabel": "Student: {name}",
+  "@studentNameLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "toDateLabel": "To date",
+  "willBeCreatedCount": "Will create: {count} lessons",
+  "@willBeCreatedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creatingLabel": "Creating...",
+  "createLessonsLabel": "Create lessons",
+  "noDatesToCreate": "No dates to create",
+  "roomNotSpecified": "Room not specified",
+  "createdLessonsCount": "Created {count} lessons",
+  "@createdLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesLoadError": "Series load error: {error}",
+  "@seriesLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "savingLabel": "Saving...",
+  "applyChangesAction": "Apply changes",
+  "changeScopeLabel": "Change scope",
+  "byWeekdaysLabel": "By weekdays",
+  "allLabel": "All",
+  "seriesLessonsTitle": "Series lessons ({count})",
+  "@seriesLessonsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectedLabel": "Selected: {count}",
+  "@selectedLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "changesLabel": "Changes",
+  "currentLabel": "current",
+  "noLessonsToUpdate": "No lessons to update (all have conflicts)",
+  "updatedLessonsSkipped": "Updated {updated} lessons (skipped: {skipped})",
+  "@updatedLessonsSkipped": {
+    "placeholders": {
+      "updated": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "updatedLessonsCount": "Updated {count} lessons",
+  "@updatedLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "memberDataError": "Failed to get member data",
+  "allRoomsDisplayed": "Showing all rooms",
+  "selectedRoomsCount": "Selected rooms: {count}",
+  "@selectedRoomsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "whichRoomsDoYouUse": "Which rooms do you use?",
+  "defaultRoomsLabel": "Default rooms",
+  "roomSetupFirstTimeHint": "Only selected rooms will be displayed in the schedule. You can change this setting anytime in the filter menu.",
+  "roomSetupHint": "Select rooms to display in the schedule by default.",
+  "selectRoomsAction": "Select rooms",
+  "saveCountAction": "Save ({count})",
+  "@saveCountAction": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "virtualLessonLabel": "Virtual lesson",
+  "completeOnDate": "Complete lesson on {date}",
+  "@completeOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelOnDate": "Cancel lesson on {date}",
+  "@cancelOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "lessonCompletedMessage": "Lesson completed",
+  "lessonWillNotShowMessage": "Lesson will not appear on {date}.\n\nThis will not create a lesson history entry.",
+  "@lessonWillNotShowMessage": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "schedulePausedMessage": "Schedule paused",
+  "scheduleResumedSuccessMessage": "Schedule resumed",
+  "scheduleDeactivatedMessage": "Schedule deactivated",
+  "conflictsLabel": "Conflicts: {count}",
+  "@conflictsLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "willBeChangedCount": "Will change: {count} lessons",
+  "@willBeChangedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "conflictsWillBeSkippedLabel": "Conflicts: {count} (will be skipped)",
+  "@conflictsWillBeSkippedLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_STUDENT_DETAIL_LOCALIZATION": {},
+  "errorFormat": "Error: {error}",
+  "@errorFormat": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "theseDatesWillBeSkipped": "These dates will be skipped:",
+  "andMore": "...and {count} more",
+  "@andMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "@_MEMBER_PERMISSIONS": {},
+  "enabledForAdmin": "Enabled for admin",
+  "teacherSubjectsLabel": "SUBJECTS",
+  "teacherSubjectsHint": "Subjects taught by teacher",
+  "noDirectionsHint": "No subjects specified.\nAdd subjects taught by the teacher.",
+  "unknownSubject": "Unknown",
+  "addDirectionTitle": "Add subject",
+  "selectSubjectFor": "Select subject for {name}",
+  "@selectSubjectFor": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "directionAdded": "Subject \"{name}\" added",
+  "@directionAdded": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "@_ALL_ROOMS_SCHEDULE_SCREEN": {},
+  "newRoom": "New room",
+  "fillRoomData": "Fill in room data",
+  "roomNumberRequired": "Room number *",
+  "roomNumberHint": "E.g.: 101",
+  "enterRoomNumber": "Enter room number",
+  "roomNameOptional": "Name (optional)",
+  "roomNameHint": "E.g.: Piano room",
+  "createRoom": "Create room",
+  "newStudent": "New student",
+  "quickAdd": "Quick add",
+  "fullNameRequired": "Full name *",
+  "fullNameHint": "John Smith",
+  "enterStudentName": "Enter student name",
+  "phone": "Phone",
+  "createStudent": "Create student",
+  "newSubject": "New subject",
+  "addSubjectDescription": "Add a subject for lessons",
+  "subjectNameField": "Subject name",
+  "subjectNameHint": "E.g.: Piano",
+  "enterSubjectName": "Enter subject name",
+  "createSubject": "Create subject",
+  "durationValidationError": "Duration must be between 5 and 480 minutes",
+  "newLessonType": "New lesson type",
+  "configureLessonParams": "Configure lesson parameters",
+  "nameField": "Name",
+  "lessonTypeNameHint": "E.g.: Individual lesson",
+  "enterName": "Enter name",
+  "duration": "Duration",
+  "customDuration": "Custom duration",
+  "enterMinutes": "Enter minutes",
+  "minSuffix": "min",
+  "priceOptional": "Price (optional)",
+  "priceHint": "E.g.: 5000",
+  "createType": "Create type",
+  "filters": "Filters",
+  "teachers": "Teachers",
+  "noName": "No name",
+  "lessonTypes": "Lesson types",
+  "subjects": "Subjects",
+  "applyFilters": "Apply filters",
+  "showAll": "Show all",
+  "students": "Students",
+  "noStudents": "No students",
+  "deleted": "Deleted",
+  "studentAddedAsGuest": "{name} added as guest",
+  "@studentAddedAsGuest": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "roomWithNumberDefault": "Room {number}",
+  "@roomWithNumberDefault": {
+    "placeholders": {
+      "number": {"type": "String"}
+    }
+  },
+  "roomAddedMessage": "Room \"{name}\" added",
+  "@roomAddedMessage": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "noOwnStudentsMessage": "You have no own students",
+  "showAllStudentsCount": "Show all ({count})",
+  "@showAllStudentsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "otherStudentsLabel": "Other students",
+  "hideLabel": "Hide",
+  "studentNameAddedMessage": "Student \"{name}\" added",
+  "@studentNameAddedMessage": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "subjectNameAddedMessage": "Subject \"{name}\" added",
+  "@subjectNameAddedMessage": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "lessonTypeNameAddedMessage": "Lesson type \"{name}\" added",
+  "@lessonTypeNameAddedMessage": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "durationMinutesLabel": "{minutes} min",
+  "@durationMinutesLabel": {
+    "placeholders": {
+      "minutes": {"type": "int"}
+    }
+  },
+  "lessonTypeDurationFormat": "{name} ({duration} min)",
+  "@lessonTypeDurationFormat": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "duration": {"type": "int"}
+    }
+  },
+  "groupMembersCount": "{name} ({count} st.)",
+  "@groupMembersCount": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+  "whichRoomsDoYouUse": "Which rooms do you use?",
+  "roomSetupFirstTimeDescription": "Only selected rooms will be displayed in the schedule. You can change this setting at any time through the filters menu.",
+  "roomSetupDescription": "Select rooms that will be displayed in the schedule by default.",
+  "saveWithCountLabel": "Save ({count})",
+  "@saveWithCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "selectRoomsLabel": "Select rooms",
+  "memberDataError": "Failed to get member data",
+  "allRoomsDisplayedMessage": "All rooms displayed",
+  "selectedRoomsCountMessage": "Selected rooms: {count}",
+  "@selectedRoomsCountMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "temporarilyShowingAllRooms": "Temporarily showing all",
+  "notConfiguredRooms": "Not configured",
+  "allRoomsDefault": "All rooms",
+  "noDataAvailableMessage": "No data",
+  "januaryMonth": "January",
+  "februaryMonth": "February",
+  "marchMonth": "March",
+  "aprilMonth": "April",
+  "mayMonth": "May",
+  "juneMonth": "June",
+  "julyMonth": "July",
+  "augustMonth": "August",
+  "septemberMonth": "September",
+  "octoberMonth": "October",
+  "novemberMonth": "November",
+  "decemberMonth": "December",
+  "selectDatesLabel": "Select dates",
+  "lessonTabLabel": "Lesson",
+  "bookingTabLabel": "Booking",
+  "noRoomsAvailableMessage": "No rooms",
+  "roomsLabel": "Rooms",
+  "roomAbbreviation": "Rm. {number}",
+  "@roomAbbreviation": {
+    "placeholders": {
+      "number": {"type": "String"}
+    }
+  },
+  "selectAtLeastOneRoomMessage": "Select at least one room",
+  "descriptionOptionalField": "Description (optional)",
+  "eventMeetingHint": "Event, meeting, etc.",
+  "studentTabLabel": "Student",
+  "groupTabLabel": "Group",
+  "noStudentsAvailableMessage": "No students",
+  "selectStudentLabel": "Select student",
+  "noGroupsAvailableMessage": "No groups",
+  "lessonsCountLabel": "Number of lessons:",
+  "lessonTimeTitle": "Lesson time",
+  "selectDatesInCalendarLabel": "Select dates in calendar",
+  "selectedDatesCountLabel": "Selected: {count} dates",
+  "@selectedDatesCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "checkingConflictsProgress": "Checking conflicts...",
+  "willCreateLessonsCountMessage": "Will create {count} lessons",
+  "@willCreateLessonsCountMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "conflictsWillBeSkippedMessage": "Conflicts: {count} (will be skipped)",
+  "@conflictsWillBeSkippedMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createSchedulesCountLabel": "Create {count} schedules",
+  "@createSchedulesCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createScheduleActionLabel": "Create schedule",
+  "createLessonsCountLabel": "Create {count} lessons",
+  "@createLessonsCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createLessonActionLabel": "Create lesson",
+  "minBookingDurationError": "Minimum booking duration is 15 minutes",
+  "roomsBookedSuccess": "Rooms booked",
+  "durationHoursMinutesFormat": "{hours}h {minutes}m",
+  "@durationHoursMinutesFormat": {
+    "placeholders": {
+      "hours": {"type": "int"},
+      "minutes": {"type": "int"}
+    }
+  },
+  "durationHoursOnlyFormat": "{hours}h",
+  "@durationHoursOnlyFormat": {
+    "placeholders": {
+      "hours": {"type": "int"}
+    }
+  },
+  "durationMinutesOnlyFormat": "{minutes}m",
+  "@durationMinutesOnlyFormat": {
+    "placeholders": {
+      "minutes": {"type": "int"}
+    }
+  },
+  "invalidTimeLabel": "Invalid",
+  "dayStartTimeHelpText": "{day}: Start time",
+  "@dayStartTimeHelpText": {
+    "placeholders": {
+      "day": {"type": "String"}
+    }
+  },
+  "dayEndTimeHelpText": "{day}: End time",
+  "@dayEndTimeHelpText": {
+    "placeholders": {
+      "day": {"type": "String"}
+    }
+  },
+  "minLessonDurationError": "Minimum lesson duration is 15 minutes",
+  "permanentSchedulesCreatedMessage": "Created {count} permanent schedules",
+  "@permanentSchedulesCreatedMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "permanentScheduleCreatedMessage": "Permanent schedule created",
+  "allDatesOccupiedError": "All dates occupied",
+  "lessonsCreatedSkippedMessage": "Created {created} lessons (skipped: {skipped})",
+  "@lessonsCreatedSkippedMessage": {
+    "placeholders": {
+      "created": {"type": "int"},
+      "skipped": {"type": "int"}
+    }
+  },
+  "lessonsCreatedSuccessMessage": "Created {count} lessons",
+  "@lessonsCreatedSuccessMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "groupLessonCreatedMessage": "Group lesson created",
+  "lessonCreatedSuccessMessage": "Lesson created",
+  "groupNameHint": "E.g.: Vocal group",
+  "enterGroupName": "Enter name",
+  "unknownUserLabel": "Unknown user",
+  "deletingProgress": "Deleting...",
+  "deleteBookingActionLabel": "Delete booking",
+  "bookingWillBeDeletedMessage": "Booking will be deleted and rooms will be freed.",
+  "bookingDeletedSuccess": "Booking deleted",
+  "deletionErrorMessage": "Deletion error",
+  "bookRoomsLabel": "Book rooms",
+  "selectMinOneRoomMessage": "Select at least one room",
+  "descriptionExampleHint": "E.g.: Rehearsal, Event",
+  "bookingErrorMessage": "Booking error",
+  "slotExceptionMessage": "Slot will not work on {date}.\n\nThis will allow creating another lesson at this time.",
+  "@slotExceptionMessage": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "exceptionAddedSuccess": "Exception added",
+  "pauseUntilHelpText": "Pause until",
+  "slotPausedUntilMessage": "Slot paused until {date}",
+  "@slotPausedUntilMessage": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "slotResumedSuccess": "Slot resumed",
+  "slotDeactivateMessage": "Slot will be completely disabled and won't be displayed in the schedule.\n\nYou can activate it again in the student card.",
+  "slotDeactivatedSuccess": "Slot deactivated",
+  "createLessonsForPeriodTitle": "Create lessons for period",
+  "studentLabelWithName": "Student: {name}",
+  "@studentLabelWithName": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "fromDateLabel": "From date",
+  "toDateLabelSchedule": "To date",
+  "willBeCreatedCountMessage": "Will be created: {count} lessons",
+  "@willBeCreatedCountMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "creatingProgress": "Creating...",
+  "createLessonsActionLabel": "Create lessons",
+  "noDatesToCreateError": "No dates to create",
+  "roomNotSpecifiedError": "Room not specified",
+  "seriesLoadError": "Series loading error: {error}",
+  "@seriesLoadError": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "editSeriesLabel": "Edit series",
+  "savingProgress": "Saving...",
+  "applyChangesLabel": "Apply changes",
+  "byWeekdaysFilterLabel": "By weekdays",
+  "allLessonsLabel": "All",
+  "seriesLessonsLabel": "Series lessons ({count})",
+  "@seriesLessonsLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "selectedCountLabel": "Selected: {count}",
+  "@selectedCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "changesTitle": "Changes",
+  "timeChangeLabel": "Time",
+  "roomChangeLabel": "Room",
+  "studentChangeLabel": "Student",
+  "subjectChangeLabel": "Subject",
+  "lessonTypeChangeLabel": "Lesson type",
+  "currentValueLabel": "current",
+  "willBeChangedCountMessage": "Will be changed: {count} lessons",
+  "@willBeChangedCountMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "noLessonsToUpdateError": "No lessons to update (all have conflicts)",
+  "updatedLessonsSkippedMessage": "Updated {updated} lessons (skipped: {skipped})",
+  "@updatedLessonsSkippedMessage": {
+    "placeholders": {
+      "updated": {"type": "int"},
+      "skipped": {"type": "int"}
+    }
+  },
+  "updatedLessonsSuccessMessage": "Updated {count} lessons",
+  "@updatedLessonsSuccessMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "lessonSchedulePaused": "Paused until {date}",
+  "@lessonSchedulePaused": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "lessonScheduleIndefinitePause": "Indefinite pause",
+  "temporaryRoomReplacementInfo": "Temporarily in room {room} until {date}",
+  "@temporaryRoomReplacementInfo": {
+    "placeholders": {
+      "room": {"type": "String"},
+      "date": {"type": "String"}
+    }
+  },
+  "createLessonOnDateLabel": "Create lesson on {date}",
+  "@createLessonOnDateLabel": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "completeLessonOnDateLabel": "Complete lesson on {date}",
+  "@completeLessonOnDateLabel": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "cancelLessonOnDateLabel": "Cancel lesson on {date}",
+  "@cancelLessonOnDateLabel": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "lessonCompletedSuccess": "Lesson completed",
+  "lessonWillNotShowOnDate": "Lesson will not be displayed on {date}.\n\nThis will not create an entry in lesson history.",
+  "@lessonWillNotShowOnDate": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "dateSkippedSuccess": "Date skipped",
+  "schedulePausedSuccess": "Schedule paused",
+  "scheduleResumedSuccess": "Schedule resumed",
+  "scheduleDeactivatedSuccess": "Schedule deactivated",
+  "scheduleTitle": "Schedule",
+  "deletedFromHistory": "Delete from history",
+  "modify": "Modify",
+  "cancelLesson": "Cancel",
+  "skipThisDate": "Skip this date",
+  "statusUpdateFailed": "Failed to update status",
+  "skipDateMessage": "The lesson will not be displayed on {date}.\n\nThis will not create an entry in lesson history.",
+  "@skipDateMessage": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteLessonWithPayment": "The lesson will be deleted from history.\nThe payment for the lesson will also be deleted.",
+  "deleteLessonWithBalance": "The lesson will be deleted from history.\nThe deducted lesson will be returned to the student's balance.",
+  "deleteLessonSimple": "The lesson will be completely deleted from history.",
+  "lessonPaymentType": "Lesson payment",
+  "cancelWithoutDeduction": "The lesson will be cancelled and archived without deduction from balance",
+  "deductionWillBeReturned": "The lesson deducted upon completion will be automatically returned to the balance.",
+  "deductFromBalance": "Deduct lesson from balance",
+  "whoToDeduct": "Deduct lesson from:",
+  "seriesPartInfo": "This lesson is part of a series ({count} lessons)",
+  "@seriesPartInfo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deductOnlyToday": "Deduction will only apply to today's lesson",
+  "archiveWithoutDeduction": "All series lessons will be archived without deduction",
+  "seriesCancelled": "Lesson series cancelled",
+  "cancelledWithDeduction": "Lesson cancelled and deducted from balance",
+  "cancelledWithoutDeduction": "Lesson cancelled",
+  "permanentSchedulePart": "This lesson is part of a permanent schedule",
+  "participantsTitle": "Participants",
+  "addGuestLabel": "Add guest",
+  "payLabel": "Pay",
+  "paymentTitle": "Payment",
+  "paymentError": "Payment error: {error}",
+  "@paymentError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "removeFromLessonMessage": "Remove {name} from this lesson?",
+  "@removeFromLessonMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeFromLessonGeneric": "Remove participant from this lesson?",
+  "addGuestTitle": "Add guest",
+  "allStudentsAdded": "All students have already been added",
+  "saveChangesLabel": "Save changes",
+  "minDurationError": "Minimum lesson duration is 15 minutes",
+  "noRepeat": "No repeat",
+  "everyDay": "Every day",
+  "everyWeek": "Every week",
+  "byWeekdays": "By weekdays",
+  "manualDates": "Manual date selection",
+  "onlyThisLesson": "Only this lesson",
+  "allSeriesLessons": "All series lessons",
+  "selectedLessons": "Selected",
+  "roomAdded": "Room \"{name}\" added",
+  "@roomAdded": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "roomNumberLabel": "Room number *",
+  "nameOptionalLabel": "Name (optional)",
+  "nameOptionalHint": "For example: Piano room",
+  "createRoomLabel": "Create room",
+  "noOwnStudents": "You have no students",
+  "showAllCount": "Show all ({count})",
+  "@showAllCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "otherStudents": "Other students",
+  "quickAddLabel": "Quick add",
+  "createStudentLabel": "Create student",
+  "addSubjectMessage": "Add a subject for lessons",
+  "createSubjectLabel": "Create subject",
+  "configureLessonType": "Configure lesson parameters",
+  "minutesSuffix": "min",
+  "groupLessonTitle": "Group lesson",
+  "createTypeLabel": "Create type",
+  "resetLabel": "Reset",
+  "teachersTitle": "Teachers",
+  "lessonTypesTitle": "Lesson types",
+  "directionsTitle": "Subjects",
+  "applyFiltersLabel": "Apply filters",
+  "showAllLabel": "Show all",
+  "studentsTitle": "Students",
+  "deletedStudent": "Deleted",
+  "temporarilyShowAll": "Temporarily showing all",
+  "allRooms": "All rooms",
+  "defaultRoomsTitle": "Default rooms",
+  "noDataMessage": "No data",
+  "selectDates": "Select dates",
+  "doneLabel": "Done",
+  "lessonTab": "Lesson",
+  "bookingTab": "Booking",
+  "noRoomsAvailable": "No rooms available",
+  "roomsTitle": "Rooms",
+  "roomShort": "Room {number}",
+  "@roomShort": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "bookLabel": "Book",
+  "studentTab": "Student",
+  "groupTab": "Group",
+  "selectStudentPlaceholder": "Select a student",
+  "noGroupsAvailable": "No groups available",
+  "willCreateLessons": "{count} lessons will be created",
+  "@willCreateLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createSchedule": "Create schedule",
+  "createLessonSingle": "Create lesson",
+  "roomsBooked": "Rooms booked",
+  "invalidTime": "Invalid",
+  "lessonsCreatedWithSkipped": "Created {created} lessons (skipped: {skipped})",
+  "@lessonsCreatedWithSkipped": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "newGroupTitle": "New group",
+  "createLabel": "Create",
+  "deleteBookingLabel": "Delete booking",
+  "bookingWillBeDeleted": "The booking will be deleted and rooms will be freed.",
+  "dateTitle": "Date",
+  "startTitle": "Start",
+  "endTitle": "End",
+  "permanentScheduleTitle": "Permanent schedule",
+  "temporaryRoomReplacement": "Temporarily in room {room} until {date}",
+  "@temporaryRoomReplacement": {
+    "placeholders": {
+      "room": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "createMultipleLessons": "Create multiple lessons from this slot",
+  "addException": "Add exception",
+  "slotWontWorkOnDate": "Slot will not be active on the selected date",
+  "pauseSlot": "Pause",
+  "resumeSlot": "Resume",
+  "slotWontWorkMessage": "Slot will not be active on {date}.\n\nThis will allow creating another lesson at this time.",
+  "@slotWontWorkMessage": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "addLabel": "Add",
+  "exceptionAdded": "Exception added",
+  "slotResumed": "Slot resumed",
+  "deactivateSlotTitle": "Deactivate slot",
+  "deactivateSlotMessage": "The slot will be completely disabled and will not be displayed in the schedule.\n\nYou can reactivate it in the student card.",
+  "slotDeactivated": "Slot deactivated",
+  "studentLabel": "Student: {name}",
+  "@studentLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "willBeCreated": "Will be created: {count} lessons",
+  "@willBeCreated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsCreatedMessage": "Created {count} lessons",
+  "@lessonsCreatedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "changesScope": "Changes scope",
+  "quantityLabel": "Number of lessons:",
+  "seriesLessons": "Series lessons ({count})",
+  "@seriesLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "willBeChanged": "Will be changed: {count} lessons",
+  "@willBeChanged": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsUpdatedWithSkipped": "Updated {updated} lessons (skipped: {skipped})",
+  "@lessonsUpdatedWithSkipped": {
+    "placeholders": {
+      "updated": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsUpdatedCount": "Updated {count} lessons",
+  "@lessonsUpdatedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showingAllRooms": "Showing all rooms",
+  "roomsSelectedCount": "Rooms selected: {count}",
+  "@roomsSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "onlySelectedRoomsShown": "Only selected rooms will be displayed in the schedule. You can change this setting at any time through the filter menu.",
+  "selectDefaultRooms": "Select rooms that will be displayed in the schedule by default.",
+  "saveWithCount": "Save ({count})",
+  "@saveWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "virtualLesson": "Virtual lesson",
+  "createRealCompleted": "Create a real lesson with status \"Completed\"",
+  "createRealCancelled": "Create a real lesson with status \"Cancelled\"",
+  "temporarilyDeactivateSchedule": "Temporarily deactivate",
+  "schedulePaused": "Schedule paused",
+  "scheduleResumed": "Schedule resumed",
+  "deactivateScheduleTitle": "Deactivate schedule",
+  "deactivateScheduleMessage": "The schedule will be completely disabled. This action can be undone.",
+  "scheduleDeactivated": "Schedule deactivated",
+  "deductedFromBalance": "Deducted from balance",
+  "lessonDeductedFromBalance": "Lesson deducted from student's balance",
+  "lessonNotDeducted": "Lesson not deducted from balance",
+  "completedLabel": "Completed",
+  "paidLabel": "Paid",
+  "costLabel": "Cost",
+  "repeatSeriesLabel": "Repeat",
+  "yesLabel": "Yes",
+  "paymentLessonsWithDate": "{count} lessons • {date}",
+  "@paymentLessonsWithDate": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "date": {"type": "String"}
+    }
+  },
+  "subscriptionLessonsProgress": "{remaining} / {total} lessons",
+  "@subscriptionLessonsProgress": {
+    "placeholders": {
+      "remaining": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "daysRemainingShort": "({days} d.)",
+  "@daysRemainingShort": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  }
+}

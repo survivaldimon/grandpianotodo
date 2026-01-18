@@ -1,19 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/services/app_lifecycle_service.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 
+/// Тип ошибки для определения локализованного сообщения
+enum ErrorType {
+  network,
+  timeout,
+  sessionExpired,
+  roomOccupied,
+  custom,
+  unknown,
+}
+
 /// Виджет отображения ошибки с кнопкой повтора
 class ErrorView extends StatelessWidget {
-  final String message;
+  final String? message;
+  final Object? error;
   final VoidCallback? onRetry;
   final bool compact;
   final bool showRetryButton;
 
   const ErrorView({
     super.key,
-    this.message = AppStrings.errorOccurred,
+    this.message,
+    this.error,
     this.onRetry,
     this.compact = false,
     this.showRetryButton = true,
@@ -27,26 +39,24 @@ class ErrorView extends StatelessWidget {
     VoidCallback? onRetry,
     bool compact = false,
   }) {
-    final message = getUserFriendlyMessage(error);
     return ErrorView(
-      message: message,
+      error: error,
       onRetry: onRetry,
       compact: compact,
-      showRetryButton: true, // Всегда показываем кнопку retry
+      showRetryButton: true,
     );
   }
 
   /// Компактный виджет для inline ошибок (без иконки и кнопки)
   factory ErrorView.inline(Object error) {
     return ErrorView(
-      message: getUserFriendlyMessage(error),
+      error: error,
       compact: true,
     );
   }
 
-  /// Получить user-friendly сообщение из исключения
-  /// Используется для SnackBar и других мест где нужно показать ошибку
-  static String getUserFriendlyMessage(Object error) {
+  /// Определяет тип ошибки
+  static ErrorType getErrorType(Object error) {
     final errorStr = error.toString().toLowerCase();
 
     // Ошибки сети и Realtime
@@ -59,63 +69,125 @@ class ErrorView extends StatelessWidget {
         errorStr.contains('websocketchannelexception') ||
         errorStr.contains('realtimesubscribeexception') ||
         errorStr.contains('channelerror')) {
-      return AppStrings.networkError;
+      return ErrorType.network;
     }
 
     // Таймаут
     if (errorStr.contains('timeout') || errorStr.contains('timed out')) {
-      return 'Превышено время ожидания. Попробуйте ещё раз.';
+      return ErrorType.timeout;
     }
 
     // Ошибки авторизации
     if (errorStr.contains('unauthorized') ||
         errorStr.contains('unauthenticated') ||
         errorStr.contains('jwt expired')) {
-      return 'Сессия истекла. Войдите заново.';
+      return ErrorType.sessionExpired;
     }
 
     // Конфликт времени (кабинет занят)
     if (errorStr.contains('кабинет занят') ||
-        errorStr.contains('занят в это время')) {
-      return 'Кабинет занят в это время';
+        errorStr.contains('занят в это время') ||
+        errorStr.contains('room occupied') ||
+        errorStr.contains('room is occupied')) {
+      return ErrorType.roomOccupied;
     }
 
-    // Если это Exception с кастомным сообщением — извлекаем его
+    // Если это Exception с кастомным сообщением
     if (error is Exception) {
       final message = error.toString();
-      // Exception: message -> извлекаем message
       if (message.startsWith('Exception: ')) {
         final customMessage = message.substring('Exception: '.length);
-        // Возвращаем кастомное сообщение если оно не пустое и на кириллице
-        if (customMessage.isNotEmpty && RegExp(r'[а-яА-ЯёЁ]').hasMatch(customMessage)) {
-          return customMessage;
+        if (customMessage.isNotEmpty) {
+          return ErrorType.custom;
         }
       }
     }
 
-    // По умолчанию - общая ошибка
-    return AppStrings.errorOccurred;
+    return ErrorType.unknown;
+  }
+
+  /// Получить кастомное сообщение из Exception
+  static String? getCustomMessage(Object error) {
+    if (error is Exception) {
+      final message = error.toString();
+      if (message.startsWith('Exception: ')) {
+        final customMessage = message.substring('Exception: '.length);
+        if (customMessage.isNotEmpty) {
+          return customMessage;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Получить локализованное сообщение об ошибке
+  static String getLocalizedErrorMessage(Object error, AppLocalizations l10n) {
+    final errorType = getErrorType(error);
+
+    switch (errorType) {
+      case ErrorType.network:
+        return l10n.networkErrorMessage;
+      case ErrorType.timeout:
+        return l10n.timeoutErrorMessage;
+      case ErrorType.sessionExpired:
+        return l10n.sessionExpiredMessage;
+      case ErrorType.roomOccupied:
+        return l10n.roomOccupied;
+      case ErrorType.custom:
+        return getCustomMessage(error) ?? l10n.errorOccurredMessage;
+      case ErrorType.unknown:
+        return l10n.errorOccurredMessage;
+    }
+  }
+
+  /// Получить user-friendly сообщение из исключения (без локализации - fallback на русский)
+  /// Используется когда нет доступа к context
+  static String getUserFriendlyMessage(Object error) {
+    final errorType = getErrorType(error);
+
+    switch (errorType) {
+      case ErrorType.network:
+        return 'Ошибка сети. Проверьте подключение к интернету.';
+      case ErrorType.timeout:
+        return 'Превышено время ожидания. Попробуйте ещё раз.';
+      case ErrorType.sessionExpired:
+        return 'Сессия истекла. Войдите заново.';
+      case ErrorType.roomOccupied:
+        return 'Кабинет занят в это время';
+      case ErrorType.custom:
+        return getCustomMessage(error) ?? 'Произошла ошибка';
+      case ErrorType.unknown:
+        return 'Произошла ошибка';
+    }
   }
 
   /// Определяет, является ли ошибка проблемой с сетью
-  bool get _isConnectionError {
-    final msgLower = message.toLowerCase();
+  bool _isConnectionError(String displayMessage) {
+    final msgLower = displayMessage.toLowerCase();
     return msgLower.contains('сеть') ||
+        msgLower.contains('network') ||
         msgLower.contains('соединен') ||
+        msgLower.contains('connection') ||
         msgLower.contains('интернет') ||
-        msgLower.contains('подключ') ||
-        message == AppStrings.networkError;
+        msgLower.contains('подключ');
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    // Приоритет: явное message > локализованное из error > fallback
+    final displayMessage = message ??
+        (error != null ? getLocalizedErrorMessage(error!, l10n) : l10n.errorOccurred);
+
     // Компактный режим - только текст
     if (compact) {
       return Text(
-        message,
+        displayMessage,
         style: const TextStyle(color: AppColors.textSecondary),
       );
     }
+
+    final isConnectionErr = _isConnectionError(displayMessage);
 
     return Center(
       child: Padding(
@@ -124,13 +196,13 @@ class ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              _isConnectionError ? Icons.wifi_off : Icons.error_outline,
+              isConnectionErr ? Icons.wifi_off : Icons.error_outline,
               size: 64,
-              color: _isConnectionError ? AppColors.textSecondary : AppColors.error,
+              color: isConnectionErr ? AppColors.textSecondary : AppColors.error,
             ),
             const SizedBox(height: 16),
             Text(
-              _isConnectionError ? 'Нет соединения с сервером' : 'Произошла ошибка',
+              isConnectionErr ? l10n.noServerConnection : l10n.errorOccurredTitle,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -138,7 +210,7 @@ class ErrorView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              message,
+              displayMessage,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
@@ -159,7 +231,7 @@ class ErrorView extends StatelessWidget {
                   }
                 },
                 icon: const Icon(Icons.refresh),
-                label: const Text(AppStrings.retry),
+                label: Text(l10n.retry),
               ),
             ],
           ],

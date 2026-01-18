@@ -7,6 +7,7 @@ import 'package:kabinet/features/institution/providers/institution_provider.dart
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/shared/models/subject.dart'; // Subject, TeacherSubject
 
 /// Экран онбординга для нового преподавателя
@@ -125,6 +126,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
     final membershipAsync = ref.watch(myMembershipProvider(widget.institutionId));
@@ -182,7 +184,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                   TextButton(
                     onPressed: _isSaving ? null : _skipPage,
                     child: Text(
-                      'Пропустить',
+                      l10n.skip,
                       style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ),
@@ -198,10 +200,10 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                 onPageChanged: (page) => setState(() => _currentPage = page),
                 children: [
                   // Page 1: Выбор цвета
-                  _buildColorPage(theme),
+                  _buildColorPage(theme, l10n),
 
                   // Page 2: Выбор направлений
-                  _buildSubjectsPage(theme, subjectsAsync),
+                  _buildSubjectsPage(theme, subjectsAsync, l10n),
                 ],
               ),
             ),
@@ -232,7 +234,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              _currentPage == 0 ? 'Далее' : 'Готово',
+                              _currentPage == 0 ? l10n.next : l10n.done,
                               style: const TextStyle(fontSize: 16),
                             ),
                             const SizedBox(width: 8),
@@ -261,7 +263,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
     );
   }
 
-  Widget _buildColorPage(ThemeData theme) {
+  Widget _buildColorPage(ThemeData theme, AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -276,7 +278,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
           ),
           const SizedBox(height: 24),
           Text(
-            'Добро пожаловать!',
+            l10n.welcome,
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -284,7 +286,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
           ),
           const SizedBox(height: 12),
           Text(
-            'Выберите цвет для отображения\nваших занятий в расписании',
+            l10n.selectColorForLessons,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -302,7 +304,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
     );
   }
 
-  Widget _buildSubjectsPage(ThemeData theme, AsyncValue<List<Subject>> subjectsAsync) {
+  Widget _buildSubjectsPage(ThemeData theme, AsyncValue<List<Subject>> subjectsAsync, AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -315,7 +317,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
           ),
           const SizedBox(height: 24),
           Text(
-            'Ваши направления',
+            l10n.yourDirections,
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -323,7 +325,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
           ),
           const SizedBox(height: 12),
           Text(
-            'Выберите предметы, которые вы ведёте',
+            l10n.selectSubjectsYouTeach,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -332,7 +334,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
           const SizedBox(height: 32),
           subjectsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('Ошибка загрузки: $e'),
+            error: (e, _) => Text(l10n.loadingError(e.toString())),
             data: (subjects) {
               if (subjects.isEmpty) {
                 return Container(
@@ -350,7 +352,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'В заведении пока нет предметов',
+                        l10n.noSubjectsInInstitution,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -358,7 +360,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Владелец может добавить их в настройках',
+                        l10n.ownerCanAddInSettings,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -453,7 +455,7 @@ class _TeacherOnboardingScreenState extends ConsumerState<TeacherOnboardingScree
           const SizedBox(height: 24),
           if (_selectedSubjectIds.isNotEmpty)
             Text(
-              'Выбрано: ${_selectedSubjectIds.length}',
+              l10n.selectedCount(_selectedSubjectIds.length),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.success,
                 fontWeight: FontWeight.w500,

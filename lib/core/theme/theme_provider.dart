@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _themePrefKey = 'theme_mode';
@@ -44,10 +45,10 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 }
 
 /// Получить локализованное название темы
-String getThemeModeLabel(ThemeMode mode) {
+String getThemeModeLabel(ThemeMode mode, AppLocalizations l10n) {
   return switch (mode) {
-    ThemeMode.system => 'Как в системе',
-    ThemeMode.dark => 'Тёмная',
-    ThemeMode.light => 'Светлая',
+    ThemeMode.system => l10n.themeSystem,
+    ThemeMode.dark => l10n.themeDark,
+    ThemeMode.light => l10n.themeLight,
   };
 }

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/utils/date_utils.dart';
@@ -298,6 +298,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final allRoomsAsync = ref.watch(roomsProvider(widget.institutionId));
     final lessonsAsync = ref.watch(
       lessonsByInstitutionStreamProvider(InstitutionDateParams(widget.institutionId, _selectedDate)),
@@ -357,26 +358,26 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
     };
 
     // Получаем название выбранного кабинета для заголовка (из всех кабинетов)
-    String title = 'Расписание';
+    String title = l10n.schedule;
     if (_selectedRoomId != null) {
       allRoomsAsync.whenData((rooms) {
         final room = rooms.where((r) => r.id == _selectedRoomId).firstOrNull;
         if (room != null) {
-          title = room.number != null ? 'Кабинет ${room.number}' : room.name;
+          title = room.number != null ? l10n.roomWithNumberTitle(room.number!) : room.name;
         }
       });
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_selectedRoomId != null ? title : 'Расписание'),
+        title: Text(_selectedRoomId != null ? title : l10n.schedule),
         actions: [
           Stack(
             children: [
               IconButton(
                 icon: const Icon(Icons.filter_list),
                 onPressed: _showFilterSheet,
-                tooltip: 'Фильтры',
+                tooltip: l10n.filtersTooltip,
               ),
               if (!_filters.isEmpty)
                 Positioned(
@@ -406,7 +407,7 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
           ),
           TextButton(
             onPressed: _goToToday,
-            child: const Text(AppStrings.today),
+            child: Text(l10n.today),
           ),
         ],
       ),
@@ -1076,20 +1077,22 @@ class _AllRoomsScheduleScreenState extends ConsumerState<AllRoomsScheduleScreen>
 
     if (!canCreateLessons && !canCreateBookings) return null;
 
+    final l10n = AppLocalizations.of(context);
     // Открываем единую форму с переключателем режима
     return FloatingActionButton(
       onPressed: () => _showQuickAddLessonSheet(rooms),
-      tooltip: 'Добавить',
+      tooltip: l10n.addTooltip,
       child: const Icon(Icons.add),
     );
   }
 
   /// Показывает форму быстрого добавления занятия (из FAB)
   void _showQuickAddLessonSheet(List<Room> rooms) {
+    final l10n = AppLocalizations.of(context);
     if (rooms.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Сначала добавьте кабинет'),
+        SnackBar(
+          content: Text(l10n.addRoomFirst),
           backgroundColor: Colors.orange,
         ),
       );
@@ -1193,6 +1196,7 @@ class _ViewModeTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -1200,14 +1204,14 @@ class _ViewModeTabs extends StatelessWidget {
           // Переключатель стиля дневного вида (только для режима "День")
           if (viewMode == ScheduleViewMode.day) ...[
             SegmentedButton<DayViewStyle>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: DayViewStyle.compact,
-                  label: Text('Компакт.'),
+                  label: Text(l10n.compactView),
                 ),
                 ButtonSegment(
                   value: DayViewStyle.detailed,
-                  label: Text('Подробн.'),
+                  label: Text(l10n.detailedView),
                 ),
               ],
               selected: {dayViewStyle},
@@ -1225,15 +1229,15 @@ class _ViewModeTabs extends StatelessWidget {
           // Переключатель День/Неделя
           Expanded(
             child: SegmentedButton<ScheduleViewMode>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: ScheduleViewMode.day,
-                  label: Text('День'),
+                  label: Text(l10n.dayView),
                   icon: Icon(Icons.view_day),
                 ),
                 ButtonSegment(
                   value: ScheduleViewMode.week,
-                  label: Text('Неделя'),
+                  label: Text(l10n.weekView),
                   icon: Icon(Icons.view_week),
                 ),
               ],
@@ -1583,6 +1587,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final rooms = widget.rooms;
     final lessons = widget.lessons;
     final bookings = widget.bookings;
@@ -1597,9 +1602,9 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
               color: AppColors.textTertiary,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Нет кабинетов',
-              style: TextStyle(color: AppColors.textSecondary),
+            Text(
+              l10n.noRooms,
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
             if (widget.canManageRooms && widget.onAddRoom != null) ...[
               const SizedBox(height: 16),
@@ -1610,7 +1615,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                   child: ElevatedButton.icon(
                     onPressed: widget.onAddRoom,
                     icon: const Icon(Icons.add),
-                    label: const Text('Добавить кабинет'),
+                    label: Text(l10n.addRoom),
                   ),
                 ),
               ),
@@ -2025,8 +2030,9 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     // Показываем время только для занятий >= 30 минут
     final showTime = durationMinutes >= 30;
 
+    final l10n = AppLocalizations.of(context);
     final color = _getLessonColor(lesson);
-    final participant = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
+    final participant = lesson.student?.name ?? lesson.group?.name ?? l10n.lessonDefault;
 
     // Для коротких занятий уменьшаем padding
     final isShort = durationMinutes < 30;
@@ -2203,7 +2209,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
-                            booking.description ?? 'Забронировано',
+                            booking.description ?? AppLocalizations.of(context).booked,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: fontSize,
@@ -2267,7 +2273,7 @@ class _AllRoomsTimeGridState extends State<_AllRoomsTimeGrid> {
     final iconSize = isShort ? 10.0 : 12.0;
 
     // Имя ученика
-    final studentName = slot.student?.name ?? 'Ученик';
+    final studentName = slot.student?.name ?? AppLocalizations.of(context).studentDefault;
 
     // Пометка о замене кабинета
     final hasReplacement = slot.hasReplacement &&
@@ -2560,6 +2566,7 @@ class _CompactDayGridState extends State<_CompactDayGrid> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final rooms = widget.rooms;
     final hoursCount = widget.endHour - widget.startHour;
 
@@ -2570,13 +2577,13 @@ class _CompactDayGridState extends State<_CompactDayGrid> {
           children: [
             Icon(Icons.meeting_room_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
-            Text('Нет кабинетов', style: Theme.of(context).textTheme.titleMedium),
+            Text(l10n.noRooms, style: Theme.of(context).textTheme.titleMedium),
             if (widget.canManageRooms && widget.onAddRoom != null) ...[
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: widget.onAddRoom,
                 icon: const Icon(Icons.add),
-                label: const Text('Добавить кабинет'),
+                label: Text(l10n.addRoom),
               ),
             ],
           ],
@@ -2613,7 +2620,7 @@ class _CompactDayGridState extends State<_CompactDayGrid> {
                       border: Border(right: BorderSide(color: Theme.of(context).dividerColor)),
                     ),
                     child: Text(
-                      'Час',
+                      l10n.hour,
                       style: TextStyle(
                         fontSize: 11,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -2928,7 +2935,7 @@ class _CompactDayGridState extends State<_CompactDayGrid> {
                 const SizedBox(width: 2),
                 Expanded(
                   child: Text(
-                    booking.description ?? 'Бронь',
+                    booking.description ?? AppLocalizations.of(context).booking,
                     style: TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: Colors.grey[700]),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -3266,7 +3273,11 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
   bool _isSyncing = false;
   double _lastScrollOffset = 0.0; // Храним последнюю позицию скролла
 
-  static const _weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  /// Helper to get localized weekday names
+  List<String> _getWeekDays(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return [l10n.mondayShort, l10n.tuesdayShort, l10n.wednesdayShort, l10n.thursdayShort, l10n.fridayShort, l10n.saturdayShort, l10n.sundayShort];
+  }
 
   @override
   void initState() {
@@ -3383,6 +3394,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final rooms = widget.rooms;
     if (rooms.isEmpty) {
       return Center(
@@ -3395,9 +3407,9 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
               color: AppColors.textTertiary,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Нет кабинетов',
-              style: TextStyle(color: AppColors.textSecondary),
+            Text(
+              l10n.noRooms,
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
             if (widget.canManageRooms && widget.onAddRoom != null) ...[
               const SizedBox(height: 16),
@@ -3408,7 +3420,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                   child: ElevatedButton.icon(
                     onPressed: widget.onAddRoom,
                     icon: const Icon(Icons.add),
-                    label: const Text('Добавить кабинет'),
+                    label: Text(l10n.addRoom),
                   ),
                 ),
               ),
@@ -3510,7 +3522,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                       border: Border(right: BorderSide(color: Theme.of(context).dividerColor)),
                     ),
                     child: Text(
-                      'Неделя',
+                      l10n.weekView,
                       style: TextStyle(
                         fontSize: 11,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -3595,7 +3607,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _weekDays[dayIndex],
+                    _getWeekDays(context)[dayIndex],
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -3675,7 +3687,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _weekDays[dayIndex],
+                        _getWeekDays(context)[dayIndex],
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -3894,7 +3906,7 @@ class _WeekTimeGridState extends State<_WeekTimeGrid> {
           const SizedBox(width: 2),
           Expanded(
             child: Text(
-              '${booking.startTime.hour}:${booking.startTime.minute.toString().padLeft(2, '0')} ${booking.description ?? 'Бронь'}',
+              '${booking.startTime.hour}:${booking.startTime.minute.toString().padLeft(2, '0')} ${booking.description ?? AppLocalizations.of(context).booking}',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
@@ -4065,7 +4077,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, AppLocalizations.of(context))),
             backgroundColor: Colors.red,
           ),
         );
@@ -4080,7 +4092,8 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       accentColor = AppColors.success;
     }
 
-    final participantName = lesson.student?.name ?? lesson.group?.name ?? 'Занятие';
+    final l10n = AppLocalizations.of(context);
+    final participantName = lesson.student?.name ?? lesson.group?.name ?? l10n.lessonDefault;
 
     // Получаем имя преподавателя из списка участников
     final membersAsync = ref.watch(membersProvider(widget.institutionId));
@@ -4189,9 +4202,9 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                           color: AppColors.error.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
-                          'Отменено',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.cancelled,
+                          style: const TextStyle(
                             color: AppColors.error,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -4225,14 +4238,14 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                       // Время
                       _DetailRow(
                         icon: Icons.access_time_rounded,
-                        label: 'Время',
+                        label: l10n.time,
                         value: timeStr,
                       ),
                       // Кабинет
                       if (lesson.room != null)
                         _DetailRow(
                           icon: Icons.door_front_door_rounded,
-                          label: 'Кабинет',
+                          label: l10n.room,
                           value: lesson.room!.number != null
                               ? '№${lesson.room!.number}'
                               : lesson.room!.name,
@@ -4241,30 +4254,30 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                       if (lesson.subject != null)
                         _DetailRow(
                           icon: Icons.music_note_rounded,
-                          label: 'Предмет',
+                          label: l10n.subject,
                           value: lesson.subject!.name,
                         ),
                       // Тип занятия
                       if (lesson.lessonType != null)
                         _DetailRow(
                           icon: Icons.category_rounded,
-                          label: 'Тип',
+                          label: l10n.typeLabel,
                           value: lesson.lessonType!.name,
                         ),
                       // Стоимость
                       if (hasPrice)
                         _DetailRow(
                           icon: Icons.payments_rounded,
-                          label: 'Стоимость',
+                          label: l10n.costLabel,
                           value: '${lesson.lessonType!.defaultPrice!.toStringAsFixed(0)} ₸',
                           valueColor: AppColors.primary,
                         ),
                       // Повторяющееся
                       if (lesson.isRepeating)
-                        const _DetailRow(
+                        _DetailRow(
                           icon: Icons.repeat_rounded,
-                          label: 'Повтор',
-                          value: 'Да',
+                          label: l10n.repeatSeriesLabel,
+                          value: l10n.yesLabel,
                         ),
                     ],
                   ),
@@ -4301,11 +4314,11 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                       ),
                     ),
                     child: SwitchListTile(
-                      title: const Text('Списано с баланса'),
+                      title: Text(l10n.deductedFromBalance),
                       subtitle: Text(
                         _isDeducted
-                            ? 'Занятие списано с баланса ученика'
-                            : 'Занятие не списано с баланса',
+                            ? l10n.lessonDeductedFromBalance
+                            : l10n.lessonNotDeducted,
                         style: TextStyle(
                           fontSize: 12,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -4334,7 +4347,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                       // Проведено
                       Expanded(
                         child: _StatusButton(
-                          label: 'Проведено',
+                          label: l10n.completedLabel,
                           icon: Icons.check_circle_rounded,
                           isActive: _isCompleted,
                           color: AppColors.success,
@@ -4347,7 +4360,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _StatusButton(
-                            label: 'Оплачено',
+                            label: l10n.paidLabel,
                             icon: Icons.monetization_on_rounded,
                             isActive: _isPaid,
                             color: AppColors.primary,
@@ -4377,7 +4390,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                           ? null
                           : _handleDeleteFromHistory,
                       icon: const Icon(Icons.delete_forever_rounded, size: 18),
-                      label: const Text('Удалить из истории'),
+                      label: Text(l10n.deleteFromHistory),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         foregroundColor: AppColors.error,
@@ -4420,7 +4433,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                                     );
                                   },
                             icon: const Icon(Icons.edit_rounded, size: 18),
-                            label: const Text('Изменить'),
+                            label: Text(l10n.edit),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
@@ -4438,7 +4451,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                                 ? null
                                 : _showCancelSheet,
                             icon: const Icon(Icons.cancel_outlined, size: 18),
-                            label: const Text('Отменить'),
+                            label: Text(l10n.cancel),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               foregroundColor: AppColors.error,
@@ -4463,7 +4476,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
                           ? null
                           : _handleSkipDate,
                       icon: const Icon(Icons.event_busy_rounded, size: 18),
-                      label: const Text('Пропустить эту дату'),
+                      label: Text(l10n.skipThisDateLabel),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
@@ -4540,8 +4553,8 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         _currentStatus = previousStatus;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Не удалось обновить статус'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).statusUpdateError),
           backgroundColor: Colors.red,
         ),
       );
@@ -4579,10 +4592,11 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       widget.onUpdated();
 
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(completed == true ? 'Занятие проведено' : 'Занятие отменено'),
+            content: Text(completed == true ? l10n.lessonCompleted : l10n.lessonCancelled),
           ),
         );
       }
@@ -4590,7 +4604,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text('${AppLocalizations.of(context).error}: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -4631,22 +4645,21 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     final schedule = lesson.scheduleSource as LessonSchedule;
     final dateStr = '${lesson.date.day}.${lesson.date.month.toString().padLeft(2, '0')}.${lesson.date.year}';
 
+    final l10n = AppLocalizations.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Пропустить дату'),
-        content: Text(
-          'Занятие не будет отображаться на $dateStr.\n\n'
-          'Это не создаст запись в истории занятий.',
-        ),
+        title: Text(l10n.skipDateTitle),
+        content: Text(l10n.lessonWillNotShowOnDate(dateStr)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Пропустить'),
+            child: Text(l10n.skipLabel),
           ),
         ],
       ),
@@ -4670,13 +4683,13 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Дата пропущена')),
+          SnackBar(content: Text(l10n.dateSkipped)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text('${l10n.error}: $e'), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -4764,10 +4777,11 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
       ref.invalidate(studentsProvider(widget.institutionId));
 
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(shouldDeduct ? 'Занятие списано' : 'Занятие возвращено'),
+            content: Text(shouldDeduct ? l10n.lessonDeducted : l10n.lessonReturned),
             backgroundColor: Colors.green,
           ),
         );
@@ -4775,6 +4789,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
     } catch (e) {
       // Откат при ошибке
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() {
           _isDeducted = previousDeducted;
           _currentSubscriptionId = previousSubscriptionId;
@@ -4783,7 +4798,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: ${ErrorView.getUserFriendlyMessage(e)}'),
+            content: Text('${l10n.error}: ${ErrorView.getLocalizedErrorMessage(e, l10n)}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -4793,6 +4808,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
 
   /// Удаление занятия из истории с восстановлением счётчиков
   Future<void> _handleDeleteFromHistory() async {
+    final l10n = AppLocalizations.of(context);
     final lesson = widget.lesson;
 
     // Определяем, нужно ли возвращать занятие на баланс
@@ -4806,30 +4822,30 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
 
     String message;
     if (hasPayment) {
-      message = 'Занятие будет удалено из истории.\nОплата за занятие также будет удалена.';
+      message = l10n.lessonDeletedWithPayment;
       if (needsReturn) {
-        message += '\nСписанное занятие будет возвращено на баланс ученика.';
+        message += '\n${l10n.lessonDeletedWithReturn.split('\n').last}';
       }
     } else if (needsReturn && lesson.studentId != null) {
-      message = 'Занятие будет удалено из истории.\nСписанное занятие будет возвращено на баланс ученика.';
+      message = l10n.lessonDeletedWithReturn;
     } else {
-      message = 'Занятие будет полностью удалено из истории.';
+      message = l10n.lessonDeletedCompletely;
     }
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Удалить занятие?'),
+        title: Text(l10n.deleteLessonQuestion),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -4877,8 +4893,8 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         Navigator.pop(context);
         widget.onUpdated();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Занятие удалено из истории'),
+          SnackBar(
+            content: Text(l10n.lessonDeletedFromHistory),
             backgroundColor: Colors.green,
           ),
         );
@@ -4888,7 +4904,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: ${ErrorView.getUserFriendlyMessage(e)}'),
+            content: Text('${l10n.error}: ${ErrorView.getLocalizedErrorMessage(e, l10n)}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -4897,6 +4913,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
   }
 
   Future<void> _handlePayment() async {
+    final l10n = AppLocalizations.of(context);
     final lesson = widget.lesson;
     if (lesson.studentId == null || lesson.lessonType?.defaultPrice == null) return;
 
@@ -4904,7 +4921,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
 
     try {
       final paymentController = ref.read(paymentControllerProvider.notifier);
-      final lessonTypeName = lesson.lessonType?.name ?? 'Оплата занятия';
+      final lessonTypeName = lesson.lessonType?.name ?? l10n.lessonPaymentDefault;
 
       // Если занятие привязано к подписке — возвращаем занятие в абонемент
       if (lesson.subscriptionId != null) {
@@ -4926,7 +4943,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
           studentId: lesson.studentId!,
           amount: lesson.lessonType!.defaultPrice!,
           lessonsCount: 0,
-          comment: 'lesson:${lesson.id}|$lessonTypeName (возврат в абонемент)',
+          comment: 'lesson:${lesson.id}|$lessonTypeName (return to subscription)',
         );
       } else {
         // Обычная логика для занятий БЕЗ привязки к подписке
@@ -4953,8 +4970,8 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
           _isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Оплата добавлена'),
+          SnackBar(
+            content: Text(l10n.paymentAddedMessage),
             backgroundColor: Colors.green,
           ),
         );
@@ -4965,7 +4982,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text('${l10n.error}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -4974,6 +4991,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
   }
 
   Future<void> _handleRemovePayment() async {
+    final l10n = AppLocalizations.of(context);
     final lesson = widget.lesson;
 
     setState(() => _isLoading = true);
@@ -4993,8 +5011,8 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         });
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Оплата удалена'),
+            SnackBar(
+              content: Text(l10n.paymentDeletedMessage),
               backgroundColor: Colors.orange,
             ),
           );
@@ -5006,7 +5024,7 @@ class _LessonDetailSheetState extends ConsumerState<_LessonDetailSheet> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка удаления оплаты: $e'),
+            content: Text(l10n.paymentDeleteError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -5099,6 +5117,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
   }
 
   Future<void> _cancel() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _isLoading = true);
 
     final controller = ref.read(lessonControllerProvider.notifier);
@@ -5113,7 +5132,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
         institutionId: widget.institutionId,
       );
       success = count > 0;
-      message = 'Отменено $count занятий';
+      message = l10n.cancelledLessonsCount(count);
     } else {
       // Отмена одного занятия
       success = await controller.cancelLesson(
@@ -5122,7 +5141,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
         institutionId: widget.institutionId,
         studentIdsToDeduct: widget.lesson.isGroupLesson ? _selectedStudentIds.toList() : null,
       );
-      message = 'Занятие отменено';
+      message = l10n.lessonCancelledMessage;
     }
 
     if (!mounted) return;
@@ -5142,6 +5161,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final lesson = widget.lesson;
     final isCompleted = lesson.status == LessonStatus.completed;
@@ -5187,7 +5207,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
               children: [
                 // Заголовок
                 Text(
-                  'Отменить занятие',
+                  l10n.cancelLessonTitle,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -5218,7 +5238,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Занятие будет отменено и архивировано без списания с баланса',
+                            l10n.lessonWillBeCancelledNoDeduction,
                             style: TextStyle(color: colorScheme.primary),
                           ),
                         ),
@@ -5244,7 +5264,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Списанное при проведении занятие будет автоматически возвращено на баланс.',
+                            l10n.deductedLessonWillBeReturned,
                             style: TextStyle(color: colorScheme.primary),
                           ),
                         ),
@@ -5259,8 +5279,8 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                   SwitchListTile(
                     value: _deductFromBalance,
                     onChanged: (value) => setState(() => _deductFromBalance = value),
-                    title: const Text('Списать занятие с баланса'),
-                    subtitle: const Text('Занятие будет вычтено из предоплаченных'),
+                    title: Text(l10n.deductFromBalanceTitle),
+                    subtitle: Text(l10n.lessonWillBeDeducted),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ],
@@ -5269,7 +5289,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                 if (canShowDeductOption && _deductFromBalance && lesson.isGroupLesson) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Кому списать занятие:',
+                    l10n.whoToDeductLesson,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
@@ -5286,8 +5306,8 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                           }
                         });
                       },
-                      title: Text(ls.student?.name ?? 'Ученик'),
-                      subtitle: Text('Баланс: ${ls.student?.balance ?? 0}'),
+                      title: Text(ls.student?.name ?? l10n.studentDefault),
+                      subtitle: Text(l10n.balanceLabel(ls.student?.balance ?? 0)),
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                     );
@@ -5299,21 +5319,21 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                 if (showSeriesOption) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Это занятие является частью серии ($_followingCount шт.)',
+                    l10n.lessonIsPartOfSeries(_followingCount),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 8),
                   SegmentedButton<bool>(
-                    segments: const [
+                    segments: [
                       ButtonSegment(
                         value: false,
-                        label: Text('Только это'),
+                        label: Text(l10n.onlyThis),
                       ),
                       ButtonSegment(
                         value: true,
-                        label: Text('Это и последующие'),
+                        label: Text(l10n.thisAndFollowing),
                       ),
                     ],
                     selected: {_cancelFollowing},
@@ -5336,7 +5356,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Списание применится только к сегодняшнему занятию',
+                              l10n.deductionAppliesToTodayOnly,
                               style: TextStyle(fontSize: 12, color: colorScheme.primary),
                             ),
                           ),
@@ -5358,7 +5378,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Все занятия серии будут архивированы без списания',
+                              l10n.allSeriesLessonsWillBeArchived,
                               style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
                             ),
                           ),
@@ -5391,8 +5411,8 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                           )
                         : Text(
                             _cancelFollowing
-                                ? 'Отменить $_followingCount занятий'
-                                : 'Отменить занятие',
+                                ? l10n.cancelLessonsCount(_followingCount)
+                                : l10n.cancelLessonAction,
                           ),
                   ),
                 ),
@@ -5404,7 +5424,7 @@ class _CancelLessonSheetState extends ConsumerState<_CancelLessonSheet> {
                   width: double.infinity,
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Назад'),
+                    child: Text(l10n.back),
                   ),
                 ),
 
@@ -5442,6 +5462,7 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
   bool _isLoading = false;
 
   Future<void> _cancel() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _isLoading = true);
 
     try {
@@ -5461,7 +5482,7 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
           studentId,
           deductFromBalance: _deductFromBalance,
         );
-        message = 'Серия занятий отменена';
+        message = l10n.lessonSeriesCancelled;
       } else {
         // Отмена только этого занятия
         final lessonId = await scheduleController.createLessonFromSchedule(
@@ -5482,8 +5503,8 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
           );
         }
         message = _deductFromBalance
-            ? 'Занятие отменено и списано с баланса'
-            : 'Занятие отменено';
+            ? l10n.lessonCancelledAndDeducted
+            : l10n.lessonCancelledMessage;
       }
 
       if (!mounted) return;
@@ -5503,8 +5524,9 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
       );
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text('${l10n.error}: $e'), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -5514,6 +5536,7 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     // Определяем дату занятия относительно сегодня
@@ -5555,7 +5578,7 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
               children: [
                 // Заголовок
                 Text(
-                  'Отменить занятие',
+                  l10n.cancelLessonTitle,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -5564,7 +5587,7 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
 
                 // Информация о занятии
                 Text(
-                  widget.schedule.student?.name ?? widget.lesson.student?.name ?? 'Ученик',
+                  widget.schedule.student?.name ?? widget.lesson.student?.name ?? l10n.studentDefault,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -5576,8 +5599,8 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
                   SwitchListTile(
                     value: _deductFromBalance,
                     onChanged: (value) => setState(() => _deductFromBalance = value),
-                    title: const Text('Списать занятие с баланса'),
-                    subtitle: const Text('Занятие будет вычтено из предоплаченных'),
+                    title: Text(l10n.deductFromBalanceTitle),
+                    subtitle: Text(l10n.lessonWillBeDeducted),
                     contentPadding: EdgeInsets.zero,
                   ),
                   const SizedBox(height: 8),
@@ -5585,21 +5608,21 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
 
                 // Выбор: только это занятие или вся серия
                 Text(
-                  'Это занятие является частью постоянного расписания',
+                  l10n.lessonIsPartOfPermanentSchedule,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<bool>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                       value: false,
-                      label: Text('Только это'),
+                      label: Text(l10n.onlyThis),
                     ),
                     ButtonSegment(
                       value: true,
-                      label: Text('Это и все последующие'),
+                      label: Text(l10n.thisAndAllFollowing),
                     ),
                   ],
                   selected: {_cancelFollowing},
@@ -5630,7 +5653,7 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Отменить занятие'),
+                        : Text(AppLocalizations.of(context).cancelLessonTitle),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -5640,7 +5663,7 @@ class _VirtualCancelLessonSheetState extends ConsumerState<_VirtualCancelLessonS
                   width: double.infinity,
                   child: TextButton(
                     onPressed: _isLoading ? null : () => Navigator.pop(context),
-                    child: const Text('Назад'),
+                    child: Text(AppLocalizations.of(context).back),
                   ),
                 ),
 
@@ -5697,6 +5720,7 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final participants = widget.lesson.lessonStudents ?? [];
 
@@ -5716,7 +5740,7 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
               Icon(Icons.groups, size: 20, color: colorScheme.onSurfaceVariant),
               const SizedBox(width: 8),
               Text(
-                'Участники',
+                l10n.participantsLabel,
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
@@ -5747,7 +5771,7 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
           // Список участников
           if (participants.isEmpty)
             Text(
-              'Нет участников',
+              l10n.noParticipantsMessage,
               style: TextStyle(color: colorScheme.onSurfaceVariant),
             )
           else
@@ -5763,7 +5787,7 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
                 OutlinedButton.icon(
                   onPressed: _isUpdating ? null : _showAddGuestDialog,
                   icon: const Icon(Icons.person_add, size: 18),
-                  label: const Text('Добавить гостя'),
+                  label: Text(AppLocalizations.of(context).addGuest),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     shape: RoundedRectangleBorder(
@@ -5776,7 +5800,7 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
                   ElevatedButton.icon(
                     onPressed: _isUpdating ? null : _handleGroupPayments,
                     icon: const Icon(Icons.monetization_on, size: 18),
-                    label: const Text('Оплатить'),
+                    label: Text(AppLocalizations.of(context).pay),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -5795,8 +5819,9 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
   }
 
   Widget _buildParticipantTile(LessonStudent ls) {
+    final l10n = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final studentName = ls.student?.name ?? 'Неизвестный';
+    final studentName = ls.student?.name ?? l10n.unknownStudent;
     final attended = _attendanceState[ls.studentId] ?? ls.attended;
     final shouldPay = _paymentState[ls.studentId] ?? false;
 
@@ -5832,7 +5857,7 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
           if (widget.hasPrice && !widget.isCompleted) ...[
             const SizedBox(width: 4),
             Tooltip(
-              message: 'Оплата',
+              message: l10n.paymentLabel,
               child: SizedBox(
                 width: 24,
                 height: 24,
@@ -5867,7 +5892,7 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
                 color: colorScheme.onSurfaceVariant,
               ),
               onPressed: _isUpdating ? null : () => _removeParticipant(ls.studentId, ls.student?.name),
-              tooltip: 'Убрать из занятия',
+              tooltip: l10n.removeFromLessonTooltip,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               padding: EdgeInsets.zero,
             ),
@@ -5949,9 +5974,10 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
       }
 
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Оплата записана: ${studentsToProcess.length} ${_pluralStudents(studentsToProcess.length)}'),
+            content: Text(l10n.paymentRecorded(studentsToProcess.length, _pluralStudents(studentsToProcess.length))),
             behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.success,
           ),
@@ -5959,9 +5985,10 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка оплаты: $e'),
+            content: Text(l10n.paymentErrorMessage(e.toString())),
             behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.error,
           ),
@@ -5976,29 +6003,31 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
   }
 
   String _pluralStudents(int count) {
-    if (count % 10 == 1 && count % 100 != 11) return 'ученик';
-    if ([2, 3, 4].contains(count % 10) && ![12, 13, 14].contains(count % 100)) return 'ученика';
-    return 'учеников';
+    final l10n = AppLocalizations.of(context);
+    if (count % 10 == 1 && count % 100 != 11) return l10n.studentSingular;
+    if ([2, 3, 4].contains(count % 10) && ![12, 13, 14].contains(count % 100)) return l10n.studentFew;
+    return l10n.studentMany;
   }
 
   Future<void> _removeParticipant(String studentId, String? studentName) async {
+    final l10n = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Убрать участника?'),
+        title: Text(l10n.removeParticipantQuestion),
         content: Text(
           studentName != null
-              ? 'Убрать $studentName из этого занятия?'
-              : 'Убрать участника из этого занятия?',
+              ? l10n.removeStudentFromLessonConfirm(studentName)
+              : l10n.removeParticipantFromLesson,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Убрать'),
+            child: Text(l10n.remove),
           ),
         ],
       ),
@@ -6061,9 +6090,9 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    const Text(
-                      'Добавить гостя',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      AppLocalizations.of(context).addGuest,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const Spacer(),
                     IconButton(
@@ -6076,14 +6105,14 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
               Expanded(
                 child: studentsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Ошибка: $e')),
+                  error: (e, _) => Center(child: Text('${AppLocalizations.of(context).error}: $e')),
                   data: (students) {
                     final availableStudents = students
                         .where((s) => !existingIds.contains(s.id))
                         .toList();
                     if (availableStudents.isEmpty) {
-                      return const Center(
-                        child: Text('Все ученики уже добавлены'),
+                      return Center(
+                        child: Text(AppLocalizations.of(context).allStudentsAlreadyAdded),
                       );
                     }
                     return ListView.builder(
@@ -6133,7 +6162,7 @@ class _GroupParticipantsSectionState extends ConsumerState<_GroupParticipantsSec
       widget.onUpdated();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$studentName добавлен как гость'),
+          content: Text(AppLocalizations.of(context).studentAddedAsGuest(studentName)),
           backgroundColor: Colors.green,
         ),
       );
@@ -6292,6 +6321,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
     final groupsAsync = ref.watch(studentGroupsProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsProvider(widget.institutionId));
@@ -6303,7 +6333,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, AppLocalizations.of(context))),
             backgroundColor: Colors.red,
           ),
         );
@@ -6326,7 +6356,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Редактировать занятие',
+                  l10n.editLessonTitle,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 IconButton(
@@ -6341,9 +6371,9 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
             InkWell(
               onTap: _selectDate,
               child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Дата',
-                  prefixIcon: Icon(Icons.calendar_today),
+                decoration: InputDecoration(
+                  labelText: l10n.dateLabel,
+                  prefixIcon: const Icon(Icons.calendar_today),
                 ),
                 child: Text(AppDateUtils.formatDayMonth(_date)),
               ),
@@ -6367,9 +6397,9 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 }
               },
               child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Время',
-                  prefixIcon: Icon(Icons.access_time),
+                decoration: InputDecoration(
+                  labelText: l10n.timeLabel,
+                  prefixIcon: const Icon(Icons.access_time),
                 ),
                 child: Text('${_formatTime(_startTime)} – ${_formatTime(_endTime)}'),
               ),
@@ -6383,14 +6413,14 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
               data: (rooms) {
                 return DropdownButtonFormField<String?>(
                   key: ValueKey('room_$_selectedRoomId'),
-                  decoration: const InputDecoration(
-                    labelText: 'Кабинет',
-                    prefixIcon: Icon(Icons.door_front_door),
+                  decoration: InputDecoration(
+                    labelText: l10n.roomLabel2,
+                    prefixIcon: const Icon(Icons.door_front_door),
                   ),
                   initialValue: _selectedRoomId,
                   items: rooms.map((r) => DropdownMenuItem<String?>(
                     value: r.id,
-                    child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
+                    child: Text(r.number != null ? l10n.roomWithNumberLabel(r.number!.toString()) : r.name),
                   )).toList(),
                   onChanged: (roomId) {
                     setState(() => _selectedRoomId = roomId);
@@ -6408,9 +6438,9 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 data: (groups) {
                   return DropdownButtonFormField<String?>(
                     key: ValueKey('group_$_selectedGroupId'),
-                    decoration: const InputDecoration(
-                      labelText: 'Группа',
-                      prefixIcon: Icon(Icons.groups),
+                    decoration: InputDecoration(
+                      labelText: l10n.groupLabel,
+                      prefixIcon: const Icon(Icons.groups),
                     ),
                     initialValue: _selectedGroupId,
                     items: groups.map((g) => DropdownMenuItem<String?>(
@@ -6430,9 +6460,9 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 data: (students) {
                   return DropdownButtonFormField<String?>(
                     key: ValueKey('student_$_selectedStudentId'),
-                    decoration: const InputDecoration(
-                      labelText: 'Ученик',
-                      prefixIcon: Icon(Icons.person),
+                    decoration: InputDecoration(
+                      labelText: l10n.studentFieldLabel,
+                      prefixIcon: const Icon(Icons.person),
                     ),
                     initialValue: _selectedStudentId,
                     items: students.map((s) => DropdownMenuItem<String?>(
@@ -6455,15 +6485,15 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 if (subjects.isEmpty) return const SizedBox.shrink();
                 return DropdownButtonFormField<String?>(
                   key: ValueKey('subject_$_selectedSubjectId'),
-                  decoration: const InputDecoration(
-                    labelText: 'Предмет',
-                    prefixIcon: Icon(Icons.music_note),
+                  decoration: InputDecoration(
+                    labelText: l10n.subjectLabel,
+                    prefixIcon: const Icon(Icons.music_note),
                   ),
                   initialValue: _selectedSubjectId,
                   items: [
-                    const DropdownMenuItem<String?>(
+                    DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('Не выбран'),
+                      child: Text(l10n.notSelectedOption),
                     ),
                     ...subjects.map((s) => DropdownMenuItem<String?>(
                       value: s.id,
@@ -6486,20 +6516,20 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
                 if (lessonTypes.isEmpty) return const SizedBox.shrink();
                 return DropdownButtonFormField<String?>(
                   key: ValueKey('type_$_selectedLessonTypeId'),
-                  decoration: const InputDecoration(
-                    labelText: 'Тип занятия',
-                    prefixIcon: Icon(Icons.category),
+                  decoration: InputDecoration(
+                    labelText: l10n.lessonTypeLabel,
+                    prefixIcon: const Icon(Icons.category),
                   ),
                   initialValue: _selectedLessonTypeId,
                   items: [
-                    const DropdownMenuItem<String?>(
+                    DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('Не выбран'),
+                      child: Text(l10n.notSelectedOption),
                     ),
                     ...lessonTypes.map((lt) => DropdownMenuItem<String?>(
                       value: lt.id,
                       child: Text(
-                        '${lt.name} (${lt.defaultDurationMinutes} мин)',
+                        '${lt.name} (${lt.defaultDurationMinutes} ${l10n.minutesUnit})',
                         overflow: TextOverflow.ellipsis,
                       ),
                     )),
@@ -6529,7 +6559,7 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
             ElevatedButton.icon(
               onPressed: controllerState.isLoading ? null : _saveChanges,
               icon: const Icon(Icons.save),
-              label: const Text('Сохранить изменения'),
+              label: Text(l10n.saveChanges),
             ),
 
             if (controllerState.isLoading)
@@ -6558,14 +6588,15 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
   }
 
   Future<void> _saveChanges() async {
+    final l10n = AppLocalizations.of(context);
     // Проверка минимальной длительности (15 минут)
     final startMinutes = _startTime.hour * 60 + _startTime.minute;
     final endMinutes = _endTime.hour * 60 + _endTime.minute;
     final durationMinutes = endMinutes - startMinutes;
     if (durationMinutes < 15) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Минимальная длительность занятия — 15 минут'),
+        SnackBar(
+          content: Text(l10n.minLessonDuration),
           backgroundColor: Colors.orange,
         ),
       );
@@ -6614,8 +6645,8 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
       widget.onUpdated();
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Занятие обновлено'),
+        SnackBar(
+          content: Text(l10n.lessonUpdatedMessage),
           backgroundColor: Colors.green,
         ),
       );
@@ -6632,26 +6663,30 @@ class _EditLessonSheetState extends ConsumerState<_EditLessonSheet> {
 enum _AddFormMode { lesson, booking }
 
 /// Тип повтора занятий
+/// NOTE: These labels are in Russian as enums cannot use l10n directly.
+/// They are converted to localized strings when displayed via getRepeatTypeLabel() in _QuickAddLessonSheet
 enum RepeatType {
-  none('Без повтора'),
-  daily('Каждый день'),
-  weekly('Каждую неделю'),
-  weekdays('По дням недели'),
-  custom('Ручной выбор дат');
+  none('none'),
+  daily('daily'),
+  weekly('weekly'),
+  weekdays('weekdays'),
+  custom('custom');
 
-  final String label;
-  const RepeatType(this.label);
+  final String key;
+  const RepeatType(this.key);
 }
 
 /// Область редактирования серии занятий
+/// NOTE: These labels are in Russian as enums cannot use l10n directly.
+/// They are converted to localized strings when displayed via getEditScopeLabel()
 enum EditScope {
-  thisOnly('Только это занятие'),
-  thisAndFollowing('Это и последующие'),
-  all('Все занятия серии'),
-  selected('Выбранные');
+  thisOnly('thisOnly'),
+  thisAndFollowing('thisAndFollowing'),
+  all('all'),
+  selected('selected');
 
-  final String label;
-  const EditScope(this.label);
+  final String key;
+  const EditScope(this.key);
 }
 
 /// Быстрое добавление кабинета из формы занятия
@@ -6691,7 +6726,7 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
       final room = await controller.create(
         institutionId: widget.institutionId,
         name: _nameController.text.isEmpty
-            ? 'Кабинет ${_numberController.text}'
+            ? AppLocalizations.of(context).roomWithNumberDefault(_numberController.text)
             : _nameController.text.trim(),
         number: _numberController.text.trim(),
       );
@@ -6701,7 +6736,7 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Кабинет "${room.number != null ? "№${room.number}" : room.name}" добавлен'),
+            content: Text(AppLocalizations.of(context).roomAddedMessage(room.number != null ? "№${room.number}" : room.name)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -6764,16 +6799,16 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Новый кабинет',
-                            style: TextStyle(
+                          Text(
+                            AppLocalizations.of(context).newRoom,
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Заполните данные кабинета',
+                            AppLocalizations.of(context).fillRoomData,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -6790,8 +6825,8 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
                 TextFormField(
                   controller: _numberController,
                   decoration: InputDecoration(
-                    labelText: 'Номер кабинета *',
-                    hintText: 'Например: 101',
+                    labelText: AppLocalizations.of(context).roomNumberRequired,
+                    hintText: AppLocalizations.of(context).roomNumberHint,
                     prefixIcon: const Icon(Icons.tag),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -6801,7 +6836,7 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
                   ),
                   keyboardType: TextInputType.number,
                   autofocus: true,
-                  validator: (v) => v == null || v.isEmpty ? 'Введите номер кабинета' : null,
+                  validator: (v) => v == null || v.isEmpty ? AppLocalizations.of(context).enterRoomNumber : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -6809,8 +6844,8 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название (опционально)',
-                    hintText: 'Например: Фортепианный',
+                    labelText: AppLocalizations.of(context).roomNameOptional,
+                    hintText: AppLocalizations.of(context).roomNameHint,
                     prefixIcon: const Icon(Icons.label_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -6838,9 +6873,9 @@ class _QuickAddRoomSheetState extends ConsumerState<_QuickAddRoomSheet> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Создать кабинет',
-                            style: TextStyle(
+                        : Text(
+                            AppLocalizations.of(context).createRoom,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -6911,7 +6946,7 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Выберите ученика',
+              AppLocalizations.of(context).selectStudentLabel,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -6928,7 +6963,7 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                     child: Text(
-                      'У вас нет своих учеников',
+                      AppLocalizations.of(context).noOwnStudentsMessage,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -6953,7 +6988,7 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Показать всех (${widget.otherStudents.length})',
+                            AppLocalizations.of(context).showAllStudentsCount(widget.otherStudents.length),
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w500,
@@ -6975,7 +7010,7 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
-                              'Остальные ученики',
+                              AppLocalizations.of(context).otherStudentsLabel,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -7002,7 +7037,7 @@ class _StudentPickerSheetState extends State<_StudentPickerSheet> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Скрыть',
+                            AppLocalizations.of(context).hideLabel,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w500,
@@ -7102,7 +7137,7 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ученик "${student.name}" добавлен'),
+            content: Text(AppLocalizations.of(context).studentNameAddedMessage(student.name)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -7166,15 +7201,15 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Новый ученик',
-                            style: TextStyle(
+                          Text(
+                            AppLocalizations.of(context).newStudent,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Быстрое добавление',
+                            AppLocalizations.of(context).quickAdd,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -7191,8 +7226,8 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'ФИО *',
-                    hintText: 'Иванов Иван Иванович',
+                    labelText: AppLocalizations.of(context).fullNameRequired,
+                    hintText: AppLocalizations.of(context).fullNameHint,
                     prefixIcon: const Icon(Icons.person_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -7201,7 +7236,7 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.words,
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя ученика' : null,
+                  validator: (v) => v == null || v.trim().isEmpty ? AppLocalizations.of(context).enterStudentName : null,
                   autofocus: true,
                 ),
                 const SizedBox(height: 16),
@@ -7210,7 +7245,7 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                 TextFormField(
                   controller: _phoneController,
                   decoration: InputDecoration(
-                    labelText: 'Телефон',
+                    labelText: AppLocalizations.of(context).phone,
                     hintText: '+7 (777) 123-45-67',
                     prefixIcon: const Icon(Icons.phone_outlined),
                     border: OutlineInputBorder(
@@ -7235,7 +7270,7 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Отмена'),
+                        child: Text(AppLocalizations.of(context).cancel),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -7255,9 +7290,9 @@ class _QuickAddStudentSheetState extends ConsumerState<_QuickAddStudentSheet> {
                                 width: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text(
-                                'Создать ученика',
-                                style: TextStyle(
+                            : Text(
+                                AppLocalizations.of(context).createStudent,
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -7319,7 +7354,7 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Предмет "${subject.name}" добавлен'),
+            content: Text(AppLocalizations.of(context).subjectNameAddedMessage(subject.name)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -7382,16 +7417,16 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Новый предмет',
-                            style: TextStyle(
+                          Text(
+                            AppLocalizations.of(context).newSubject,
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Добавьте предмет для занятий',
+                            AppLocalizations.of(context).addSubjectDescription,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -7408,8 +7443,8 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название предмета',
-                    hintText: 'Например: Фортепиано',
+                    labelText: AppLocalizations.of(context).subjectNameField,
+                    hintText: AppLocalizations.of(context).subjectNameHint,
                     prefixIcon: const Icon(Icons.edit_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -7421,7 +7456,7 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
                   autofocus: true,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Введите название предмета';
+                      return AppLocalizations.of(context).enterSubjectName;
                     }
                     return null;
                   },
@@ -7440,7 +7475,7 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Отмена'),
+                        child: Text(AppLocalizations.of(context).cancel),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -7460,9 +7495,9 @@ class _QuickAddSubjectSheetState extends ConsumerState<_QuickAddSubjectSheet> {
                                 width: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text(
-                                'Создать предмет',
-                                style: TextStyle(
+                            : Text(
+                                AppLocalizations.of(context).createSubject,
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -7530,8 +7565,8 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
       final customValue = int.tryParse(_customDurationController.text);
       if (customValue == null || customValue < 5 || customValue > 480) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Длительность должна быть от 5 до 480 минут'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).durationValidationError),
             backgroundColor: Colors.red,
           ),
         );
@@ -7558,7 +7593,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Тип занятия "${lessonType.name}" добавлен'),
+            content: Text(AppLocalizations.of(context).lessonTypeNameAddedMessage(lessonType.name)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -7621,16 +7656,16 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Новый тип занятия',
-                            style: TextStyle(
+                          Text(
+                            AppLocalizations.of(context).newLessonType,
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Настройте параметры занятия',
+                            AppLocalizations.of(context).configureLessonParams,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -7647,8 +7682,8 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название',
-                    hintText: 'Например: Индивидуальное занятие',
+                    labelText: AppLocalizations.of(context).nameField,
+                    hintText: AppLocalizations.of(context).lessonTypeNameHint,
                     prefixIcon: const Icon(Icons.edit_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -7660,7 +7695,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                   autofocus: true,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Введите название';
+                      return AppLocalizations.of(context).enterName;
                     }
                     return null;
                   },
@@ -7673,7 +7708,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                     Icon(Icons.timer_outlined, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(width: 8),
                     Text(
-                      'Длительность',
+                      AppLocalizations.of(context).duration,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
@@ -7690,7 +7725,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                     ..._popularDurations.map((duration) {
                       final isSelected = !_isCustomDuration && _durationMinutes == duration;
                       return ChoiceChip(
-                        label: Text('$duration мин'),
+                        label: Text(AppLocalizations.of(context).durationMinutesLabel(duration)),
                         selected: isSelected,
                         onSelected: (_) {
                           setState(() {
@@ -7712,7 +7747,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                     }),
                     // Chip "Другое"
                     ChoiceChip(
-                      label: const Text('Другое'),
+                      label: Text(AppLocalizations.of(context).other),
                       selected: _isCustomDuration,
                       onSelected: (_) {
                         setState(() => _isCustomDuration = true);
@@ -7740,9 +7775,9 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                           child: TextFormField(
                             controller: _customDurationController,
                             decoration: InputDecoration(
-                              labelText: 'Своя длительность',
-                              hintText: 'Введите минуты',
-                              suffixText: 'мин',
+                              labelText: AppLocalizations.of(context).customDuration,
+                              hintText: AppLocalizations.of(context).enterMinutes,
+                              suffixText: AppLocalizations.of(context).minSuffix,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -7761,8 +7796,8 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                 TextFormField(
                   controller: _priceController,
                   decoration: InputDecoration(
-                    labelText: 'Цена (необязательно)',
-                    hintText: 'Например: 5000',
+                    labelText: AppLocalizations.of(context).priceOptional,
+                    hintText: AppLocalizations.of(context).priceHint,
                     prefixIcon: const Icon(Icons.payments_outlined),
                     suffixText: '₸',
                     border: OutlineInputBorder(
@@ -7777,8 +7812,8 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
 
                 // Групповое занятие
                 SwitchListTile(
-                  title: const Text('Групповое занятие'),
-                  subtitle: const Text('Для нескольких учеников'),
+                  title: Text(AppLocalizations.of(context).groupLesson),
+                  subtitle: Text(AppLocalizations.of(context).forMultipleStudents),
                   value: _isGroup,
                   onChanged: (value) {
                     setState(() => _isGroup = value);
@@ -7799,7 +7834,7 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Отмена'),
+                        child: Text(AppLocalizations.of(context).cancel),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -7819,9 +7854,9 @@ class _QuickAddLessonTypeSheetState extends ConsumerState<_QuickAddLessonTypeShe
                                 width: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text(
-                                'Создать тип',
-                                style: TextStyle(
+                            : Text(
+                                AppLocalizations.of(context).createType,
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -7931,7 +7966,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Фильтры',
+                    AppLocalizations.of(context).filters,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   Row(
@@ -7939,7 +7974,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                       if (_hasFilters)
                         TextButton(
                           onPressed: _clearAll,
-                          child: const Text('Сбросить'),
+                          child: Text(AppLocalizations.of(context).reset),
                         ),
                       IconButton(
                         icon: const Icon(Icons.close),
@@ -7963,7 +7998,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
 
                   // Преподаватели
                   _buildSection(
-                    title: 'Преподаватели',
+                    title: AppLocalizations.of(context).teachers,
                     icon: Icons.person,
                     child: membersAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
@@ -7972,7 +8007,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                         items: members.where((m) => !m.isArchived).toList(),
                         selectedIds: _selectedTeachers,
                         getId: (m) => m.userId,
-                        getLabel: (m) => m.profile?.fullName ?? 'Без имени',
+                        getLabel: (m) => m.profile?.fullName ?? AppLocalizations.of(context).noName,
                         onChanged: (ids) => setState(() => _selectedTeachers = ids),
                       ),
                     ),
@@ -7985,7 +8020,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
 
                   // Типы занятий
                   _buildSection(
-                    title: 'Типы занятий',
+                    title: AppLocalizations.of(context).lessonTypes,
                     icon: Icons.category,
                     child: lessonTypesAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
@@ -8003,7 +8038,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
 
                   // Направления
                   _buildSection(
-                    title: 'Направления',
+                    title: AppLocalizations.of(context).subjects,
                     icon: Icons.music_note,
                     child: subjectsAsync.when(
                       loading: () => const Center(child: CircularProgressIndicator()),
@@ -8045,8 +8080,8 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                   minimumSize: const Size.fromHeight(48),
                 ),
                 child: Text(_hasFilters
-                    ? 'Применить фильтры'
-                    : 'Показать все'),
+                    ? AppLocalizations.of(context).applyFilters
+                    : AppLocalizations.of(context).showAll),
               ),
             ),
           ],
@@ -8068,11 +8103,11 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
 
         if (activeStudents.isEmpty) {
           return _buildSection(
-            title: 'Ученики',
+            title: AppLocalizations.of(context).students,
             icon: Icons.school,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('Нет учеников', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              child: Text(AppLocalizations.of(context).noStudents, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ),
           );
         }
@@ -8091,7 +8126,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                     Icon(Icons.school, size: 20, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 8),
                     Text(
-                      'Ученики',
+                      AppLocalizations.of(context).students,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -8133,7 +8168,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                   children: _selectedStudents.map((id) {
                     final student = activeStudents.where((s) => s.id == id).firstOrNull;
                     return Chip(
-                      label: Text(student?.name ?? 'Удалён'),
+                      label: Text(student?.name ?? AppLocalizations.of(context).deleted),
                       onDeleted: () {
                         setState(() {
                           _selectedStudents = Set.from(_selectedStudents)..remove(id);
@@ -8208,11 +8243,11 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
 
     String subtitle;
     if (widget.showAllRoomsOverride) {
-      subtitle = 'Временно показаны все';
+      subtitle = AppLocalizations.of(context).temporarilyShowingAllRooms;
     } else if (defaultRoomIds == null) {
-      subtitle = 'Не настроено';
+      subtitle = AppLocalizations.of(context).notConfiguredRooms;
     } else if (defaultRoomIds.isEmpty) {
-      subtitle = 'Все кабинеты';
+      subtitle = AppLocalizations.of(context).allRoomsDefault;
     } else {
       // Показываем названия выбранных кабинетов
       final selectedNames = rooms
@@ -8244,7 +8279,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               Icons.meeting_room_outlined,
               color: Theme.of(context).colorScheme.primary,
             ),
-            title: const Text('Кабинеты по умолчанию'),
+            title: Text(AppLocalizations.of(context).defaultRooms),
             subtitle: Text(
               subtitle,
               style: TextStyle(
@@ -8282,7 +8317,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                           Navigator.pop(context);
                         },
                         icon: const Icon(Icons.filter_alt, size: 18),
-                        label: const Text('Вернуть фильтр кабинетов'),
+                        label: Text(AppLocalizations.of(context).restoreRoomFilter),
                       )
                     : OutlinedButton.icon(
                         onPressed: () {
@@ -8290,7 +8325,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                           Navigator.pop(context);
                         },
                         icon: const Icon(Icons.visibility, size: 18),
-                        label: const Text('Показать все кабинеты'),
+                        label: Text(AppLocalizations.of(context).showAllRooms),
                       ),
               ),
             ),
@@ -8335,7 +8370,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     if (items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text('Нет данных', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        child: Text(AppLocalizations.of(context).noDataAvailableMessage, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
       );
     }
 
@@ -8384,10 +8419,29 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
   late Set<DateTime> _selectedDates;
   late DateTime _currentMonth;
 
-  static const _weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-  static const _months = [
-    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+  List<String> _getMonths(BuildContext context) => [
+    AppLocalizations.of(context).januaryMonth,
+    AppLocalizations.of(context).februaryMonth,
+    AppLocalizations.of(context).marchMonth,
+    AppLocalizations.of(context).aprilMonth,
+    AppLocalizations.of(context).mayMonth,
+    AppLocalizations.of(context).juneMonth,
+    AppLocalizations.of(context).julyMonth,
+    AppLocalizations.of(context).augustMonth,
+    AppLocalizations.of(context).septemberMonth,
+    AppLocalizations.of(context).octoberMonth,
+    AppLocalizations.of(context).novemberMonth,
+    AppLocalizations.of(context).decemberMonth,
+  ];
+
+  List<String> _getWeekDays(BuildContext context) => [
+    AppLocalizations.of(context).mondayShort2,
+    AppLocalizations.of(context).tuesdayShort2,
+    AppLocalizations.of(context).wednesdayShort2,
+    AppLocalizations.of(context).thursdayShort2,
+    AppLocalizations.of(context).fridayShort2,
+    AppLocalizations.of(context).saturdayShort2,
+    AppLocalizations.of(context).sundayShort2,
   ];
 
   @override
@@ -8456,7 +8510,7 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Выберите даты',
+                    AppLocalizations.of(context).selectDatesLabel,
                     style: theme.textTheme.titleLarge,
                   ),
                   if (_selectedDates.isNotEmpty)
@@ -8489,7 +8543,7 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
                     onPressed: _previousMonth,
                   ),
                   Text(
-                    '${_months[_currentMonth.month - 1]} ${_currentMonth.year}',
+                    '${_getMonths(context)[_currentMonth.month - 1]} ${_currentMonth.year}',
                     style: theme.textTheme.titleMedium,
                   ),
                   IconButton(
@@ -8504,7 +8558,7 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: _weekDays.map((day) => SizedBox(
+                children: _getWeekDays(context).map((day) => SizedBox(
                   width: 40,
                   child: Center(
                     child: Text(
@@ -8533,14 +8587,14 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Отмена'),
+                    child: Text(AppLocalizations.of(context).cancel),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: _selectedDates.isEmpty
                         ? null
                         : () => Navigator.pop(context, _selectedDates),
-                    child: const Text('Готово'),
+                    child: Text(AppLocalizations.of(context).done),
                   ),
                 ],
               ),
@@ -8654,6 +8708,36 @@ class _QuickAddLessonSheet extends ConsumerStatefulWidget {
 }
 
 class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
+  /// Helper method to get localized label for RepeatType
+  String _getRepeatTypeLabel(AppLocalizations l10n, RepeatType type) {
+    switch (type) {
+      case RepeatType.none:
+        return l10n.repeatNone;
+      case RepeatType.daily:
+        return l10n.repeatDaily;
+      case RepeatType.weekly:
+        return l10n.repeatWeeklyOption;
+      case RepeatType.weekdays:
+        return l10n.repeatWeekdays;
+      case RepeatType.custom:
+        return l10n.repeatCustom;
+    }
+  }
+
+  /// Helper method to get localized label for EditScope
+  String _getEditScopeLabel(AppLocalizations l10n, EditScope scope) {
+    switch (scope) {
+      case EditScope.thisOnly:
+        return l10n.editScopeThisOnly;
+      case EditScope.thisAndFollowing:
+        return l10n.editScopeThisAndFollowing;
+      case EditScope.all:
+        return l10n.editScopeAll;
+      case EditScope.selected:
+        return l10n.editScopeSelected;
+    }
+  }
+
   // Режим формы
   _AddFormMode _mode = _AddFormMode.lesson;
 
@@ -8790,6 +8874,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsProvider(widget.institutionId));
     final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
@@ -8806,7 +8891,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, AppLocalizations.of(context))),
             backgroundColor: Colors.red,
           ),
         );
@@ -8817,7 +8902,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, AppLocalizations.of(context))),
             backgroundColor: Colors.red,
           ),
         );
@@ -8874,16 +8959,16 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             ),
             // Переключатель режима: Занятие / Бронирование
             SegmentedButton<_AddFormMode>(
-              segments: const [
+              segments: [
                 ButtonSegment<_AddFormMode>(
                   value: _AddFormMode.lesson,
-                  label: Text('Занятие'),
-                  icon: Icon(Icons.school, size: 16),
+                  label: Text(l10n.lessonTab),
+                  icon: const Icon(Icons.school, size: 16),
                 ),
                 ButtonSegment<_AddFormMode>(
                   value: _AddFormMode.booking,
-                  label: Text('Бронь'),
-                  icon: Icon(Icons.lock_clock, size: 16),
+                  label: Text(l10n.bookingTab),
+                  icon: const Icon(Icons.lock_clock, size: 16),
                 ),
               ],
               selected: {_mode},
@@ -8914,24 +8999,24 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                       Expanded(
                         child: rooms.isEmpty
                             ? InputDecorator(
-                                decoration: const InputDecoration(
-                                  labelText: 'Кабинет *',
-                                  prefixIcon: Icon(Icons.door_front_door),
+                                decoration: InputDecoration(
+                                  labelText: '${l10n.room} *',
+                                  prefixIcon: const Icon(Icons.door_front_door),
                                 ),
                                 child: Text(
-                                  'Нет кабинетов',
+                                  l10n.noRoomsAvailable,
                                   style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 ),
                               )
                             : DropdownButtonFormField<Room>(
-                                decoration: const InputDecoration(
-                                  labelText: 'Кабинет *',
-                                  prefixIcon: Icon(Icons.door_front_door),
+                                decoration: InputDecoration(
+                                  labelText: '${l10n.room} *',
+                                  prefixIcon: const Icon(Icons.door_front_door),
                                 ),
                                 initialValue: _selectedRoom,
                                 items: rooms.map((r) => DropdownMenuItem<Room>(
                                   value: r,
-                                  child: Text(r.number != null ? 'Кабинет ${r.number}' : r.name),
+                                  child: Text(r.number != null ? l10n.roomWithNumber(r.number!) : r.name),
                                 )).toList(),
                                 onChanged: (room) {
                                   setState(() => _selectedRoom = room);
@@ -8944,7 +9029,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                         child: IconButton.filled(
                           onPressed: () => _showAddRoomDialog(),
                           icon: const Icon(Icons.add, size: 20),
-                          tooltip: 'Добавить кабинет',
+                          tooltip: l10n.addRoom,
                           style: IconButton.styleFrom(
                             backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                             foregroundColor: AppColors.primary,
@@ -8971,9 +9056,9 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                   }
                 },
                 child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Дата *',
-                    prefixIcon: Icon(Icons.calendar_today),
+                  decoration: InputDecoration(
+                    labelText: '${l10n.date} *',
+                    prefixIcon: const Icon(Icons.calendar_today),
                   ),
                   child: Text(AppDateUtils.formatDayMonth(_selectedDate)),
                 ),
@@ -8998,9 +9083,9 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                   }
                 },
                 child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Время *',
-                    prefixIcon: Icon(Icons.access_time),
+                  decoration: InputDecoration(
+                    labelText: '${l10n.time} *',
+                    prefixIcon: const Icon(Icons.access_time),
                   ),
                   child: Text('${_formatTime(_startTime)} – ${_formatTime(_endTime)}'),
                 ),
@@ -9012,7 +9097,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
             if (_mode == _AddFormMode.booking) ...[
                 // Выбор кабинетов (мультиселект)
                 Text(
-                  'Кабинеты',
+                  l10n.roomsTitle,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -9024,7 +9109,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                   children: widget.rooms.map((room) {
                     final isSelected = _selectedRoomIds.contains(room.id);
                     final roomLabel = room.number != null
-                        ? 'Каб. ${room.number}'
+                        ? l10n.roomShort(room.number!)
                         : room.name;
                     return FilterChip(
                       label: Text(roomLabel),
@@ -9044,11 +9129,11 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                   }).toList(),
                 ),
                 if (_selectedRoomIds.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      'Выберите хотя бы один кабинет',
-                      style: TextStyle(
+                      l10n.selectAtLeastOneRoom,
+                      style: const TextStyle(
                         color: AppColors.error,
                         fontSize: 12,
                       ),
@@ -9070,9 +9155,9 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                     }
                   },
                   child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Дата *',
-                      prefixIcon: Icon(Icons.calendar_today),
+                    decoration: InputDecoration(
+                      labelText: '${l10n.date} *',
+                      prefixIcon: const Icon(Icons.calendar_today),
                     ),
                     child: Text(AppDateUtils.formatDayMonth(_selectedDate)),
                   ),
@@ -9096,9 +9181,9 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                     }
                   },
                   child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Время *',
-                      prefixIcon: Icon(Icons.access_time),
+                    decoration: InputDecoration(
+                      labelText: '${l10n.time} *',
+                      prefixIcon: const Icon(Icons.access_time),
                     ),
                     child: Text('${_formatTime(_startTime)} – ${_formatTime(_endTime)}'),
                   ),
@@ -9108,10 +9193,10 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 // Описание
                 TextField(
                   controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Описание (опционально)',
-                    prefixIcon: Icon(Icons.description),
-                    hintText: 'Мероприятие, встреча и т.д.',
+                  decoration: InputDecoration(
+                    labelText: l10n.descriptionOptional,
+                    prefixIcon: const Icon(Icons.description),
+                    hintText: l10n.descriptionHint,
                   ),
                   maxLines: 2,
                 ),
@@ -9127,7 +9212,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                       ? null
                       : _createBooking,
                   icon: const Icon(Icons.lock),
-                  label: const Text('Забронировать'),
+                  label: Text(AppLocalizations.of(context).book),
                 ),
 
                 if (isLoading)
@@ -9149,16 +9234,16 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 return Column(
                   children: [
                     SegmentedButton<bool>(
-                      segments: const [
+                      segments: [
                         ButtonSegment(
                           value: false,
-                          label: Text('Ученик'),
-                          icon: Icon(Icons.person),
+                          label: Text(l10n.studentTab),
+                          icon: const Icon(Icons.person),
                         ),
                         ButtonSegment(
                           value: true,
-                          label: Text('Группа'),
-                          icon: Icon(Icons.groups),
+                          label: Text(l10n.groupTab),
+                          icon: const Icon(Icons.groups),
                         ),
                       ],
                       selected: {_isGroupLesson},
@@ -9206,12 +9291,12 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           Expanded(
                             child: allStudents.isEmpty
                                 ? InputDecorator(
-                                    decoration: const InputDecoration(
-                                      labelText: 'Ученик *',
-                                      prefixIcon: Icon(Icons.person),
+                                    decoration: InputDecoration(
+                                      labelText: '${l10n.student} *',
+                                      prefixIcon: const Icon(Icons.person),
                                     ),
                                     child: Text(
-                                      'Нет учеников',
+                                      l10n.noStudents,
                                       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                     ),
                                   )
@@ -9226,13 +9311,13 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                                     borderRadius: BorderRadius.circular(12),
                                     child: InputDecorator(
                                       decoration: InputDecoration(
-                                        labelText: 'Ученик *',
+                                        labelText: '${l10n.student} *',
                                         prefixIcon: const Icon(Icons.person),
                                         suffixIcon: const Icon(Icons.arrow_drop_down),
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                       ),
                                       child: Text(
-                                        currentStudent?.name ?? 'Выберите ученика',
+                                        currentStudent?.name ?? l10n.selectStudentPlaceholder,
                                         style: currentStudent != null
                                             ? null
                                             : TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
@@ -9246,7 +9331,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                             child: IconButton.filled(
                               onPressed: () => _showAddStudentDialog(),
                               icon: const Icon(Icons.add, size: 20),
-                              tooltip: 'Добавить ученика',
+                              tooltip: l10n.addStudent,
                               style: IconButton.styleFrom(
                                 backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                                 foregroundColor: AppColors.primary,
@@ -9275,24 +9360,24 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                         Expanded(
                           child: groups.isEmpty
                               ? InputDecorator(
-                                  decoration: const InputDecoration(
-                                    labelText: 'Группа *',
-                                    prefixIcon: Icon(Icons.groups),
+                                  decoration: InputDecoration(
+                                    labelText: '${l10n.group} *',
+                                    prefixIcon: const Icon(Icons.groups),
                                   ),
                                   child: Text(
-                                    'Нет групп',
+                                    l10n.noGroups,
                                     style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                   ),
                                 )
                               : DropdownButtonFormField<StudentGroup?>(
-                                  decoration: const InputDecoration(
-                                    labelText: 'Группа *',
-                                    prefixIcon: Icon(Icons.groups),
+                                  decoration: InputDecoration(
+                                    labelText: '${l10n.group} *',
+                                    prefixIcon: const Icon(Icons.groups),
                                   ),
                                   initialValue: currentGroup,
                                   items: groups.map((g) => DropdownMenuItem<StudentGroup?>(
                                     value: g,
-                                    child: Text('${g.name} (${g.membersCount} уч.)'),
+                                    child: Text('${g.name} (${g.membersCount})'),
                                   )).toList(),
                                   onChanged: (group) {
                                     setState(() => _selectedGroup = group);
@@ -9305,7 +9390,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           child: IconButton.filled(
                             onPressed: () => _showCreateGroupDialog(),
                             icon: const Icon(Icons.add, size: 20),
-                            tooltip: 'Создать группу',
+                            tooltip: l10n.createGroup,
                             style: IconButton.styleFrom(
                               backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                               foregroundColor: AppColors.primary,
@@ -9349,14 +9434,14 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 }
 
                 return DropdownButtonFormField<InstitutionMember?>(
-                  decoration: const InputDecoration(
-                    labelText: 'Преподаватель',
-                    prefixIcon: Icon(Icons.school),
+                  decoration: InputDecoration(
+                    labelText: l10n.teacher,
+                    prefixIcon: const Icon(Icons.school),
                   ),
                   initialValue: currentTeacher,
                   items: activeMembers.map((m) => DropdownMenuItem<InstitutionMember?>(
                     value: m,
-                    child: Text(m.profile?.fullName ?? 'Без имени'),
+                    child: Text(m.profile?.fullName ?? l10n.noName),
                   )).toList(),
                   onChanged: (member) async {
                     setState(() => _selectedTeacher = member);
@@ -9386,15 +9471,15 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                     Expanded(
                       child: DropdownButtonFormField<Subject?>(
                         isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Предмет',
-                          prefixIcon: Icon(Icons.music_note),
+                        decoration: InputDecoration(
+                          labelText: l10n.subject,
+                          prefixIcon: const Icon(Icons.music_note),
                         ),
                         initialValue: effectiveSubject,
                         items: [
-                          const DropdownMenuItem<Subject?>(
+                          DropdownMenuItem<Subject?>(
                             value: null,
-                            child: Text('Не выбран'),
+                            child: Text(l10n.notSelected),
                           ),
                           ...subjects.map((s) => DropdownMenuItem<Subject?>(
                             value: s,
@@ -9412,7 +9497,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                       child: IconButton.filled(
                         onPressed: _showAddSubjectDialog,
                         icon: const Icon(Icons.add, size: 20),
-                        tooltip: 'Добавить предмет',
+                        tooltip: l10n.addSubject,
                         style: IconButton.styleFrom(
                           backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                           foregroundColor: AppColors.primary,
@@ -9440,20 +9525,20 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                     Expanded(
                       child: DropdownButtonFormField<LessonType?>(
                         isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Тип занятия',
-                          prefixIcon: Icon(Icons.category),
+                        decoration: InputDecoration(
+                          labelText: l10n.lessonType,
+                          prefixIcon: const Icon(Icons.category),
                         ),
                         initialValue: effectiveLessonType,
                         items: [
-                          const DropdownMenuItem<LessonType?>(
+                          DropdownMenuItem<LessonType?>(
                             value: null,
-                            child: Text('Не выбран'),
+                            child: Text(l10n.notSelected),
                           ),
                           ...lessonTypes.map((lt) => DropdownMenuItem<LessonType?>(
                             value: lt,
                             child: Text(
-                              '${lt.name} (${lt.defaultDurationMinutes} мин)',
+                              '${lt.name} (${lt.defaultDurationMinutes} ${l10n.minutes})',
                               overflow: TextOverflow.ellipsis,
                             ),
                           )),
@@ -9479,7 +9564,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                       child: IconButton.filled(
                         onPressed: _showAddLessonTypeDialog,
                         icon: const Icon(Icons.add, size: 20),
-                        tooltip: 'Добавить тип занятия',
+                        tooltip: l10n.addType,
                         style: IconButton.styleFrom(
                           backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                           foregroundColor: AppColors.primary,
@@ -9504,7 +9589,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                       DropdownButtonFormField<RepeatType>(
                         key: ValueKey('repeat_$_repeatType'),
                         decoration: InputDecoration(
-                          labelText: 'Повтор',
+                          labelText: l10n.repeatLabel,
                           prefixIcon: const Icon(Icons.repeat),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -9515,7 +9600,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                         items: RepeatType.values
                             .map((type) => DropdownMenuItem(
                                   value: type,
-                                  child: Text(type.label),
+                                  child: Text(_getRepeatTypeLabel(l10n, type)),
                                 ))
                             .toList(),
                         onChanged: (type) {
@@ -9537,7 +9622,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                         Row(
                           children: [
                             Text(
-                              'Количество занятий:',
+                              l10n.quantityLabel,
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             const Spacer(),
@@ -9622,13 +9707,13 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           runSpacing: 6,
                           children: [
                             for (final day in [
-                              (1, 'Пн'),
-                              (2, 'Вт'),
-                              (3, 'Ср'),
-                              (4, 'Чт'),
-                              (5, 'Пт'),
-                              (6, 'Сб'),
-                              (7, 'Вс')
+                              (1, l10n.mondayShort),
+                              (2, l10n.tuesdayShort),
+                              (3, l10n.wednesdayShort),
+                              (4, l10n.thursdayShort),
+                              (5, l10n.fridayShort),
+                              (6, l10n.saturdayShort),
+                              (7, l10n.sundayShort)
                             ])
                               FilterChip(
                                 label: Text(day.$2),
@@ -9653,7 +9738,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                         if (_weekdayTimes.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           Text(
-                            'Время занятий',
+                            l10n.lessonTimeLabel,
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
                           const SizedBox(height: 8),
@@ -9668,8 +9753,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           onPressed: _showMultiDatePicker,
                           icon: const Icon(Icons.calendar_month),
                           label: Text(_customDates.isEmpty
-                              ? 'Выбрать даты в календаре'
-                              : 'Выбрано: ${_customDates.length} дат'),
+                              ? l10n.selectDatesInCalendar
+                              : l10n.selectedDatesCount(_customDates.length)),
                         ),
                       ],
 
@@ -9686,7 +9771,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Проверка конфликтов...',
+                                l10n.checkingConflictsMessage,
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: Theme.of(context).colorScheme.outline,
                                     ),
@@ -9695,14 +9780,14 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                           )
                         else ...[
                           Text(
-                            'Будет создано ${_previewDates.length} занятий',
+                            l10n.willCreateLessons(_previewDates.length),
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: Theme.of(context).colorScheme.outline,
                                 ),
                           ),
                           if (_conflictDates.isNotEmpty)
                             Text(
-                              'Конфликты: ${_conflictDates.length} (будут пропущены)',
+                              l10n.conflictsWillBeSkipped(_conflictDates.length),
                               style: const TextStyle(
                                 color: AppColors.error,
                                 fontSize: 12,
@@ -9732,14 +9817,14 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                       )
                     : const Icon(Icons.add),
                 label: Text(_isCheckingConflicts
-                    ? 'Проверка конфликтов...'
+                    ? l10n.checkingConflictsMessage
                     : _isInfinite && _repeatType != RepeatType.none && _repeatType != RepeatType.custom
                         ? _repeatType == RepeatType.weekdays && _weekdayTimes.length > 1
-                            ? 'Создать ${_weekdayTimes.length} расписаний'
-                            : 'Создать расписание'
+                            ? l10n.createSchedulesCount(_weekdayTimes.length)
+                            : l10n.createSchedule
                         : _repeatType != RepeatType.none
-                            ? 'Создать ${_previewDates.length > 1 ? _previewDates.length : _repeatCount} занятий'
-                            : 'Создать занятие'),
+                            ? l10n.createLessonsCount(_previewDates.length > 1 ? _previewDates.length : _repeatCount)
+                            : l10n.createLessonSingle),
               ),
 
               if (controllerState.isLoading)
@@ -9765,10 +9850,11 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     final startMinutes = _startTime.hour * 60 + _startTime.minute;
     final endMinutes = _endTime.hour * 60 + _endTime.minute;
     final durationMinutes = endMinutes - startMinutes;
+    final l10n = AppLocalizations.of(context);
     if (durationMinutes < 15) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Минимальная длительность брони — 15 минут'),
+        SnackBar(
+          content: Text(l10n.minBookingDuration),
           backgroundColor: Colors.orange,
         ),
       );
@@ -9792,8 +9878,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
       widget.onCreated(_selectedDate);
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Кабинеты забронированы'),
+        SnackBar(
+          content: Text(l10n.roomsBooked),
           backgroundColor: Colors.green,
         ),
       );
@@ -9802,7 +9888,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
   /// Строит строки времени для каждого выбранного дня недели
   List<Widget> _buildWeekdayTimeRows() {
-    const days = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    final l10n = AppLocalizations.of(context);
+    final days = ['', l10n.mondayShort, l10n.tuesdayShort, l10n.wednesdayShort, l10n.thursdayShort, l10n.fridayShort, l10n.saturdayShort, l10n.sundayShort];
     final sortedDays = _weekdayTimes.keys.toList()..sort();
 
     return sortedDays.map((dayNumber) {
@@ -9816,9 +9903,9 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
       final durationMinutes = endMinutes - startMinutes;
       final durationText = durationMinutes > 0
           ? (durationMinutes >= 60
-              ? '${durationMinutes ~/ 60} ч${durationMinutes % 60 > 0 ? ' ${durationMinutes % 60} мин' : ''}'
-              : '$durationMinutes мин')
-          : 'Некорректно';
+              ? (durationMinutes % 60 > 0 ? l10n.durationHoursMinutes(durationMinutes ~/ 60, durationMinutes % 60) : l10n.durationHours(durationMinutes ~/ 60))
+              : l10n.durationMinutes(durationMinutes))
+          : l10n.incorrect;
 
       return Card(
         margin: const EdgeInsets.only(bottom: 8),
@@ -9895,13 +9982,14 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
   /// Выбор времени для конкретного дня недели
   Future<void> _pickWeekdayTimeRange(int dayNumber) async {
-    const days = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    final l10n = AppLocalizations.of(context);
+    final days = ['', l10n.mondayShort, l10n.tuesdayShort, l10n.wednesdayShort, l10n.thursdayShort, l10n.fridayShort, l10n.saturdayShort, l10n.sundayShort];
     final currentTimes = _weekdayTimes[dayNumber]!;
 
     final startPicked = await showTimePicker(
       context: context,
       initialTime: currentTimes.$1,
-      helpText: '${days[dayNumber]}: Начало занятия',
+      helpText: '${days[dayNumber]}: ${l10n.startTime}',
     );
 
     if (startPicked == null || !mounted) return;
@@ -9909,7 +9997,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     final endPicked = await showTimePicker(
       context: context,
       initialTime: currentTimes.$2,
-      helpText: '${days[dayNumber]}: Конец занятия',
+      helpText: '${days[dayNumber]}: ${l10n.endTime}',
     );
 
     if (endPicked == null || !mounted) return;
@@ -10042,10 +10130,11 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     final startMinutes = _startTime.hour * 60 + _startTime.minute;
     final endMinutes = _endTime.hour * 60 + _endTime.minute;
     final durationMinutes = endMinutes - startMinutes;
+    final l10n = AppLocalizations.of(context);
     if (durationMinutes < 15) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Минимальная длительность занятия — 15 минут'),
+        SnackBar(
+          content: Text(l10n.minLessonDuration),
           backgroundColor: Colors.orange,
         ),
       );
@@ -10139,8 +10228,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(createdCount > 1
-                  ? 'Создано $createdCount постоянных расписаний'
-                  : 'Постоянное расписание создано'),
+                  ? l10n.permanentSchedulesCreated(createdCount)
+                  : l10n.permanentScheduleCreated),
               backgroundColor: Colors.green,
             ),
           );
@@ -10149,7 +10238,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Ошибка: $e'),
+              content: Text(l10n.errorWithDetails(e.toString())),
               backgroundColor: Colors.red,
             ),
           );
@@ -10169,8 +10258,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
       if (validDates.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Все даты заняты'),
+          SnackBar(
+            content: Text(l10n.allDatesOccupied),
             backgroundColor: Colors.orange,
           ),
         );
@@ -10242,8 +10331,8 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
 
         final skipped = allDates.length - validDates.length;
         final message = skipped > 0
-            ? 'Создано $totalCreated занятий (пропущено: $skipped)'
-            : 'Создано $totalCreated занятий';
+            ? l10n.lessonsCreatedWithSkipped(totalCreated, skipped)
+            : l10n.lessonsCreatedCount(totalCreated);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -10277,7 +10366,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isGroupLesson ? 'Групповое занятие создано' : 'Занятие создано'),
+            content: Text(_isGroupLesson ? l10n.groupLessonCreated : l10n.lessonCreatedMessage),
             backgroundColor: Colors.green,
           ),
         );
@@ -10508,19 +10597,19 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Новая группа'),
+        title: Text(AppLocalizations.of(context).newGroup),
         content: Form(
           key: formKey,
           child: TextFormField(
             controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'Название группы',
-              hintText: 'Например: Группа вокала',
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(context).groupName,
+              hintText: AppLocalizations.of(context).groupNameHint,
             ),
             autofocus: true,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Введите название';
+                return AppLocalizations.of(context).enterNameValidation;
               }
               return null;
             },
@@ -10529,7 +10618,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -10557,7 +10646,7 @@ class _QuickAddLessonSheetState extends ConsumerState<_QuickAddLessonSheet> {
                 });
               }
             },
-            child: const Text('Создать'),
+            child: Text(AppLocalizations.of(context).create),
           ),
         ],
       ),
@@ -10641,7 +10730,7 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        booking.description ?? 'Забронировано',
+                        booking.description ?? AppLocalizations.of(context).booked,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -10688,7 +10777,7 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
                     Icon(Icons.person_outline, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
                     const SizedBox(width: AppSizes.paddingM),
                     Text(
-                      booking.creator?.fullName ?? 'Неизвестный пользователь',
+                      booking.creator?.fullName ?? AppLocalizations.of(context).unknownUser,
                       style: const TextStyle(fontSize: 16),
                     ),
                   ],
@@ -10713,7 +10802,7 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.delete_outline),
-                  label: Text(_isDeleting ? 'Удаление...' : 'Удалить бронь'),
+                  label: Text(_isDeleting ? AppLocalizations.of(context).deleting : AppLocalizations.of(context).deleteBooking),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.error,
                     foregroundColor: Colors.white,
@@ -10738,17 +10827,17 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Удалить бронь?'),
-        content: const Text('Бронирование будет удалено и кабинеты освободятся.'),
+        title: Text(AppLocalizations.of(context).deleteBookingQuestion),
+        content: Text(AppLocalizations.of(context).deleteBookingMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Отмена'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Удалить'),
+            child: Text(AppLocalizations.of(context).delete),
           ),
         ],
       ),
@@ -10770,11 +10859,11 @@ class _BookingDetailSheetState extends ConsumerState<_BookingDetailSheet> {
       if (success) {
         widget.onUpdated();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Бронь удалена')),
+          SnackBar(content: Text(AppLocalizations.of(context).bookingDeleted)),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка при удалении')),
+          SnackBar(content: Text(AppLocalizations.of(context).deleteError)),
         );
       }
     }
@@ -10865,9 +10954,9 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                     ),
                   ),
                   const SizedBox(width: AppSizes.paddingM),
-                  const Text(
-                    'Забронировать кабинеты',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context).bookRooms,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -10885,9 +10974,9 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                 padding: const EdgeInsets.all(AppSizes.paddingL),
                 children: [
                   // Выбор кабинетов (чекбоксы)
-                  const Text(
-                    'Выберите кабинеты',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context).selectRooms,
+                    style: const TextStyle(
                       fontWeight: FontWeight.w500,
                       fontSize: 14,
                     ),
@@ -10910,11 +10999,11 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                     controlAffinity: ListTileControlAffinity.leading,
                   )),
                   if (_selectedRoomIds.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        'Выберите минимум один кабинет',
-                        style: TextStyle(
+                        AppLocalizations.of(context).selectAtLeastOneRoomValidation,
+                        style: const TextStyle(
                           color: AppColors.error,
                           fontSize: 12,
                         ),
@@ -10927,7 +11016,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.calendar_today),
-                    title: const Text('Дата'),
+                    title: Text(AppLocalizations.of(context).date),
                     trailing: Text(
                       _formatDate(_selectedDate),
                       style: const TextStyle(fontSize: 16),
@@ -10941,7 +11030,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.access_time),
-                    title: const Text('Начало'),
+                    title: Text(AppLocalizations.of(context).start),
                     trailing: Text(
                       _formatTime(_startTime),
                       style: const TextStyle(fontSize: 16),
@@ -10953,7 +11042,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const SizedBox(width: 24),
-                    title: const Text('Окончание'),
+                    title: Text(AppLocalizations.of(context).endLabel),
                     trailing: Text(
                       _formatTime(_endTime),
                       style: const TextStyle(fontSize: 16),
@@ -10967,10 +11056,10 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                   const SizedBox(height: AppSizes.paddingS),
                   TextField(
                     controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Описание (необязательно)',
-                      hintText: 'Например: Репетиция, Мероприятие',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context).descriptionOptionalField,
+                      hintText: AppLocalizations.of(context).descriptionExampleHint,
+                      border: const OutlineInputBorder(),
                     ),
                     maxLines: 2,
                   ),
@@ -10996,7 +11085,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text('Забронировать'),
+                          : Text(AppLocalizations.of(context).book),
                     ),
                   ),
                 ],
@@ -11017,7 +11106,8 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
   }
 
   String _formatDate(DateTime date) {
-    const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    final l10n = AppLocalizations.of(context);
+    final weekdays = [l10n.mondayShort, l10n.tuesdayShort, l10n.wednesdayShort, l10n.thursdayShort, l10n.fridayShort, l10n.saturdayShort, l10n.sundayShort];
     return '${weekdays[date.weekday - 1]}, ${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
@@ -11087,13 +11177,13 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
         if (booking != null) {
           widget.onCreated(_selectedDate);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Кабинеты забронированы')),
+            SnackBar(content: Text(AppLocalizations.of(context).roomsBooked)),
           );
         } else {
           final error = ref.read(bookingControllerProvider);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(error.error?.toString() ?? 'Ошибка бронирования'),
+              content: Text(error.error?.toString() ?? AppLocalizations.of(context).bookingError),
               backgroundColor: AppColors.error,
             ),
           );
@@ -11103,7 +11193,7 @@ class _AddBookingSheetState extends ConsumerState<_AddBookingSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -11167,9 +11257,9 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Постоянное расписание',
-                          style: TextStyle(
+                        Text(
+                          AppLocalizations.of(context).permanentSchedule,
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -11200,24 +11290,24 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
                   // Ученик
                   _buildInfoRow(
                     Icons.person,
-                    'Ученик',
-                    slot.student?.name ?? 'Не указан',
+                    AppLocalizations.of(context).student,
+                    slot.student?.name ?? AppLocalizations.of(context).notSpecified,
                   ),
                   const SizedBox(height: 12),
 
                   // Преподаватель
                   _buildInfoRow(
                     Icons.school,
-                    'Преподаватель',
-                    slot.teacher?.fullName ?? 'Не указан',
+                    AppLocalizations.of(context).teacher,
+                    slot.teacher?.fullName ?? AppLocalizations.of(context).notSpecified,
                   ),
                   const SizedBox(height: 12),
 
                   // Кабинет
                   _buildInfoRow(
                     Icons.meeting_room,
-                    'Кабинет',
-                    slot.getEffectiveRoom(widget.selectedDate)?.name ?? 'Не указан',
+                    AppLocalizations.of(context).room,
+                    slot.getEffectiveRoom(widget.selectedDate)?.name ?? AppLocalizations.of(context).notSpecified,
                   ),
 
                   // Если есть замена кабинета
@@ -11236,7 +11326,7 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Временно в кабинете ${slot.replacementRoom!.name} до ${_formatDate(slot.replacementUntil!)}',
+                              AppLocalizations.of(context).temporaryRoomMessage(slot.replacementRoom!.name, _formatDate(slot.replacementUntil!)),
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.warning,
@@ -11253,7 +11343,7 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
                     const SizedBox(height: 12),
                     _buildInfoRow(
                       Icons.book,
-                      'Предмет',
+                      AppLocalizations.of(context).subject,
                       slot.subject!.name,
                     ),
                   ],
@@ -11263,7 +11353,7 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
                     const SizedBox(height: 12),
                     _buildInfoRow(
                       Icons.category,
-                      'Тип занятия',
+                      AppLocalizations.of(context).lessonType,
                       slot.lessonType!.name,
                     ),
                   ],
@@ -11281,23 +11371,23 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
                   // Создать занятие на эту дату
                   ListTile(
                     leading: const Icon(Icons.add_circle_outline),
-                    title: Text('Создать занятие на $_formatDateShort'),
+                    title: Text(AppLocalizations.of(context).createLessonOn(_formatDateShort)),
                     onTap: _isLoading ? null : widget.onCreateLesson,
                   ),
 
                   // Создать занятия на период
                   ListTile(
                     leading: const Icon(Icons.calendar_month),
-                    title: const Text('Создать занятия на период'),
-                    subtitle: const Text('Создать несколько занятий из этого слота'),
+                    title: Text(AppLocalizations.of(context).createLessonsForPeriod),
+                    subtitle: Text(AppLocalizations.of(context).createMultipleLessonsFromSlot),
                     onTap: _isLoading ? null : _showCreateLessonsForPeriod,
                   ),
 
                   // Добавить исключение
                   ListTile(
                     leading: const Icon(Icons.event_busy),
-                    title: const Text('Добавить исключение'),
-                    subtitle: const Text('Слот не будет действовать в выбранную дату'),
+                    title: Text(AppLocalizations.of(context).addExceptionTitle),
+                    subtitle: Text(AppLocalizations.of(context).slotWillNotWorkOnDate),
                     onTap: _isLoading ? null : _addException,
                   ),
 
@@ -11305,18 +11395,18 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
                   if (!slot.isPaused)
                     ListTile(
                       leading: const Icon(Icons.pause_circle_outline),
-                      title: const Text('Приостановить'),
-                      subtitle: const Text('Временно деактивировать слот'),
+                      title: Text(AppLocalizations.of(context).pause),
+                      subtitle: Text(AppLocalizations.of(context).temporarilyDeactivateSlot),
                       onTap: _isLoading ? null : _pauseSlot,
                     )
                   else
                     ListTile(
                       leading: const Icon(Icons.play_circle_outline, color: AppColors.success),
-                      title: const Text('Возобновить'),
+                      title: Text(AppLocalizations.of(context).resume),
                       subtitle: Text(
                         slot.pauseUntil != null
-                            ? 'Приостановлено до ${_formatDate(slot.pauseUntil!)}'
-                            : 'Бессрочная пауза',
+                            ? AppLocalizations.of(context).pausedUntilDate(_formatDate(slot.pauseUntil!))
+                            : AppLocalizations.of(context).indefinitePause,
                       ),
                       onTap: _isLoading ? null : _resumeSlot,
                     ),
@@ -11324,8 +11414,8 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
                   // Деактивировать
                   ListTile(
                     leading: const Icon(Icons.archive_outlined, color: AppColors.error),
-                    title: const Text('Деактивировать', style: TextStyle(color: AppColors.error)),
-                    subtitle: const Text('Полностью отключить слот'),
+                    title: Text(AppLocalizations.of(context).deactivate, style: const TextStyle(color: AppColors.error)),
+                    subtitle: Text(AppLocalizations.of(context).completelyDisableSlot),
                     onTap: _isLoading ? null : _deactivateSlot,
                   ),
                 ],
@@ -11380,19 +11470,18 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Добавить исключение'),
+        title: Text(AppLocalizations.of(context).addExceptionTitle),
         content: Text(
-          'Слот не будет действовать ${_formatDate(widget.selectedDate)}.\n\n'
-          'Это позволит создать другое занятие в это время.',
+          AppLocalizations.of(context).exceptionMessage(_formatDate(widget.selectedDate)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Добавить'),
+            child: Text(AppLocalizations.of(context).add),
           ),
         ],
       ),
@@ -11415,13 +11504,13 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Исключение добавлено')),
+          SnackBar(content: Text(AppLocalizations.of(context).exceptionAdded)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -11431,12 +11520,13 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
 
   Future<void> _pauseSlot() async {
     // Показываем диалог выбора даты возобновления
+    final l10n = AppLocalizations.of(context);
     final untilDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now().add(const Duration(days: 7)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      helpText: 'Приостановить до',
+      helpText: l10n.pauseUntil,
     );
 
     if (untilDate == null) return;
@@ -11455,13 +11545,13 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Слот приостановлен до ${_formatDate(untilDate)}')),
+          SnackBar(content: Text(l10n.slotPausedUntil(_formatDate(untilDate)))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(l10n.errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -11483,13 +11573,13 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Слот возобновлён')),
+          SnackBar(content: Text(AppLocalizations.of(context).slotResumed)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -11501,22 +11591,21 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Деактивировать слот'),
-        content: const Text(
-          'Слот будет полностью отключён и не будет отображаться в расписании.\n\n'
-          'Вы сможете активировать его снова в карточке ученика.',
+        title: Text(AppLocalizations.of(context).deactivateSlot),
+        content: Text(
+          AppLocalizations.of(context).deactivateSlotMessage,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.error,
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Деактивировать'),
+            child: Text(AppLocalizations.of(context).deactivate),
           ),
         ],
       ),
@@ -11538,13 +11627,13 @@ class _ScheduleSlotDetailSheetState extends ConsumerState<_ScheduleSlotDetailShe
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Слот деактивирован')),
+          SnackBar(content: Text(AppLocalizations.of(context).slotDeactivated)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -11640,10 +11729,10 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
                   children: [
                     Icon(Icons.calendar_month, color: colorScheme.primary),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Создать занятия на период',
-                        style: TextStyle(
+                        AppLocalizations.of(context).createLessonsForPeriodTitle,
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -11669,7 +11758,7 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         if (slot.student != null)
-                          Text('Ученик: ${slot.student!.name}'),
+                          Text('${AppLocalizations.of(context).student}: ${slot.student!.name}'),
                       ],
                     ),
                   ),
@@ -11681,7 +11770,7 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
                   children: [
                     Expanded(
                       child: _buildDateField(
-                        label: 'С даты',
+                        label: AppLocalizations.of(context).fromDate,
                         value: _startDate,
                         onChanged: (date) {
                           setState(() => _startDate = date);
@@ -11692,7 +11781,7 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildDateField(
-                        label: 'По дату',
+                        label: AppLocalizations.of(context).toDate,
                         value: _endDate,
                         onChanged: (date) {
                           setState(() => _endDate = date);
@@ -11709,19 +11798,19 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
                   spacing: 8,
                   children: [
                     ActionChip(
-                      label: const Text('1 месяц'),
+                      label: Text(AppLocalizations.of(context).oneMonth),
                       onPressed: () => _setEndDate(30),
                     ),
                     ActionChip(
-                      label: const Text('3 месяца'),
+                      label: Text(AppLocalizations.of(context).threeMonths),
                       onPressed: () => _setEndDate(90),
                     ),
                     ActionChip(
-                      label: const Text('6 месяцев'),
+                      label: Text(AppLocalizations.of(context).sixMonths),
                       onPressed: () => _setEndDate(180),
                     ),
                     ActionChip(
-                      label: const Text('1 год'),
+                      label: Text(AppLocalizations.of(context).oneYear),
                       onPressed: () => _setEndDate(365),
                     ),
                   ],
@@ -11739,7 +11828,7 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Будет создано: $_previewCount занятий',
+                            AppLocalizations.of(context).willBeCreatedLessons(_previewCount),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: colorScheme.primary,
@@ -11765,7 +11854,7 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
                           ),
                         )
                       : const Icon(Icons.add),
-                  label: Text(_isLoading ? 'Создание...' : 'Создать занятия'),
+                  label: Text(_isLoading ? AppLocalizations.of(context).creating : AppLocalizations.of(context).createLessonsButton),
                 ),
               ],
             ),
@@ -11810,6 +11899,7 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
 
   Future<void> _createLessons() async {
     setState(() => _isLoading = true);
+    final l10n = AppLocalizations.of(context);
 
     try {
       final slot = widget.slot;
@@ -11829,11 +11919,10 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
         dates.add(DateTime(current.year, current.month, current.day));
         current = current.add(const Duration(days: 7));
       }
-
       if (dates.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Нет дат для создания')),
+            SnackBar(content: Text(l10n.noDatesToCreate)),
           );
         }
         return;
@@ -11844,7 +11933,7 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
       if (effectiveRoomId == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Не указан кабинет')),
+            SnackBar(content: Text(l10n.roomNotSpecified)),
           );
         }
         return;
@@ -11869,7 +11958,7 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
         widget.onCreated();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Создано ${lessons?.length ?? 0} занятий'),
+            content: Text(l10n.lessonsCreatedCount(lessons?.length ?? 0)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -11877,7 +11966,7 @@ class _CreateLessonsFromSlotSheetState extends ConsumerState<_CreateLessonsFromS
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(l10n.errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -11907,6 +11996,20 @@ class _EditSeriesSheet extends ConsumerStatefulWidget {
 }
 
 class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
+  /// Helper method to get localized label for EditScope
+  String _getEditScopeLabel(AppLocalizations l10n, EditScope scope) {
+    switch (scope) {
+      case EditScope.thisOnly:
+        return l10n.editScopeThisOnly;
+      case EditScope.thisAndFollowing:
+        return l10n.editScopeThisAndFollowing;
+      case EditScope.all:
+        return l10n.editScopeAll;
+      case EditScope.selected:
+        return l10n.editScopeSelected;
+    }
+  }
+
   // Занятия серии
   List<Lesson> _seriesLessons = [];
   bool _isLoadingSeries = true;
@@ -11958,7 +12061,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
       setState(() => _isLoadingSeries = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки серии: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).seriesLoadError(e.toString())), backgroundColor: AppColors.error),
         );
       }
     }
@@ -12047,7 +12150,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Редактировать серию',
+                    AppLocalizations.of(context).editSeries,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   IconButton(
@@ -12109,7 +12212,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.check),
-                          label: Text(_isSaving ? 'Сохранение...' : 'Применить изменения'),
+                          label: Text(_isSaving ? AppLocalizations.of(context).saving : AppLocalizations.of(context).applyChanges),
                           style: ElevatedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 48),
                           ),
@@ -12125,11 +12228,12 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
   }
 
   Widget _buildScopeSelector() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Область изменений',
+          l10n.changeScopeLabel,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -12146,7 +12250,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
           items: EditScope.values.map((scope) {
             return DropdownMenuItem(
               value: scope,
-              child: Text(scope.label),
+              child: Text(_getEditScopeLabel(l10n, scope)),
             );
           }).toList(),
           onChanged: (scope) {
@@ -12170,12 +12274,13 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
       weekdaysInSeries.add(lesson.date.weekday);
     }
 
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Дни недели
         Text(
-          'По дням недели',
+          l10n.byDaysOfWeek,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -12186,13 +12291,13 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
           runSpacing: 6,
           children: [
             for (final day in [
-              (1, 'Пн'),
-              (2, 'Вт'),
-              (3, 'Ср'),
-              (4, 'Чт'),
-              (5, 'Пт'),
-              (6, 'Сб'),
-              (7, 'Вс'),
+              (1, l10n.mondayShort),
+              (2, l10n.tuesdayShort),
+              (3, l10n.wednesdayShort),
+              (4, l10n.thursdayShort),
+              (5, l10n.fridayShort),
+              (6, l10n.saturdayShort),
+              (7, l10n.sundayShort),
             ])
               FilterChip(
                 label: Text(day.$2),
@@ -12223,7 +12328,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
         Row(
           children: [
             Text(
-              'Количество занятий:',
+              l10n.quantityLabel,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const Spacer(),
@@ -12234,7 +12339,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                _quantityLimit > 0 ? '$_quantityLimit' : 'Все',
+                _quantityLimit > 0 ? '$_quantityLimit' : l10n.all,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onPrimaryContainer,
                       fontWeight: FontWeight.bold,
@@ -12254,7 +12359,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
             min: 0,
             max: 52,
             divisions: 52,
-            label: _quantityLimit > 0 ? '$_quantityLimit' : 'Все',
+            label: _quantityLimit > 0 ? '$_quantityLimit' : l10n.all,
             onChanged: (value) {
               setState(() => _quantityLimit = value.round());
               _updateSelectedLessons();
@@ -12268,7 +12373,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
           children: [
             for (final count in [0, 4, 8, 12, 24])
               ActionChip(
-                label: Text(count == 0 ? 'Все' : '$count'),
+                label: Text(count == 0 ? l10n.all : '$count'),
                 backgroundColor: _quantityLimit == count
                     ? Theme.of(context).colorScheme.primaryContainer
                     : null,
@@ -12291,6 +12396,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
       months.add(DateTime(lesson.date.year, lesson.date.month));
     }
     final sortedMonths = months.toList()..sort();
+    final l10n = AppLocalizations.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -12326,7 +12432,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
         const SizedBox(height: 8),
         // Дни недели
         Row(
-          children: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+          children: [l10n.mondayShort, l10n.tuesdayShort, l10n.wednesdayShort, l10n.thursdayShort, l10n.fridayShort, l10n.saturdayShort, l10n.sundayShort]
               .map((d) => Expanded(
                     child: Center(
                       child: Text(
@@ -12465,13 +12571,13 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Занятия серии (${_seriesLessons.length})',
+              AppLocalizations.of(context).seriesLessonsCount(_seriesLessons.length),
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
             Text(
-              'Выбрано: ${_selectedLessonIds.length}',
+              AppLocalizations.of(context).selectedCount(_selectedLessonIds.length),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
                   ),
@@ -12548,11 +12654,12 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
     required AsyncValue<List<Subject>> subjectsAsync,
     required AsyncValue<List<LessonType>> lessonTypesAsync,
   }) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Изменения',
+          l10n.changes,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -12561,7 +12668,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
 
         // Время
         _buildChangeRow(
-          label: 'Время',
+          label: l10n.time,
           currentValue: '${_formatTime(widget.lesson.startTime)} – ${_formatTime(widget.lesson.endTime)}',
           newValue: _newStartTime != null && _newEndTime != null
               ? '${_formatTime(_newStartTime!)} – ${_formatTime(_newEndTime!)}'
@@ -12585,8 +12692,8 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                 : null;
 
             return _buildChangeRow(
-              label: 'Кабинет',
-              currentValue: currentRoom?.name ?? 'Не выбран',
+              label: l10n.room,
+              currentValue: currentRoom?.name ?? l10n.notSelected,
               newValue: newRoom?.name,
               onTap: () => _showRoomPicker(rooms),
               onClear: () => setState(() {
@@ -12609,8 +12716,8 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                   : null;
 
               return _buildChangeRow(
-                label: 'Ученик',
-                currentValue: currentStudent?.name ?? 'Не выбран',
+                label: l10n.student,
+                currentValue: currentStudent?.name ?? l10n.notSelected,
                 newValue: newStudent?.name,
                 onTap: () => _showStudentPicker(students),
                 onClear: () => setState(() => _newStudentId = null),
@@ -12629,8 +12736,8 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                 : null;
 
             return _buildChangeRow(
-              label: 'Предмет',
-              currentValue: currentSubject?.name ?? 'Не выбран',
+              label: l10n.subject,
+              currentValue: currentSubject?.name ?? l10n.notSelected,
               newValue: newSubject?.name,
               onTap: () => _showSubjectPicker(subjects),
               onClear: () => setState(() => _newSubjectId = null),
@@ -12649,8 +12756,8 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                 : null;
 
             return _buildChangeRow(
-              label: 'Тип занятия',
-              currentValue: currentType?.name ?? 'Не выбран',
+              label: l10n.lessonType,
+              currentValue: currentType?.name ?? l10n.notSelected,
               newValue: newType?.name,
               onTap: () => _showLessonTypePicker(lessonTypes),
               onClear: () => setState(() => _newLessonTypeId = null),
@@ -12776,20 +12883,20 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Проверка конфликтов...',
+                  AppLocalizations.of(context).checkingConflictsMessage,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             )
           else ...[
             Text(
-              'Будет изменено: $validCount занятий',
+              AppLocalizations.of(context).willBeChangedLessons(validCount),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             if (conflictCount > 0) ...[
               const SizedBox(height: 4),
               Text(
-                'Конфликты: $conflictCount (будут пропущены)',
+                AppLocalizations.of(context).conflictsWillBeSkipped(conflictCount),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.error,
                     ),
@@ -12833,7 +12940,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
             trailing: isSelected
                 ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                 : isCurrent
-                    ? Text('текущий', style: Theme.of(context).textTheme.bodySmall)
+                    ? Text(AppLocalizations.of(context).current, style: Theme.of(context).textTheme.bodySmall)
                     : null,
             onTap: () {
               Navigator.pop(ctx);
@@ -12863,7 +12970,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
             trailing: isSelected
                 ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                 : isCurrent
-                    ? Text('текущий', style: Theme.of(context).textTheme.bodySmall)
+                    ? Text(AppLocalizations.of(context).current, style: Theme.of(context).textTheme.bodySmall)
                     : null,
             onTap: () {
               Navigator.pop(ctx);
@@ -12885,7 +12992,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
         itemBuilder: (_, index) {
           if (index == 0) {
             return ListTile(
-              title: const Text('Не выбран'),
+              title: Text(AppLocalizations.of(context).notSelected),
               trailing: _newSubjectId == '' ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary) : null,
               onTap: () {
                 Navigator.pop(ctx);
@@ -12902,7 +13009,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
             trailing: isSelected
                 ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                 : isCurrent
-                    ? Text('текущий', style: Theme.of(context).textTheme.bodySmall)
+                    ? Text(AppLocalizations.of(context).current, style: Theme.of(context).textTheme.bodySmall)
                     : null,
             onTap: () {
               Navigator.pop(ctx);
@@ -12924,7 +13031,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
         itemBuilder: (_, index) {
           if (index == 0) {
             return ListTile(
-              title: const Text('Не выбран'),
+              title: Text(AppLocalizations.of(context).notSelected),
               trailing: _newLessonTypeId == '' ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary) : null,
               onTap: () {
                 Navigator.pop(ctx);
@@ -12941,7 +13048,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
             trailing: isSelected
                 ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                 : isCurrent
-                    ? Text('текущий', style: Theme.of(context).textTheme.bodySmall)
+                    ? Text(AppLocalizations.of(context).current, style: Theme.of(context).textTheme.bodySmall)
                     : null,
             onTap: () {
               Navigator.pop(ctx);
@@ -13004,10 +13111,11 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
         .where((l) => !_conflictLessonIds.contains(l.id))
         .toList();
 
+    final l10n = AppLocalizations.of(context);
     if (lessonsToUpdate.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Нет занятий для обновления (все имеют конфликты)'),
+        SnackBar(
+          content: Text(l10n.noLessonsToUpdate),
           backgroundColor: Colors.orange,
         ),
       );
@@ -13037,8 +13145,8 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
 
         final skipped = _lessonsToEdit.length - lessonsToUpdate.length;
         final message = skipped > 0
-            ? 'Обновлено ${lessonsToUpdate.length} занятий (пропущено: $skipped)'
-            : 'Обновлено ${lessonsToUpdate.length} занятий';
+            ? l10n.lessonsUpdatedWithSkipped(lessonsToUpdate.length, skipped)
+            : l10n.lessonsUpdatedCount(lessonsToUpdate.length);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), backgroundColor: Colors.green),
@@ -13047,7 +13155,7 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(l10n.errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -13062,9 +13170,10 @@ class _EditSeriesSheetState extends ConsumerState<_EditSeriesSheet> {
   }
 
   String _formatMonth(DateTime date) {
-    const months = [
-      '', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-      'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+    final l10n = AppLocalizations.of(context);
+    final months = [
+      '', l10n.january, l10n.february, l10n.march, l10n.april, l10n.may, l10n.june,
+      l10n.july, l10n.august, l10n.september, l10n.october, l10n.november, l10n.december
     ];
     return '${months[date.month]} ${date.year}';
   }
@@ -13109,7 +13218,7 @@ class _RoomSetupSheetState extends ConsumerState<_RoomSetupSheet> {
 
     try {
       final membership = ref.read(myMembershipProvider(widget.institutionId)).valueOrNull;
-      if (membership == null) throw Exception('Не удалось получить данные участника');
+      if (membership == null) throw Exception(AppLocalizations.of(context).memberDataError);
 
       final success = await ref.read(memberControllerProvider.notifier).updateDefaultRooms(
         membership.id,
@@ -13124,8 +13233,8 @@ class _RoomSetupSheetState extends ConsumerState<_RoomSetupSheet> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(roomIds == null || roomIds.isEmpty
-                  ? 'Отображаются все кабинеты'
-                  : 'Выбрано кабинетов: ${roomIds.length}'),
+                  ? AppLocalizations.of(context).allRoomsDisplayed
+                  : AppLocalizations.of(context).roomsSelectedCount(roomIds.length)),
               backgroundColor: Colors.green,
             ),
           );
@@ -13134,7 +13243,7 @@ class _RoomSetupSheetState extends ConsumerState<_RoomSetupSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -13181,16 +13290,16 @@ class _RoomSetupSheetState extends ConsumerState<_RoomSetupSheet> {
                   const SizedBox(height: 12),
                   Text(
                     widget.isFirstTime
-                        ? 'Какими кабинетами вы пользуетесь?'
-                        : 'Кабинеты по умолчанию',
+                        ? AppLocalizations.of(context).whichRoomsDoYouUse
+                        : AppLocalizations.of(context).defaultRooms,
                     style: Theme.of(context).textTheme.titleLarge,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     widget.isFirstTime
-                        ? 'В расписании будут отображаться только выбранные кабинеты. Изменить настройку можно в любой момент через меню фильтров.'
-                        : 'Выберите кабинеты, которые будут отображаться в расписании по умолчанию.',
+                        ? AppLocalizations.of(context).roomSetupFirstTimeDescription
+                        : AppLocalizations.of(context).roomSetupDefaultDescription,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -13214,7 +13323,7 @@ class _RoomSetupSheetState extends ConsumerState<_RoomSetupSheet> {
                   final isSelected = _selectedRoomIds.contains(room.id);
                   return CheckboxListTile(
                     title: Text(room.name),
-                    subtitle: room.number != null ? Text('Кабинет ${room.number}') : null,
+                    subtitle: room.number != null ? Text(AppLocalizations.of(context).roomWithNumber(room.number!)) : null,
                     value: isSelected,
                     onChanged: _isSaving ? null : (value) {
                       setState(() {
@@ -13240,7 +13349,7 @@ class _RoomSetupSheetState extends ConsumerState<_RoomSetupSheet> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _isSaving ? null : () => _saveSelection([]),
-                        child: const Text('Пропустить'),
+                        child: Text(AppLocalizations.of(context).skipLabel),
                       ),
                     ),
                   if (widget.isFirstTime) const SizedBox(width: 12),
@@ -13257,8 +13366,8 @@ class _RoomSetupSheetState extends ConsumerState<_RoomSetupSheet> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text(_selectedRoomIds.isEmpty
-                              ? 'Выберите кабинеты'
-                              : 'Сохранить (${_selectedRoomIds.length})'),
+                              ? AppLocalizations.of(context).selectRoomsPlaceholder
+                              : AppLocalizations.of(context).saveWithCount(_selectedRoomIds.length)),
                     ),
                   ),
                 ],
@@ -13324,9 +13433,9 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Виртуальное занятие',
-                          style: TextStyle(
+                        Text(
+                          AppLocalizations.of(context).virtualLesson,
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -13354,18 +13463,18 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildInfoRow(Icons.person, 'Ученик', schedule.student?.name ?? 'Не указан'),
+                  _buildInfoRow(Icons.person, AppLocalizations.of(context).student, schedule.student?.name ?? AppLocalizations.of(context).notSpecified),
                   const SizedBox(height: 12),
-                  _buildInfoRow(Icons.school, 'Преподаватель', schedule.teacher?.profile?.fullName ?? 'Не указан'),
+                  _buildInfoRow(Icons.school, AppLocalizations.of(context).teacher, schedule.teacher?.profile?.fullName ?? AppLocalizations.of(context).notSpecified),
                   const SizedBox(height: 12),
-                  _buildInfoRow(Icons.meeting_room, 'Кабинет', schedule.getEffectiveRoom(widget.selectedDate)?.name ?? 'Не указан'),
+                  _buildInfoRow(Icons.meeting_room, AppLocalizations.of(context).room, schedule.getEffectiveRoom(widget.selectedDate)?.name ?? AppLocalizations.of(context).notSpecified),
                   if (schedule.subject != null) ...[
                     const SizedBox(height: 12),
-                    _buildInfoRow(Icons.book, 'Предмет', schedule.subject!.name),
+                    _buildInfoRow(Icons.book, AppLocalizations.of(context).subject, schedule.subject!.name),
                   ],
                   if (schedule.lessonType != null) ...[
                     const SizedBox(height: 12),
-                    _buildInfoRow(Icons.category, 'Тип занятия', schedule.lessonType!.name),
+                    _buildInfoRow(Icons.category, AppLocalizations.of(context).lessonType, schedule.lessonType!.name),
                   ],
                 ],
               ),
@@ -13381,24 +13490,24 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
                   // Провести занятие
                   ListTile(
                     leading: const Icon(Icons.check_circle_outline, color: AppColors.success),
-                    title: Text('Провести занятие на $_formatDateShort'),
-                    subtitle: const Text('Создать реальное занятие со статусом "Проведено"'),
+                    title: Text(AppLocalizations.of(context).completeLessonOn(_formatDateShort)),
+                    subtitle: Text(AppLocalizations.of(context).createCompletedLesson),
                     onTap: _isLoading ? null : _completeLesson,
                   ),
 
                   // Отменить занятие
                   ListTile(
                     leading: const Icon(Icons.cancel_outlined, color: AppColors.error),
-                    title: Text('Отменить занятие на $_formatDateShort'),
-                    subtitle: const Text('Создать реальное занятие со статусом "Отменено"'),
+                    title: Text(AppLocalizations.of(context).cancelLessonOn(_formatDateShort)),
+                    subtitle: Text(AppLocalizations.of(context).createCancelledLesson),
                     onTap: _isLoading ? null : _cancelLesson,
                   ),
 
                   // Пропустить дату (добавить исключение)
                   ListTile(
                     leading: const Icon(Icons.event_busy),
-                    title: const Text('Пропустить эту дату'),
-                    subtitle: const Text('Добавить исключение без создания занятия'),
+                    title: Text(AppLocalizations.of(context).skipThisDateLabel),
+                    subtitle: Text(AppLocalizations.of(context).addExceptionWithoutLesson),
                     onTap: _isLoading ? null : _addException,
                   ),
 
@@ -13406,18 +13515,18 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
                   if (!schedule.isPaused)
                     ListTile(
                       leading: const Icon(Icons.pause_circle_outline),
-                      title: const Text('Приостановить расписание'),
-                      subtitle: const Text('Временно деактивировать'),
+                      title: Text(AppLocalizations.of(context).pauseSchedule),
+                      subtitle: Text(AppLocalizations.of(context).temporarilyDeactivate),
                       onTap: _isLoading ? null : _pauseSchedule,
                     )
                   else
                     ListTile(
                       leading: const Icon(Icons.play_circle_outline, color: AppColors.success),
-                      title: const Text('Возобновить расписание'),
+                      title: Text(AppLocalizations.of(context).resumeSchedule),
                       subtitle: Text(
                         schedule.pauseUntil != null
-                            ? 'Приостановлено до ${_formatDate(schedule.pauseUntil!)}'
-                            : 'Бессрочная пауза',
+                            ? AppLocalizations.of(context).pausedUntilDate(_formatDate(schedule.pauseUntil!))
+                            : AppLocalizations.of(context).indefinitePause,
                       ),
                       onTap: _isLoading ? null : _resumeSchedule,
                     ),
@@ -13425,8 +13534,8 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
                   // Деактивировать
                   ListTile(
                     leading: const Icon(Icons.archive_outlined, color: AppColors.error),
-                    title: const Text('Деактивировать', style: TextStyle(color: AppColors.error)),
-                    subtitle: const Text('Полностью отключить расписание'),
+                    title: Text(AppLocalizations.of(context).deactivate, style: const TextStyle(color: AppColors.error)),
+                    subtitle: Text(AppLocalizations.of(context).completelyDisableSchedule),
                     onTap: _isLoading ? null : _archiveSchedule,
                   ),
                 ],
@@ -13482,13 +13591,13 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Занятие проведено')),
+          SnackBar(content: Text(AppLocalizations.of(context).lessonCompletedMessage)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -13522,19 +13631,18 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Пропустить дату'),
+        title: Text(AppLocalizations.of(context).skipDateTitle),
         content: Text(
-          'Занятие не будет отображаться на ${_formatDate(widget.selectedDate)}.\n\n'
-          'Это не создаст запись в истории занятий.',
+          AppLocalizations.of(context).skipDateMessage(_formatDate(widget.selectedDate)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Пропустить'),
+            child: Text(AppLocalizations.of(context).skipLabel),
           ),
         ],
       ),
@@ -13557,13 +13665,13 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Дата пропущена')),
+          SnackBar(content: Text(AppLocalizations.of(context).dateSkipped)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -13586,13 +13694,13 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Расписание приостановлено')),
+          SnackBar(content: Text(AppLocalizations.of(context).schedulePaused)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -13615,13 +13723,13 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Расписание возобновлено')),
+          SnackBar(content: Text(AppLocalizations.of(context).scheduleResumed)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -13633,17 +13741,17 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Деактивировать расписание'),
-        content: const Text('Расписание будет полностью отключено. Это действие можно отменить.'),
+        title: Text(AppLocalizations.of(context).deactivateSchedule),
+        content: Text(AppLocalizations.of(context).scheduleWillBeDisabled),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Деактивировать'),
+            child: Text(AppLocalizations.of(context).deactivate),
           ),
         ],
       ),
@@ -13665,13 +13773,13 @@ class _VirtualLessonDetailSheetState extends ConsumerState<_VirtualLessonDetailS
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Расписание деактивировано')),
+          SnackBar(content: Text(AppLocalizations.of(context).scheduleDeactivated)),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithDetails(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {

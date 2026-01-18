@@ -5,9 +5,9 @@ import 'package:kabinet/features/institution/providers/institution_provider.dart
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/institution/providers/teacher_subjects_provider.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/shared/models/institution_member.dart';
 import 'package:kabinet/shared/providers/supabase_provider.dart';
-import 'package:kabinet/core/widgets/error_view.dart';
 
 /// Экран редактирования прав участника
 class MemberPermissionsScreen extends ConsumerStatefulWidget {
@@ -55,7 +55,7 @@ class _MemberPermissionsScreenState
         _permissions = member.permissions;
         _isAdmin = member.isAdmin;
         _isOwnerViewing = institution.ownerId == currentUserId;
-        _memberName = member.profile?.fullName ?? 'Участник';
+        _memberName = member.profile?.fullName ?? AppLocalizations.of(context).member;
         _roleName = member.roleName;
         _userId = member.userId;
         _isLoading = false;
@@ -63,8 +63,9 @@ class _MemberPermissionsScreenState
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки: $e')),
+          SnackBar(content: Text(l10n.loadingError(e.toString()))),
         );
       }
     }
@@ -85,9 +86,10 @@ class _MemberPermissionsScreenState
       ref.invalidate(myMembershipProvider(widget.institutionId));
 
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Права сохранены'),
+          SnackBar(
+            content: Text(l10n.permissionsSaved),
             backgroundColor: Colors.green,
           ),
         );
@@ -95,9 +97,10 @@ class _MemberPermissionsScreenState
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка сохранения: $e'),
+            content: Text(l10n.saveError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -111,9 +114,10 @@ class _MemberPermissionsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Права доступа'),
+        title: Text(l10n.permissions),
         actions: [
           TextButton(
             onPressed: _isSaving ? null : _save,
@@ -123,7 +127,7 @@ class _MemberPermissionsScreenState
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Сохранить'),
+                : Text(l10n.save),
           ),
         ],
       ),
@@ -163,14 +167,14 @@ class _MemberPermissionsScreenState
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(color: AppColors.primary),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.admin_panel_settings, size: 16, color: AppColors.primary),
-                                  SizedBox(width: 4),
+                                  const Icon(Icons.admin_panel_settings, size: 16, color: AppColors.primary),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'Админ',
-                                    style: TextStyle(
+                                    l10n.adminBadge,
+                                    style: const TextStyle(
                                       color: AppColors.primary,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
@@ -193,23 +197,23 @@ class _MemberPermissionsScreenState
 
                 // Секция: Управление заведением
                 _buildSection(
-                  'Управление заведением',
+                  l10n.permissionSectionInstitution,
                   [
                     _buildPermissionTile(
-                      'Управление заведением',
-                      'Изменение названия, настроек',
+                      l10n.permissionManageInstitution,
+                      l10n.permissionManageInstitutionDesc,
                       _permissions.manageInstitution,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageInstitution: v)),
                     ),
                     _buildPermissionTile(
-                      'Управление участниками',
-                      'Добавление, удаление, изменение прав',
+                      l10n.permissionManageMembers,
+                      l10n.permissionManageMembersDesc,
                       _permissions.manageMembers,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageMembers: v)),
                     ),
                     _buildPermissionTile(
-                      'Архивирование данных',
-                      'Удаление и архивирование записей',
+                      l10n.permissionArchiveData,
+                      l10n.permissionArchiveDataDesc,
                       _permissions.archiveData,
                       (v) => setState(() => _permissions = _permissions.copyWith(archiveData: v)),
                     ),
@@ -218,29 +222,29 @@ class _MemberPermissionsScreenState
 
                 // Секция: Справочники
                 _buildSection(
-                  'Справочники',
+                  l10n.permissionSectionReferences,
                   [
                     _buildPermissionTile(
-                      'Управление кабинетами',
-                      'Создание, редактирование кабинетов',
+                      l10n.permissionManageRooms,
+                      l10n.permissionManageRoomsDesc,
                       _permissions.manageRooms,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageRooms: v)),
                     ),
                     _buildPermissionTile(
-                      'Управление предметами',
-                      'Создание, редактирование предметов',
+                      l10n.permissionManageSubjects,
+                      l10n.permissionManageSubjectsDesc,
                       _permissions.manageSubjects,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageSubjects: v)),
                     ),
                     _buildPermissionTile(
-                      'Управление типами занятий',
-                      'Создание, редактирование типов',
+                      l10n.permissionManageLessonTypes,
+                      l10n.permissionManageLessonTypesDesc,
                       _permissions.manageLessonTypes,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageLessonTypes: v)),
                     ),
                     _buildPermissionTile(
-                      'Управление тарифами',
-                      'Создание, редактирование тарифов оплаты',
+                      l10n.permissionManagePaymentPlans,
+                      l10n.permissionManagePaymentPlansDesc,
                       _permissions.managePaymentPlans,
                       (v) => setState(() => _permissions = _permissions.copyWith(managePaymentPlans: v)),
                     ),
@@ -249,23 +253,23 @@ class _MemberPermissionsScreenState
 
                 // Секция: Ученики
                 _buildSection(
-                  'Ученики и группы',
+                  l10n.permissionSectionStudents,
                   [
                     _buildPermissionTile(
-                      'Управление своими учениками',
-                      'Добавление, редактирование своих учеников',
+                      l10n.permissionManageOwnStudents,
+                      l10n.permissionManageOwnStudentsDesc,
                       _permissions.manageOwnStudents,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageOwnStudents: v)),
                     ),
                     _buildPermissionTile(
-                      'Управление всеми учениками',
-                      'Редактирование учеников любого преподавателя',
+                      l10n.permissionManageAllStudents,
+                      l10n.permissionManageAllStudentsDesc,
                       _permissions.manageAllStudents,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageAllStudents: v)),
                     ),
                     _buildPermissionTile(
-                      'Управление группами',
-                      'Создание групп, управление составом',
+                      l10n.permissionManageGroups,
+                      l10n.permissionManageGroupsDesc,
                       _permissions.manageGroups,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageGroups: v)),
                     ),
@@ -274,41 +278,41 @@ class _MemberPermissionsScreenState
 
                 // Секция: Расписание
                 _buildSection(
-                  'Расписание',
+                  l10n.schedule,
                   [
                     _buildPermissionTile(
-                      'Просмотр всего расписания',
-                      'Видеть занятия всех преподавателей',
+                      l10n.permissionViewAllSchedule,
+                      l10n.permissionViewAllScheduleDesc,
                       _permissions.viewAllSchedule,
                       (v) => setState(() => _permissions = _permissions.copyWith(viewAllSchedule: v)),
                     ),
                     _buildPermissionTile(
-                      'Создание занятий',
-                      'Добавление новых занятий',
+                      l10n.permissionCreateLessons,
+                      l10n.permissionCreateLessonsDesc,
                       _permissions.createLessons,
                       (v) => setState(() => _permissions = _permissions.copyWith(createLessons: v)),
                     ),
                     _buildPermissionTile(
-                      'Редактирование своих занятий',
-                      'Изменение только своих занятий',
+                      l10n.permissionEditOwnLessons,
+                      l10n.permissionEditOwnLessonsDesc,
                       _permissions.editOwnLessons,
                       (v) => setState(() => _permissions = _permissions.copyWith(editOwnLessons: v)),
                     ),
                     _buildPermissionTile(
-                      'Редактирование всех занятий',
-                      'Изменение занятий любого преподавателя',
+                      l10n.permissionEditAllLessons,
+                      l10n.permissionEditAllLessonsDesc,
                       _permissions.editAllLessons,
                       (v) => setState(() => _permissions = _permissions.copyWith(editAllLessons: v)),
                     ),
                     _buildPermissionTile(
-                      'Удаление своих занятий',
-                      'Удаление только своих занятий',
+                      l10n.permissionDeleteOwnLessons,
+                      l10n.permissionDeleteOwnLessonsDesc,
                       _permissions.deleteOwnLessons,
                       (v) => setState(() => _permissions = _permissions.copyWith(deleteOwnLessons: v)),
                     ),
                     _buildPermissionTile(
-                      'Удаление всех занятий',
-                      'Удаление занятий любого преподавателя',
+                      l10n.permissionDeleteAllLessons,
+                      l10n.permissionDeleteAllLessonsDesc,
                       _permissions.deleteAllLessons,
                       (v) => setState(() => _permissions = _permissions.copyWith(deleteAllLessons: v)),
                     ),
@@ -317,47 +321,47 @@ class _MemberPermissionsScreenState
 
                 // Секция: Финансы
                 _buildSection(
-                  'Финансы',
+                  l10n.permissionSectionFinance,
                   [
                     _buildPermissionTile(
-                      'Просмотр оплат своих учеников',
-                      'Видеть историю оплат своих учеников',
+                      l10n.permissionViewOwnStudentsPayments,
+                      l10n.permissionViewOwnStudentsPaymentsDesc,
                       _permissions.viewOwnStudentsPayments,
                       (v) => setState(() => _permissions = _permissions.copyWith(viewOwnStudentsPayments: v)),
                     ),
                     _buildPermissionTile(
-                      'Просмотр всех оплат',
-                      'Видеть историю оплат всех учеников',
+                      l10n.permissionViewAllPayments,
+                      l10n.permissionViewAllPaymentsDesc,
                       _permissions.viewAllPayments,
                       (v) => setState(() => _permissions = _permissions.copyWith(viewAllPayments: v)),
                     ),
                     _buildPermissionTile(
-                      'Оплаты для своих учеников',
-                      'Добавление оплат своим ученикам',
+                      l10n.permissionAddPaymentsForOwnStudents,
+                      l10n.permissionAddPaymentsForOwnStudentsDesc,
                       _permissions.addPaymentsForOwnStudents,
                       (v) => setState(() => _permissions = _permissions.copyWith(addPaymentsForOwnStudents: v)),
                     ),
                     _buildPermissionTile(
-                      'Оплаты для всех учеников',
-                      'Добавление оплат любым ученикам',
+                      l10n.permissionAddPaymentsForAllStudents,
+                      l10n.permissionAddPaymentsForAllStudentsDesc,
                       _permissions.addPaymentsForAllStudents,
                       (v) => setState(() => _permissions = _permissions.copyWith(addPaymentsForAllStudents: v)),
                     ),
                     _buildPermissionTile(
-                      'Управление оплатами своих учеников',
-                      'Редактирование и удаление оплат своих учеников',
+                      l10n.permissionManageOwnStudentsPayments,
+                      l10n.permissionManageOwnStudentsPaymentsDesc,
                       _permissions.manageOwnStudentsPayments,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageOwnStudentsPayments: v)),
                     ),
                     _buildPermissionTile(
-                      'Управление всеми оплатами',
-                      'Редактирование и удаление оплат любых учеников',
+                      l10n.permissionManageAllPayments,
+                      l10n.permissionManageAllPaymentsDesc,
                       _permissions.manageAllPayments,
                       (v) => setState(() => _permissions = _permissions.copyWith(manageAllPayments: v)),
                     ),
                     _buildPermissionTile(
-                      'Просмотр статистики',
-                      'Доступ к отчётам и аналитике',
+                      l10n.permissionViewStatistics,
+                      l10n.permissionViewStatisticsDesc,
                       _permissions.viewStatistics,
                       (v) => setState(() => _permissions = _permissions.copyWith(viewStatistics: v)),
                     ),
@@ -371,13 +375,14 @@ class _MemberPermissionsScreenState
   }
 
   Widget _buildAdminSection() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
           child: Text(
-            'СТАТУС',
+            l10n.statusSection,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.bold,
@@ -392,11 +397,11 @@ class _MemberPermissionsScreenState
               Icons.admin_panel_settings,
               color: _isAdmin ? AppColors.primary : null,
             ),
-            title: const Text('Администратор'),
+            title: Text(l10n.admin),
             subtitle: Text(
               _isAdmin
-                  ? 'Имеет все права, кроме удаления заведения'
-                  : 'Дать полные права управления заведением',
+                  ? l10n.adminHasAllPermissions
+                  : l10n.grantFullPermissions,
               style: const TextStyle(fontSize: 12),
             ),
             value: _isAdmin,
@@ -415,14 +420,14 @@ class _MemberPermissionsScreenState
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: AppColors.primary, size: 20),
-                  SizedBox(width: 12),
+                  const Icon(Icons.info_outline, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Все права ниже автоматически включены для администратора',
-                      style: TextStyle(
+                      l10n.allPermissionsEnabledForAdmin,
+                      style: const TextStyle(
                         color: AppColors.primary,
                         fontSize: 13,
                       ),
@@ -473,7 +478,7 @@ class _MemberPermissionsScreenState
       child: SwitchListTile(
         title: Text(title),
         subtitle: Text(
-          isDisabled ? 'Включено для администратора' : subtitle,
+          isDisabled ? AppLocalizations.of(context).enabledForAdmin : subtitle,
           style: TextStyle(
             fontSize: 12,
             color: isDisabled ? AppColors.textTertiary : null,
@@ -488,6 +493,7 @@ class _MemberPermissionsScreenState
   }
 
   Widget _buildSubjectsSection() {
+    final l10n = AppLocalizations.of(context);
     final params = TeacherSubjectsParams(
       userId: _userId,
       institutionId: widget.institutionId,
@@ -503,7 +509,7 @@ class _MemberPermissionsScreenState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'НАПРАВЛЕНИЯ',
+                l10n.teacherSubjectsLabel,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.bold,
@@ -512,16 +518,16 @@ class _MemberPermissionsScreenState
               TextButton.icon(
                 onPressed: () => _showAddSubjectDialog(),
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Добавить'),
+                label: Text(l10n.add),
               ),
             ],
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'Предметы, которые ведёт преподаватель',
-            style: TextStyle(
+            l10n.teacherSubjectsHint,
+            style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
             ),
@@ -536,19 +542,19 @@ class _MemberPermissionsScreenState
           error: (_, __) => const SizedBox.shrink(),
           data: (teacherSubjects) {
             if (teacherSubjects.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Card(
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: AppColors.textSecondary),
-                        SizedBox(width: 12),
+                        const Icon(Icons.info_outline, color: AppColors.textSecondary),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Направления не указаны.\nДобавьте предметы, которые ведёт преподаватель.',
-                            style: TextStyle(color: AppColors.textSecondary),
+                            l10n.noDirectionsHint,
+                            style: const TextStyle(color: AppColors.textSecondary),
                           ),
                         ),
                       ],
@@ -575,7 +581,7 @@ class _MemberPermissionsScreenState
                       radius: 12,
                       child: const Icon(Icons.book, size: 14, color: Colors.white),
                     ),
-                    label: Text(subject?.name ?? 'Неизвестный'),
+                    label: Text(subject?.name ?? l10n.unknownSubject),
                     deleteIcon: const Icon(Icons.close, size: 18),
                     onDeleted: () => _removeSubject(ts.subjectId),
                   );
@@ -591,6 +597,7 @@ class _MemberPermissionsScreenState
   }
 
   void _showAddSubjectDialog() {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (dialogContext) => Consumer(
@@ -607,12 +614,12 @@ class _MemberPermissionsScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Добавить направление',
+                  l10n.addDirectionTitle,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Выберите предмет для $_memberName',
+                  l10n.selectSubjectFor(_memberName),
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 16),
@@ -630,9 +637,9 @@ class _MemberPermissionsScreenState
                         .toList();
 
                     if (available.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('Все предметы уже добавлены'),
+                      return Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(l10n.allSubjectsAdded),
                       );
                     }
 
@@ -665,7 +672,7 @@ class _MemberPermissionsScreenState
                               if (mounted) {
                                 messenger.showSnackBar(
                                   SnackBar(
-                                    content: Text('Направление "${subject.name}" добавлено'),
+                                    content: Text(l10n.directionAdded(subject.name)),
                                     backgroundColor: AppColors.success,
                                   ),
                                 );

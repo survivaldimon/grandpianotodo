@@ -8,6 +8,7 @@ import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/core/widgets/empty_state.dart';
 import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/features/subjects/providers/subject_provider.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/shared/models/subject.dart';
 
 /// Экран управления предметами
@@ -23,6 +24,7 @@ class SubjectsScreen extends ConsumerStatefulWidget {
 class _SubjectsScreenState extends ConsumerState<SubjectsScreen> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
     final subjects = subjectsAsync.valueOrNull ?? [];
     final hasItems = subjects.isNotEmpty;
@@ -32,7 +34,7 @@ class _SubjectsScreenState extends ConsumerState<SubjectsScreen> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, l10n)),
             backgroundColor: Colors.red,
           ),
         );
@@ -41,7 +43,7 @@ class _SubjectsScreenState extends ConsumerState<SubjectsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Предметы'),
+        title: Text(l10n.subjects),
       ),
       floatingActionButton: hasItems
           ? FloatingActionButton(
@@ -60,14 +62,15 @@ class _SubjectsScreenState extends ConsumerState<SubjectsScreen> {
 
           // Всегда показываем данные (даже если фоном ошибка)
           if (subjects.isEmpty) {
+            final l10n = AppLocalizations.of(context);
             return EmptyState(
               icon: Icons.music_note_outlined,
-              title: 'Нет предметов',
-              subtitle: 'Добавьте первый предмет',
+              title: l10n.noSubjects,
+              subtitle: l10n.addFirstSubject,
               action: ElevatedButton.icon(
                 onPressed: () => _showAddSheet(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Добавить предмет'),
+                label: Text(l10n.addSubject),
               ),
             );
           }
@@ -152,6 +155,7 @@ class _SubjectCard extends ConsumerWidget {
   }
 
   void _showOptions(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -160,7 +164,7 @@ class _SubjectCard extends ConsumerWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Редактировать'),
+              title: Text(l10n.edit),
               onTap: () {
                 Navigator.pop(context);
                 _showEditSheet(context);
@@ -168,7 +172,7 @@ class _SubjectCard extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+              title: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
                 _showDeleteConfirmation(context, ref);
@@ -193,19 +197,20 @@ class _SubjectCard extends ConsumerWidget {
   }
 
   void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить предмет?'),
+        title: Text(l10n.deleteSubjectQuestion),
         content: Text(
-          'Предмет "${subject.name}" будет удалён. Это действие нельзя отменить.',
+          l10n.subjectWillBeDeleted(subject.name),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -214,15 +219,15 @@ class _SubjectCard extends ConsumerWidget {
               final success = await controller.archive(subject.id, institutionId);
               if (success) {
                 scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Предмет удалён'),
+                  SnackBar(
+                    content: Text(l10n.subjectDeleted),
                     backgroundColor: AppColors.error,
                   ),
                 );
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -265,10 +270,11 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
       );
 
       if (subject != null && mounted) {
+        final l10n = AppLocalizations.of(context);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Предмет "${subject.name}" создан'),
+            content: Text(l10n.subjectCreated(subject.name)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -282,6 +288,7 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -332,15 +339,15 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Новый предмет',
-                            style: TextStyle(
+                          Text(
+                            l10n.newSubject,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Введите название предмета',
+                            l10n.enterSubjectName,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -357,8 +364,8 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название *',
-                    hintText: 'Например: Фортепиано',
+                    labelText: l10n.subjectNameRequired,
+                    hintText: l10n.subjectNameHint,
                     prefixIcon: const Icon(Icons.edit_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -367,7 +374,7 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
-                  validator: (v) => v == null || v.isEmpty ? 'Введите название' : null,
+                  validator: (v) => v == null || v.isEmpty ? l10n.enterName : null,
                   autofocus: true,
                 ),
                 const SizedBox(height: 28),
@@ -388,9 +395,9 @@ class _AddSubjectSheetState extends ConsumerState<_AddSubjectSheet> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Создать предмет',
-                            style: TextStyle(
+                        : Text(
+                            l10n.createSubject,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -455,10 +462,11 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
       );
 
       if (success && mounted) {
+        final l10n = AppLocalizations.of(context);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Предмет обновлён'),
+          SnackBar(
+            content: Text(l10n.subjectUpdated),
             backgroundColor: AppColors.success,
           ),
         );
@@ -472,6 +480,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -522,15 +531,15 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Редактировать предмет',
-                            style: TextStyle(
+                          Text(
+                            l10n.editSubject,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Измените данные предмета',
+                            l10n.changeSubjectData,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -547,8 +556,8 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название *',
-                    hintText: 'Например: Фортепиано',
+                    labelText: l10n.subjectNameRequired,
+                    hintText: l10n.subjectNameHint,
                     prefixIcon: const Icon(Icons.edit_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -557,13 +566,13 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
-                  validator: (v) => v == null || v.isEmpty ? 'Введите название' : null,
+                  validator: (v) => v == null || v.isEmpty ? l10n.enterName : null,
                 ),
                 const SizedBox(height: 20),
 
                 // Выбор цвета
                 ColorPickerField(
-                  label: 'Цвет',
+                  label: l10n.color,
                   selectedColor: _selectedColor,
                   onColorChanged: (color) => setState(() => _selectedColor = color),
                 ),
@@ -585,9 +594,9 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Сохранить',
-                            style: TextStyle(
+                        : Text(
+                            l10n.save,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),

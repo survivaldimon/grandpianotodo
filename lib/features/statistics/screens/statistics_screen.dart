@@ -6,6 +6,7 @@ import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/statistics/providers/statistics_provider.dart';
 import 'package:kabinet/features/statistics/repositories/statistics_repository.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 
 /// Экран статистики
 class StatisticsScreen extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // Проверяем права на просмотр статистики
     final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
@@ -48,21 +50,21 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
 
     if (!canViewStatistics) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Статистика')),
-        body: const Center(
+        appBar: AppBar(title: Text(l10n.statistics)),
+        body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.lock_outline, size: 64, color: AppColors.textSecondary),
-              SizedBox(height: 16),
+              const Icon(Icons.lock_outline, size: 64, color: AppColors.textSecondary),
+              const SizedBox(height: 16),
               Text(
-                'Нет доступа к статистике',
-                style: TextStyle(fontSize: 18, color: AppColors.textSecondary),
+                l10n.noAccessToStatistics,
+                style: const TextStyle(fontSize: 18, color: AppColors.textSecondary),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
-                'Обратитесь к владельцу заведения',
-                style: TextStyle(color: AppColors.textSecondary),
+                l10n.contactOwner,
+                style: const TextStyle(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -86,15 +88,15 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       length: 5,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Статистика'),
-          bottom: const TabBar(
+          title: Text(l10n.statistics),
+          bottom: TabBar(
             isScrollable: true,
             tabs: [
-              Tab(text: 'Общая'),
-              Tab(text: 'Предметы'),
-              Tab(text: 'Преподаватели'),
-              Tab(text: 'Ученики'),
-              Tab(text: 'Тарифы'),
+              Tab(text: l10n.statsTabGeneral),
+              Tab(text: l10n.subjects),
+              Tab(text: l10n.teachers),
+              Tab(text: l10n.students),
+              Tab(text: l10n.paymentPlans),
             ],
           ),
         ),
@@ -111,7 +113,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
-                          label: Text(_periodLabel(p)),
+                          label: Text(_periodLabel(p, l10n)),
                           selected: p == period,
                           onSelected: (_) => _selectPresetPeriod(p),
                         ),
@@ -207,18 +209,18 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
     return getPeriodDates(period, customRange: customRange);
   }
 
-  String _periodLabel(StatsPeriod period) {
+  String _periodLabel(StatsPeriod period, AppLocalizations l10n) {
     switch (period) {
       case StatsPeriod.week:
-        return 'Неделя';
+        return l10n.periodWeek;
       case StatsPeriod.month:
-        return 'Месяц';
+        return l10n.periodMonth;
       case StatsPeriod.quarter:
-        return 'Квартал';
+        return l10n.periodQuarter;
       case StatsPeriod.year:
-        return 'Год';
+        return l10n.periodYear;
       case StatsPeriod.custom:
-        return 'Свой';
+        return l10n.periodCustom;
     }
   }
 
@@ -355,6 +357,7 @@ class _GeneralTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final statsAsync = ref.watch(generalStatsProvider(params));
 
     final stats = statsAsync.valueOrNull;
@@ -367,29 +370,29 @@ class _GeneralTab extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // Занятия
-          const _SectionTitle(title: 'Занятия'),
+          _SectionTitle(title: l10n.lessons),
           _StatsGrid(
             items: [
               _StatItem(
-                label: 'Всего',
+                label: l10n.statsTotal,
                 value: stats.totalLessons.toString(),
                 icon: Icons.event,
                 color: AppColors.primary,
               ),
               _StatItem(
-                label: 'Проведено',
+                label: l10n.completed,
                 value: stats.completedLessons.toString(),
                 icon: Icons.check_circle,
                 color: AppColors.success,
               ),
               _StatItem(
-                label: 'Отменено',
+                label: l10n.cancelled,
                 value: stats.cancelledLessons.toString(),
                 icon: Icons.cancel,
                 color: AppColors.error,
               ),
               _StatItem(
-                label: 'Запланировано',
+                label: l10n.scheduled,
                 value: stats.scheduledLessons.toString(),
                 icon: Icons.schedule,
                 color: AppColors.warning,
@@ -399,7 +402,7 @@ class _GeneralTab extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // Финансы
-          const _SectionTitle(title: 'Финансы'),
+          _SectionTitle(title: l10n.statsFinances),
           Builder(
             builder: (context) {
               // Рассчитываем среднюю стоимость: точную (из subscription_id) или приблизительную
@@ -420,21 +423,21 @@ class _GeneralTab extends ConsumerWidget {
               return _StatsGrid(
                 items: [
                   _StatItem(
-                    label: 'Оплаты',
+                    label: l10n.payments,
                     value: _formatMoney(stats.totalPayments),
                     icon: Icons.payments,
                     color: AppColors.success,
                   ),
                   if (avgCost > 0)
                     _StatItem(
-                      label: isApproximate ? 'Ср. занятие ≈' : 'Ср. занятие',
+                      label: isApproximate ? l10n.statsAvgLessonApprox : l10n.statsAvgLesson,
                       value: _formatMoney(avgCost),
                       icon: Icons.trending_up,
                       color: AppColors.primary,
                     ),
                   if (stats.totalDiscounts > 0)
                     _StatItem(
-                      label: 'Скидки',
+                      label: l10n.statsDiscounts,
                       value: _formatMoney(stats.totalDiscounts),
                       icon: Icons.discount,
                       color: AppColors.warning,
@@ -461,7 +464,7 @@ class _GeneralTab extends ConsumerWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Оплаченных занятий: ${stats.paidLessonsCount} из ${stats.completedLessons}',
+                            l10n.statsPaidLessonsOf(stats.paidLessonsCount, stats.completedLessons),
                             style: const TextStyle(color: AppColors.primary),
                           ),
                         ),
@@ -475,7 +478,7 @@ class _GeneralTab extends ConsumerWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Оплат со скидкой: ${stats.discountedPaymentsCount}',
+                            l10n.statsPaymentsWithDiscount(stats.discountedPaymentsCount),
                             style: const TextStyle(color: AppColors.warning),
                           ),
                         ),
@@ -489,17 +492,17 @@ class _GeneralTab extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // Загруженность
-          const _SectionTitle(title: 'Загруженность'),
+          _SectionTitle(title: l10n.statsWorkload),
           _StatsGrid(
             items: [
               _StatItem(
-                label: 'Часов занятий',
+                label: l10n.statsLessonHours,
                 value: stats.roomHours.toStringAsFixed(1),
                 icon: Icons.access_time,
                 color: AppColors.primary,
               ),
               _StatItem(
-                label: 'Активных учеников',
+                label: l10n.statsActiveStudents,
                 value: stats.activeStudents.toString(),
                 icon: Icons.people,
                 color: AppColors.primary,
@@ -510,17 +513,17 @@ class _GeneralTab extends ConsumerWidget {
           // Способы оплаты (если есть оплаты)
           if (stats.cashCount > 0 || stats.cardCount > 0) ...[
             const SizedBox(height: 24),
-            const _SectionTitle(title: 'Способы оплаты'),
+            _SectionTitle(title: l10n.statsPaymentMethods),
             _StatsGrid(
               items: [
                 _StatItem(
-                  label: 'Карта',
+                  label: l10n.card,
                   value: _formatMoney(stats.cardTotal),
                   icon: Icons.credit_card,
                   color: AppColors.primary,
                 ),
                 _StatItem(
-                  label: 'Наличные',
+                  label: l10n.cash,
                   value: _formatMoney(stats.cashTotal),
                   icon: Icons.payments_outlined,
                   color: AppColors.success,
@@ -543,7 +546,7 @@ class _GeneralTab extends ConsumerWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Карта: ${stats.cardCount} оплат (${_calcPercent(stats.cardTotal, stats.totalPayments)}%)',
+                          l10n.statsCardPayments(stats.cardCount, _calcPercent(stats.cardTotal, stats.totalPayments)),
                           style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
                         ),
                       ),
@@ -556,7 +559,7 @@ class _GeneralTab extends ConsumerWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Наличные: ${stats.cashCount} оплат (${_calcPercent(stats.cashTotal, stats.totalPayments)}%)',
+                          l10n.statsCashPayments(stats.cashCount, _calcPercent(stats.cashTotal, stats.totalPayments)),
                           style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
                         ),
                       ),
@@ -589,6 +592,7 @@ class _SubjectsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final statsAsync = ref.watch(subjectStatsProvider(params));
     final generalStatsAsync = ref.watch(generalStatsProvider(params));
     final formatter = NumberFormat('#,###', 'ru_RU');
@@ -600,7 +604,7 @@ class _SubjectsTab extends ConsumerWidget {
     }
 
     if (stats.isEmpty) {
-      return const Center(child: Text('Нет данных за период'));
+      return Center(child: Text(l10n.noDataForPeriod));
     }
 
     // Получаем общую среднюю стоимость для приблизительного расчёта
@@ -728,6 +732,7 @@ class _TeachersTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final statsAsync = ref.watch(teacherStatsProvider(params));
     final generalStatsAsync = ref.watch(generalStatsProvider(params));
     final formatter = NumberFormat('#,###', 'ru_RU');
@@ -739,7 +744,7 @@ class _TeachersTab extends ConsumerWidget {
     }
 
     if (stats.isEmpty) {
-      return const Center(child: Text('Нет данных за период'));
+      return Center(child: Text(l10n.noDataForPeriod));
     }
 
     // Получаем общую среднюю стоимость для приблизительного расчёта
@@ -818,7 +823,7 @@ class _TeachersTab extends ConsumerWidget {
                                   ),
                                   const SizedBox(width: 2),
                                   Text(
-                                    'Ср. занятие: ${isApproximate ? '≈ ' : ''}${formatter.format(costValue.round())} ₸',
+                                    '${l10n.statsAvgLessonShort}: ${isApproximate ? '≈ ' : ''}${formatter.format(costValue.round())} ₸',
                                     style: const TextStyle(
                                       color: AppColors.primary,
                                       fontSize: 11,
@@ -871,6 +876,7 @@ class _StudentsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final topStudentsAsync = ref.watch(topStudentsProvider(params));
     final debtorsAsync = ref.watch(debtorsProvider(institutionId));
     final generalStatsAsync = ref.watch(generalStatsProvider(params));
@@ -879,9 +885,9 @@ class _StudentsTab extends ConsumerWidget {
     return ListView(
       children: [
         // Статистика занятий (проведено/отменено)
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: _SectionTitle(title: 'Статистика занятий'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: _SectionTitle(title: l10n.statsLessonStats),
         ),
         Builder(
           builder: (context) {
@@ -934,9 +940,9 @@ class _StudentsTab extends ConsumerWidget {
                                     color: AppColors.success,
                                   ),
                                 ),
-                                const Text(
-                                  'Проведено',
-                                  style: TextStyle(
+                                Text(
+                                  l10n.completed,
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     color: AppColors.success,
                                   ),
@@ -970,9 +976,9 @@ class _StudentsTab extends ConsumerWidget {
                                     color: AppColors.error,
                                   ),
                                 ),
-                                const Text(
-                                  'Отменено',
-                                  style: TextStyle(
+                                Text(
+                                  l10n.cancelled,
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     color: AppColors.error,
                                   ),
@@ -995,7 +1001,7 @@ class _StudentsTab extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          'Процент отмен: $cancellationRate%',
+                          l10n.cancellationRatePercent(cancellationRate.toString()),
                           style: const TextStyle(
                             color: AppColors.warning,
                             fontWeight: FontWeight.w500,
@@ -1013,9 +1019,9 @@ class _StudentsTab extends ConsumerWidget {
         const Divider(height: 32),
 
         // Топ учеников
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: _SectionTitle(title: 'Топ по занятиям'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: _SectionTitle(title: l10n.topByLessons),
         ),
         Builder(
           builder: (context) {
@@ -1030,9 +1036,9 @@ class _StudentsTab extends ConsumerWidget {
               );
             }
             if (students.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('Нет данных за период'),
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(l10n.noDataForPeriod),
               );
             }
 
@@ -1054,7 +1060,7 @@ class _StudentsTab extends ConsumerWidget {
                   ),
                   title: Text(stat.studentName),
                   trailing: Text(
-                    '${stat.lessonsCount} зан.',
+                    l10n.lessonsCountShort(stat.lessonsCount),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 );
@@ -1066,9 +1072,9 @@ class _StudentsTab extends ConsumerWidget {
         const Divider(height: 32),
 
         // Должники
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: _SectionTitle(title: 'Должники'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: _SectionTitle(title: l10n.debtors),
         ),
         Builder(
           builder: (context) {
@@ -1083,13 +1089,13 @@ class _StudentsTab extends ConsumerWidget {
               );
             }
             if (debtors.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
+              return Padding(
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle, color: AppColors.success),
-                    SizedBox(width: 8),
-                    Text('Должников нет'),
+                    const Icon(Icons.check_circle, color: AppColors.success),
+                    const SizedBox(width: 8),
+                    Text(l10n.noDebtors),
                   ],
                 ),
               );
@@ -1120,9 +1126,9 @@ class _StudentsTab extends ConsumerWidget {
         const Divider(height: 32),
 
         // Статистика по каждому ученику
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: _SectionTitle(title: 'По ученикам'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: _SectionTitle(title: l10n.byStudents),
         ),
         Builder(
           builder: (context) {
@@ -1137,9 +1143,9 @@ class _StudentsTab extends ConsumerWidget {
               );
             }
             if (stats.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('Нет данных за период'),
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(l10n.noDataForPeriod),
               );
             }
 
@@ -1257,6 +1263,7 @@ class _PaymentPlansTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final statsAsync = ref.watch(paymentPlanStatsProvider(params));
     final generalStatsAsync = ref.watch(generalStatsProvider(params));
 
@@ -1267,7 +1274,7 @@ class _PaymentPlansTab extends ConsumerWidget {
     }
 
     if (stats.isEmpty) {
-      return const Center(child: Text('Нет данных за период'));
+      return Center(child: Text(l10n.noDataForPeriod));
     }
 
     // Считаем итоги
@@ -1297,17 +1304,17 @@ class _PaymentPlansTab extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       _SummaryItem(
-                        label: 'Покупок',
+                        label: l10n.purchases,
                         value: totalPurchases.toString(),
                         icon: Icons.shopping_cart,
                       ),
                       _SummaryItem(
-                        label: 'Сумма',
+                        label: l10n.sumLabel,
                         value: _formatMoney(totalAmount),
                         icon: Icons.payments,
                       ),
                       _SummaryItem(
-                        label: 'Занятий',
+                        label: l10n.lessons,
                         value: totalLessons.toString(),
                         icon: Icons.event,
                       ),
@@ -1324,7 +1331,7 @@ class _PaymentPlansTab extends ConsumerWidget {
                         const Icon(Icons.trending_up, color: AppColors.success, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'Средняя стоимость занятия: ',
+                          '${l10n.avgLessonCost}: ',
                           style: TextStyle(
                             color: Colors.grey[700],
                             fontSize: 14,
@@ -1362,7 +1369,7 @@ class _PaymentPlansTab extends ConsumerWidget {
                         const Icon(Icons.discount, color: AppColors.warning),
                         const SizedBox(width: 8),
                         Text(
-                          'Оплаты со скидкой',
+                          l10n.paymentsWithDiscount,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -1376,13 +1383,13 @@ class _PaymentPlansTab extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _SummaryItem(
-                          label: 'Оплат',
+                          label: l10n.payments,
                           value: discountedCount.toString(),
                           icon: Icons.receipt_long,
                           color: AppColors.warning,
                         ),
                         _SummaryItem(
-                          label: 'Сумма скидок',
+                          label: l10n.discountSum,
                           value: _formatMoney(totalDiscounts),
                           icon: Icons.savings,
                           color: AppColors.warning,
@@ -1423,7 +1430,7 @@ class _PaymentPlansTab extends ConsumerWidget {
                               const Icon(Icons.credit_card, color: AppColors.primary),
                               const SizedBox(width: 8),
                               Text(
-                                'Способы оплаты',
+                                l10n.paymentMethods,
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -1437,13 +1444,13 @@ class _PaymentPlansTab extends ConsumerWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               _SummaryItem(
-                                label: 'Карта ($totalCardCount)',
+                                label: l10n.cardPaymentsCount(totalCardCount),
                                 value: _formatMoney(totalCardTotal),
                                 icon: Icons.credit_card,
                                 color: AppColors.primary,
                               ),
                               _SummaryItem(
-                                label: 'Наличные ($totalCashCount)',
+                                label: l10n.cashPaymentsCount(totalCashCount),
                                 value: _formatMoney(totalCashTotal),
                                 icon: Icons.payments_outlined,
                                 color: AppColors.success,
@@ -1459,7 +1466,7 @@ class _PaymentPlansTab extends ConsumerWidget {
             ),
 
             const SizedBox(height: 24),
-            const _SectionTitle(title: 'По тарифам'),
+            _SectionTitle(title: l10n.byPlans),
             const SizedBox(height: 8),
             ...stats.map((stat) => _PaymentPlanStatCard(stat: stat)),
           ],
@@ -1521,6 +1528,7 @@ class _PaymentPlanStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final formatter = NumberFormat.currency(locale: 'ru_RU', symbol: '₸', decimalDigits: 0);
     final avgCost = stat.totalLessons > 0 ? stat.totalAmount / stat.totalLessons : 0.0;
 
@@ -1564,7 +1572,7 @@ class _PaymentPlanStatCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
-                    '${stat.purchaseCount} покуп.',
+                    '${stat.purchaseCount} ${AppLocalizations.of(context).purchasesShort}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
@@ -1590,7 +1598,7 @@ class _PaymentPlanStatCard extends StatelessWidget {
                       Expanded(
                         child: _DetailRow(
                           icon: Icons.payments,
-                          label: 'Сумма',
+                          label: l10n.sumLabel,
                           value: formatter.format(stat.totalAmount),
                           color: AppColors.success,
                         ),
@@ -1599,7 +1607,7 @@ class _PaymentPlanStatCard extends StatelessWidget {
                       Expanded(
                         child: _DetailRow(
                           icon: Icons.event,
-                          label: 'Занятий',
+                          label: l10n.lessons,
                           value: stat.totalLessons.toString(),
                           color: AppColors.primary,
                         ),
@@ -1617,7 +1625,7 @@ class _PaymentPlanStatCard extends StatelessWidget {
                         const Icon(Icons.trending_up, size: 18, color: AppColors.primary),
                         const SizedBox(width: 6),
                         Text(
-                          'Ср. занятие: ',
+                          '${l10n.avgLesson}: ',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 13,

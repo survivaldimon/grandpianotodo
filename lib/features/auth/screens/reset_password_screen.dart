@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show UserAttributes;
 import 'package:kabinet/core/config/supabase_config.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/utils/validators.dart';
 
@@ -45,17 +45,19 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       );
 
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Пароль успешно изменён!'),
+          SnackBar(
+            content: Text(l10n.passwordChanged),
             backgroundColor: Colors.green,
           ),
         );
         context.go('/institutions');
       }
     } catch (e) {
+      final l10n = AppLocalizations.of(context);
       setState(() {
-        _error = 'Ошибка смены пароля: $e';
+        _error = l10n.passwordChangeError(e.toString());
       });
     } finally {
       if (mounted) {
@@ -66,9 +68,11 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Новый пароль'),
+        title: Text(l10n.newPassword),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -86,13 +90,13 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Установите новый пароль',
+                  l10n.setNewPasswordDescription,
                   style: Theme.of(context).textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Минимум 8 символов, 1 заглавная буква и 1 спецсимвол',
+                  l10n.passwordRequirements,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[600],
                   ),
@@ -117,7 +121,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 TextFormField(
                   controller: _passwordController,
                   decoration: InputDecoration(
-                    labelText: 'Новый пароль',
+                    labelText: l10n.newPassword,
                     prefixIcon: const Icon(Icons.lock_outlined),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -131,14 +135,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     ),
                   ),
                   obscureText: _obscurePassword,
-                  validator: Validators.password,
+                  validator: Validators.password(l10n),
                   enabled: !_isLoading,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _confirmController,
                   decoration: InputDecoration(
-                    labelText: AppStrings.confirmPassword,
+                    labelText: l10n.confirmPassword,
                     prefixIcon: const Icon(Icons.lock_outlined),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -154,7 +158,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                   obscureText: _obscureConfirm,
                   validator: (value) {
                     if (value != _passwordController.text) {
-                      return 'Пароли не совпадают';
+                      return l10n.passwordsDoNotMatch;
                     }
                     return null;
                   },
@@ -169,7 +173,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Сохранить пароль'),
+                      : Text(l10n.savePassword),
                 ),
               ],
             ),

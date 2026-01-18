@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:kabinet/core/router/app_router.dart';
 import 'package:kabinet/core/theme/app_theme.dart';
 import 'package:kabinet/core/theme/theme_provider.dart';
+import 'package:kabinet/core/providers/locale_provider.dart';
 import 'package:kabinet/core/config/app_config.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
 
@@ -50,6 +51,8 @@ class _KabinetAppState extends ConsumerState<KabinetApp> {
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final appLocale = ref.watch(localeProvider);
+    final resolvedLocale = resolveLocale(appLocale);
 
     return MaterialApp.router(
       title: AppConfig.appName,
@@ -58,15 +61,9 @@ class _KabinetAppState extends ConsumerState<KabinetApp> {
       themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
-      locale: const Locale('ru', 'RU'),
-      supportedLocales: const [
-        Locale('ru', 'RU'),
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+      locale: resolvedLocale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
     );
   }
 }

@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
+import 'package:kabinet/core/providers/locale_provider.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/utils/date_utils.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
@@ -13,7 +14,6 @@ import 'package:kabinet/features/payments/providers/payment_provider.dart';
 import 'package:kabinet/features/subscriptions/providers/subscription_provider.dart';
 import 'package:kabinet/shared/models/lesson.dart';
 import 'package:kabinet/shared/models/subscription.dart';
-import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 
 /// Главный экран (Dashboard)
@@ -64,6 +64,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
+    final l10n = AppLocalizations.of(context);
+    final locale = ref.watch(dateLocaleProvider);
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
     // Комбинированный провайдер (реальные + виртуальные занятия)
     final lessons = ref.watch(combinedTodayLessonsProvider(widget.institutionId));
@@ -81,7 +83,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         title: institutionAsync.when(
           data: (institution) => Text(institution.name),
           loading: () => const Text('...'),
-          error: (_, __) => const Text('Заведение'),
+          error: (_, __) => Text(l10n.institutions),
         ),
         leading: IconButton(
           icon: const Icon(Icons.swap_horiz),
@@ -108,7 +110,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           children: [
             // Дата
             Text(
-              'Сегодня, ${AppDateUtils.formatDayMonth(today)}',
+              l10n.todayWithDate(AppDateUtils.formatDayMonth(today, locale)),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
@@ -116,6 +118,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             // Баннер онбординга (если не заполнены цвет или направления)
             if (needsOnboarding) ...[
               _OnboardingBanner(
+                l10n: l10n,
                 onTap: () => context.go('/institutions/${widget.institutionId}/onboarding'),
               ),
               const SizedBox(height: 12),
@@ -123,7 +126,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
             // Занятия сегодня (реальные + виртуальные)
             _DashboardCard(
-              title: 'Занятия сегодня',
+              title: l10n.lessonsToday,
               trailing: lessons.length.toString(),
               icon: Icons.event_note,
               onTap: () => context.go('/institutions/${widget.institutionId}/schedule'),
@@ -133,15 +136,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             // Неотмеченные занятия (реальные + виртуальные)
             Builder(builder: (context) {
               final subtitle = unmarkedLessons.isEmpty
-                  ? AppStrings.noUnmarkedLessons
-                  : unmarkedLessons.take(2).map((l) {
-                      final date = AppDateUtils.formatDayMonth(l.date);
+                  ? l10n.noUnmarkedLessons
+                  : unmarkedLessons.take(2).map((lesson) {
+                      final date = AppDateUtils.formatDayMonth(lesson.date, locale);
                       final time =
-                          '${l.startTime.hour.toString().padLeft(2, '0')}:${l.startTime.minute.toString().padLeft(2, '0')}';
+                          '${lesson.startTime.hour.toString().padLeft(2, '0')}:${lesson.startTime.minute.toString().padLeft(2, '0')}';
                       return '$date $time';
                     }).join(', ');
               return _DashboardCard(
-                title: AppStrings.unmarkedLessons,
+                title: l10n.unmarkedLessons,
                 trailing: unmarkedLessons.length.toString(),
                 subtitle: subtitle,
                 icon: Icons.pending_actions,
@@ -157,16 +160,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             Builder(builder: (context) {
               final nextLesson = _getNextLesson(lessons, today);
               if (nextLesson == null) {
-                return const _DashboardCard(
-                  title: 'Ближайшее занятие',
-                  subtitle: 'Нет запланированных занятий',
+                return _DashboardCard(
+                  title: l10n.nextLesson,
+                  subtitle: l10n.noScheduledLessons,
                   icon: Icons.schedule,
                   onTap: null,
                 );
               }
               return _DashboardCard(
-                title: 'Ближайшее занятие',
-                subtitle: _formatNextLesson(nextLesson),
+                title: l10n.nextLesson,
+                subtitle: _formatNextLesson(nextLesson, l10n),
                 icon: Icons.schedule,
                 onTap: () {
                   context.go('/institutions/${widget.institutionId}/schedule');
@@ -179,10 +182,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             debtorsAsync.when(
               data: (debtors) {
                 final subtitle = debtors.isEmpty
-                    ? 'Нет должников'
+                    ? l10n.noDebtors
                     : debtors.take(2).map((s) => '${s.name} (${s.balance})').join(', ');
                 return _DashboardCard(
-                  title: 'Должники',
+                  title: l10n.debtors,
                   trailing: debtors.isEmpty ? '0' : debtors.length.toString(),
                   subtitle: subtitle,
                   icon: Icons.warning_amber,
@@ -193,15 +196,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   },
                 );
               },
-              loading: () => const _DashboardCard(
-                title: 'Должники',
+              loading: () => _DashboardCard(
+                title: l10n.debtors,
                 trailing: '...',
                 icon: Icons.warning_amber,
                 iconColor: AppColors.warning,
                 onTap: null,
               ),
               error: (_, __) => _DashboardCard(
-                title: 'Должники',
+                title: l10n.debtors,
                 trailing: '—',
                 icon: Icons.warning_amber,
                 iconColor: AppColors.warning,
@@ -216,21 +219,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             // Оплаты за сегодня
             todayPaymentsAsync.when(
               data: (total) => _DashboardCard(
-                title: 'Сегодня оплачено',
+                title: l10n.todayPayments,
                 trailing: _formatCurrency(total),
                 icon: Icons.payments,
                 iconColor: AppColors.success,
                 onTap: () => context.go('/institutions/${widget.institutionId}/payments'),
               ),
-              loading: () => const _DashboardCard(
-                title: 'Сегодня оплачено',
+              loading: () => _DashboardCard(
+                title: l10n.todayPayments,
                 trailing: '...',
                 icon: Icons.payments,
                 iconColor: AppColors.success,
                 onTap: null,
               ),
               error: (_, __) => _DashboardCard(
-                title: 'Сегодня оплачено',
+                title: l10n.todayPayments,
                 trailing: '—',
                 icon: Icons.payments,
                 iconColor: AppColors.success,
@@ -246,17 +249,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   return const SizedBox.shrink();
                 }
                 final subtitle = subscriptions.take(2).map((s) {
-                  final name = s.student?.name ?? 'Ученик';
+                  final name = s.student?.name ?? l10n.student;
                   final days = s.daysUntilExpiration;
-                  return '$name ($days дн.)';
+                  return '$name ($days ${l10n.daysShort})';
                 }).join(', ');
                 return _DashboardCard(
-                  title: 'Истекающие абонементы',
+                  title: l10n.expiringSubscriptions,
                   trailing: subscriptions.length.toString(),
                   subtitle: subtitle,
                   icon: Icons.timer,
                   iconColor: AppColors.warning,
-                  onTap: () => _showExpiringSubscriptionsSheet(context, subscriptions),
+                  onTap: () => _showExpiringSubscriptionsSheet(context, subscriptions, l10n),
                 );
               },
               loading: () => const SizedBox.shrink(),
@@ -271,11 +274,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   void _showExpiringSubscriptionsSheet(
     BuildContext context,
     List<Subscription> subscriptions,
+    AppLocalizations l10n,
   ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
+      builder: (sheetContext) => DraggableScrollableSheet(
         initialChildSize: 0.6,
         minChildSize: 0.3,
         maxChildSize: 0.9,
@@ -289,7 +293,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   const Icon(Icons.timer, color: AppColors.warning),
                   const SizedBox(width: 12),
                   Text(
-                    'Истекающие абонементы (${subscriptions.length})',
+                    '${l10n.expiringSubscriptions} (${subscriptions.length})',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ],
@@ -302,7 +306,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 itemCount: subscriptions.length,
                 itemBuilder: (context, index) {
                   final sub = subscriptions[index];
-                  final studentName = sub.student?.name ?? 'Ученик';
+                  final studentName = sub.student?.name ?? l10n.student;
                   final expiresStr = DateFormat('dd.MM.yyyy').format(sub.expiresAt);
                   final daysLeft = sub.daysUntilExpiration;
 
@@ -321,7 +325,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                     ),
                     title: Text(studentName),
                     subtitle: Text(
-                      '${sub.lessonsRemaining}/${sub.lessonsTotal} занятий • до $expiresStr',
+                      '${sub.lessonsRemaining}/${sub.lessonsTotal} ${l10n.lessons} • $expiresStr',
                     ),
                     trailing: daysLeft <= 3
                         ? Container(
@@ -333,9 +337,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                               color: AppColors.error.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              'Срочно',
-                              style: TextStyle(
+                            child: Text(
+                              l10n.urgent,
+                              style: const TextStyle(
                                 color: AppColors.error,
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -344,7 +348,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                           )
                         : null,
                     onTap: () {
-                      Navigator.pop(context);
+                      Navigator.pop(sheetContext);
                       context.go('/institutions/${widget.institutionId}/students/${sub.studentId}');
                     },
                   );
@@ -373,9 +377,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     return upcomingLessons.first;
   }
 
-  String _formatNextLesson(Lesson lesson) {
+  String _formatNextLesson(Lesson lesson, AppLocalizations l10n) {
     final time = '${lesson.startTime.hour.toString().padLeft(2, '0')}:${lesson.startTime.minute.toString().padLeft(2, '0')}';
-    final room = lesson.room?.name ?? 'Кабинет';
+    final room = lesson.room?.name ?? l10n.room;
     final participant = lesson.student?.name ?? lesson.group?.name ?? '';
     return '$time $room — $participant';
   }
@@ -475,11 +479,12 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
         }
 
         if (mark.isCompleted) {
+          final l10n = AppLocalizations.of(context);
           futures.add(
             lessonController.complete(lesson.id, lesson.roomId, lesson.date, widget.institutionId).then((_) async {
               // Если оплачено - создать оплату
               if (mark.isPaid && lesson.studentId != null && lesson.lessonType?.defaultPrice != null) {
-                final lessonTypeName = lesson.lessonType?.name ?? 'Оплата занятия';
+                final lessonTypeName = lesson.lessonType?.name ?? l10n.lessonPayment;
                 await paymentController.create(
                   institutionId: widget.institutionId,
                   studentId: lesson.studentId!,
@@ -516,10 +521,11 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
       }
 
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Изменения сохранены'),
+          SnackBar(
+            content: Text(l10n.changesSaved),
             backgroundColor: Colors.green,
           ),
         );
@@ -527,10 +533,11 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
     } catch (e) {
       debugPrint('[DashboardScreen] _saveAll error: $e');
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка сохранения: $e'),
+            content: Text(l10n.saveError(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -542,6 +549,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
   Widget build(BuildContext context) {
     // Комбинированный провайдер неотмеченных занятий (реальные + виртуальные)
     final lessons = ref.watch(combinedUnmarkedLessonsProvider(widget.institutionId));
+    final l10n = AppLocalizations.of(context);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
@@ -559,7 +567,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    '${AppStrings.unmarkedLessons} (${lessons.length})',
+                    '${l10n.unmarkedLessons} (${lessons.length})',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -577,7 +585,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
             child: lessons.isEmpty
                 ? Center(
                     child: Text(
-                      AppStrings.noUnmarkedLessons,
+                      l10n.noUnmarkedLessons,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -598,6 +606,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                       lesson: lesson,
                       mark: mark,
                       showPaid: hasPrice && hasStudent,
+                      l10n: l10n,
                       onCompletedChanged: (v) => _updateMark(lesson.id, completed: v),
                       onCancelledChanged: (v) => _updateMark(lesson.id, cancelled: v),
                       onPaidChanged: (v) => _updateMark(lesson.id, paid: v),
@@ -630,7 +639,7 @@ class _UnmarkedLessonsSheetState extends ConsumerState<_UnmarkedLessonsSheet> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Сохранить'),
+                      : Text(l10n.save),
                 ),
               ),
             ),
@@ -725,6 +734,7 @@ class _UnmarkedLessonItem extends StatelessWidget {
   final Lesson lesson;
   final _LessonMark mark;
   final bool showPaid;
+  final AppLocalizations l10n;
   final ValueChanged<bool> onCompletedChanged;
   final ValueChanged<bool> onCancelledChanged;
   final ValueChanged<bool> onPaidChanged;
@@ -733,6 +743,7 @@ class _UnmarkedLessonItem extends StatelessWidget {
     required this.lesson,
     required this.mark,
     required this.showPaid,
+    required this.l10n,
     required this.onCompletedChanged,
     required this.onCancelledChanged,
     required this.onPaidChanged,
@@ -792,26 +803,23 @@ class _UnmarkedLessonItem extends StatelessWidget {
           // Checkboxes row
           Row(
             children: [
-              // Проведено
               _LessonCheckbox(
-                label: 'Проведено',
+                label: l10n.completed,
                 value: mark.isCompleted,
                 onChanged: onCompletedChanged,
                 activeColor: AppColors.success,
               ),
               const SizedBox(width: 16),
-              // Отменено
               _LessonCheckbox(
-                label: 'Отменено',
+                label: l10n.cancelled,
                 value: mark.isCancelled,
                 onChanged: onCancelledChanged,
                 activeColor: AppColors.warning,
               ),
-              // Оплачено
               if (showPaid) ...[
                 const SizedBox(width: 16),
                 _LessonCheckbox(
-                  label: 'Оплачено',
+                  label: l10n.paid,
                   value: mark.isPaid,
                   onChanged: onPaidChanged,
                   activeColor: AppColors.primary,
@@ -874,9 +882,10 @@ class _LessonCheckbox extends StatelessWidget {
 
 /// Баннер для незавершённого онбординга
 class _OnboardingBanner extends StatelessWidget {
+  final AppLocalizations l10n;
   final VoidCallback onTap;
 
-  const _OnboardingBanner({required this.onTap});
+  const _OnboardingBanner({required this.l10n, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -923,7 +932,7 @@ class _OnboardingBanner extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Завершите настройку профиля',
+                        l10n.completeProfileSetup,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -931,7 +940,7 @@ class _OnboardingBanner extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Выберите цвет и направления',
+                        l10n.selectColorAndSubjects,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
                         ),
@@ -945,9 +954,9 @@ class _OnboardingBanner extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
-                    'Заполнить',
-                    style: TextStyle(
+                  child: Text(
+                    l10n.fillIn,
+                    style: const TextStyle(
                       color: AppColors.primary,
                       fontWeight: FontWeight.bold,
                     ),

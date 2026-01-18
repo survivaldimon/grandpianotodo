@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 
 /// Предустановленные цвета для выбора
@@ -189,13 +190,14 @@ class _PaletteButton extends StatelessWidget {
   }
 
   void _showFullColorPicker(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     Color selectedColor = currentColor ?? Colors.blue;
 
     showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Выберите цвет'),
+          title: Text(l10n.selectColor),
           content: SingleChildScrollView(
             child: ColorPicker(
               pickerColor: selectedColor,
@@ -209,7 +211,7 @@ class _PaletteButton extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Отмена'),
+              child: Text(l10n.cancel),
             ),
             if (onReset != null && currentColor != null)
               TextButton(
@@ -217,14 +219,14 @@ class _PaletteButton extends StatelessWidget {
                   Navigator.pop(dialogContext);
                   onReset!();
                 },
-                child: const Text('Сбросить', style: TextStyle(color: AppColors.warning)),
+                child: Text(l10n.reset, style: const TextStyle(color: AppColors.warning)),
               ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
                 onColorSelected(selectedColor);
               },
-              child: const Text('Сохранить'),
+              child: Text(l10n.save),
             ),
           ],
         ),
@@ -239,6 +241,7 @@ Future<String?> showColorPickerDialog(
   String? currentColor,
   bool showReset = false,
 }) async {
+  final l10n = AppLocalizations.of(context);
   String? result;
   Color selectedColor = currentColor != null ? hexToColor(currentColor) : Colors.blue;
 
@@ -246,7 +249,7 @@ Future<String?> showColorPickerDialog(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: const Text('Выберите цвет'),
+        title: Text(l10n.selectColor),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -254,7 +257,7 @@ Future<String?> showColorPickerDialog(
             children: [
               // Пресеты
               Text(
-                'Быстрый выбор',
+                l10n.quickSelect,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -293,7 +296,7 @@ Future<String?> showColorPickerDialog(
               const SizedBox(height: 20),
               // Полная палитра
               Text(
-                'Палитра',
+                l10n.palette,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -313,22 +316,22 @@ Future<String?> showColorPickerDialog(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           if (showReset && currentColor != null)
             TextButton(
               onPressed: () {
-                result = ''; // Пустая строка означает сброс
+                result = '';
                 Navigator.pop(dialogContext);
               },
-              child: const Text('Сбросить', style: TextStyle(color: AppColors.warning)),
+              child: Text(l10n.reset, style: const TextStyle(color: AppColors.warning)),
             ),
           ElevatedButton(
             onPressed: () {
               result = '#${colorToHex(selectedColor)}';
               Navigator.pop(dialogContext);
             },
-            child: const Text('Сохранить'),
+            child: Text(l10n.save),
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/providers/phone_settings_provider.dart';
 import 'package:kabinet/features/students/providers/student_provider.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/shared/models/student.dart';
 
 /// Диалог объединения учеников
@@ -121,14 +122,14 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
       Navigator.pop(context, newStudent);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Создана карточка "${newStudent.name}"'),
+          content: Text(AppLocalizations.of(context).cardCreatedWithName(newStudent.name)),
           backgroundColor: AppColors.success,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ошибка при объединении'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).mergeError),
           backgroundColor: AppColors.error,
         ),
       );
@@ -138,6 +139,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -171,7 +173,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Объединить ${widget.students.length} учеников',
+                      l10n.mergeStudentsCount(widget.students.length),
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -207,7 +209,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Будет создана новая карточка. Исходные карточки будут архивированы.',
+                            l10n.mergeStudentsWarning,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: AppColors.warning,
                             ),
@@ -220,7 +222,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
 
                   // Students list
                   Text(
-                    'Объединяемые ученики',
+                    l10n.studentsToMerge,
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -240,13 +242,13 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _buildSummaryStat(
-                          'Общий баланс',
+                          l10n.totalBalance,
                           '$_totalBalance',
                           _totalBalance < 0 ? AppColors.error : AppColors.primary,
                         ),
                         if (_totalLegacyBalance > 0)
                           _buildSummaryStat(
-                            'Из остатка',
+                            l10n.fromLegacyBalance,
                             '$_totalLegacyBalance',
                             AppColors.warning,
                           ),
@@ -257,7 +259,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
 
                   // New student form
                   Text(
-                    'Данные новой карточки',
+                    l10n.newCardData,
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -271,7 +273,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                         TextFormField(
                           controller: _nameController,
                           decoration: InputDecoration(
-                            labelText: 'ФИО',
+                            labelText: l10n.personName,
                             prefixIcon: const Icon(Icons.person_outline),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -280,7 +282,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                             fillColor: theme.colorScheme.surfaceContainerLow,
                           ),
                           validator: (v) =>
-                              v == null || v.isEmpty ? 'Введите имя' : null,
+                              v == null || v.isEmpty ? l10n.enterPersonName : null,
                           textCapitalization: TextCapitalization.words,
                         ),
                         const SizedBox(height: 16),
@@ -288,7 +290,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                         TextFormField(
                           controller: _phoneController,
                           decoration: InputDecoration(
-                            labelText: 'Телефон',
+                            labelText: l10n.phone,
                             prefixIcon: const Icon(Icons.phone_outlined),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -303,7 +305,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                         TextFormField(
                           controller: _commentController,
                           decoration: InputDecoration(
-                            labelText: 'Комментарий',
+                            labelText: l10n.comment,
                             prefixIcon: const Icon(Icons.notes_outlined),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -330,7 +332,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _isLoading ? null : () => Navigator.pop(context),
-                        child: const Text('Отмена'),
+                        child: Text(l10n.cancel),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -345,7 +347,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.merge),
-                        label: const Text('Объединить'),
+                        label: Text(l10n.merge),
                       ),
                     ),
                   ],
@@ -412,7 +414,7 @@ class _MergeStudentsDialogState extends ConsumerState<MergeStudentsDialog> {
                 ),
               ),
               Text(
-                'занятий',
+                AppLocalizations.of(context).lessonsCountField.toLowerCase(),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 10,

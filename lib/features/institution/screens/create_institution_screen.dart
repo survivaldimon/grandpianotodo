@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/utils/validators.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
@@ -43,12 +43,14 @@ class _CreateInstitutionScreenState
     final controllerState = ref.watch(institutionControllerProvider);
     final isLoading = controllerState.isLoading;
 
+    final l10n = AppLocalizations.of(context);
+
     // Показать ошибку
     ref.listen(institutionControllerProvider, (prev, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, l10n)),
             backgroundColor: Colors.red,
           ),
         );
@@ -57,7 +59,7 @@ class _CreateInstitutionScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.createInstitution),
+        title: Text(l10n.createInstitution),
       ),
       body: Padding(
         padding: AppSizes.paddingAllL,
@@ -68,13 +70,13 @@ class _CreateInstitutionScreenState
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: AppStrings.institutionName,
-                  hintText: 'Например: Музыкальная школа №1',
-                  prefixIcon: Icon(Icons.business_outlined),
+                decoration: InputDecoration(
+                  labelText: l10n.institutionName,
+                  hintText: l10n.institutionNameHint,
+                  prefixIcon: const Icon(Icons.business_outlined),
                 ),
                 textInputAction: TextInputAction.done,
-                validator: Validators.required,
+                validator: Validators.required(l10n),
                 enabled: !isLoading,
                 onFieldSubmitted: (_) => _create(),
               ),
@@ -87,7 +89,7 @@ class _CreateInstitutionScreenState
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text(AppStrings.create),
+                    : Text(l10n.create),
               ),
             ],
           ),

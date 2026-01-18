@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/utils/validators.dart';
 import 'package:kabinet/features/auth/providers/auth_provider.dart';
@@ -44,65 +44,69 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void _showForgotPasswordDialog() {
     final emailController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final l10n = AppLocalizations.of(context);
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text(AppStrings.resetPasswordTitle),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(AppStrings.resetPasswordMessage),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: AppStrings.email,
-                  prefixIcon: Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-                validator: Validators.email,
-                autofocus: true,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text(AppStrings.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-
-              final controller = ref.read(authControllerProvider.notifier);
-              final success = await controller.resetPassword(
-                emailController.text.trim(),
-              );
-
-              if (dialogContext.mounted) {
-                Navigator.pop(dialogContext);
-              }
-
-              if (success && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(AppStrings.resetPasswordSuccess),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 5),
+      builder: (dialogContext) {
+        final dialogL10n = AppLocalizations.of(dialogContext);
+        return AlertDialog(
+          title: Text(dialogL10n.resetPasswordTitle),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(dialogL10n.resetPasswordMessage),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: emailController,
+                  decoration: InputDecoration(
+                    labelText: dialogL10n.email,
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: const OutlineInputBorder(),
                   ),
-                );
-              }
-            },
-            child: const Text(AppStrings.resetPassword),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: Validators.email(dialogL10n),
+                  autofocus: true,
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(dialogL10n.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+
+                final controller = ref.read(authControllerProvider.notifier);
+                final success = await controller.resetPassword(
+                  emailController.text.trim(),
+                );
+
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+
+                if (success && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.resetPasswordSuccess),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+              },
+              child: Text(dialogL10n.resetPassword),
+            ),
+          ],
+        );
+      },
     ).then((_) => emailController.dispose());
   }
 
@@ -123,6 +127,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     });
 
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -140,27 +146,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  AppStrings.login,
+                  l10n.login,
                   style: Theme.of(context).textTheme.headlineMedium,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
                 TextFormField(
                   controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: AppStrings.email,
-                    prefixIcon: Icon(Icons.email_outlined),
+                  decoration: InputDecoration(
+                    labelText: l10n.email,
+                    prefixIcon: const Icon(Icons.email_outlined),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  validator: Validators.email,
+                  validator: Validators.email(l10n),
                   enabled: !authState.isLoading,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
                   decoration: InputDecoration(
-                    labelText: AppStrings.password,
+                    labelText: l10n.password,
                     prefixIcon: const Icon(Icons.lock_outlined),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -175,7 +181,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
-                  validator: Validators.required,
+                  validator: Validators.required(l10n),
                   enabled: !authState.isLoading,
                   onFieldSubmitted: (_) => _login(),
                 ),
@@ -183,7 +189,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: authState.isLoading ? null : _showForgotPasswordDialog,
-                    child: const Text(AppStrings.forgotPassword),
+                    child: Text(l10n.forgotPassword),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -195,17 +201,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text(AppStrings.login),
+                      : Text(l10n.login),
                 ),
                 const SizedBox(height: 32),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(AppStrings.noAccount),
+                    Text(l10n.noAccount),
                     TextButton(
                       onPressed:
                           authState.isLoading ? null : () => context.go('/register'),
-                      child: const Text(AppStrings.register),
+                      child: Text(l10n.register),
                     ),
                   ],
                 ),

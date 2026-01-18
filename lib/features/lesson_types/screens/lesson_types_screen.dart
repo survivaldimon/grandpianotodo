@@ -9,6 +9,7 @@ import 'package:kabinet/core/widgets/empty_state.dart';
 import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/features/lesson_types/providers/lesson_type_provider.dart';
 import 'package:kabinet/shared/models/lesson_type.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 
 /// Экран управления типами занятий
 class LessonTypesScreen extends ConsumerStatefulWidget {
@@ -23,6 +24,7 @@ class LessonTypesScreen extends ConsumerStatefulWidget {
 class _LessonTypesScreenState extends ConsumerState<LessonTypesScreen> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
     final lessonTypes = lessonTypesAsync.valueOrNull ?? [];
     final hasItems = lessonTypes.isNotEmpty;
@@ -32,7 +34,7 @@ class _LessonTypesScreenState extends ConsumerState<LessonTypesScreen> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, l10n)),
             backgroundColor: Colors.red,
           ),
         );
@@ -41,7 +43,7 @@ class _LessonTypesScreenState extends ConsumerState<LessonTypesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Типы занятий'),
+        title: Text(l10n.lessonTypes),
       ),
       floatingActionButton: hasItems
           ? FloatingActionButton(
@@ -62,12 +64,12 @@ class _LessonTypesScreenState extends ConsumerState<LessonTypesScreen> {
           if (lessonTypes.isEmpty) {
             return EmptyState(
               icon: Icons.event_note_outlined,
-              title: 'Нет типов занятий',
-              subtitle: 'Добавьте первый тип занятия',
+              title: l10n.noLessonTypes,
+              subtitle: l10n.addFirstLessonType,
               action: ElevatedButton.icon(
                 onPressed: () => _showAddSheet(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Добавить тип'),
+                label: Text(l10n.addType),
               ),
             );
           }
@@ -122,6 +124,7 @@ class _LessonTypeCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final color = lessonType.color != null
         ? hexToColor(lessonType.color!)
         : AppColors.primary;
@@ -146,7 +149,7 @@ class _LessonTypeCard extends ConsumerWidget {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          '${lessonType.defaultDurationMinutes} мин${lessonType.defaultPrice != null ? ' • ${lessonType.defaultPrice!.toStringAsFixed(0)} ₸' : ''}',
+          '${lessonType.defaultDurationMinutes} ${l10n.minutes}${lessonType.defaultPrice != null ? ' • ${lessonType.defaultPrice!.toStringAsFixed(0)} ₸' : ''}',
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -161,6 +164,7 @@ class _LessonTypeCard extends ConsumerWidget {
   }
 
   void _showOptions(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -169,7 +173,7 @@ class _LessonTypeCard extends ConsumerWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Редактировать'),
+              title: Text(l10n.edit),
               onTap: () {
                 Navigator.pop(context);
                 _showEditSheet(context);
@@ -177,7 +181,7 @@ class _LessonTypeCard extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+              title: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
                 _showDeleteConfirmation(context, ref);
@@ -202,19 +206,20 @@ class _LessonTypeCard extends ConsumerWidget {
   }
 
   void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить тип занятия?'),
+        title: Text(l10n.deleteLessonTypeQuestion),
         content: Text(
-          'Тип занятия "${lessonType.name}" будет удалён. Это действие нельзя отменить.',
+          l10n.lessonTypeWillBeDeleted(lessonType.name),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -223,15 +228,15 @@ class _LessonTypeCard extends ConsumerWidget {
               final success = await controller.archive(lessonType.id, institutionId);
               if (success) {
                 scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Тип занятия удалён'),
+                  SnackBar(
+                    content: Text(l10n.lessonTypeDeleted),
                     backgroundColor: AppColors.error,
                   ),
                 );
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -277,6 +282,7 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
   }
 
   Future<void> _createLessonType() async {
+    final l10n = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     // Валидация кастомной длительности
@@ -284,8 +290,8 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
       final customValue = int.tryParse(_customDurationController.text);
       if (customValue == null || customValue < 5 || customValue > 480) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Длительность должна быть от 5 до 480 минут'),
+          SnackBar(
+            content: Text(l10n.durationValidationError),
             backgroundColor: Colors.red,
           ),
         );
@@ -312,7 +318,7 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Тип занятия "${lessonType.name}" создан'),
+            content: Text(l10n.lessonTypeCreated(lessonType.name)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -326,6 +332,7 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -376,15 +383,15 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Новый тип занятия',
-                            style: TextStyle(
+                          Text(
+                            l10n.newLessonType,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Заполните данные типа',
+                            l10n.fillLessonTypeData,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -401,8 +408,8 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название *',
-                    hintText: 'Например: Индивидуальное',
+                    labelText: l10n.nameRequired,
+                    hintText: l10n.nameHintExample,
                     prefixIcon: const Icon(Icons.edit_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -411,13 +418,13 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
-                  validator: (v) => v == null || v.isEmpty ? 'Введите название' : null,
+                  validator: (v) => v == null || v.isEmpty ? l10n.enterNameValidation : null,
                 ),
                 const SizedBox(height: 16),
 
                 // Длительность
                 Text(
-                  'Длительность',
+                  l10n.duration,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -430,7 +437,7 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
                     ..._popularDurations.map((duration) {
                       final isSelected = !_isCustomDuration && _selectedDuration == duration;
                       return ChoiceChip(
-                        label: Text('$duration мин'),
+                        label: Text('$duration ${l10n.minutes}'),
                         selected: isSelected,
                         onSelected: (_) {
                           setState(() {
@@ -443,7 +450,7 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
                       );
                     }),
                     ChoiceChip(
-                      label: const Text('Другое'),
+                      label: Text(l10n.other),
                       selected: _isCustomDuration,
                       onSelected: (_) {
                         setState(() => _isCustomDuration = true);
@@ -462,8 +469,8 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
                           child: TextFormField(
                             controller: _customDurationController,
                             decoration: InputDecoration(
-                              labelText: 'Своя длительность',
-                              suffixText: 'мин',
+                              labelText: l10n.customDuration,
+                              suffixText: l10n.minutes,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -482,8 +489,8 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
                 TextFormField(
                   controller: _priceController,
                   decoration: InputDecoration(
-                    labelText: 'Цена по умолчанию',
-                    hintText: 'Необязательно',
+                    labelText: l10n.defaultPrice,
+                    hintText: l10n.optional,
                     prefixIcon: const Icon(Icons.payments_outlined),
                     suffixText: '₸',
                     border: OutlineInputBorder(
@@ -503,9 +510,9 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: SwitchListTile(
-                    title: const Text('Групповое занятие'),
+                    title: Text(l10n.groupLessonSwitch),
                     subtitle: Text(
-                      _isGroup ? 'Несколько учеников одновременно' : 'Один ученик',
+                      _isGroup ? l10n.multipleStudents : l10n.oneStudent,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12,
@@ -540,9 +547,9 @@ class _AddLessonTypeSheetState extends ConsumerState<_AddLessonTypeSheet> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Создать тип',
-                            style: TextStyle(
+                        : Text(
+                            l10n.createType,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -625,14 +632,15 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
   }
 
   Future<void> _updateLessonType() async {
+    final l10n = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     if (_isCustomDuration) {
       final customValue = int.tryParse(_customDurationController.text);
       if (customValue == null || customValue < 5 || customValue > 480) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Длительность должна быть от 5 до 480 минут'),
+          SnackBar(
+            content: Text(l10n.durationValidationError),
             backgroundColor: Colors.red,
           ),
         );
@@ -659,8 +667,8 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
       if (success && mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Тип занятия обновлён'),
+          SnackBar(
+            content: Text(l10n.lessonTypeUpdated),
             backgroundColor: AppColors.success,
           ),
         );
@@ -674,6 +682,7 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -724,15 +733,15 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Редактировать тип',
-                            style: TextStyle(
+                          Text(
+                            l10n.editLessonType,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Измените данные типа занятия',
+                            l10n.changeLessonTypeData,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -749,8 +758,8 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название *',
-                    hintText: 'Например: Индивидуальное',
+                    labelText: l10n.nameRequired,
+                    hintText: l10n.nameHintExample,
                     prefixIcon: const Icon(Icons.edit_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -759,13 +768,13 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
-                  validator: (v) => v == null || v.isEmpty ? 'Введите название' : null,
+                  validator: (v) => v == null || v.isEmpty ? l10n.enterNameValidation : null,
                 ),
                 const SizedBox(height: 16),
 
                 // Длительность
                 Text(
-                  'Длительность',
+                  l10n.duration,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -778,7 +787,7 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
                     ..._popularDurations.map((duration) {
                       final isSelected = !_isCustomDuration && _selectedDuration == duration;
                       return ChoiceChip(
-                        label: Text('$duration мин'),
+                        label: Text('$duration ${l10n.minutes}'),
                         selected: isSelected,
                         onSelected: (_) {
                           setState(() {
@@ -791,7 +800,7 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
                       );
                     }),
                     ChoiceChip(
-                      label: const Text('Другое'),
+                      label: Text(l10n.other),
                       selected: _isCustomDuration,
                       onSelected: (_) {
                         setState(() => _isCustomDuration = true);
@@ -809,8 +818,8 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
                           child: TextFormField(
                             controller: _customDurationController,
                             decoration: InputDecoration(
-                              labelText: 'Своя длительность',
-                              suffixText: 'мин',
+                              labelText: l10n.customDuration,
+                              suffixText: l10n.minutes,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -828,8 +837,8 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
                 TextFormField(
                   controller: _priceController,
                   decoration: InputDecoration(
-                    labelText: 'Цена по умолчанию',
-                    hintText: 'Необязательно',
+                    labelText: l10n.defaultPrice,
+                    hintText: l10n.optional,
                     prefixIcon: const Icon(Icons.payments_outlined),
                     suffixText: '₸',
                     border: OutlineInputBorder(
@@ -849,9 +858,9 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: SwitchListTile(
-                    title: const Text('Групповое занятие'),
+                    title: Text(l10n.groupLessonSwitch),
                     subtitle: Text(
-                      _isGroup ? 'Несколько учеников одновременно' : 'Один ученик',
+                      _isGroup ? l10n.multipleStudents : l10n.oneStudent,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12,
@@ -872,7 +881,7 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
 
                 // Выбор цвета
                 ColorPickerField(
-                  label: 'Цвет',
+                  label: l10n.color,
                   selectedColor: _selectedColor,
                   onColorChanged: (color) => setState(() => _selectedColor = color),
                 ),
@@ -894,9 +903,9 @@ class _EditLessonTypeSheetState extends ConsumerState<_EditLessonTypeSheet> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Сохранить',
-                            style: TextStyle(
+                        : Text(
+                            l10n.save,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),

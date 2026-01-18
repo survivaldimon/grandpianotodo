@@ -1,3 +1,4 @@
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/shared/models/payment.dart';
 import 'package:kabinet/shared/models/student.dart';
 
@@ -140,7 +141,8 @@ class Subscription {
     return daysUntilExpiration <= 7 && daysUntilExpiration >= 0;
   }
 
-  /// Строковое представление статуса
+  /// Строковое представление статуса (устаревший, используйте getLocalizedStatusName)
+  @Deprecated('Use getLocalizedStatusName(l10n) instead')
   String get statusDisplayName {
     switch (status) {
       case SubscriptionStatus.active:
@@ -151,6 +153,20 @@ class Subscription {
         return 'Истёк';
       case SubscriptionStatus.exhausted:
         return 'Исчерпан';
+    }
+  }
+
+  /// Локализованное строковое представление статуса
+  String getLocalizedStatusName(AppLocalizations l10n) {
+    switch (status) {
+      case SubscriptionStatus.active:
+        return l10n.statusActive;
+      case SubscriptionStatus.frozen:
+        return l10n.statusFrozen;
+      case SubscriptionStatus.expired:
+        return l10n.statusExpired;
+      case SubscriptionStatus.exhausted:
+        return l10n.statusExhausted;
     }
   }
 

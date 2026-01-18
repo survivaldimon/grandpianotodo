@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
@@ -140,7 +140,8 @@ final _studentTeacherNamesProvider =
   for (final member in membersData as List) {
     final userId = member['user_id'] as String;
     final profile = member['profiles'] as Map<String, dynamic>?;
-    final fullName = profile?['full_name'] as String? ?? 'Без имени';
+    final fullName = profile?['full_name'] as String?;
+    if (fullName == null) continue;  // Skip members without name
     userNames[userId] = fullName;
   }
 
@@ -276,6 +277,8 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     // Проверяем права
     final permissions = ref.watch(myPermissionsProvider(widget.institutionId));
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
@@ -320,19 +323,19 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
               )
             : null,
         title: _isSelectionMode
-            ? Text('Выбрано: ${_selectedStudentIds.length}')
-            : const Text(AppStrings.students),
+            ? Text(l10n.selectedCount(_selectedStudentIds.length))
+            : Text(l10n.students),
         bottom: _isSelectionMode
             ? null
             : TabBar(
                 controller: _tabController,
-                tabs: const [
-                  Tab(text: 'Ученики', icon: Icon(Icons.person)),
-                  Tab(text: 'Группы', icon: Icon(Icons.groups)),
+                tabs: [
+                  Tab(text: l10n.students, icon: const Icon(Icons.person)),
+                  Tab(text: l10n.groups, icon: const Icon(Icons.groups)),
                 ],
               ),
       ),
-      floatingActionButton: _buildFab(canAddStudent, studentsAsync.valueOrNull ?? []),
+      floatingActionButton: _buildFab(canAddStudent, studentsAsync.valueOrNull ?? [], l10n),
       body: _isSelectionMode
           ? _buildStudentsList(
               studentsAsync,
@@ -354,7 +357,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Поиск по имени...',
+                    hintText: l10n.searchByName,
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
@@ -399,27 +402,27 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                 child: Row(
                   children: [
                     FilterChip(
-                      label: const Text('Все'),
+                      label: Text(l10n.all),
                       selected: filter == StudentFilter.all,
                       onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.all,
                     ),
                     if (canManageAllStudents) ...[
                       const SizedBox(width: 8),
                       FilterChip(
-                        label: const Text('Мои'),
+                        label: Text(l10n.myStudents),
                         selected: filter == StudentFilter.myStudents,
                         onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.myStudents,
                       ),
                     ],
                     const SizedBox(width: 8),
                     FilterChip(
-                      label: const Text('С долгом'),
+                      label: Text(l10n.withDebt),
                       selected: filter == StudentFilter.withDebt,
                       onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.withDebt,
                     ),
                     const SizedBox(width: 8),
                     FilterChip(
-                      label: const Text('Архив'),
+                      label: Text(l10n.archive),
                       selected: filter == StudentFilter.archived,
                       onSelected: (_) => ref.read(studentFilterProvider.notifier).state = StudentFilter.archived,
                     ),
@@ -437,43 +440,46 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                     children: [
                       // Фильтр по преподавателю
                       _FilterButton(
-                        label: 'Преподаватель',
+                        label: l10n.teacher,
                         isActive: _selectedTeacherIds.isNotEmpty,
                         onPressed: () => _showTeacherFilter(
                           membersAsync.valueOrNull ?? [],
+                          l10n,
                         ),
                       ),
                       const SizedBox(width: 8),
                       // Фильтр по направлению
                       _FilterButton(
-                        label: 'Направление',
+                        label: l10n.direction,
                         isActive: _selectedSubjectIds.isNotEmpty,
                         onPressed: () => _showSubjectFilter(
                           subjectsAsync.valueOrNull ?? [],
+                          l10n,
                         ),
                       ),
                       const SizedBox(width: 8),
                       // Фильтр по группе
                       _FilterButton(
-                        label: 'Группа',
+                        label: l10n.group,
                         isActive: _selectedGroupIds.isNotEmpty,
                         onPressed: () => _showGroupFilter(
                           groupsAsync.valueOrNull ?? [],
+                          l10n,
                         ),
                       ),
                       const SizedBox(width: 8),
                       // Фильтр по активности
                       _FilterButton(
-                        label: 'Активность',
+                        label: l10n.activity,
                         isActive: _inactivityDays != null,
-                        onPressed: () => _showActivityFilter(),
+                        onPressed: () => _showActivityFilter(l10n),
                       ),
                       // Кнопка сброса
                       if (_hasAdvancedFilters) ...[
                         const SizedBox(width: 8),
                         TextButton(
                           onPressed: _resetAdvancedFilters,
-                          child: const Text('Сбросить'),
+                          child: Text(l10n.reset),
                         ),
                       ],
                     ],
@@ -511,12 +517,12 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
 
                     if (filteredStudents.isEmpty) {
                       if (_searchQuery.isNotEmpty) {
-                        return _buildSearchEmptyState();
+                        return _buildSearchEmptyState(l10n);
                       }
                       if (_hasAdvancedFilters) {
-                        return _buildFilteredEmptyState();
+                        return _buildFilteredEmptyState(l10n);
                       }
-                      return _buildEmptyState(context, ref, filter);
+                      return _buildEmptyState(context, ref, filter, l10n);
                     }
 
                     return RefreshIndicator(
@@ -572,6 +578,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
             groups: groupsAsync.valueOrNull ?? [],
             isLoading: groupsAsync.isLoading && groupsAsync.valueOrNull == null,
             onRefresh: () => ref.invalidate(groupsProvider(widget.institutionId)),
+            l10n: l10n,
           ),
         ],
       ),
@@ -640,7 +647,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
   }
 
   /// Показать фильтр по преподавателю
-  void _showTeacherFilter(List<InstitutionMember> members) {
+  void _showTeacherFilter(List<InstitutionMember> members, AppLocalizations l10n) {
     final activeMembers = members.where((m) => !m.isArchived).toList();
 
     showModalBottomSheet(
@@ -656,16 +663,16 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Преподаватель',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      l10n.teacher,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     TextButton(
                       onPressed: () {
                         setState(() => _selectedTeacherIds = {});
                         setSheetState(() {});
                       },
-                      child: const Text('Сбросить'),
+                      child: Text(l10n.reset),
                     ),
                   ],
                 ),
@@ -683,7 +690,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                         setState(() => _selectedTeacherIds = {});
                         setSheetState(() {});
                       },
-                      title: const Text('Все'),
+                      title: Text(l10n.all),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     // Преподаватели
@@ -699,7 +706,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                         });
                         setSheetState(() {});
                       },
-                      title: Text(member.profile?.fullName ?? 'Без имени'),
+                      title: Text(member.profile?.fullName ?? l10n.noName),
                       controlAffinity: ListTileControlAffinity.leading,
                     )),
                   ],
@@ -713,7 +720,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
   }
 
   /// Показать фильтр по направлению
-  void _showSubjectFilter(List<Subject> subjects) {
+  void _showSubjectFilter(List<Subject> subjects, AppLocalizations l10n) {
     final activeSubjects = subjects.where((s) => s.archivedAt == null).toList();
 
     showModalBottomSheet(
@@ -729,16 +736,16 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Направление',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      l10n.direction,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     TextButton(
                       onPressed: () {
                         setState(() => _selectedSubjectIds = {});
                         setSheetState(() {});
                       },
-                      child: const Text('Сбросить'),
+                      child: Text(l10n.reset),
                     ),
                   ],
                 ),
@@ -756,7 +763,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                         setState(() => _selectedSubjectIds = {});
                         setSheetState(() {});
                       },
-                      title: const Text('Все'),
+                      title: Text(l10n.all),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     // Направления
@@ -804,7 +811,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
   }
 
   /// Показать фильтр по группе
-  void _showGroupFilter(List<StudentGroup> groups) {
+  void _showGroupFilter(List<StudentGroup> groups, AppLocalizations l10n) {
     final activeGroups = groups.where((g) => g.archivedAt == null).toList();
 
     showModalBottomSheet(
@@ -820,16 +827,16 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Группа',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      l10n.group,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     TextButton(
                       onPressed: () {
                         setState(() => _selectedGroupIds = {});
                         setSheetState(() {});
                       },
-                      child: const Text('Сбросить'),
+                      child: Text(l10n.reset),
                     ),
                   ],
                 ),
@@ -847,7 +854,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                         setState(() => _selectedGroupIds = {});
                         setSheetState(() {});
                       },
-                      title: const Text('Все'),
+                      title: Text(l10n.all),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     // Группы
@@ -864,7 +871,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                         setSheetState(() {});
                       },
                       title: Text(group.name),
-                      subtitle: Text('${group.membersCount} учеников'),
+                      subtitle: Text(l10n.studentsCount(group.membersCount)),
                       controlAffinity: ListTileControlAffinity.leading,
                     )),
                   ],
@@ -878,7 +885,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
   }
 
   /// Показать фильтр по активности
-  void _showActivityFilter() {
+  void _showActivityFilter(AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -892,16 +899,16 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Активность',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      l10n.activity,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     TextButton(
                       onPressed: () {
                         setState(() => _inactivityDays = null);
                         setSheetState(() {});
                       },
-                      child: const Text('Сбросить'),
+                      child: Text(l10n.reset),
                     ),
                   ],
                 ),
@@ -914,28 +921,53 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                   setState(() => _inactivityDays = value);
                   setSheetState(() {});
                 },
-                child: const Column(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     RadioListTile<int?>(
                       value: null,
-                      title: Text('Все'),
+                      groupValue: _inactivityDays,
+                      onChanged: (v) {
+                        setState(() => _inactivityDays = v);
+                        setSheetState(() {});
+                      },
+                      title: Text(l10n.all),
                     ),
                     RadioListTile<int?>(
                       value: 7,
-                      title: Text('Нет занятий 7+ дней'),
+                      groupValue: _inactivityDays,
+                      onChanged: (v) {
+                        setState(() => _inactivityDays = v);
+                        setSheetState(() {});
+                      },
+                      title: Text(l10n.noLessons7Days),
                     ),
                     RadioListTile<int?>(
                       value: 14,
-                      title: Text('Нет занятий 14+ дней'),
+                      groupValue: _inactivityDays,
+                      onChanged: (v) {
+                        setState(() => _inactivityDays = v);
+                        setSheetState(() {});
+                      },
+                      title: Text(l10n.noLessons14Days),
                     ),
                     RadioListTile<int?>(
                       value: 30,
-                      title: Text('Нет занятий 30+ дней'),
+                      groupValue: _inactivityDays,
+                      onChanged: (v) {
+                        setState(() => _inactivityDays = v);
+                        setSheetState(() {});
+                      },
+                      title: Text(l10n.noLessons30Days),
                     ),
                     RadioListTile<int?>(
                       value: 60,
-                      title: Text('Нет занятий 60+ дней'),
+                      groupValue: _inactivityDays,
+                      onChanged: (v) {
+                        setState(() => _inactivityDays = v);
+                        setSheetState(() {});
+                      },
+                      title: Text(l10n.noLessons60Days),
                     ),
                   ],
                 ),
@@ -948,7 +980,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
     );
   }
 
-  Widget _buildFilteredEmptyState() {
+  Widget _buildFilteredEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -960,7 +992,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'Нет учеников по заданным фильтрам',
+            l10n.noStudentsByFilters,
             style: TextStyle(
               fontSize: 16,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -969,14 +1001,14 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
           const SizedBox(height: 16),
           TextButton(
             onPressed: _resetAdvancedFilters,
-            child: const Text('Сбросить фильтры'),
+            child: Text(l10n.clearFilters),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSearchEmptyState() {
+  Widget _buildSearchEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -988,7 +1020,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'Ничего не найдено',
+            l10n.nothingFound,
             style: TextStyle(
               fontSize: 16,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -996,7 +1028,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Попробуйте изменить запрос',
+            l10n.tryDifferentQuery,
             style: TextStyle(
               fontSize: 14,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1007,35 +1039,35 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, WidgetRef ref, StudentFilter filter) {
+  Widget _buildEmptyState(BuildContext context, WidgetRef ref, StudentFilter filter, AppLocalizations l10n) {
     switch (filter) {
       case StudentFilter.archived:
-        return const EmptyState(
+        return EmptyState(
           icon: Icons.archive_outlined,
-          title: 'Архив пуст',
-          subtitle: 'Здесь будут отображаться архивированные ученики',
+          title: l10n.archiveEmpty,
+          subtitle: l10n.archivedStudentsHere,
         );
       case StudentFilter.withDebt:
-        return const EmptyState(
+        return EmptyState(
           icon: Icons.check_circle_outlined,
-          title: 'Нет учеников с долгом',
-          subtitle: 'У всех учеников положительный баланс',
+          title: l10n.noStudentsWithDebt,
+          subtitle: l10n.allStudentsPositiveBalance,
         );
       case StudentFilter.myStudents:
-        return const EmptyState(
+        return EmptyState(
           icon: Icons.person_outlined,
-          title: 'Нет привязанных учеников',
-          subtitle: 'К вам пока не привязаны ученики',
+          title: l10n.noLinkedStudents,
+          subtitle: l10n.noLinkedStudentsHint,
         );
       case StudentFilter.all:
         return EmptyState(
           icon: Icons.person_outlined,
-          title: 'Нет учеников',
-          subtitle: 'Добавьте первого ученика',
+          title: l10n.noStudents,
+          subtitle: l10n.addFirstStudent,
           action: ElevatedButton.icon(
             onPressed: () => _showAddStudentDialog(context, ref),
             icon: const Icon(Icons.add),
-            label: const Text('Добавить ученика'),
+            label: Text(l10n.addStudent),
           ),
         );
     }
@@ -1119,7 +1151,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
   }
 
   /// FAB по контексту текущей вкладки
-  Widget? _buildFab(bool canAddStudent, List<Student> allStudents) {
+  Widget? _buildFab(bool canAddStudent, List<Student> allStudents, AppLocalizations l10n) {
     // В режиме выбора — кнопка объединения
     if (_isSelectionMode) {
       final canMerge = _selectedStudentIds.length >= 2;
@@ -1127,7 +1159,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
         onPressed: canMerge ? () => _mergeSelectedStudents(allStudents) : null,
         backgroundColor: canMerge ? AppColors.primary : Theme.of(context).disabledColor,
         icon: const Icon(Icons.merge),
-        label: Text('Объединить (${_selectedStudentIds.length})'),
+        label: Text(l10n.mergeCount(_selectedStudentIds.length)),
       );
     }
 
@@ -1141,33 +1173,33 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
     } else {
       // Вкладка Группы
       return FloatingActionButton(
-        onPressed: () => _showAddGroupDialog(context, ref),
+        onPressed: () => _showAddGroupDialog(context, ref, l10n),
         child: const Icon(Icons.add),
       );
     }
   }
 
   /// Диалог создания группы
-  void _showAddGroupDialog(BuildContext context, WidgetRef ref) {
+  void _showAddGroupDialog(BuildContext context, WidgetRef ref, AppLocalizations l10n) {
     final nameController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Новая группа'),
+        title: Text(l10n.newGroup),
         content: Form(
           key: formKey,
           child: TextFormField(
             controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'Название группы',
-              hintText: 'Например: Группа вокала',
+            decoration: InputDecoration(
+              labelText: l10n.groupName,
+              hintText: l10n.groupNameHint,
             ),
             autofocus: true,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Введите название';
+                return l10n.enterName;
               }
               return null;
             },
@@ -1176,7 +1208,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1197,7 +1229,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen>
                 context.push('/institutions/${widget.institutionId}/groups/${group.id}');
               }
             },
-            child: const Text('Создать'),
+            child: Text(l10n.create),
           ),
         ],
       ),
@@ -1339,12 +1371,13 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
   }
 
   Future<void> _createStudent() async {
+    final l10n = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     // Валидация расписания если настроено
     if (_setupSchedule && _selectedDays.isNotEmpty && _selectedRoomId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Выберите кабинет для расписания')),
+        SnackBar(content: Text(l10n.selectRoomForSchedule)),
       );
       return;
     }
@@ -1352,8 +1385,8 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     // Проверка конфликтов расписания
     if (_setupSchedule && _conflictingDays.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Есть конфликты в расписании. Измените время или кабинет.'),
+        SnackBar(
+          content: Text(l10n.scheduleConflictsError),
           backgroundColor: Colors.red,
         ),
       );
@@ -1384,7 +1417,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
               institutionId: widget.institutionId,
               studentId: student.id,
               lessonsCount: initialBalance,
-              comment: 'Начальный остаток',
+              comment: l10n.initialBalanceComment,
             );
             // Инвалидируем провайдеры для обновления баланса
             ref.invalidate(studentProvider(student.id));
@@ -1432,8 +1465,8 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
         if (mounted) {
           Navigator.pop(context);
           final message = _setupSchedule && _selectedDays.isNotEmpty
-              ? 'Ученик "${student.name}" создан с расписанием'
-              : 'Ученик "${student.name}" создан';
+              ? l10n.studentCreatedWithSchedule(student.name)
+              : l10n.studentCreatedSimple(student.name);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(message),
@@ -1555,6 +1588,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
     final lessonTypesAsync = ref.watch(lessonTypesProvider(widget.institutionId));
@@ -1609,15 +1643,15 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Новый ученик',
-                            style: TextStyle(
+                          Text(
+                            l10n.newStudent,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Заполните данные ученика',
+                            l10n.fillStudentData,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -1634,8 +1668,8 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'ФИО *',
-                    hintText: 'Иванов Иван Иванович',
+                    labelText: l10n.fullNameRequired,
+                    hintText: l10n.fullNameHint,
                     prefixIcon: const Icon(Icons.person_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1644,7 +1678,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.words,
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя ученика' : null,
+                  validator: (v) => v == null || v.trim().isEmpty ? l10n.enterStudentName : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -1652,8 +1686,8 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                 TextFormField(
                   controller: _phoneController,
                   decoration: InputDecoration(
-                    labelText: 'Телефон',
-                    hintText: '+7 (777) 123-45-67',
+                    labelText: l10n.phone,
+                    hintText: l10n.phoneHint,
                     prefixIcon: const Icon(Icons.phone_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1667,7 +1701,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
                 // Преподаватель
                 membersAsync.when(
-                  loading: () => _buildDropdownSkeleton('Преподаватель'),
+                  loading: () => _buildDropdownSkeleton(l10n.teacher),
                   error: (_, __) => const SizedBox.shrink(),
                   data: (members) {
                     // Показываем всех активных участников
@@ -1692,10 +1726,10 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
                     // Если нет прав - показываем только информацию без возможности изменить
                     if (!widget.canManageAllStudents) {
-                      final teacherName = _selectedTeacher?.profile?.fullName ?? 'Вы';
+                      final teacherName = _selectedTeacher?.profile?.fullName ?? l10n.you;
                       return InputDecorator(
                         decoration: InputDecoration(
-                          labelText: 'Преподаватель',
+                          labelText: l10n.teacher,
                           prefixIcon: const Icon(Icons.school_outlined),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1713,7 +1747,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     if (activeMembers.isEmpty) {
                       return InputDecorator(
                         decoration: InputDecoration(
-                          labelText: 'Преподаватель',
+                          labelText: l10n.teacher,
                           prefixIcon: const Icon(Icons.school_outlined),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1722,7 +1756,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                           fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                         ),
                         child: Text(
-                          'Нет доступных преподавателей',
+                          l10n.noAvailableTeachers,
                           style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                       );
@@ -1737,7 +1771,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                       key: ValueKey('teacher_${effectiveTeacher?.userId}'),
                       value: effectiveTeacher,
                       decoration: InputDecoration(
-                        labelText: 'Преподаватель',
+                        labelText: l10n.teacher,
                         prefixIcon: const Icon(Icons.school_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -1746,11 +1780,11 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                         fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                       ),
                       dropdownColor: Theme.of(context).colorScheme.surfaceContainer,
-                      hint: const Text('Выберите преподавателя'),
+                      hint: Text(l10n.selectTeacher),
                       items: activeMembers.map((member) => DropdownMenuItem(
                         value: member,
                         child: Text(
-                          member.profile?.fullName ?? 'Без имени',
+                          member.profile?.fullName ?? l10n.noName,
                           overflow: TextOverflow.ellipsis,
                         ),
                       )).toList(),
@@ -1768,7 +1802,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
                 // Направление
                 subjectsAsync.when(
-                  loading: () => _buildDropdownSkeleton('Направление'),
+                  loading: () => _buildDropdownSkeleton(l10n.direction),
                   error: (_, __) => const SizedBox.shrink(),
                   data: (subjects) {
                     final activeSubjects = subjects.where((s) => s.archivedAt == null).toList();
@@ -1782,7 +1816,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                       key: ValueKey('subject_${effectiveSubject?.id}'),
                       value: effectiveSubject,
                       decoration: InputDecoration(
-                        labelText: 'Направление',
+                        labelText: l10n.direction,
                         prefixIcon: const Icon(Icons.category_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -1791,7 +1825,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                         fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                       ),
                       dropdownColor: Theme.of(context).colorScheme.surfaceContainer,
-                      hint: const Text('Выберите направление'),
+                      hint: Text(l10n.selectSubject),
                       items: activeSubjects.map((subject) {
                         final color = subject.color != null
                             ? Color(int.parse('0xFF${subject.color!.replaceAll('#', '')}'))
@@ -1822,7 +1856,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
                 // Тип занятия
                 lessonTypesAsync.when(
-                  loading: () => _buildDropdownSkeleton('Тип занятия'),
+                  loading: () => _buildDropdownSkeleton(l10n.lessonType),
                   error: (_, __) => const SizedBox.shrink(),
                   data: (lessonTypes) {
                     final activeTypes = lessonTypes.where((t) => t.archivedAt == null).toList();
@@ -1852,7 +1886,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                       key: ValueKey('lessonType_${effectiveLessonType?.id}'),
                       value: effectiveLessonType,
                       decoration: InputDecoration(
-                        labelText: 'Тип занятия',
+                        labelText: l10n.lessonType,
                         prefixIcon: const Icon(Icons.event_note_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -1861,7 +1895,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                         fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                       ),
                       dropdownColor: Theme.of(context).colorScheme.surfaceContainer,
-                      hint: const Text('Выберите тип занятия'),
+                      hint: Text(l10n.selectLessonType),
                       items: activeTypes.map((type) {
                         final color = type.color != null
                             ? Color(int.parse('0xFF${type.color!.replaceAll('#', '')}'))
@@ -1898,8 +1932,8 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                 TextFormField(
                   controller: _commentController,
                   decoration: InputDecoration(
-                    labelText: 'Комментарий',
-                    hintText: 'Дополнительная информация...',
+                    labelText: l10n.comment,
+                    hintText: l10n.additionalInfo,
                     prefixIcon: const Icon(Icons.notes_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1915,16 +1949,16 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                 TextFormField(
                   controller: _legacyBalanceController,
                   decoration: InputDecoration(
-                    labelText: 'Остаток занятий',
-                    hintText: 'При переносе из другой школы',
+                    labelText: l10n.remainingLessons,
+                    hintText: l10n.fromOtherSchool,
                     prefixIcon: const Icon(Icons.sync_alt_outlined),
-                    suffixText: 'занятий',
+                    suffixText: l10n.lessonsUnit,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
-                    helperText: 'Списывается первым, не влияет на доход',
+                    helperText: l10n.remainingLessonsHint,
                     helperMaxLines: 2,
                   ),
                   keyboardType: TextInputType.number,
@@ -1933,7 +1967,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                 const SizedBox(height: 16),
 
                 // Постоянное расписание (опционально)
-                _buildScheduleSection(),
+                _buildScheduleSection(l10n),
                 const SizedBox(height: 28),
 
                 // Кнопки
@@ -1948,7 +1982,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Отмена'),
+                        child: Text(l10n.cancel),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -1968,9 +2002,9 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                                 width: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text(
-                                'Создать ученика',
-                                style: TextStyle(
+                            : Text(
+                                l10n.createStudent,
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -2041,7 +2075,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
   }
 
   /// Секция настройки постоянного расписания
-  Widget _buildScheduleSection() {
+  Widget _buildScheduleSection(AppLocalizations l10n) {
     final roomsAsync = ref.watch(roomsStreamProvider(widget.institutionId));
 
     return Column(
@@ -2078,14 +2112,14 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Настроить постоянное расписание',
+                        l10n.setupPermanentSchedule,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Выберите дни и время занятий',
+                        l10n.selectDaysAndTime,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -2108,7 +2142,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
           // Кабинет
           roomsAsync.when(
-            loading: () => _buildDropdownSkeleton('Кабинет'),
+            loading: () => _buildDropdownSkeleton(l10n.room),
             error: (_, __) => const SizedBox.shrink(),
             data: (rooms) {
               if (rooms.isEmpty) return const SizedBox.shrink();
@@ -2126,7 +2160,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                 key: ValueKey('room_$_selectedRoomId'),
                 initialValue: _selectedRoomId,
                 decoration: InputDecoration(
-                  labelText: 'Кабинет для занятий',
+                  labelText: l10n.roomForLessons,
                   prefixIcon: const Icon(Icons.meeting_room_outlined),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -2156,7 +2190,6 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                 initialDate: _validFrom,
                 firstDate: DateTime.now(),
                 lastDate: DateTime.now().add(const Duration(days: 365)),
-                locale: const Locale('ru', 'RU'),
               );
               if (picked != null && mounted) {
                 setState(() => _validFrom = picked);
@@ -2165,7 +2198,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
             borderRadius: BorderRadius.circular(12),
             child: InputDecorator(
               decoration: InputDecoration(
-                labelText: 'Действует с',
+                labelText: l10n.validFrom,
                 prefixIcon: const Icon(Icons.calendar_today_outlined),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -2183,29 +2216,37 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
 
           // Дни недели
           Text(
-            'Дни недели',
+            l10n.daysOfWeekLabel,
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 8),
-          _buildDaysSelector(),
+          _buildDaysSelector(l10n),
 
           // Время для выбранных дней
           if (_selectedDays.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              'Время занятий',
+              l10n.lessonTimeLabel,
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
-            ..._buildDayTimeRows(),
+            ..._buildDayTimeRows(l10n),
           ],
         ],
       ],
     );
   }
 
-  Widget _buildDaysSelector() {
-    const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  Widget _buildDaysSelector(AppLocalizations l10n) {
+    final days = [
+      l10n.mondayShort,
+      l10n.tuesdayShort,
+      l10n.wednesdayShort,
+      l10n.thursdayShort,
+      l10n.fridayShort,
+      l10n.saturdayShort,
+      l10n.sundayShort,
+    ];
 
     return Wrap(
       spacing: 8,
@@ -2254,13 +2295,22 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     );
   }
 
-  List<Widget> _buildDayTimeRows() {
+  List<Widget> _buildDayTimeRows(AppLocalizations l10n) {
     final sortedDays = _selectedDays.toList()..sort();
-    return sortedDays.map((day) => _buildDayTimeRow(day)).toList();
+    return sortedDays.map((day) => _buildDayTimeRow(day, l10n)).toList();
   }
 
-  Widget _buildDayTimeRow(int dayNumber) {
-    const days = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  Widget _buildDayTimeRow(int dayNumber, AppLocalizations l10n) {
+    final days = [
+      '',
+      l10n.mondayShort,
+      l10n.tuesdayShort,
+      l10n.wednesdayShort,
+      l10n.thursdayShort,
+      l10n.fridayShort,
+      l10n.saturdayShort,
+      l10n.sundayShort,
+    ];
     final startTime = _startTimes[dayNumber] ?? _defaultStartTime;
     final endTime = _endTimes[dayNumber] ?? _defaultEndTime;
     final hasConflict = _conflictingDays.contains(dayNumber);
@@ -2268,11 +2318,18 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
     final startMinutes = startTime.hour * 60 + startTime.minute;
     final endMinutes = endTime.hour * 60 + endTime.minute;
     final durationMinutes = endMinutes - startMinutes;
-    final durationText = durationMinutes > 0
-        ? (durationMinutes >= 60
-            ? '${durationMinutes ~/ 60} ч${durationMinutes % 60 > 0 ? ' ${durationMinutes % 60} мин' : ''}'
-            : '$durationMinutes мин')
-        : 'Некорректно';
+    String durationText;
+    if (durationMinutes <= 0) {
+      durationText = l10n.incorrect;
+    } else if (durationMinutes >= 60) {
+      final hours = durationMinutes ~/ 60;
+      final mins = durationMinutes % 60;
+      durationText = mins > 0
+          ? l10n.durationHoursMinutes(hours, mins)
+          : l10n.durationHours(hours);
+    } else {
+      durationText = l10n.durationMinutes(durationMinutes);
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -2320,7 +2377,7 @@ class _AddStudentSheetState extends ConsumerState<_AddStudentSheet> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      hasConflict ? 'Конфликт! Время занято' : durationText,
+                      hasConflict ? l10n.conflictTimeOccupied : durationText,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: hasConflict
                             ? Theme.of(context).colorScheme.error
@@ -2381,12 +2438,14 @@ class _GroupsTab extends StatelessWidget {
   final List<StudentGroup> groups;
   final bool isLoading;
   final VoidCallback onRefresh;
+  final AppLocalizations l10n;
 
   const _GroupsTab({
     required this.institutionId,
     required this.groups,
     required this.isLoading,
     required this.onRefresh,
+    required this.l10n,
   });
 
   @override
@@ -2396,10 +2455,10 @@ class _GroupsTab extends StatelessWidget {
     }
 
     if (groups.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.groups,
-        title: 'Нет групп',
-        subtitle: 'Создайте первую группу учеников',
+        title: l10n.noGroups,
+        subtitle: l10n.createFirstGroup,
       );
     }
 
@@ -2413,6 +2472,7 @@ class _GroupsTab extends StatelessWidget {
           return _GroupCard(
             group: group,
             institutionId: institutionId,
+            l10n: l10n,
           );
         },
       ),
@@ -2423,10 +2483,12 @@ class _GroupsTab extends StatelessWidget {
 class _GroupCard extends StatelessWidget {
   final StudentGroup group;
   final String institutionId;
+  final AppLocalizations l10n;
 
   const _GroupCard({
     required this.group,
     required this.institutionId,
+    required this.l10n,
   });
 
   @override
@@ -2443,7 +2505,7 @@ class _GroupCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
         subtitle: Text(
-          '${group.membersCount} ${_pluralize(group.membersCount, 'ученик', 'ученика', 'учеников')}',
+          l10n.studentsCount(group.membersCount),
           style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         trailing: const Icon(Icons.chevron_right),
@@ -2452,12 +2514,6 @@ class _GroupCard extends StatelessWidget {
         },
       ),
     );
-  }
-
-  String _pluralize(int count, String one, String few, String many) {
-    if (count % 10 == 1 && count % 100 != 11) return one;
-    if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) return few;
-    return many;
   }
 }
 
@@ -2484,6 +2540,7 @@ class _StudentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final hasDebt = student.balance < 0;
 
     return Card(
@@ -2557,7 +2614,7 @@ class _StudentCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${student.balance} занятий',
+                          l10n.lessonsBalance(student.balance),
                           style: TextStyle(
                             fontSize: 12,
                             color: hasDebt

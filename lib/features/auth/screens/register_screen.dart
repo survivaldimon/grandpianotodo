@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/utils/validators.dart';
 import 'package:kabinet/features/auth/providers/auth_provider.dart';
@@ -43,9 +43,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
 
     if (success && mounted) {
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Регистрация успешна!'),
+        SnackBar(
+          content: Text(l10n.registrationSuccess),
           backgroundColor: Colors.green,
         ),
       );
@@ -56,6 +57,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
+    final l10n = AppLocalizations.of(context);
 
     // Показать ошибку если есть
     ref.listen(authControllerProvider, (prev, next) {
@@ -86,40 +88,40 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  AppStrings.register,
+                  l10n.register,
                   style: Theme.of(context).textTheme.headlineMedium,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: AppStrings.fullName,
-                    prefixIcon: Icon(Icons.person_outlined),
+                  decoration: InputDecoration(
+                    labelText: l10n.fullName,
+                    prefixIcon: const Icon(Icons.person_outlined),
                   ),
                   textInputAction: TextInputAction.next,
-                  validator: Validators.required,
+                  validator: Validators.required(l10n),
                   enabled: !authState.isLoading,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: AppStrings.email,
-                    prefixIcon: Icon(Icons.email_outlined),
+                  decoration: InputDecoration(
+                    labelText: l10n.email,
+                    prefixIcon: const Icon(Icons.email_outlined),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  validator: Validators.email,
+                  validator: Validators.email(l10n),
                   enabled: !authState.isLoading,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
                   decoration: InputDecoration(
-                    labelText: AppStrings.password,
+                    labelText: l10n.password,
                     prefixIcon: const Icon(Icons.lock_outlined),
-                    helperText: 'Мин. 8 символов, заглавная буква, спецсимвол',
+                    helperText: l10n.passwordRequirements,
                     helperMaxLines: 2,
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -134,14 +136,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.next,
-                  validator: Validators.password,
+                  validator: Validators.password(l10n),
                   enabled: !authState.isLoading,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _confirmPasswordController,
                   decoration: InputDecoration(
-                    labelText: AppStrings.confirmPassword,
+                    labelText: l10n.confirmPassword,
                     prefixIcon: const Icon(Icons.lock_outlined),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -159,10 +161,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.done,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return AppStrings.fieldRequired;
+                      return l10n.fieldRequired;
                     }
                     if (value != _passwordController.text) {
-                      return AppStrings.passwordsDoNotMatch;
+                      return l10n.passwordsDoNotMatch;
                     }
                     return null;
                   },
@@ -178,17 +180,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text(AppStrings.register),
+                      : Text(l10n.register),
                 ),
                 const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(AppStrings.hasAccount),
+                    Text(l10n.hasAccount),
                     TextButton(
                       onPressed:
                           authState.isLoading ? null : () => context.go('/login'),
-                      child: const Text(AppStrings.login),
+                      child: Text(l10n.login),
                     ),
                   ],
                 ),

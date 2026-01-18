@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/features/groups/providers/group_provider.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/shared/models/student_group.dart';
 
 /// Экран списка групп
@@ -13,14 +14,15 @@ class GroupsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final groupsAsync = ref.watch(groupsProvider(institutionId));
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Группы'),
+        title: Text(l10n.groups),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateDialog(context, ref),
+        onPressed: () => _showCreateDialog(context, ref, l10n),
         child: const Icon(Icons.add),
       ),
       body: Builder(
@@ -40,23 +42,23 @@ class GroupsScreen extends ConsumerWidget {
                 children: [
                   const Icon(Icons.groups, size: 64, color: AppColors.textTertiary),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Нет групп',
-                    style: TextStyle(
+                  Text(
+                    l10n.noGroups,
+                    style: const TextStyle(
                       fontSize: 18,
                       color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Создайте первую группу учеников',
-                    style: TextStyle(color: AppColors.textTertiary),
+                  Text(
+                    l10n.createFirstGroup,
+                    style: const TextStyle(color: AppColors.textTertiary),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: () => _showCreateDialog(context, ref),
+                    onPressed: () => _showCreateDialog(context, ref, l10n),
                     icon: const Icon(Icons.add),
-                    label: const Text('Создать группу'),
+                    label: Text(l10n.createGroup),
                   ),
                 ],
               ),
@@ -79,7 +81,7 @@ class GroupsScreen extends ConsumerWidget {
     );
   }
 
-  void _showCreateDialog(BuildContext context, WidgetRef ref) {
+  void _showCreateDialog(BuildContext context, WidgetRef ref, AppLocalizations l10n) {
     final nameController = TextEditingController();
     final commentController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -87,7 +89,7 @@ class GroupsScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Новая группа'),
+        title: Text(l10n.newGroup),
         content: Form(
           key: formKey,
           child: Column(
@@ -95,14 +97,14 @@ class GroupsScreen extends ConsumerWidget {
             children: [
               TextFormField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Название группы',
-                  hintText: 'Например: Группа вокала',
+                decoration: InputDecoration(
+                  labelText: l10n.groupName,
+                  hintText: l10n.groupNameHint,
                 ),
                 autofocus: true,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Введите название';
+                    return l10n.enterName;
                   }
                   return null;
                 },
@@ -110,8 +112,8 @@ class GroupsScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               TextFormField(
                 controller: commentController,
-                decoration: const InputDecoration(
-                  labelText: 'Комментарий (необязательно)',
+                decoration: InputDecoration(
+                  labelText: l10n.commentOptional,
                 ),
                 maxLines: 2,
               ),
@@ -121,7 +123,7 @@ class GroupsScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -144,7 +146,7 @@ class GroupsScreen extends ConsumerWidget {
                 context.push('/institutions/$institutionId/groups/${group.id}');
               }
             },
-            child: const Text('Создать'),
+            child: Text(l10n.create),
           ),
         ],
       ),
@@ -163,6 +165,8 @@ class _GroupTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: AppColors.primary.withValues(alpha: 0.1),
@@ -170,7 +174,7 @@ class _GroupTile extends ConsumerWidget {
       ),
       title: Text(group.name),
       subtitle: Text(
-        '${group.membersCount} ${_pluralize(group.membersCount, 'ученик', 'ученика', 'учеников')}',
+        l10n.studentsCountPlural(group.membersCount),
         style: const TextStyle(color: AppColors.textSecondary),
       ),
       trailing: const Icon(Icons.chevron_right),
@@ -178,11 +182,5 @@ class _GroupTile extends ConsumerWidget {
         context.push('/institutions/$institutionId/groups/${group.id}');
       },
     );
-  }
-
-  String _pluralize(int count, String one, String few, String many) {
-    if (count % 10 == 1 && count % 100 != 11) return one;
-    if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) return few;
-    return many;
   }
 }

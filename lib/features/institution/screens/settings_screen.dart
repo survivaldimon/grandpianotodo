@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/core/extensions/context_extensions.dart';
 import 'package:kabinet/core/theme/theme_provider.dart';
+import 'package:kabinet/core/providers/locale_provider.dart';
 import 'package:kabinet/core/providers/phone_settings_provider.dart';
 import 'package:kabinet/features/auth/providers/auth_provider.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
@@ -42,7 +43,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, context.l10n)),
             backgroundColor: Colors.red,
           ),
         );
@@ -51,7 +52,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.settings),
+        title: Text(context.l10n.settings),
       ),
       body: institutionAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -61,11 +62,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               const Icon(Icons.error_outline, size: 48, color: Colors.red),
               const SizedBox(height: 16),
-              Text('Ошибка загрузки: $error'),
+              Text('${context.l10n.error}: $error'),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => ref.invalidate(currentInstitutionProvider(institutionId)),
-                child: const Text('Повторить'),
+                child: Text(context.l10n.retry),
               ),
             ],
           ),
@@ -81,10 +82,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           return ListView(
             children: [
-              const _SectionHeader(title: 'ЗАВЕДЕНИЕ'),
+              _SectionHeader(title: context.l10n.institutions.toUpperCase()),
               ListTile(
                 leading: const Icon(Icons.business),
-                title: const Text('Название'),
+                title: Text(context.l10n.institutionName),
                 subtitle: Text(institution.name),
                 trailing: canManageInstitution ? const Icon(Icons.chevron_right) : null,
                 onTap: canManageInstitution
@@ -93,7 +94,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.access_time),
-                title: const Text('Рабочее время'),
+                title: Text(context.l10n.workingHours),
                 subtitle: Text(
                   '${institution.workStartHour.toString().padLeft(2, '0')}:00 — ${institution.workEndHour.toString().padLeft(2, '0')}:00',
                 ),
@@ -111,27 +112,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (hasFullAccess)
                 ListTile(
                   leading: const Icon(Icons.share),
-                  title: const Text('Пригласить участника'),
-                  subtitle: Text('Код: ${institution.inviteCode}'),
+                  title: Text(context.l10n.inviteMembers),
+                  subtitle: Text('${context.l10n.inviteCode}: ${institution.inviteCode}'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         icon: const Icon(Icons.copy),
-                        tooltip: 'Скопировать код',
+                        tooltip: context.l10n.copy,
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: institution.inviteCode));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Код скопирован в буфер обмена'),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: Text(context.l10n.inviteCodeCopied),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         },
                       ),
                       IconButton(
                         icon: const Icon(Icons.refresh),
-                        tooltip: 'Сгенерировать новый код',
+                        tooltip: context.l10n.generateNewCode,
                         onPressed: controllerState.isLoading
                             ? null
                             : () => _regenerateInviteCode(context, ref),
@@ -140,12 +141,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               const Divider(),
-              const _SectionHeader(title: 'УПРАВЛЕНИЕ'),
+              _SectionHeader(title: context.l10n.general.toUpperCase()),
               // Кабинеты — только если есть право manageRooms
               if (hasFullAccess || (permissions?.manageRooms ?? false))
                 ListTile(
                   leading: const Icon(Icons.door_front_door),
-                  title: const Text(AppStrings.rooms),
+                  title: Text(context.l10n.rooms),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     context.push('/institutions/$institutionId/rooms');
@@ -155,7 +156,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (hasFullAccess || (permissions?.viewStatistics ?? false))
                 ListTile(
                   leading: const Icon(Icons.bar_chart),
-                  title: const Text('Статистика'),
+                  title: Text(context.l10n.statistics),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     context.push('/institutions/$institutionId/statistics');
@@ -163,7 +164,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ListTile(
                 leading: const Icon(Icons.people),
-                title: const Text(AppStrings.teamMembers),
+                title: Text(context.l10n.teamMembers),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   context.push('/institutions/$institutionId/members');
@@ -173,7 +174,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (hasFullAccess || (permissions?.manageSubjects ?? false))
                 ListTile(
                   leading: const Icon(Icons.music_note),
-                  title: const Text(AppStrings.subjects),
+                  title: Text(context.l10n.subjects),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     context.push('/institutions/$institutionId/subjects');
@@ -183,7 +184,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (hasFullAccess || (permissions?.manageLessonTypes ?? false))
                 ListTile(
                   leading: const Icon(Icons.event_note),
-                  title: const Text(AppStrings.lessonTypes),
+                  title: Text(context.l10n.lessonTypes),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     context.push('/institutions/$institutionId/lesson-types');
@@ -193,17 +194,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (hasFullAccess || (permissions?.managePaymentPlans ?? false))
                 ListTile(
                   leading: const Icon(Icons.credit_card),
-                  title: const Text(AppStrings.paymentPlans),
+                  title: Text(context.l10n.paymentPlans),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     context.push('/institutions/$institutionId/payment-plans');
                   },
                 ),
               const Divider(),
-              const _SectionHeader(title: 'АККАУНТ'),
+              _SectionHeader(title: context.l10n.account.toUpperCase()),
               ListTile(
                 leading: const Icon(Icons.person),
-                title: const Text(AppStrings.profile),
+                title: Text(context.l10n.profile),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   context.push('/institutions/$institutionId/profile');
@@ -211,38 +212,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.brightness_6),
-                title: const Text('Тема оформления'),
-                subtitle: Text(getThemeModeLabel(ref.watch(themeModeProvider))),
+                title: Text(context.l10n.theme),
+                subtitle: Text(getThemeModeLabel(ref.watch(themeModeProvider), context.l10n)),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showThemeDialog(context, ref),
               ),
               ListTile(
+                leading: const Icon(Icons.language),
+                title: Text(context.l10n.language),
+                subtitle: Text(ref.watch(localeProvider).label),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showLanguageDialog(context, ref),
+              ),
+              ListTile(
                 leading: const Icon(Icons.phone),
-                title: const Text('Код страны для телефона'),
+                title: Text(context.l10n.phoneCountry),
                 subtitle: Text(ref.watch(phoneCountryCodeProvider).displayLabel),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showPhoneCountryCodeDialog(context, ref),
               ),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text(
-                  AppStrings.logout,
-                  style: TextStyle(color: Colors.red),
+                title: Text(
+                  context.l10n.logout,
+                  style: const TextStyle(color: Colors.red),
                 ),
                 onTap: () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Выход'),
-                      content: const Text('Вы уверены, что хотите выйти?'),
+                    builder: (dialogContext) => AlertDialog(
+                      title: Text(context.l10n.logout),
+                      content: Text(context.l10n.confirmLogout),
                       actions: [
                         TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Отмена'),
+                          onPressed: () => Navigator.of(dialogContext).pop(false),
+                          child: Text(context.l10n.cancel),
                         ),
                         TextButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('Выйти', style: TextStyle(color: Colors.red)),
+                          onPressed: () => Navigator.of(dialogContext).pop(true),
+                          child: Text(context.l10n.logout, style: const TextStyle(color: Colors.red)),
                         ),
                       ],
                     ),
@@ -256,41 +264,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 },
               ),
               const Divider(),
-              const _SectionHeader(title: 'ОПАСНАЯ ЗОНА'),
+              _SectionHeader(title: context.l10n.dangerZone.toUpperCase()),
               ListTile(
                 leading: Icon(
                   isOwner ? Icons.archive : Icons.exit_to_app,
                   color: Colors.orange,
                 ),
                 title: Text(
-                  isOwner ? 'Архивировать заведение' : 'Покинуть заведение',
+                  isOwner ? context.l10n.archiveInstitution : context.l10n.leaveInstitutionAction,
                   style: const TextStyle(color: Colors.orange),
                 ),
                 subtitle: Text(
                   isOwner
-                      ? 'Заведение можно будет восстановить'
-                      : 'Вы больше не будете участником',
+                      ? context.l10n.institutionCanBeRestored
+                      : context.l10n.youWillNoLongerBeMember,
                 ),
                 enabled: !controllerState.isLoading,
                 onTap: () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text(isOwner ? 'Архивировать заведение?' : 'Покинуть заведение?'),
+                    builder: (dialogContext) => AlertDialog(
+                      title: Text(isOwner ? context.l10n.archiveInstitutionQuestion : context.l10n.leaveInstitutionQuestion),
                       content: Text(
                         isOwner
-                            ? 'Заведение "${institution.name}" будет перемещено в архив. Вы сможете восстановить его позже из списка заведений.'
-                            : 'Вы уверены, что хотите покинуть "${institution.name}"? Чтобы вернуться, вам понадобится новый код приглашения.',
+                            ? context.l10n.archiveInstitutionMessage(institution.name)
+                            : context.l10n.leaveInstitutionMessage(institution.name),
                       ),
                       actions: [
                         TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Отмена'),
+                          onPressed: () => Navigator.of(dialogContext).pop(false),
+                          child: Text(context.l10n.cancel),
                         ),
                         TextButton(
-                          onPressed: () => Navigator.of(context).pop(true),
+                          onPressed: () => Navigator.of(dialogContext).pop(true),
                           child: Text(
-                            isOwner ? 'Архивировать' : 'Покинуть',
+                            isOwner ? context.l10n.archive : context.l10n.leaveInstitution,
                             style: const TextStyle(color: Colors.orange),
                           ),
                         ),
@@ -313,8 +321,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         SnackBar(
                           content: Text(
                             isOwner
-                                ? 'Заведение архивировано'
-                                : 'Вы покинули заведение',
+                                ? context.l10n.institutionArchived
+                                : context.l10n.youLeftInstitution,
                           ),
                           backgroundColor: Colors.green,
                         ),
@@ -335,19 +343,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _regenerateInviteCode(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Сгенерировать новый код?'),
-        content: const Text(
-          'Старый код перестанет работать. Все, кто ещё не присоединился по старому коду, не смогут это сделать.',
-        ),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.l10n.generateNewCodeQuestion),
+        content: Text(context.l10n.generateNewCodeMessage),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Сгенерировать'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(context.l10n.generate),
           ),
         ],
       ),
@@ -359,7 +365,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (newCode != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Новый код: $newCode'),
+            content: Text(context.l10n.newCodeGenerated(newCode)),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -373,21 +379,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Название заведения'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.l10n.institutionName),
         content: Form(
           key: formKey,
           child: TextFormField(
             controller: nameController,
-            decoration: const InputDecoration(labelText: 'Название'),
-            validator: (v) => v == null || v.isEmpty ? 'Введите название' : null,
+            decoration: InputDecoration(labelText: context.l10n.institutionName),
+            validator: (v) => v == null || v.isEmpty ? context.l10n.enterName : null,
             autofocus: true,
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(context.l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -397,15 +403,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   widget.institutionId,
                   nameController.text.trim(),
                 );
-                if (success && context.mounted) {
-                  Navigator.pop(context);
+                if (success && dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Название обновлено')),
+                    SnackBar(content: Text(context.l10n.nameUpdated)),
                   );
                 }
               }
             },
-            child: const Text('Сохранить'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -423,15 +429,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Рабочее время'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) => AlertDialog(
+          title: Text(context.l10n.workingHours),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Это время будет отображаться в сетке расписания',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+              Text(
+                context.l10n.workingHoursDescription,
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 24),
               Row(
@@ -440,7 +446,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Начало', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Text(context.l10n.start, style: const TextStyle(fontWeight: FontWeight.w500)),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<int>(
                           initialValue: startHour,
@@ -474,7 +480,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Конец', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Text(context.l10n.end, style: const TextStyle(fontWeight: FontWeight.w500)),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<int>(
                           initialValue: endHour,
@@ -503,8 +509,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(context.l10n.cancel),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -514,14 +520,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   startHour,
                   endHour,
                 );
-                if (success && context.mounted) {
-                  Navigator.pop(context);
+                if (success && dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Рабочее время обновлено')),
+                    SnackBar(content: Text(context.l10n.workingHoursUpdated)),
                   );
                 }
               },
-              child: const Text('Сохранить'),
+              child: Text(context.l10n.save),
             ),
           ],
         ),
@@ -536,7 +542,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Тема оформления'),
+        title: Text(context.l10n.theme),
         contentPadding: const EdgeInsets.only(top: 16),
         content: RadioGroup<ThemeMode>(
           groupValue: currentMode,
@@ -544,20 +550,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ref.read(themeModeProvider.notifier).setThemeMode(mode!);
             Navigator.pop(ctx);
           },
-          child: const Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               RadioListTile<ThemeMode>(
-                title: Text('Как в системе'),
-                subtitle: Text('Автоматически'),
+                title: Text(context.l10n.themeSystem),
+                subtitle: Text(context.l10n.languageSystem),
                 value: ThemeMode.system,
               ),
               RadioListTile<ThemeMode>(
-                title: Text('Тёмная'),
+                title: Text(context.l10n.themeDark),
                 value: ThemeMode.dark,
               ),
               RadioListTile<ThemeMode>(
-                title: Text('Светлая'),
+                title: Text(context.l10n.themeLight),
                 value: ThemeMode.light,
               ),
             ],
@@ -566,7 +572,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(context.l10n.cancel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Диалог выбора языка приложения
+  void _showLanguageDialog(BuildContext context, WidgetRef ref) {
+    final currentLocale = ref.read(localeProvider);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.language),
+        contentPadding: const EdgeInsets.only(top: 16),
+        content: RadioGroup<AppLocale>(
+          groupValue: currentLocale,
+          onChanged: (locale) {
+            ref.read(localeProvider.notifier).setLocale(locale!);
+            Navigator.pop(ctx);
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: AppLocale.values.map((locale) {
+              return RadioListTile<AppLocale>(
+                title: Text(locale.label),
+                subtitle: locale == AppLocale.system
+                    ? Text(context.l10n.languageSystem)
+                    : null,
+                value: locale,
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.l10n.cancel),
           ),
         ],
       ),
@@ -580,7 +624,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Код страны'),
+        title: Text(context.l10n.phoneCountry),
         contentPadding: const EdgeInsets.only(top: 16),
         content: SingleChildScrollView(
           child: RadioGroup<PhoneCountryCode>(
@@ -595,7 +639,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 return RadioListTile<PhoneCountryCode>(
                   title: Text(code.displayLabel),
                   subtitle: code == PhoneCountryCode.auto
-                      ? const Text('По локали устройства')
+                      ? Text(context.l10n.byLocale)
                       : null,
                   value: code,
                 );
@@ -606,7 +650,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(context.l10n.cancel),
           ),
         ],
       ),

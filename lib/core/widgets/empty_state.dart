@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 
 /// Заглушка для пустых списков
 class EmptyState extends StatelessWidget {
   final IconData icon;
-  final String title;
+  final String? title;
   final String? subtitle;
   final Widget? action;
 
   const EmptyState({
     super.key,
     this.icon = Icons.inbox_outlined,
-    this.title = AppStrings.noData,
+    this.title,
     this.subtitle,
     this.action,
   });
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final displayTitle = title ?? l10n.noData;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -32,7 +35,7 @@ class EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              title,
+              displayTitle,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppColors.textSecondary,

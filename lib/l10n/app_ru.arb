@@ -1,0 +1,4028 @@
+{
+  "@@locale": "ru",
+  "@_COMMON": {},
+  "appName": "Kabinet",
+  "loading": "Загрузка...",
+  "error": "Ошибка",
+  "retry": "Повторить",
+  "cancel": "Отмена",
+  "save": "Сохранить",
+  "delete": "Удалить",
+  "archive": "Архивировать",
+  "restore": "Восстановить",
+  "edit": "Редактировать",
+  "add": "Добавить",
+  "create": "Создать",
+  "search": "Поиск",
+  "noData": "Нет данных",
+  "confirm": "Подтвердить",
+  "yes": "Да",
+  "no": "Нет",
+  "close": "Закрыть",
+  "done": "Готово",
+  "next": "Далее",
+  "back": "Назад",
+  "apply": "Применить",
+  "reset": "Сбросить",
+  "all": "Все",
+  "select": "Выбрать",
+  "copy": "Копировать",
+  "copied": "Скопировано",
+  "share": "Поделиться",
+  "more": "Ещё",
+  "less": "Меньше",
+  "show": "Показать",
+  "hide": "Скрыть",
+  "optional": "Необязательно",
+  "required": "Обязательно",
+  "or": "или",
+  "and": "и",
+  "from": "от",
+  "to": "до",
+  "tenge": "тг",
+  "@_AUTH": {},
+  "login": "Войти",
+  "register": "Зарегистрироваться",
+  "logout": "Выйти",
+  "email": "Email",
+  "password": "Пароль",
+  "confirmPassword": "Подтвердите пароль",
+  "fullName": "Полное имя",
+  "forgotPassword": "Забыли пароль?",
+  "resetPassword": "Восстановить пароль",
+  "resetPasswordTitle": "Восстановление пароля",
+  "resetPasswordMessage": "Введите email, указанный при регистрации. Мы отправим вам ссылку для сброса пароля.",
+  "resetPasswordSuccess": "Письмо отправлено! Проверьте свою почту.",
+  "noAccount": "Нет аккаунта?",
+  "hasAccount": "Уже есть аккаунт?",
+  "loginWithGoogle": "Войти через Google",
+  "loginWithApple": "Войти через Apple",
+  "newPassword": "Новый пароль",
+  "setNewPassword": "Задать новый пароль",
+  "setNewPasswordDescription": "Установите новый пароль",
+  "savePassword": "Сохранить пароль",
+  "passwordChangeError": "Ошибка смены пароля: {error}",
+  "@passwordChangeError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "passwordChanged": "Пароль успешно изменён",
+  "registrationSuccess": "Регистрация успешна!",
+  "passwordRequirements": "Мин. 8 символов, заглавная буква, спецсимвол",
+  "@_INSTITUTION": {},
+  "institutions": "Заведения",
+  "createInstitution": "Создать заведение",
+  "joinInstitution": "Присоединиться",
+  "institutionName": "Название заведения",
+  "inviteCode": "Код приглашения",
+  "institutionNameHint": "Например: Музыкальная школа №1",
+  "inviteCodeHint": "Например: ABC12345",
+  "inviteCodeDescription": "Введите код приглашения, который вам прислал администратор заведения",
+  "joinedInstitution": "Вы присоединились к \"{name}\"",
+  "@joinedInstitution": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "owner": "Владелец",
+  "member": "Участник",
+  "admin": "Администратор",
+  "teacher": "Преподаватель",
+  "noInstitutions": "Нет заведений",
+  "createOrJoin": "Создайте новое или присоединитесь",
+  "@_NAVIGATION": {},
+  "dashboard": "Главная",
+  "rooms": "Кабинеты",
+  "students": "Ученики",
+  "payments": "Оплаты",
+  "settings": "Настройки",
+  "statistics": "Статистика",
+  "groups": "Группы",
+  "schedule": "Расписание",
+  "@_ROOMS": {},
+  "room": "Кабинет",
+  "roomName": "Название кабинета",
+  "roomNumber": "Номер кабинета",
+  "addRoom": "Добавить кабинет",
+  "editRoom": "Редактировать кабинет",
+  "deleteRoom": "Удалить кабинет",
+  "noRooms": "Нет кабинетов",
+  "addRoomFirst": "Сначала добавьте кабинет",
+  "roomDeleted": "Кабинет удалён",
+  "roomUpdated": "Кабинет обновлён",
+  "roomCreated": "Кабинет создан",
+  "roomColor": "Цвет кабинета",
+  "roomOccupied": "Кабинет занят в это время",
+  "@_SCHEDULE": {},
+  "today": "Сегодня",
+  "yesterday": "Вчера",
+  "tomorrow": "Завтра",
+  "lesson": "Занятие",
+  "lessons": "Занятия",
+  "newLesson": "Новое занятие",
+  "editLesson": "Редактировать занятие",
+  "deleteLesson": "Удалить занятие",
+  "lessonType": "Тип занятия",
+  "subject": "Предмет",
+  "date": "Дата",
+  "time": "Время",
+  "startTime": "Начало",
+  "endTime": "Окончание",
+  "duration": "Длительность",
+  "minutes": "мин",
+  "comment": "Комментарий",
+  "noLessons": "Нет занятий",
+  "noLessonsToday": "Нет занятий сегодня",
+  "lessonsToday": "Занятия сегодня",
+  "nextLesson": "Ближайшее занятие",
+  "selectDate": "Выберите дату",
+  "selectTime": "Выберите время",
+  "selectRoom": "Выберите кабинет",
+  "selectStudent": "Выберите ученика",
+  "selectSubject": "Выберите предмет",
+  "selectTeacher": "Выберите преподавателя",
+  "selectLessonType": "Выберите тип занятия",
+  "repeatLesson": "Повторять занятие",
+  "repeatWeekly": "Каждую неделю",
+  "repeatCount": "Количество повторений",
+  "quickAdd": "Быстрое добавление",
+  "@_LESSON_STATUSES": {},
+  "scheduled": "Запланировано",
+  "completed": "Проведено",
+  "cancelled": "Отменено",
+  "rescheduled": "Перенесено",
+  "markCompleted": "Отметить проведённым",
+  "markCancelled": "Отменить занятие",
+  "unmarkedLessons": "Неотмеченные занятия",
+  "noUnmarkedLessons": "Нет неотмеченных занятий",
+  "lessonCompleted": "Занятие проведено",
+  "lessonCancelled": "Занятие отменено",
+  "lessonDeleted": "Занятие удалено",
+  "lessonCreated": "Занятие создано",
+  "lessonUpdated": "Занятие обновлено",
+  "@_STUDENTS": {},
+  "student": "Ученик",
+  "studentName": "Имя ученика",
+  "phone": "Телефон",
+  "addStudent": "Добавить ученика",
+  "editStudent": "Редактировать ученика",
+  "deleteStudent": "Удалить ученика",
+  "archiveStudent": "Архивировать ученика",
+  "unarchiveStudent": "Разархивировать",
+  "prepaidLessons": "Предоплаченных занятий",
+  "debt": "Долг",
+  "individualLesson": "Индивидуальное",
+  "groupLesson": "Групповое",
+  "noStudents": "Нет учеников",
+  "addStudentFirst": "Добавьте первого ученика",
+  "studentDeleted": "Ученик удалён",
+  "studentArchived": "Ученик архивирован",
+  "studentUnarchived": "Ученик разархивирован",
+  "studentUpdated": "Ученик обновлён",
+  "studentCreated": "Ученик добавлен",
+  "showArchived": "Показать архив",
+  "hideArchived": "Скрыть архив",
+  "mergeStudents": "Объединить учеников",
+  "mergeWith": "Объединить с...",
+  "parentName": "Имя родителя",
+  "parentPhone": "Телефон родителя",
+  "notes": "Заметки",
+  "debtors": "Должники",
+  "noDebtors": "Должников нет",
+  "@_GROUPS": {},
+  "group": "Группа",
+  "groupName": "Название группы",
+  "addGroup": "Добавить группу",
+  "editGroup": "Редактировать группу",
+  "deleteGroup": "Удалить группу",
+  "archiveGroup": "Архивировать группу",
+  "members": "Участники",
+  "addMember": "Добавить участника",
+  "noGroups": "Нет групп",
+  "groupDeleted": "Группа удалена",
+  "groupArchived": "Группа архивирована",
+  "groupUpdated": "Группа обновлена",
+  "groupCreated": "Группа создана",
+  "selectStudents": "Выберите учеников",
+  "minTwoStudents": "Выберите минимум 2 ученика",
+  "participants": "Участники",
+  "participantsCount": "УЧАСТНИКИ ({count})",
+  "@participantsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addParticipants": "Добавить участников",
+  "selectStudentsForGroup": "Выберите учеников для группы",
+  "searchStudent": "Поиск ученика...",
+  "createNewStudent": "Создать нового ученика",
+  "allStudentsInGroup": "Все ученики уже в группе",
+  "noAvailableStudents": "Нет доступных учеников",
+  "resetSearch": "Сбросить поиск",
+  "balanceColon": "Баланс: {count}",
+  "@balanceColon": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "removeFromGroup": "Удалить из группы",
+  "removeStudentFromGroupQuestion": "Удалить из группы?",
+  "removeStudentFromGroupMessage": "Удалить {name} из группы?",
+  "@removeStudentFromGroupMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "studentAddedToGroup": "Ученик добавлен в группу",
+  "studentsAddedCount": "Добавлено учеников: {count}",
+  "@studentsAddedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "newStudent": "Новый ученик",
+  "studentCreatedAndSelected": "Ученик \"{name}\" создан и выбран",
+  "@studentCreatedAndSelected": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveGroupConfirmation": "Архивировать группу?",
+  "archiveGroupMessage": "Группа \"{name}\" будет перемещена в архив. Вы сможете восстановить её позже.",
+  "@archiveGroupMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noParticipants": "Нет участников",
+  "addStudentsToGroup": "Добавьте учеников в группу",
+  "createFirstGroup": "Создайте первую группу учеников",
+  "createGroup": "Создать группу",
+  "newGroup": "Новая группа",
+  "nothingFound": "Ничего не найдено",
+  "lessonsCountLabel": "Количество занятий:",
+  "@lessonsCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectedColon": "Выбрано: {count}",
+  "@selectedColon": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addCount": "Добавить ({count})",
+  "@addCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_PAYMENTS": {},
+  "payment": "Оплата",
+  "addPayment": "Добавить оплату",
+  "editPayment": "Редактировать оплату",
+  "deletePayment": "Удалить оплату",
+  "amount": "Сумма",
+  "lessonsCount": "Количество занятий",
+  "paymentPlan": "Тариф",
+  "paidAt": "Дата оплаты",
+  "correction": "Корректировка",
+  "correctionReason": "Причина корректировки",
+  "noPayments": "Нет оплат",
+  "paymentDeleted": "Оплата удалена",
+  "paymentUpdated": "Оплата обновлена",
+  "paymentCreated": "Оплата добавлена",
+  "paymentMethod": "Способ оплаты",
+  "cash": "Наличные",
+  "card": "Карта",
+  "transfer": "Передать",
+  "todayPayments": "Сегодня оплачено",
+  "paymentHistory": "История оплат",
+  "balanceTransfer": "Перенос остатка",
+  "balanceTransferComment": "Комментарий к переносу",
+  "filterStudents": "Ученики",
+  "filterSubjects": "Предметы",
+  "filterTeachers": "Преподаватели",
+  "filterPlans": "Тарифы",
+  "filterMethod": "Способ",
+  "resetFilters": "Сбросить фильтры",
+  "periodWeek": "Неделя",
+  "periodMonth": "Месяц",
+  "periodQuarter": "Квартал",
+  "periodYear": "Год",
+  "periodCustom": "Свой",
+  "total": "Итого:",
+  "totalOwnStudents": "Итого (ваши ученики):",
+  "noAccessToPayments": "Нет доступа к просмотру оплат",
+  "noPaymentsForPeriod": "Нет оплат за этот период",
+  "noPaymentsOwnForPeriod": "Нет оплат ваших учеников за этот период",
+  "noPaymentsWithFilters": "Нет оплат по заданным фильтрам",
+  "familySubscriptionOption": "Групповой абонемент",
+  "familySubscriptionDescription": "Один абонемент на несколько учеников",
+  "selectParticipants": "Выберите участников",
+  "participantsOf": "{count} из {total}",
+  "@participantsOf": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "minTwoParticipants": "Минимум 2 участника",
+  "minTwoParticipantsRequired": "Выберите минимум 2 участника для группового абонемента",
+  "mergeIntoCard": "Объединить в одну карточку",
+  "mergeIntoCardDescription": "Создаст групповую карточку учеников",
+  "groupCardName": "Имя групповой карточки",
+  "groupCardNameHint": "Например: Семья Петровых",
+  "selectStudentRequired": "Выберите ученика",
+  "selectStudentAndPlan": "Выберите ученика и тариф",
+  "addStudentsFirst": "Сначала добавьте учеников",
+  "customOption": "Свой вариант",
+  "discount": "Скидка",
+  "discountSize": "Размер скидки",
+  "wasPrice": "Было: {price} ₸",
+  "@wasPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "totalPrice": "Итого: {price} ₸",
+  "@totalPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "enterAmount": "Введите сумму",
+  "invalidAmount": "Неверная сумма",
+  "lessonsCountField": "Занятий",
+  "enterValue": "Введите",
+  "invalidNumber": "Число",
+  "validityDays": "Срок (дн.)",
+  "invalidValue": "Некорректное значение",
+  "commentOptional": "Комментарий (необязательно)",
+  "addPaymentWithAmount": "Добавить оплату {amount} ₸",
+  "@addPaymentWithAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "cardMergedAndPaymentAdded": "Карточка объединена и оплата добавлена",
+  "groupSubscriptionAdded": "Групповой абонемент добавлен",
+  "paymentAdded": "Оплата добавлена",
+  "deletePaymentConfirmation": "Оплата на сумму {amount} ₸ будет удалена. Баланс ученика уменьшится на {lessons} занятий.",
+  "@deletePaymentConfirmation": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      },
+      "lessons": {
+        "type": "int"
+      }
+    }
+  },
+  "noEditPermission": "Нет прав на редактирование",
+  "canEditOwnStudentsOnly": "Вы можете редактировать только оплаты своих учеников",
+  "paymentFrom": "Оплата от {date}",
+  "@paymentFrom": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "saveChanges": "Сохранить изменения",
+  "deletePaymentButton": "Удалить оплату",
+  "subscriptionMembers": "Участники абонемента",
+  "selectedCount": "Выбрано: {count}",
+  "@selectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loadingError": "Ошибка загрузки: {error}",
+  "@loadingError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noStudentsYet": "Нет учеников",
+  "discountNote": "Скидка: {amount} ₸",
+  "@discountNote": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@_SUBSCRIPTIONS": {},
+  "subscription": "Абонемент",
+  "subscriptions": "Абонементы",
+  "expiringSubscriptions": "Истекающие абонементы",
+  "noSubscriptions": "Нет абонементов",
+  "lessonsRemaining": "Осталось занятий",
+  "validUntil": "Действует до",
+  "expired": "Истёк",
+  "active": "Активный",
+  "familySubscription": "Семейный абонемент",
+  "statusActive": "Активен",
+  "statusFrozen": "Заморожен",
+  "statusExpired": "Истёк",
+  "statusExhausted": "Исчерпан",
+  "@_DURATIONS": {},
+  "minutesShort": "{minutes} мин",
+  "@minutesShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "hourOne": "1 час",
+  "hourOneHalf": "1.5 часа",
+  "hoursShort": "{hours} ч",
+  "@hoursShort": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursMinutesShort": "{hours} ч {minutes} мин",
+  "@hoursMinutesShort": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "currencyName": "тенге",
+  "@_ERROR_MESSAGES": {},
+  "networkErrorMessage": "Ошибка сети. Проверьте подключение к интернету.",
+  "timeoutErrorMessage": "Превышено время ожидания. Попробуйте ещё раз.",
+  "sessionExpiredMessage": "Сессия истекла. Войдите заново.",
+  "errorOccurredMessage": "Произошла ошибка",
+  "errorMessage": "Ошибка: {message}",
+  "@errorMessage": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@_PROFILE": {},
+  "profile": "Профиль",
+  "name": "Имя",
+  "registrationDate": "Дата регистрации",
+  "editName": "Изменить имя",
+  "personName": "ФИО",
+  "personNameHint": "Иванов Иван Иванович",
+  "enterPersonName": "Введите имя",
+  "personNameUpdated": "Имя обновлено",
+  "@_SETTINGS": {},
+  "subjects": "Предметы",
+  "lessonTypes": "Типы занятий",
+  "paymentPlans": "Тарифы оплаты",
+  "teamMembers": "Участники",
+  "inviteMembers": "Пригласить участника",
+  "theme": "Тема оформления",
+  "themeSystem": "Как в системе",
+  "themeLight": "Светлая",
+  "themeDark": "Тёмная",
+  "language": "Язык",
+  "languageSystem": "Как в системе",
+  "languageRu": "Русский",
+  "languageEn": "English",
+  "account": "Аккаунт",
+  "general": "Основные",
+  "data": "Данные",
+  "workingHours": "Рабочие часы",
+  "workStart": "Начало работы",
+  "workEnd": "Конец работы",
+  "phoneCountry": "Код страны для телефонов",
+  "changesSaved": "Изменения сохранены",
+  "inviteCodeCopied": "Код приглашения скопирован",
+  "shareInviteCode": "Поделиться кодом",
+  "generateNewCode": "Сгенерировать новый код",
+  "permissions": "Права доступа",
+  "editPermissions": "Редактировать права",
+  "removeMember": "Удалить участника",
+  "leaveInstitution": "Покинуть заведение",
+  "@_BOOKINGS": {},
+  "booking": "Бронь",
+  "bookings": "Бронирования",
+  "addBooking": "Добавить бронь",
+  "deleteBooking": "Удалить бронь",
+  "bookingDeleted": "Бронь удалена",
+  "bookingCreated": "Бронь создана",
+  "permanentSchedule": "Постоянное расписание",
+  "oneTimeBooking": "Разовое бронирование",
+  "slot": "Слот",
+  "slots": "Слоты",
+  "freeSlot": "Свободный слот",
+  "occupiedSlot": "Занятый слот",
+  "@_LESSON_SCHEDULES": {},
+  "lessonSchedule": "Постоянное занятие",
+  "lessonSchedules": "Постоянные занятия",
+  "addLessonSchedule": "Добавить постоянное занятие",
+  "editLessonSchedule": "Редактировать постоянное занятие",
+  "deleteLessonSchedule": "Удалить постоянное занятие",
+  "pauseLessonSchedule": "Приостановить",
+  "resumeLessonSchedule": "Возобновить",
+  "pauseUntil": "Приостановить до",
+  "paused": "Приостановлено",
+  "dayOfWeek": "День недели",
+  "validFrom": "Действует с",
+  "replaceRoom": "Временная замена кабинета",
+  "replaceUntil": "Замена до",
+  "@_STATISTICS": {},
+  "totalLessons": "Всего занятий",
+  "totalPayments": "Всего оплат",
+  "totalStudents": "Всего учеников",
+  "period": "Период",
+  "thisWeek": "Эта неделя",
+  "thisMonth": "Этот месяц",
+  "lastMonth": "Прошлый месяц",
+  "customPeriod": "Свой период",
+  "income": "Доход",
+  "lessonsCompleted": "Проведено",
+  "lessonsCancelled": "Отменено",
+  "bySubject": "По предметам",
+  "byTeacher": "По преподавателям",
+  "byStudent": "По ученикам",
+  "@_FILTERS": {},
+  "filters": "Фильтры",
+  "filterBy": "Фильтр по",
+  "sortBy": "Сортировать по",
+  "dateRange": "Период",
+  "status": "Статус",
+  "clearFilters": "Сбросить фильтры",
+  "applyFilters": "Применить фильтры",
+  "noResults": "Ничего не найдено",
+  "teachers": "Преподаватели",
+  "@_DAYS_OF_WEEK": {},
+  "monday": "Понедельник",
+  "tuesday": "Вторник",
+  "wednesday": "Среда",
+  "thursday": "Четверг",
+  "friday": "Пятница",
+  "saturday": "Суббота",
+  "sunday": "Воскресенье",
+  "mondayShort": "Пн",
+  "tuesdayShort": "Вт",
+  "wednesdayShort": "Ср",
+  "thursdayShort": "Чт",
+  "fridayShort": "Пт",
+  "saturdayShort": "Сб",
+  "sundayShort": "Вс",
+  "@_ERRORS": {},
+  "errorOccurred": "Произошла ошибка",
+  "networkError": "Ошибка сети. Проверьте подключение.",
+  "unknownError": "Неизвестная ошибка",
+  "invalidEmail": "Некорректный email",
+  "weakPassword": "Пароль слишком простой",
+  "emailInUse": "Email уже используется",
+  "invalidCredentials": "Неверный email или пароль",
+  "fieldRequired": "Это поле обязательно",
+  "passwordsDoNotMatch": "Пароли не совпадают",
+  "minPasswordLength": "Минимум 8 символов",
+  "passwordNeedsUppercase": "Нужна хотя бы одна заглавная буква",
+  "passwordNeedsSpecialChar": "Нужен хотя бы один спецсимвол (!@#$%^&*)",
+  "invalidPhoneNumber": "Некорректный номер телефона",
+  "enterPositiveNumber": "Введите положительное число",
+  "enterPositiveInteger": "Введите целое положительное число",
+  "sessionExpired": "Сессия истекла. Войдите заново.",
+  "noServerConnection": "Нет соединения с сервером",
+  "errorOccurredTitle": "Произошла ошибка",
+  "timeoutError": "Превышено время ожидания. Попробуйте ещё раз.",
+  "noConnection": "Нет соединения с сервером",
+  "timeout": "Превышено время ожидания. Попробуйте ещё раз.",
+  "notFound": "Не найдено",
+  "accessDenied": "Доступ запрещён",
+  "errorWithMessage": "Ошибка: {message}",
+  "@errorWithMessage": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@_CONFIRMATIONS": {},
+  "confirmDelete": "Подтвердите удаление",
+  "confirmArchive": "Подтвердите архивацию",
+  "confirmCancel": "Подтвердите отмену",
+  "confirmLogout": "Выйти из аккаунта?",
+  "confirmLeave": "Покинуть заведение?",
+  "deleteConfirmation": "Вы уверены, что хотите удалить?",
+  "archiveConfirmation": "Вы уверены, что хотите архивировать?",
+  "actionCannotBeUndone": "Это действие нельзя отменить",
+  "deleteQuestion": "Удалить {item}?",
+  "@deleteQuestion": {
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveQuestion": "Архивировать {item}?",
+  "@archiveQuestion": {
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  },
+  "@_PLURALS": {},
+  "lessonsCountPlural": "{count, plural, =0{нет занятий} =1{1 занятие} few{{count} занятия} many{{count} занятий} other{{count} занятий}}",
+  "@lessonsCountPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "studentsCountPlural": "{count, plural, =0{нет учеников} =1{1 ученик} few{{count} ученика} many{{count} учеников} other{{count} учеников}}",
+  "@studentsCountPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "paymentsCountPlural": "{count, plural, =0{нет оплат} =1{1 оплата} few{{count} оплаты} many{{count} оплат} other{{count} оплат}}",
+  "@paymentsCountPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "daysCountPlural": "{count, plural, =0{0 дней} =1{1 день} few{{count} дня} many{{count} дней} other{{count} дней}}",
+  "@daysCountPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "minutesCountPlural": "{count, plural, =0{0 минут} =1{1 минута} few{{count} минуты} many{{count} минут} other{{count} минут}}",
+  "@minutesCountPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "membersCountPlural": "{count, plural, =0{нет участников} =1{1 участник} few{{count} участника} many{{count} участников} other{{count} участников}}",
+  "@membersCountPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "prepaidLessonsBalance": "{count, plural, =0{Нет предоплаченных занятий} =1{Предоплачено 1 занятие} few{Предоплачено {count} занятия} many{Предоплачено {count} занятий} other{Предоплачено {count} занятий}}",
+  "@prepaidLessonsBalance": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsRemainingPlural": "{count, plural, =0{Занятий не осталось} =1{Осталось 1 занятие} few{Осталось {count} занятия} many{Осталось {count} занятий} other{Осталось {count} занятий}}",
+  "@lessonsRemainingPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_MISC": {},
+  "colorPicker": "Выберите цвет",
+  "selectColor": "Выберите цвет",
+  "defaultColor": "Цвет по умолчанию",
+  "dateMissed": "Дата пропущена",
+  "slotPaused": "Слот приостановлен",
+  "exclusionAdded": "Исключение добавлено",
+  "history": "История",
+  "deleteFromHistory": "Удалить из истории",
+  "noHistory": "Нет истории",
+  "sendLink": "Отправить ссылку",
+  "linkSent": "Ссылка отправлена",
+  "@_SETTINGS_EXTRA": {},
+  "dangerZone": "Опасная зона",
+  "archiveInstitution": "Архивировать заведение",
+  "leaveInstitutionAction": "Покинуть заведение",
+  "institutionCanBeRestored": "Заведение можно будет восстановить",
+  "youWillNoLongerBeMember": "Вы больше не будете участником",
+  "archiveInstitutionQuestion": "Архивировать заведение?",
+  "leaveInstitutionQuestion": "Покинуть заведение?",
+  "archiveInstitutionMessage": "Заведение \"{name}\" будет перемещено в архив. Вы сможете восстановить его позже из списка заведений.",
+  "@archiveInstitutionMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "leaveInstitutionMessage": "Вы уверены, что хотите покинуть \"{name}\"? Чтобы вернуться, вам понадобится новый код приглашения.",
+  "@leaveInstitutionMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "institutionArchived": "Заведение архивировано",
+  "institutionDeleted": "Заведение удалено",
+  "institutionDeletedMessage": "Это заведение было удалено владельцем. Вы будете перенаправлены на главный экран.",
+  "ok": "ОК",
+  "youLeftInstitution": "Вы покинули заведение",
+  "generateNewCodeQuestion": "Сгенерировать новый код?",
+  "generateNewCodeMessage": "Старый код перестанет работать. Все, кто ещё не присоединился по старому коду, не смогут это сделать.",
+  "generate": "Сгенерировать",
+  "newCodeGenerated": "Новый код: {code}",
+  "@newCodeGenerated": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "nameUpdated": "Название обновлено",
+  "enterName": "Введите имя",
+  "workingHoursUpdated": "Рабочее время обновлено",
+  "workingHoursDescription": "Это время будет отображаться в сетке расписания",
+  "start": "Начало",
+  "end": "Конец",
+  "byLocale": "По локали устройства",
+  "@_DASHBOARD": {},
+  "todayWithDate": "Сегодня, {date}",
+  "@todayWithDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "noScheduledLessons": "Нет запланированных занятий",
+  "urgent": "Срочно",
+  "daysShort": "дн.",
+  "lessonPayment": "Оплата занятия",
+  "saveError": "Ошибка сохранения: {error}",
+  "@saveError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "completeProfileSetup": "Завершите настройку профиля",
+  "selectColorAndSubjects": "Выберите цвет и направления",
+  "fillIn": "Заполнить",
+  "paid": "Оплачено",
+  "@_ARCHIVE": {},
+  "archivedInstitutions": "Архив заведений",
+  "archiveEmpty": "Архив пуст",
+  "restoreInstitutionQuestion": "Восстановить заведение?",
+  "restoreInstitutionMessage": "Заведение \"{name}\" будет восстановлено и появится в основном списке.",
+  "@restoreInstitutionMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "institutionRestored": "Заведение восстановлено",
+  "archivedOn": "Архивировано {date}",
+  "@archivedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@_MEMBERS": {},
+  "noMembers": "Нет участников",
+  "noName": "Без имени",
+  "you": "Вы",
+  "adminBadge": "Админ",
+  "changeColor": "Изменить цвет",
+  "colorUpdated": "Цвет обновлён",
+  "colorReset": "Цвет сброшен",
+  "directions": "Направления",
+  "changeRole": "Изменить роль",
+  "roleName": "Название роли",
+  "roleNameHint": "Например: Преподаватель, Администратор",
+  "accessRights": "Права доступа",
+  "manageLessons": "Управление занятиями",
+  "transferOwnershipQuestion": "Передать владение?",
+  "transferOwnershipWarning": "Вы собираетесь передать права владельца пользователю:",
+  "transferWarningTitle": "Внимание!",
+  "transferWarningPoints": "• Вы потеряете права владельца\n• Новый владелец сможет удалить заведение\n• Это действие нельзя отменить самостоятельно",
+  "ownershipTransferred": "Права владельца переданы {name}",
+  "@ownershipTransferred": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeMemberQuestion": "Удалить участника?",
+  "removeMemberConfirmation": "Вы уверены, что хотите удалить {name} из заведения?",
+  "@removeMemberConfirmation": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "futureLessonsCount": "Будущих занятий: {count}",
+  "@futureLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noFutureLessonsToManage": "Нет будущих занятий для управления",
+  "deleteAllFutureLessons": "Удалить все будущие занятия",
+  "deleteAllFutureLessonsDescription": "Занятия будут удалены без изменения баланса учеников",
+  "reassignTeacher": "Переназначить преподавателя",
+  "reassignTeacherDescription": "Передать все занятия другому преподавателю",
+  "deleteLessonsQuestion": "Удалить занятия?",
+  "deleteLessonsCount": "Будет удалено {count} занятий преподавателя:",
+  "@deleteLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteLessonsWarning": "Баланс абонементов учеников не изменится.\nЭто действие нельзя отменить.",
+  "lessonsDeletedCount": "Удалено занятий: {count}",
+  "@lessonsDeletedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignLessons": "Переназначить занятия",
+  "reassignLessonsFrom": "{count} занятий от {name}",
+  "@reassignLessonsFrom": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "selectNewTeacher": "Выберите нового преподавателя:",
+  "noOtherTeachers": "Нет других преподавателей",
+  "checkingConflicts": "Проверка конфликтов...",
+  "conflictsFound": "Найдено {count} конфликтов",
+  "@conflictsFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noConflictsFound": "Конфликтов не найдено",
+  "andMoreConflicts": "...и ещё {count} конфликтов",
+  "@andMoreConflicts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skipConflicts": "Пропустить конфликты",
+  "reassign": "Переназначить",
+  "conflictCheckError": "Ошибка проверки: {error}",
+  "@conflictCheckError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noLessonsToReassign": "Нет занятий для переназначения",
+  "reassignedCount": "Переназначено занятий: {count}",
+  "@reassignedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skippedConflicts": "пропущено: {count}",
+  "@skippedConflicts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noSubjectsAvailable": "Нет доступных направлений",
+  "subjectsUpdated": "Направления обновлены",
+  "errorWithDetails": "Ошибка: {error}",
+  "@errorWithDetails": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "newRoom": "Новый кабинет",
+  "editRoomTitle": "Редактировать кабинет",
+  "roomNumberRequired": "Номер кабинета *",
+  "roomNumberHint": "Например: 101",
+  "roomNameOptional": "Название (опционально)",
+  "roomNameHint": "Например: Фортепианный",
+  "enterRoomNumber": "Введите номер кабинета",
+  "fillRoomData": "Заполните данные кабинета",
+  "changeRoomData": "Измените данные кабинета",
+  "createRoom": "Создать кабинет",
+  "roomWithNumber": "Кабинет {number}",
+  "@roomWithNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "roomCreatedMessage": "Кабинет \"{name}\" создан",
+  "@roomCreatedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteRoomQuestion": "Удалить кабинет?",
+  "deleteRoomMessage": "Кабинет \"{name}\" будет удалён. Это действие нельзя отменить.",
+  "@deleteRoomMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@_STUDENTS_LIST": {},
+  "myStudents": "Мои",
+  "withDebt": "С долгом",
+  "searchByName": "Поиск по имени...",
+  "direction": "Направление",
+  "activity": "Активность",
+  "noStudentsByFilters": "Нет учеников по заданным фильтрам",
+  "tryDifferentQuery": "Попробуйте изменить запрос",
+  "archivedStudentsHere": "Здесь будут отображаться архивированные ученики",
+  "noStudentsWithDebt": "Нет учеников с долгом",
+  "allStudentsPositiveBalance": "У всех учеников положительный баланс",
+  "noLinkedStudents": "Нет привязанных учеников",
+  "noLinkedStudentsHint": "К вам пока не привязаны ученики",
+  "addFirstStudent": "Добавьте первого ученика",
+  "noLessons7Days": "Нет занятий 7+ дней",
+  "noLessons14Days": "Нет занятий 14+ дней",
+  "noLessons30Days": "Нет занятий 30+ дней",
+  "noLessons60Days": "Нет занятий 60+ дней",
+  "@_GROUPS_LIST": {},
+  "groupNameHint": "Например: Группа вокала",
+  "studentsCount": "{count, plural, =1{1 ученик} few{{count} ученика} many{{count} учеников} other{{count} учеников}}",
+  "@studentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeCount": "Объединить ({count})",
+  "@mergeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_ADD_STUDENT_FORM": {},
+  "fillStudentData": "Заполните данные ученика",
+  "fullNameRequired": "ФИО *",
+  "fullNameHint": "Иванов Иван Иванович",
+  "enterStudentName": "Введите имя ученика",
+  "phoneHint": "+7 (777) 123-45-67",
+  "noAvailableTeachers": "Нет доступных преподавателей",
+  "additionalInfo": "Дополнительная информация...",
+  "remainingLessons": "Остаток занятий",
+  "fromOtherSchool": "При переносе из другой школы",
+  "lessonsUnit": "занятий",
+  "remainingLessonsHint": "Списывается первым, не влияет на доход",
+  "createStudent": "Создать ученика",
+  "selectRoomForSchedule": "Выберите кабинет для расписания",
+  "scheduleConflictsError": "Есть конфликты в расписании. Измените время или кабинет.",
+  "initialBalanceComment": "Начальный остаток",
+  "studentCreatedWithSchedule": "Ученик \"{name}\" создан с расписанием",
+  "@studentCreatedWithSchedule": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "studentCreatedSimple": "Ученик \"{name}\" создан",
+  "@studentCreatedSimple": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@_SCHEDULE_SETUP": {},
+  "setupPermanentSchedule": "Настроить постоянное расписание",
+  "selectDaysAndTime": "Выберите дни и время занятий",
+  "roomForLessons": "Кабинет для занятий",
+  "daysOfWeekLabel": "Дни недели",
+  "lessonTimeLabel": "Время занятий",
+  "durationHoursMinutes": "{hours} ч {minutes} мин",
+  "@durationHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "durationHours": "{hours} ч",
+  "@durationHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "durationMinutes": "{minutes} мин",
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "incorrect": "Некорректно",
+  "conflictTimeOccupied": "Конфликт! Время занято",
+  "@_BALANCE": {},
+  "lessonsBalance": "{count} занятий",
+  "@lessonsBalance": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_LESSON_TYPES": {},
+  "noLessonTypes": "Нет типов занятий",
+  "addFirstLessonType": "Добавьте первый тип занятия",
+  "addType": "Добавить тип",
+  "deleteLessonTypeQuestion": "Удалить тип занятия?",
+  "lessonTypeWillBeDeleted": "Тип \"{name}\" будет удалён",
+  "@lessonTypeWillBeDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lessonTypeDeleted": "Тип занятия удалён",
+  "newLessonType": "Новый тип занятия",
+  "fillLessonTypeData": "Заполните данные типа",
+  "nameRequired": "Название *",
+  "nameHintExample": "Например: Индивидуальное",
+  "enterNameValidation": "Введите имя",
+  "other": "Другое",
+  "customDuration": "Своя длительность",
+  "defaultPrice": "Цена по умолчанию",
+  "groupLessonSwitch": "Групповое занятие",
+  "multipleStudents": "Несколько учеников одновременно",
+  "oneStudent": "Один ученик",
+  "createType": "Создать тип",
+  "lessonTypeCreated": "Тип \"{name}\" создан",
+  "@lessonTypeCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "editLessonType": "Редактировать тип",
+  "changeLessonTypeData": "Измените данные типа занятия",
+  "durationValidationError": "Длительность должна быть от 5 до 480 минут",
+  "color": "Цвет",
+  "lessonTypeUpdated": "Тип занятия обновлён",
+  "@_SCHEDULE_SCREEN": {},
+  "scheduleTitle": "Расписание",
+  "roomWithNumberTitle": "Кабинет {number}",
+  "@roomWithNumberTitle": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "filtersTooltip": "Фильтры",
+  "addTooltip": "Добавить",
+  "compactView": "Компакт.",
+  "detailedView": "Подробн.",
+  "dayView": "День",
+  "weekView": "Неделя",
+  "lessonDefault": "Занятие",
+  "booked": "Забронировано",
+  "studentDefault": "Ученик",
+  "hour": "Час",
+  "deletedFromHistory": "Удалить из истории",
+  "modify": "Изменить",
+  "cancelLesson": "Отменить",
+  "skipThisDate": "Пропустить эту дату",
+  "statusUpdateFailed": "Не удалось обновить статус",
+  "lessonCompletedMessage": "Занятие проведено",
+  "lessonCancelledMessage": "Занятие отменено",
+  "skipDateTitle": "Пропустить дату",
+  "skipDateMessage": "Занятие не будет отображаться на {date}.\n\nЭто не создаст запись в истории занятий.",
+  "@skipDateMessage": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "skip": "Пропустить",
+  "dateSkipped": "Дата пропущена",
+  "lessonDeducted": "Занятие списано",
+  "lessonReturned": "Занятие возвращено",
+  "deleteLessonWithPayment": "Занятие будет удалено из истории.\nОплата за занятие также будет удалена.",
+  "deleteLessonWithBalance": "Занятие будет удалено из истории.\nСписанное занятие будет возвращено на баланс ученика.",
+  "deleteLessonSimple": "Занятие будет полностью удалено из истории.",
+  "deleteLessonQuestion": "Удалить занятие?",
+  "lessonDeletedFromHistory": "Занятие удалено из истории",
+  "lessonPaymentType": "Оплата занятия",
+  "paymentAddedMessage": "Оплата добавлена",
+  "paymentDeletedMessage": "Оплата удалена",
+  "paymentDeleteError": "Ошибка удаления оплаты: {error}",
+  "@paymentDeleteError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelledLessonsCount": "Отменено {count} занятий",
+  "@cancelledLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cancelLessonTitle": "Отменить занятие",
+  "cancelWithoutDeduction": "Занятие будет отменено и архивировано без списания с баланса",
+  "deductionWillBeReturned": "Списанное при проведении занятие будет автоматически возвращено на баланс.",
+  "deductFromBalance": "Списать занятие с баланса",
+  "lessonWillBeDeducted": "Занятие будет вычтено из предоплаченных",
+  "whoToDeduct": "Кому списать занятие:",
+  "balanceLabel": "Баланс: {count}",
+  "@balanceLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesPartInfo": "Это занятие является частью серии ({count} шт.)",
+  "@seriesPartInfo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "onlyThis": "Только это",
+  "thisAndFollowing": "Это и последующие",
+  "deductOnlyToday": "Списание применится только к сегодняшнему занятию",
+  "archiveWithoutDeduction": "Все занятия серии будут архивированы без списания",
+  "cancelLessonsCount": "Отменить {count} занятий",
+  "@cancelLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesCancelled": "Серия занятий отменена",
+  "cancelledWithDeduction": "Занятие отменено и списано с баланса",
+  "cancelledWithoutDeduction": "Занятие отменено",
+  "permanentSchedulePart": "Это занятие является частью постоянного расписания",
+  "thisAndAllFollowing": "Это и все последующие",
+  "participantsTitle": "Участники",
+  "noParticipantsMessage": "Нет участников",
+  "addGuestLabel": "Добавить гостя",
+  "payLabel": "Оплатить",
+  "unknownStudent": "Неизвестный",
+  "paymentTitle": "Оплата",
+  "removeFromLessonTooltip": "Убрать из занятия",
+  "paymentRecorded": "Оплата записана: {count} {students}",
+  "@paymentRecorded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "students": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentError": "Ошибка оплаты: {error}",
+  "@paymentError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "studentSingular": "ученик",
+  "studentFew": "ученика",
+  "studentMany": "учеников",
+  "removeParticipantQuestion": "Убрать участника?",
+  "removeFromLessonMessage": "Убрать {name} из этого занятия?",
+  "@removeFromLessonMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeFromLessonGeneric": "Убрать участника из этого занятия?",
+  "remove": "Убрать",
+  "addGuestTitle": "Добавить гостя",
+  "allStudentsAdded": "Все ученики уже добавлены",
+  "editLessonTitle": "Редактировать занятие",
+  "dateLabel": "Дата",
+  "timeLabel": "Время",
+  "roomLabel": "Кабинет",
+  "groupLabel": "Группа",
+  "subjectLabel": "Предмет",
+  "lessonTypeLabel": "Тип занятия",
+  "notSelected": "Не выбран",
+  "saveChangesLabel": "Сохранить изменения",
+  "minDurationError": "Минимальная длительность занятия — 15 минут",
+  "lessonUpdatedMessage": "Занятие обновлено",
+  "noRepeat": "Без повтора",
+  "everyDay": "Каждый день",
+  "everyWeek": "Каждую неделю",
+  "byWeekdays": "По дням недели",
+  "manualDates": "Ручной выбор дат",
+  "onlyThisLesson": "Только это занятие",
+  "allSeriesLessons": "Все занятия серии",
+  "selectedLessons": "Выбранные",
+  "roomAdded": "Кабинет \"{name}\" добавлен",
+  "@roomAdded": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newRoomTitle": "Новый кабинет",
+  "fillRoomDataMessage": "Заполните данные кабинета",
+  "roomNumberLabel": "Номер кабинета *",
+  "enterRoomNumberValidation": "Введите номер кабинета",
+  "nameOptionalLabel": "Название (опционально)",
+  "nameOptionalHint": "Например: Фортепианный",
+  "createRoomLabel": "Создать кабинет",
+  "selectStudentTitle": "Выберите ученика",
+  "noOwnStudents": "У вас нет своих учеников",
+  "showAllCount": "Показать всех ({count})",
+  "@showAllCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "otherStudents": "Остальные ученики",
+  "hideLabel": "Скрыть",
+  "studentAddedMessage": "Ученик \"{name}\" добавлен",
+  "@studentAddedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newStudentTitle": "Новый ученик",
+  "quickAddLabel": "Быстрое добавление",
+  "fullNameLabel": "ФИО",
+  "enterStudentNameValidation": "Введите имя ученика",
+  "phoneLabel": "Телефон",
+  "createStudentLabel": "Создать ученика",
+  "subjectAddedMessage": "Предмет \"{name}\" добавлен",
+  "@subjectAddedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newSubjectTitle": "Новый предмет",
+  "addSubjectMessage": "Добавьте предмет для занятий",
+  "subjectNameLabel": "Название предмета",
+  "subjectNameHint": "Например: Фортепиано",
+  "enterSubjectNameValidation": "Введите название предмета",
+  "createSubjectLabel": "Создать предмет",
+  "durationValidation": "Длительность должна быть от 5 до 480 минут",
+  "lessonTypeAddedMessage": "Тип занятия \"{name}\" добавлен",
+  "@lessonTypeAddedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newLessonTypeTitle": "Новый тип занятия",
+  "configureLessonType": "Настройте параметры занятия",
+  "nameLabel": "Название",
+  "lessonTypeNameHint": "Например: Индивидуальное занятие",
+  "durationLabel": "Длительность",
+  "otherOption": "Другое",
+  "customDurationLabel": "Своя длительность",
+  "enterMinutes": "Введите минуты",
+  "minutesSuffix": "мин",
+  "priceOptionalLabel": "Цена (необязательно)",
+  "priceHint": "Например: 5000",
+  "groupLessonTitle": "Групповое занятие",
+  "forMultipleStudents": "Для нескольких учеников",
+  "createTypeLabel": "Создать тип",
+  "filtersTitle": "Фильтры",
+  "resetLabel": "Сбросить",
+  "teachersTitle": "Преподаватели",
+  "lessonTypesTitle": "Типы занятий",
+  "directionsTitle": "Направления",
+  "applyFiltersLabel": "Применить фильтры",
+  "showAllLabel": "Показать все",
+  "studentsTitle": "Ученики",
+  "noStudentsMessage": "Нет учеников",
+  "deletedStudent": "Удалён",
+  "temporarilyShowAll": "Временно показаны все",
+  "notConfigured": "Не настроено",
+  "allRooms": "Все кабинеты",
+  "defaultRoomsTitle": "Кабинеты по умолчанию",
+  "restoreRoomFilter": "Вернуть фильтр кабинетов",
+  "showAllRooms": "Показать все кабинеты",
+  "noDataMessage": "Нет данных",
+  "selectDates": "Выберите даты",
+  "doneLabel": "Готово",
+  "lessonTab": "Занятие",
+  "bookingTab": "Бронь",
+  "noRoomsAvailable": "Нет кабинетов",
+  "dateRequired": "Дата *",
+  "timeRequired": "Время *",
+  "roomsTitle": "Кабинеты",
+  "roomShort": "Каб. {number}",
+  "@roomShort": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "selectAtLeastOneRoom": "Выберите хотя бы один кабинет",
+  "descriptionOptional": "Описание (опционально)",
+  "descriptionHint": "Мероприятие, встреча и т.д.",
+  "bookLabel": "Забронировать",
+  "studentTab": "Ученик",
+  "groupTab": "Группа",
+  "studentRequired": "Ученик *",
+  "selectStudentPlaceholder": "Выберите ученика",
+  "addStudentTooltip": "Добавить ученика",
+  "groupRequired": "Группа *",
+  "noGroupsAvailable": "Нет групп",
+  "createGroupTooltip": "Создать группу",
+  "teacherLabel": "Преподаватель",
+  "addSubjectTooltip": "Добавить предмет",
+  "addLessonTypeTooltip": "Добавить тип занятия",
+  "repeatLabel": "Повтор",
+  "selectDatesInCalendar": "Выбрать даты в календаре",
+  "selectedDatesCount": "Выбрано: {count} дат",
+  "@selectedDatesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkingConflictsMessage": "Проверка конфликтов...",
+  "willCreateLessons": "Будет создано {count} занятий",
+  "@willCreateLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "conflictsWillBeSkipped": "Конфликты: {count} (будут пропущены)",
+  "@conflictsWillBeSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createSchedulesCount": "Создать {count} расписаний",
+  "@createSchedulesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createSchedule": "Создать расписание",
+  "createLessonsCount": "Создать {count} занятий",
+  "@createLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createLessonSingle": "Создать занятие",
+  "minBookingDuration": "Минимальная длительность брони — 15 минут",
+  "roomsBooked": "Кабинеты забронированы",
+  "invalidTime": "Некорректно",
+  "minLessonDuration": "Минимальная длительность занятия — 15 минут",
+  "permanentSchedulesCreated": "Создано {count} постоянных расписаний",
+  "@permanentSchedulesCreated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permanentScheduleCreated": "Постоянное расписание создано",
+  "allDatesOccupied": "Все даты заняты",
+  "lessonsCreatedWithSkipped": "Создано {created} занятий (пропущено: {skipped})",
+  "@lessonsCreatedWithSkipped": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsCreatedCount": "Создано {count} занятий",
+  "@lessonsCreatedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupLessonCreated": "Групповое занятие создано",
+  "lessonCreatedMessage": "Занятие создано",
+  "newGroupTitle": "Новая группа",
+  "groupNameLabel": "Название группы",
+  "createLabel": "Создать",
+  "unknownUser": "Неизвестный пользователь",
+  "deletingLabel": "Удаление...",
+  "deleteBookingLabel": "Удалить бронь",
+  "deleteBookingQuestion": "Удалить бронь?",
+  "bookingWillBeDeleted": "Бронирование будет удалено и кабинеты освободятся.",
+  "bookingDeletedMessage": "Бронь удалена",
+  "bookingDeleteError": "Ошибка при удалении",
+  "bookRoomsTitle": "Забронировать кабинеты",
+  "selectRoomsLabel": "Выберите кабинеты",
+  "selectAtLeastOneRoomMessage": "Выберите минимум один кабинет",
+  "dateTitle": "Дата",
+  "startTitle": "Начало",
+  "endTitle": "Окончание",
+  "descriptionOptionalLabel": "Описание (необязательно)",
+  "descriptionExampleHint": "Например: Репетиция, Мероприятие",
+  "bookingError": "Ошибка бронирования",
+  "permanentScheduleTitle": "Постоянное расписание",
+  "notSpecified": "Не указан",
+  "temporaryRoomReplacement": "Временно в кабинете {room} до {date}",
+  "@temporaryRoomReplacement": {
+    "placeholders": {
+      "room": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "createLessonOnDate": "Создать занятие на {date}",
+  "@createLessonOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "createLessonsForPeriod": "Создать занятия на период",
+  "createMultipleLessons": "Создать несколько занятий из этого слота",
+  "addException": "Добавить исключение",
+  "slotWontWorkOnDate": "Слот не будет действовать в выбранную дату",
+  "pauseSlot": "Приостановить",
+  "temporarilyDeactivate": "Временно деактивировать",
+  "resumeSlot": "Возобновить",
+  "pausedUntilDate": "Приостановлено до {date}",
+  "@pausedUntilDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "indefinitePause": "Бессрочная пауза",
+  "deactivate": "Деактивировать",
+  "completelyDisableSlot": "Полностью отключить слот",
+  "addExceptionTitle": "Добавить исключение",
+  "slotWontWorkMessage": "Слот не будет действовать {date}.\n\nЭто позволит создать другое занятие в это время.",
+  "@slotWontWorkMessage": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "addLabel": "Добавить",
+  "exceptionAdded": "Исключение добавлено",
+  "pauseUntilLabel": "Приостановить до",
+  "slotPausedUntil": "Слот приостановлен до {date}",
+  "@slotPausedUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "slotResumed": "Слот возобновлён",
+  "deactivateSlotTitle": "Деактивировать слот",
+  "deactivateSlotMessage": "Слот будет полностью отключён и не будет отображаться в расписании.\n\nВы сможете активировать его снова в карточке ученика.",
+  "slotDeactivated": "Слот деактивирован",
+  "createLessonsForPeriodTitle": "Создать занятия на период",
+  "studentLabel": "Ученик: {name}",
+  "@studentLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "fromDateLabel": "С даты",
+  "toDateLabel": "По дату",
+  "willBeCreated": "Будет создано: {count} занятий",
+  "@willBeCreated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creatingLabel": "Создание...",
+  "createLessonsLabel": "Создать занятия",
+  "noDatesToCreate": "Нет дат для создания",
+  "roomNotSpecified": "Не указан кабинет",
+  "lessonsCreatedMessage": "Создано {count} занятий",
+  "@lessonsCreatedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesLoadError": "Ошибка загрузки серии: {error}",
+  "@seriesLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "editSeriesTitle": "Редактировать серию",
+  "savingLabel": "Сохранение...",
+  "applyChangesLabel": "Применить изменения",
+  "changesScope": "Область изменений",
+  "byWeekdaysLabel": "По дням недели",
+  "quantityLabel": "Количество занятий:",
+  "allLabel": "Все",
+  "seriesLessons": "Занятия серии ({count})",
+  "@seriesLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "changesTitle": "Изменения",
+  "willBeChanged": "Будет изменено: {count} занятий",
+  "@willBeChanged": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "currentLabel": "текущий",
+  "noLessonsToUpdate": "Нет занятий для обновления (все имеют конфликты)",
+  "lessonsUpdatedWithSkipped": "Обновлено {updated} занятий (пропущено: {skipped})",
+  "@lessonsUpdatedWithSkipped": {
+    "placeholders": {
+      "updated": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsUpdatedCount": "Обновлено {count} занятий",
+  "@lessonsUpdatedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "memberDataError": "Не удалось получить данные участника",
+  "showingAllRooms": "Отображаются все кабинеты",
+  "roomsSelectedCount": "Выбрано кабинетов: {count}",
+  "@roomsSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "whichRoomsDoYouUse": "Какими кабинетами вы пользуетесь?",
+  "onlySelectedRoomsShown": "В расписании будут отображаться только выбранные кабинеты. Изменить настройку можно в любой момент через меню фильтров.",
+  "selectDefaultRooms": "Выберите кабинеты, которые будут отображаться в расписании по умолчанию.",
+  "skipLabel": "Пропустить",
+  "saveWithCount": "Сохранить ({count})",
+  "@saveWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "virtualLesson": "Виртуальное занятие",
+  "completeOnDate": "Провести занятие на {date}",
+  "@completeOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "createRealCompleted": "Создать реальное занятие со статусом \"Проведено\"",
+  "cancelOnDate": "Отменить занятие на {date}",
+  "@cancelOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "createRealCancelled": "Создать реальное занятие со статусом \"Отменено\"",
+  "skipThisDateLabel": "Пропустить эту дату",
+  "addExceptionWithoutLesson": "Добавить исключение без создания занятия",
+  "pauseSchedule": "Приостановить расписание",
+  "temporarilyDeactivateSchedule": "Временно деактивировать",
+  "resumeSchedule": "Возобновить расписание",
+  "completelyDisableSchedule": "Полностью отключить расписание",
+  "schedulePaused": "Расписание приостановлено",
+  "scheduleResumed": "Расписание возобновлено",
+  "deactivateScheduleTitle": "Деактивировать расписание",
+  "deactivateScheduleMessage": "Расписание будет полностью отключено. Это действие можно отменить.",
+  "scheduleDeactivated": "Расписание деактивировано",
+  "deductedFromBalance": "Списано с баланса",
+  "lessonDeductedFromBalance": "Занятие списано с баланса ученика",
+  "lessonNotDeducted": "Занятие не списано с баланса",
+  "completedLabel": "Проведено",
+  "paidLabel": "Оплачено",
+  "costLabel": "Стоимость",
+  "repeatSeriesLabel": "Повтор",
+  "yesLabel": "Да",
+  "typeLabel": "Тип",
+  "statusUpdateError": "Не удалось обновить статус",
+  "deductFromBalanceTitle": "Списать занятие с баланса",
+  "addGuest": "Добавить гостя",
+  "pay": "Оплатить",
+  "defaultRooms": "Кабинеты по умолчанию",
+  "book": "Забронировать",
+  "deleteBookingMessage": "Бронирование будет удалено и кабинеты освободятся.",
+  "endLabel": "Окончание",
+  "createMultipleLessonsFromSlot": "Создать несколько занятий из этого слота",
+  "slotWillNotWorkOnDate": "Слот не будет действовать в выбранную дату",
+  "pause": "Приостановить",
+  "temporarilyDeactivateSlot": "Временно деактивировать слот",
+  "resume": "Возобновить",
+  "deactivateSlot": "Деактивировать слот",
+  "oneMonth": "1 месяц",
+  "threeMonths": "3 месяца",
+  "sixMonths": "6 месяцев",
+  "oneYear": "1 год",
+  "createCompletedLesson": "Создать реальное занятие со статусом \"Проведено\"",
+  "createCancelledLesson": "Создать реальное занятие со статусом \"Отменено\"",
+  "deactivateSchedule": "Деактивировать расписание",
+  "scheduleWillBeDisabled": "Расписание будет полностью отключено. Это действие можно отменить.",
+  "@_PERMISSIONS": {},
+  "permissionsSaved": "Права сохранены",
+  "permissionSectionInstitution": "Управление заведением",
+  "permissionManageInstitution": "Изменение заведения",
+  "permissionManageInstitutionDesc": "Изменение названия, настроек",
+  "permissionManageMembers": "Управление участниками",
+  "permissionManageMembersDesc": "Добавление, удаление, изменение прав",
+  "permissionArchiveData": "Архивация данных",
+  "permissionArchiveDataDesc": "Архивация учеников, групп",
+  "permissionSectionReferences": "Справочники",
+  "permissionManageRooms": "Управление кабинетами",
+  "permissionManageRoomsDesc": "Создание, редактирование, удаление",
+  "permissionManageSubjects": "Управление предметами",
+  "permissionManageSubjectsDesc": "Создание, редактирование, удаление",
+  "permissionManageLessonTypes": "Управление типами занятий",
+  "permissionManageLessonTypesDesc": "Создание, редактирование, удаление",
+  "permissionManagePaymentPlans": "Управление тарифами",
+  "permissionManagePaymentPlansDesc": "Создание, редактирование, удаление",
+  "permissionSectionStudents": "Ученики и группы",
+  "permissionManageOwnStudents": "Управление своими учениками",
+  "permissionManageOwnStudentsDesc": "Создание, редактирование своих учеников",
+  "permissionManageAllStudents": "Управление всеми учениками",
+  "permissionManageAllStudentsDesc": "Управление учениками других преподавателей",
+  "permissionManageGroups": "Управление группами",
+  "permissionManageGroupsDesc": "Создание, редактирование групп",
+  "permissionSectionSchedule": "Расписание",
+  "permissionViewAllSchedule": "Просмотр всего расписания",
+  "permissionViewAllScheduleDesc": "Просмотр занятий других преподавателей",
+  "permissionCreateLessons": "Создание занятий",
+  "permissionCreateLessonsDesc": "Добавление новых занятий в расписание",
+  "permissionEditOwnLessons": "Редактирование своих занятий",
+  "permissionEditOwnLessonsDesc": "Изменение своих занятий",
+  "permissionEditAllLessons": "Редактирование всех занятий",
+  "permissionEditAllLessonsDesc": "Изменение занятий других преподавателей",
+  "permissionDeleteOwnLessons": "Удаление своих занятий",
+  "permissionDeleteOwnLessonsDesc": "Удаление своих занятий из расписания",
+  "permissionDeleteAllLessons": "Удаление всех занятий",
+  "permissionDeleteAllLessonsDesc": "Удаление занятий других преподавателей",
+  "permissionSectionFinance": "Финансы",
+  "permissionViewOwnStudentsPayments": "Просмотр оплат своих учеников",
+  "permissionViewOwnStudentsPaymentsDesc": "Просмотр платежей своих учеников",
+  "permissionViewAllPayments": "Просмотр всех оплат",
+  "permissionViewAllPaymentsDesc": "Просмотр платежей всех учеников",
+  "permissionAddPaymentsForOwnStudents": "Добавление оплат своим ученикам",
+  "permissionAddPaymentsForOwnStudentsDesc": "Принятие оплат от своих учеников",
+  "permissionAddPaymentsForAllStudents": "Добавление оплат всем ученикам",
+  "permissionAddPaymentsForAllStudentsDesc": "Принятие оплат от любых учеников",
+  "permissionManageOwnStudentsPayments": "Редактирование оплат своих учеников",
+  "permissionManageOwnStudentsPaymentsDesc": "Изменение и удаление оплат своих учеников",
+  "permissionManageAllPayments": "Редактирование всех оплат",
+  "permissionManageAllPaymentsDesc": "Изменение и удаление любых оплат",
+  "permissionViewStatistics": "Просмотр статистики",
+  "permissionViewStatisticsDesc": "Доступ к разделу статистики",
+  "statusSection": "СТАТУС",
+  "adminHasAllPermissions": "Администратор",
+  "grantFullPermissions": "Предоставить все права",
+  "allPermissionsEnabledForAdmin": "Включено для администратора",
+  "@_TEACHER_ONBOARDING": {},
+  "welcome": "Добро пожаловать!",
+  "selectColorForLessons": "Выберите цвет для отображения\nваших занятий в расписании",
+  "yourDirections": "Ваши направления",
+  "selectSubjectsYouTeach": "Выберите предметы, которые вы ведёте",
+  "noSubjectsInInstitution": "В заведении пока нет предметов",
+  "ownerCanAddInSettings": "Владелец может добавить их в настройках",
+  "@_PAYMENT_PLANS": {},
+  "noPaymentPlans": "Нет тарифов",
+  "addFirstPaymentPlan": "Добавьте первый тариф оплаты",
+  "addPlan": "Добавить тариф",
+  "addPaymentPlan": "Добавить тариф",
+  "paymentPlanNameHint": "Например: Абонемент на 8 занятий",
+  "enterNameField": "Введите название",
+  "lessonsRequired": "Занятий *",
+  "invalidValueError": "Некорректное значение",
+  "createPaymentPlan": "Создать тариф",
+  "deletePaymentPlanQuestion": "Удалить тариф?",
+  "paymentPlanWillBeDeleted": "Тариф \"{name}\" будет удалён",
+  "@paymentPlanWillBeDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentPlanDeleted": "Тариф удалён",
+  "paymentPlanCreated": "Тариф \"{name}\" создан",
+  "@paymentPlanCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newPaymentPlan": "Новый тариф",
+  "fillPaymentPlanData": "Заполните данные тарифа",
+  "planNameHint": "Например: Абонемент на 8 занятий",
+  "lessonsCountRequired": "Занятий *",
+  "priceRequired": "Цена *",
+  "validityDaysRequired": "Срок действия (дней) *",
+  "enterValidityDays": "Введите срок",
+  "createPlan": "Создать тариф",
+  "paymentPlanUpdated": "Тариф обновлён",
+  "editPaymentPlan": "Редактировать тариф",
+  "changePaymentPlanData": "Измените данные тарифа",
+  "pricePerLesson": "{price} ₸/занятие",
+  "@pricePerLesson": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "validityDaysShort": "{days} дн.",
+  "@validityDaysShort": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@_SUBJECTS": {},
+  "noSubjects": "Нет предметов",
+  "addFirstSubject": "Добавьте первый предмет",
+  "deleteSubjectQuestion": "Удалить предмет?",
+  "subjectWillBeDeleted": "Предмет \"{name}\" будет удалён",
+  "@subjectWillBeDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "subjectDeleted": "Предмет удалён",
+  "subjectCreated": "Предмет \"{name}\" создан",
+  "@subjectCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "newSubject": "Новый предмет",
+  "fillSubjectData": "Введите название предмета",
+  "addSubject": "Добавить предмет",
+  "createSubject": "Создать предмет",
+  "enterSubjectName": "Введите название предмета",
+  "subjectNameRequired": "Название *",
+  "subjectUpdated": "Предмет обновлён",
+  "editSubject": "Редактировать предмет",
+  "changeSubjectData": "Измените данные предмета",
+  "noAccessToStatistics": "Нет доступа к статистике",
+  "statisticsNoAccess": "Нет доступа к статистике",
+  "statsTabGeneral": "Общая",
+  "statsTotal": "Занятия",
+  "statsFinances": "Финансы",
+  "statsAvgLessonApprox": "≈",
+  "statsAvgLesson": "Ср. занятие",
+  "statsDiscounts": "Скидки",
+  "statsPaidLessonsOf": "{paid} из {total}",
+  "@statsPaidLessonsOf": {
+    "placeholders": {
+      "paid": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "statsPaymentsWithDiscount": "{count} со скидкой",
+  "@statsPaymentsWithDiscount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "statsWorkload": "Загруженность",
+  "statsLessonHours": "Часов занятий",
+  "statsActiveStudents": "Активных учеников",
+  "statsPaymentMethods": "Способы оплаты",
+  "statsCardPayments": "Карта ({count}) — {percent}%",
+  "@statsCardPayments": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "statsCashPayments": "Наличные ({count}) — {percent}%",
+  "@statsCashPayments": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "statsAvgLessonShort": "Ср.:",
+  "statsLessonStats": "Статистика занятий",
+  "contactOwner": "Обратитесь к владельцу заведения",
+  "tabGeneral": "Общая",
+  "tabSubjects": "Предметы",
+  "tabTeachers": "Преподаватели",
+  "tabStudents": "Ученики",
+  "tabPlans": "Тарифы",
+  "lessonsTotal": "Всего",
+  "lessonsScheduled": "Запланировано",
+  "paymentsLabel": "Оплаты",
+  "avgLesson": "Ср. занятие",
+  "discounts": "Скидки",
+  "workload": "Загруженность",
+  "hoursOfLessons": "Часов занятий",
+  "activeStudentsCount": "Активных учеников",
+  "paymentMethodCard": "Карта",
+  "paymentMethodCash": "Наличные",
+  "noDataForPeriod": "Нет данных за период",
+  "lessonStatistics": "Статистика занятий",
+  "cancellationRate": "Процент отмен",
+  "topByLessons": "Топ по занятиям",
+  "lessonsShort": "зан.",
+  "byStudents": "По ученикам",
+  "purchases": "Покупок",
+  "sumLabel": "Сумма",
+  "avgLessonCost": "Средняя стоимость занятия",
+  "paymentsWithDiscount": "Оплаты со скидкой",
+  "discountSum": "Сумма скидок",
+  "byPlans": "По тарифам",
+  "purchasesShort": "покуп.",
+  "cancellationRatePercent": "Процент отмен: {rate}%",
+  "@cancellationRatePercent": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentMethods": "Способы оплаты",
+  "cardPaymentsCount": "Карта ({count})",
+  "@cardPaymentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cashPaymentsCount": "Наличные ({count})",
+  "@cashPaymentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsCountShort": "{count} зан.",
+  "@lessonsCountShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_MERGE_STUDENTS": {},
+  "mergeStudentsCount": "Объединить {count} учеников",
+  "@mergeStudentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeStudentsTitle": "Объединить {count} учеников",
+  "mergeStudentsWarning": "Будет создана новая карточка. Исходные карточки будут архивированы.",
+  "fromLegacyBalance": "Из остатка",
+  "cardCreatedWithName": "Создана карточка \"{name}\"",
+  "@cardCreatedWithName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@mergeStudentsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mergeWarning": "Будет создана новая карточка. Исходные карточки будут архивированы.",
+  "studentsToMerge": "Объединяемые ученики",
+  "totalBalance": "Общий баланс",
+  "fromLegacy": "Из остатка",
+  "newCardData": "Данные новой карточки",
+  "merge": "Объединить",
+  "cardCreated": "Создана карточка \"{name}\"",
+  "@cardCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "mergeError": "Ошибка при объединении",
+  "@_TIME_PICKER": {},
+  "lessonTime": "Время занятия",
+  "invalid": "Некорректно",
+  "durationFormat": "{hours} ч {mins} мин",
+  "@durationFormat": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "mins": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursOnly": "{hours} ч",
+  "@hoursOnly": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "minutesOnly": "{mins} мин",
+  "@minutesOnly": {
+    "placeholders": {
+      "mins": {
+        "type": "int"
+      }
+    }
+  },
+  "@_COLOR_PICKER": {},
+  "quickSelect": "Быстрый выбор",
+  "palette": "Палитра",
+  "@_STUDENT_DETAIL": {},
+  "unarchive": "Разархивировать",
+  "deleteForever": "Удалить навсегда",
+  "studentInArchive": "Ученик в архиве",
+  "unarchiveToCreateLessons": "Разархивируйте, чтобы создавать занятия",
+  "contactInfo": "Контактная информация",
+  "noPhone": "Телефон не указан",
+  "phoneCopied": "Телефон скопирован",
+  "lessonStatisticsTitle": "Статистика занятий",
+  "noLessonsYet": "Нет занятий",
+  "balance": "Баланс",
+  "subscriptionsSection": "Абонементы",
+  "noActiveSubscriptions": "Нет активных абонементов",
+  "paymentsSection": "Оплаты",
+  "noPaymentsHistory": "Нет истории оплат",
+  "showMoreCount": "Показать ещё ({count})",
+  "@showMoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permanentScheduleSection": "Постоянное расписание",
+  "noPermanentSchedule": "Нет постоянного расписания",
+  "addScheduleSlot": "Добавить слот",
+  "createLessonsFromSchedule": "Создать занятия из расписания",
+  "repeatGroupsSection": "Серии занятий",
+  "noRepeatGroups": "Нет серий занятий",
+  "lessonHistorySection": "История занятий",
+  "manageLessonsTitle": "Управление занятиями",
+  "archivedSection": "Архивированные",
+  "archived": "Архивировано",
+  "inRoom": "в каб. {room}",
+  "@inRoom": {
+    "placeholders": {
+      "room": {
+        "type": "String"
+      }
+    }
+  },
+  "temporaryRoomUntil": "Временно {room} до {date}",
+  "@temporaryRoomUntil": {
+    "placeholders": {
+      "room": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "schedulePausedUntil": "Приостановлено до {date}",
+  "@schedulePausedUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "resumeScheduleAction": "Возобновить",
+  "pauseScheduleAction": "Приостановить",
+  "clearReplacementRoom": "Снять замену кабинета",
+  "temporaryRoomReplacementAction": "Временная замена кабинета",
+  "archiveSchedule": "Архивировать",
+  "unarchiveSchedule": "Разархивировать",
+  "deleteScheduleAction": "Удалить",
+  "scheduleResumedMessage": "Расписание возобновлено",
+  "pauseScheduleTitle": "Приостановить расписание",
+  "pauseScheduleUntilQuestion": "До какой даты приостановить?",
+  "resumeDate": "Дата возобновления",
+  "selectDatePlaceholder": "Выберите дату",
+  "pauseAction": "Приостановить",
+  "schedulePausedUntilMessage": "Расписание приостановлено до {date}",
+  "@schedulePausedUntilMessage": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "replacementRoomCleared": "Замена кабинета снята",
+  "temporaryRoomReplacementTitle": "Временная замена кабинета",
+  "untilDateLabel": "До какой даты",
+  "replacementRoomSet": "Замена кабинета установлена",
+  "archiveScheduleQuestion": "Архивировать расписание?",
+  "archiveScheduleMessage": "Слот будет перемещён в архив. Вы сможете разархивировать его позже.",
+  "scheduleArchivedMessage": "Расписание архивировано",
+  "scheduleUnarchivedMessage": "Расписание разархивировано",
+  "deleteScheduleQuestion": "Удалить расписание?",
+  "deleteScheduleMessage": "Этот слот будет удалён навсегда. Это действие нельзя отменить.",
+  "scheduleDeletedMessage": "Расписание удалено",
+  "editScheduleTitle": "Редактировать расписание",
+  "startTimeLabel": "Время начала",
+  "endTimeLabel": "Время окончания",
+  "roomFieldLabel": "Кабинет",
+  "scheduleUpdatedMessage": "Расписание обновлено",
+  "scheduleUpdateError": "Ошибка обновления (возможно конфликт времени)",
+  "lessonsInSeries": "{count} занятий в серии",
+  "@lessonsInSeries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesStartDate": "Начало: {date}",
+  "@seriesStartDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "editAction": "Редактировать",
+  "deleteSeriesAction": "Удалить серию",
+  "editSeriesSheetTitle": "Редактировать серию",
+  "deleteSeriesQuestion": "Удалить серию?",
+  "deleteSeriesMessage": "Будет удалено {count} занятий из расписания. Это действие нельзя отменить.",
+  "@deleteSeriesMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "seriesDeleted": "Серия удалена",
+  "deletionError": "Ошибка удаления",
+  "seriesUpdated": "Серия обновлена",
+  "updateError": "Ошибка обновления",
+  "createLessonsFromScheduleTitle": "Создать занятия из расписания",
+  "createLessonsDescription": "Будут созданы занятия на основе постоянного расписания ученика.",
+  "fromDateField": "С даты",
+  "toDateField": "По дату",
+  "oneWeek": "1 неделя",
+  "twoWeeks": "2 недели",
+  "checkConflicts": "Проверить конфликты",
+  "noConflictsMessage": "Конфликтов не найдено",
+  "conflictsFoundCount": "Найдено конфликтов: {count}",
+  "@conflictsFoundCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "datesWillBeSkipped": "Эти даты будут пропущены:",
+  "andMoreCount": "...и ещё {count}",
+  "@andMoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createLessonsAction": "Создать занятия",
+  "creatingLessons": "Создание...",
+  "lessonsCreatedSkipped": "Создано занятий: {success}, пропущено: {skipped}",
+  "@lessonsCreatedSkipped": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "addPermanentScheduleTitle": "Добавить постоянное расписание",
+  "selectDaysAndTimeDescription": "Выберите дни недели и время занятий",
+  "daysOfWeek": "Дни недели",
+  "timeAndRooms": "Время и кабинеты",
+  "validFromField": "Действует с",
+  "teacherRequired": "Преподаватель *",
+  "selectTeacherValidation": "Выберите преподавателя",
+  "subjectOptional": "Предмет (опционально)",
+  "notSpecifiedOption": "Не указано",
+  "lessonTypeOptional": "Тип занятия (опционально)",
+  "checkingConflictsStatus": "Проверка конфликтов...",
+  "conflictsCountChange": "Конфликты: {count} (измените время)",
+  "@conflictsCountChange": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hasConflicts": "Есть конфликты",
+  "selectRoomsValidation": "Выберите кабинеты",
+  "createSchedulesCountAction": "Создать {count} занятий",
+  "@createSchedulesCountAction": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createScheduleAction": "Создать расписание",
+  "selectAtLeastOneDayValidation": "Выберите хотя бы один день недели",
+  "selectRoomForEachDayValidation": "Выберите кабинет для каждого дня",
+  "schedulesCreatedCount": "Создано {count} записей расписания",
+  "@schedulesCreatedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleCreated": "Расписание создано",
+  "conflictTimeMessage": "Конфликт! Время занято",
+  "manageLessonsSection": "Управление занятиями",
+  "futureLessonsFound": "Найдено {count} будущих занятий",
+  "@futureLessonsFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noScheduledLessonsMessage": "Нет запланированных занятий",
+  "loadingErrorMessage": "Ошибка загрузки: {error}",
+  "@loadingErrorMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "reassignTeacherTitle": "Переназначить преподавателя",
+  "reassignTeacherSubtitle": "Выбрать нового преподавателя для всех занятий",
+  "deleteAllFutureLessonsTitle": "Удалить все занятия",
+  "deleteAllFutureLessonsSubtitle": "Баланс абонементов не изменится",
+  "deleteAllLessonsQuestion": "Удалить все занятия?",
+  "deleteAllLessonsMessage": "Вы уверены, что хотите удалить {count} будущих занятий \"{name}\"?\n\nБаланс абонементов не изменится.",
+  "@deleteAllLessonsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deletedLessonsCount": "Удалено {count} занятий",
+  "@deletedLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noAvailableTeachersMessage": "Нет доступных преподавателей",
+  "selectTeacherTitle": "Выберите преподавателя",
+  "reassignedSlotsCount": "Переназначено {count} слотов",
+  "@reassignedSlotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pausedSlotsCount": "Приостановлено {count} слотов",
+  "@pausedSlotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deactivateScheduleQuestion": "Деактивировать расписание?",
+  "deactivateSlotsMessage": "Деактивировать {count} слотов постоянного расписания?\n\nСлоты останутся в архиве и могут быть восстановлены.",
+  "@deactivateSlotsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deactivateAction": "Деактивировать",
+  "deactivatedSlotsCount": "Деактивировано {count} слотов",
+  "@deactivatedSlotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduleSlotsDays": "{count} {slots}",
+  "@scheduleSlotsDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "slots": {
+        "type": "String"
+      }
+    }
+  },
+  "slotWord": "слот",
+  "slotsWordFew": "слота",
+  "slotsWordMany": "слотов",
+  "pauseAllSlots": "Приостановить",
+  "pauseAllSlotsSubtitle": "Временно приостановить все слоты",
+  "deactivateAllSlots": "Деактивировать",
+  "deactivateAllSlotsSubtitle": "Отключить постоянное расписание",
+  "newTeacherLabel": "Новый преподаватель",
+  "allLessonsCanBeReassigned": "Все {count} занятий можно переназначить",
+  "@allLessonsCanBeReassigned": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "canReassignCount": "Можно переназначить: {count} занятий",
+  "@canReassignCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignCount": "Переназначить {count} занятий",
+  "@reassignCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignAllLessons": "Переназначить все занятия",
+  "noCompletedLessons": "Нет завершённых занятий",
+  "noSubjectLabel": "Без предмета",
+  "showMore": "Показать ещё",
+  "editStudentTitle": "Редактировать",
+  "basicInfoSection": "Основная информация",
+  "fullNameField": "ФИО",
+  "phoneField": "Телефон",
+  "commentField": "Комментарий",
+  "legacyBalanceSection": "Остаток занятий",
+  "currentBalance": "Текущий остаток",
+  "balanceLessonsCount": "{count} занятий",
+  "@balanceLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "changeBalance": "Изменить",
+  "changeBalanceTitle": "Изменить остаток",
+  "quantityField": "Количество",
+  "quantityHint": "+5 или -3",
+  "reasonOptional": "Причина (опционально)",
+  "applyAction": "Применить",
+  "saveChangesAction": "Сохранить изменения",
+  "lessonsAddedCount": "Добавлено {count} занятий",
+  "@lessonsAddedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsDeductedCount": "Списано {count} занятий",
+  "@lessonsDeductedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addLessonsTitle": "Добавить занятия",
+  "legacyBalanceLabel": "Остаток занятий: {count}",
+  "@legacyBalanceLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsQuantityField": "Количество занятий",
+  "quantityPlaceholder": "Положительное или отрицательное число",
+  "enterQuantity": "Введите количество",
+  "enterInteger": "Введите целое число",
+  "quantityCannotBeZero": "Количество не может быть 0",
+  "commentOptionalField": "Комментарий (необязательно)",
+  "commentHint": "Например: Перенос с другого абонемента",
+  "archiveStudentQuestion": "Архивировать ученика?",
+  "archiveStudentMessage": "Ученик \"{name}\" будет перемещён в архив. Вы сможете восстановить его позже.",
+  "@archiveStudentMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "restoreStudentQuestion": "Восстановить ученика?",
+  "restoreStudentMessage": "Ученик \"{name}\" будет восстановлен из архива.",
+  "@restoreStudentMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteStudentQuestion": "Удалить ученика навсегда?",
+  "deleteStudentMessage": "Ученик \"{name}\" будет удалён навсегда вместе со всеми данными (занятия, оплаты, абонементы).\n\nЭто действие НЕЛЬЗЯ отменить!",
+  "@deleteStudentMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "teacherDefault": "Преподаватель",
+  "unknownName": "Неизвестный",
+  "roomDefault": "Кабинет",
+  "checking": "Проверка...",
+  "freezeSubscription": "Заморозить абонемент",
+  "freezeSubscriptionDescription": "При заморозке срок действия абонемента приостанавливается. После разморозки срок будет продлён на количество дней заморозки.",
+  "daysCount": "Количество дней",
+  "enterQuantityValidation": "Введите количество",
+  "enterNumberFrom1To90": "Введите число от 1 до 90",
+  "freeze": "Заморозить",
+  "subscriptionFrozen": "Абонемент заморожен",
+  "subscriptionUnfrozen": "Абонемент разморожен. Срок продлён до {date}",
+  "@subscriptionUnfrozen": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "extendSubscription": "Продлить срок",
+  "currentTermUntil": "Текущий срок: до {date}",
+  "@currentTermUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "extendForDays": "Продлить на дней",
+  "enterNumberFrom1To365": "Введите число от 1 до 365",
+  "extend": "Продлить",
+  "termExtendedUntil": "Срок продлён до {date}",
+  "@termExtendedUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "subscriptionBalanceLabel": "Абонементы: {count}",
+  "@subscriptionBalanceLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "legacyBalanceShort": "Остаток: {count}",
+  "@legacyBalanceShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addLessonsAction": "Добавить занятия",
+  "avgCost": "СР. СТОИМОСТЬ",
+  "avgCostApprox": "СР. СТОИМОСТЬ ≈",
+  "noDataAvailable": "нет данных",
+  "perLesson": "за занятие",
+  "manageLessonsAction": "Управление",
+  "conductedLabel": "Проведено",
+  "cancelledLabel": "Отменено",
+  "discountLabel": "Скидка",
+  "correctionLabel": "Корр.",
+  "legacyBalanceTitle": "Остаток занятий",
+  "exhaustedStatus": "Исчерпан",
+  "expiringSoon": "Скоро истекает",
+  "groupSubscription": "Групповой",
+  "frozenUntilDate": "Заморожен до {date}",
+  "@frozenUntilDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "expiredDate": "Истёк {date}",
+  "@expiredDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "validUntilDate": "Действует до {date}",
+  "@validUntilDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "unfreezeAction": "Разморозить",
+  "teachersSection": "Преподаватели",
+  "addTeacherTooltip": "Добавить преподавателя",
+  "noLinkedTeachers": "Нет привязанных преподавателей",
+  "addTeacherTitle": "Добавить преподавателя",
+  "allTeachersAdded": "Все преподаватели уже добавлены",
+  "teacherAdded": "Преподаватель добавлен",
+  "removeTeacherQuestion": "Удалить преподавателя?",
+  "removeTeacherMessage": "Преподаватель будет отвязан от этого ученика.",
+  "teacherRemoved": "Преподаватель удалён",
+  "subjectsSection": "Предметы",
+  "noLinkedSubjects": "Нет привязанных предметов",
+  "addSubjectTitle": "Добавить предмет",
+  "allSubjectsAdded": "Все предметы уже добавлены",
+  "subjectAdded": "Предмет добавлен",
+  "removeSubjectQuestion": "Удалить предмет?",
+  "removeSubjectMessage": "Предмет будет отвязан от этого ученика.",
+  "subjectRemoved": "Предмет удалён",
+  "lessonTypesSection": "Типы занятий",
+  "noLinkedLessonTypes": "Нет привязанных типов занятий",
+  "addLessonTypeTitle": "Добавить тип занятия",
+  "allLessonTypesAdded": "Все типы занятий уже добавлены",
+  "lessonTypeAdded": "Тип занятия добавлен",
+  "removeLessonTypeQuestion": "Удалить тип занятия?",
+  "removeLessonTypeMessage": "Тип занятия будет отвязан от этого ученика.",
+  "lessonTypeRemoved": "Тип занятия удалён",
+  "mergeWithAction": "Объединить с...",
+  "selectStudentsToMerge": "Выберите учеников для объединения с \"{name}\"",
+  "@selectStudentsToMerge": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "searchStudentsHint": "Поиск учеников...",
+  "noStudentsToMerge": "Нет учеников для объединения",
+  "balanceValue": "Баланс: {count}",
+  "@balanceValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectStudentsValidation": "Выберите учеников",
+  "nextWithCount": "Далее ({count})",
+  "@nextWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupCard": "Групповая карточка",
+  "failedToLoadNames": "Не удалось загрузить имена",
+  "archiveSlots": "Архив ({count})",
+  "@archiveSlots": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "replacementRoom": "Замена",
+  "pauseUntilDateFormat": "Пауза до {date}",
+  "@pauseUntilDateFormat": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "onPause": "На паузе",
+  "mondayShort2": "Пн",
+  "tuesdayShort2": "Вт",
+  "wednesdayShort2": "Ср",
+  "thursdayShort2": "Чт",
+  "fridayShort2": "Пт",
+  "saturdayShort2": "Сб",
+  "sundayShort2": "Вс",
+  "mondayFull": "Понедельник",
+  "tuesdayFull": "Вторник",
+  "wednesdayFull": "Среда",
+  "thursdayFull": "Четверг",
+  "fridayFull": "Пятница",
+  "saturdayFull": "Суббота",
+  "sundayFull": "Воскресенье",
+  "seriesStartDateLabel": "Начало: {date}",
+  "@seriesStartDateLabel": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "editSeriesAction": "Редактировать",
+  "deleteSeriesLessons": "Будет удалено {count} занятий из расписания. Это действие нельзя отменить.",
+  "@deleteSeriesLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "saveSeries": "Сохранить",
+  "invalidTimeError": "Некорректно",
+  "roomFieldHint": "Кабинет",
+  "pauseScheduleUntilDate": "До какой даты приостановить?",
+  "resumeDateLabel": "Дата возобновления",
+  "selectDateHint": "Выберите дату",
+  "pauseUntilMessage": "Приостановить до",
+  "selectRoomLabel": "Новый кабинет",
+  "untilDateQuestion": "До какой даты",
+  "applyRoomReplacement": "Применить",
+  "archiveScheduleConfirm": "Слот будет перемещён в архив. Вы сможете разархивировать его позже.",
+  "deleteScheduleConfirm": "Этот слот будет удалён навсегда. Это действие нельзя отменить.",
+  "errorWithParam": "Ошибка: {error}",
+  "@errorWithParam": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "createLessonsFromScheduleDescription": "Будут созданы занятия на основе постоянного расписания ученика.",
+  "toDateLabel2": "По дату",
+  "checkConflictsAction": "Проверить конфликты",
+  "noConflictsFoundMessage": "Конфликтов не найдено",
+  "conflictsCountMessage": "Найдено конфликтов: {count}",
+  "@conflictsCountMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "datesWillBeSkippedMessage": "Эти даты будут пропущены:",
+  "andMoreLabel": "...и ещё {count}",
+  "@andMoreLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "creatingMessage": "Создание...",
+  "lessonsCreatedResult": "Создано занятий: {count}",
+  "@lessonsCreatedResult": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addPermanentScheduleDescription": "Выберите дни недели и время занятий",
+  "timeAndRoomsLabel": "Время и кабинеты",
+  "validFromLabel": "Действует с",
+  "teacherRequiredLabel": "Преподаватель *",
+  "selectTeacherError": "Выберите преподавателя",
+  "subjectOptionalLabel": "Предмет (опционально)",
+  "notSpecifiedLabel": "Не указано",
+  "lessonTypeOptionalLabel": "Тип занятия (опционально)",
+  "conflictsChangeTime": "Конфликты: {count} (измените время)",
+  "@conflictsChangeTime": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hasConflictsError": "Есть конфликты",
+  "selectRoomsError": "Выберите кабинеты",
+  "checkingLabel": "Проверка...",
+  "createCountSchedules": "Создать {count} занятий",
+  "@createCountSchedules": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createScheduleLabel": "Создать расписание",
+  "selectAtLeastOneDay": "Выберите хотя бы один день недели",
+  "selectRoomForEachDay": "Выберите кабинет для каждого дня",
+  "scheduleCreatedMessage": "Расписание создано",
+  "schedulesCreatedMessage": "Создано {count} записей расписания",
+  "@schedulesCreatedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "conflictTimeOccupiedMessage": "Конфликт! Время занято",
+  "deleteAllLessonsConfirm": "Вы уверены, что хотите удалить {count} будущих занятий \"{name}\"?\n\nБаланс абонементов не изменится.",
+  "@deleteAllLessonsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deletedCountLessons": "Удалено {count} занятий",
+  "@deletedCountLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noAvailableTeachersError": "Нет доступных преподавателей",
+  "selectTeacherLabel": "Выберите преподавателя",
+  "noNameLabel": "Без имени",
+  "reassignedSlotsMessage": "Переназначено {count} слотов",
+  "@reassignedSlotsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pausedSlotsMessage": "Приостановлено {count} слотов",
+  "@pausedSlotsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deactivateScheduleConfirm": "Деактивировать {count} слотов постоянного расписания?\n\nСлоты останутся в архиве и могут быть восстановлены.",
+  "@deactivateScheduleConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deactivatedSlotsMessage": "Деактивировано {count} слотов",
+  "@deactivatedSlotsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "manageLessonsHeader": "Управление занятиями",
+  "loadingErrorLabel": "Ошибка загрузки: {error}",
+  "@loadingErrorLabel": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noScheduledLessonsLabel": "Нет запланированных занятий",
+  "foundFutureLessons": "Найдено {count} будущих занятий",
+  "@foundFutureLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignTeacherSubtitleLabel": "Выбрать нового преподавателя для всех занятий",
+  "deleteAllLessonsLabel": "Удалить все занятия",
+  "subscriptionBalanceWontChange": "Баланс абонементов не изменится",
+  "permanentScheduleLabel": "Постоянное расписание",
+  "slotsCountLabel": "{count} {slots}",
+  "@slotsCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "slots": {
+        "type": "String"
+      }
+    }
+  },
+  "forAllScheduleSlots": "Для всех слотов расписания",
+  "temporaryPauseAllSlots": "Временно приостановить все слоты",
+  "disablePermanentSchedule": "Отключить постоянное расписание",
+  "noLessonsToReassignError": "Нет занятий для переназначения",
+  "reassignedLessonsMessage": "Переназначено {count} занятий",
+  "@reassignedLessonsMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignTeacherHeader": "Переназначить преподавателя",
+  "newTeacherFieldLabel": "Новый преподаватель",
+  "allLessonsCanReassign": "Все {count} занятий можно переназначить",
+  "@allLessonsCanReassign": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "foundConflictsCount": "Найдено конфликтов: {count}",
+  "@foundConflictsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "canReassignLessons": "Можно переназначить: {count} занятий",
+  "@canReassignLessons": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignLessonsCount": "Переназначить {count} занятий",
+  "@reassignLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reassignAllLessonsLabel": "Переназначить все занятия",
+  "lessonHistoryHeader": "История занятий",
+  "noCompletedLessonsLabel": "Нет завершённых занятий",
+  "showMoreAction": "Показать ещё",
+  "noSubjectPlaceholder": "Без предмета",
+  "studentUpdatedMessage": "Ученик обновлен",
+  "enterLessonsCountValidation": "Введите количество занятий",
+  "lessonsAddedMessage": "Добавлено {count} занятий",
+  "@lessonsAddedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsDeductedMessage": "Списано {count} занятий",
+  "@lessonsDeductedMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "editStudentHeader": "Редактировать",
+  "basicInfoHeader": "Основная информация",
+  "fullNameFieldLabel": "ФИО",
+  "enterNameError": "Введите имя",
+  "phoneFieldLabel": "Телефон",
+  "commentFieldLabel": "Комментарий",
+  "legacyBalanceHeader": "Остаток занятий",
+  "currentBalanceLabel": "Текущий остаток",
+  "changeBalanceAction": "Изменить",
+  "changeBalanceHeader": "Изменить остаток",
+  "quantityFieldLabel": "Количество",
+  "reasonOptionalLabel": "Причина (опционально)",
+  "applyChangeAction": "Применить",
+  "quantityCannotBeZeroError": "Количество занятий не может быть 0",
+  "addLessonsHeader": "Добавить занятия",
+  "legacyBalanceDisplay": "Остаток занятий: {count}",
+  "@legacyBalanceDisplay": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lessonsQuantityFieldLabel": "Количество занятий",
+  "positiveOrNegativeHint": "Положительное или отрицательное число",
+  "enterQuantityError": "Введите количество",
+  "enterIntegerError": "Введите целое число",
+  "commentOptionalLabel": "Комментарий (необязательно)",
+  "transferFromSubscriptionHint": "Например: Перенос с другого абонемента",
+  "saveAction": "Сохранить",
+  "@_SCHEDULE_SCREEN_LOCALIZATION": {},
+  "lessonWillNotShowOnDate": "Занятие не будет отображаться на {date}.\n\nЭто не создаст запись в истории занятий.",
+  "@lessonWillNotShowOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "lessonDeletedWithPayment": "Занятие будет удалено из истории.\nОплата за занятие также будет удалена.",
+  "lessonDeletedWithReturn": "Занятие будет удалено из истории.\nСписанное занятие будет возвращено на баланс ученика.",
+  "lessonDeletedCompletely": "Занятие будет полностью удалено из истории.",
+  "lessonPaymentDefault": "Оплата занятия",
+  "lessonWillBeCancelledNoDeduction": "Занятие будет отменено и архивировано без списания с баланса",
+  "deductedLessonWillBeReturned": "Списанное при проведении занятие будет автоматически возвращено на баланс.",
+  "whoToDeductLesson": "Кому списать занятие:",
+  "lessonIsPartOfSeries": "Это занятие является частью серии ({count} шт.)",
+  "@lessonIsPartOfSeries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deductionAppliesToTodayOnly": "Списание применится только к сегодняшнему занятию",
+  "allSeriesLessonsWillBeArchived": "Все занятия серии будут архивированы без списания",
+  "cancelLessonAction": "Отменить занятие",
+  "lessonSeriesCancelled": "Серия занятий отменена",
+  "lessonCancelledAndDeducted": "Занятие отменено и списано с баланса",
+  "lessonIsPartOfPermanentSchedule": "Это занятие является частью постоянного расписания",
+  "participantsLabel": "Участники",
+  "paymentLabel": "Оплата",
+  "paymentErrorMessage": "Ошибка оплаты: {error}",
+  "@paymentErrorMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "removeStudentFromLessonConfirm": "Убрать {name} из этого занятия?",
+  "@removeStudentFromLessonConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeParticipantFromLesson": "Убрать участника из этого занятия?",
+  "allStudentsAlreadyAdded": "Все ученики уже добавлены",
+  "roomLabel2": "Кабинет",
+  "roomWithNumberLabel": "Кабинет {number}",
+  "@roomWithNumberLabel": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "studentFieldLabel": "Ученик",
+  "notSelectedOption": "Не выбран",
+  "repeatNone": "Без повтора",
+  "repeatDaily": "Каждый день",
+  "repeatWeeklyOption": "Каждую неделю",
+  "repeatWeekdays": "По дням недели",
+  "repeatCustom": "Ручной выбор дат",
+  "editScopeThisOnly": "Только это занятие",
+  "editScopeThisAndFollowing": "Это и последующие",
+  "editScopeAll": "Все занятия серии",
+  "editScopeSelected": "Выбранные",
+  "roomAddedMessage": "Кабинет \"{name}\" добавлен",
+  "@roomAddedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "roomNameOptionalLabel": "Название (опционально)",
+  "roomNameHintExample": "Например: Фортепианный",
+  "createRoomAction": "Создать кабинет",
+  "noOwnStudentsMessage": "У вас нет своих учеников",
+  "showAllStudents": "Показать всех ({count})",
+  "@showAllStudents": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "otherStudentsSection": "Остальные ученики",
+  "hideAction": "Скрыть",
+  "quickAddMessage": "Быстрое добавление",
+  "createStudentAction": "Создать ученика",
+  "addSubjectForLessons": "Добавьте предмет для занятий",
+  "createSubjectAction": "Создать предмет",
+  "configureLessonParams": "Настройте параметры занятия",
+  "enterNameRequired": "Введите название",
+  "minutesUnit": "мин",
+  "createTypeAction": "Создать тип",
+  "teachersFilter": "Преподаватели",
+  "lessonTypesFilter": "Типы занятий",
+  "directionsFilter": "Направления",
+  "applyFiltersAction": "Применить фильтры",
+  "showAllAction": "Показать все",
+  "studentsFilter": "Ученики",
+  "deletedLabel": "Удалён",
+  "temporarilyShowingAll": "Временно показаны все",
+  "allRoomsLabel": "Все кабинеты",
+  "noDataLabel": "Нет данных",
+  "selectDatesTitle": "Выберите даты",
+  "lessonSegment": "Занятие",
+  "bookingSegment": "Бронь",
+  "roomRequired": "Кабинет *",
+  "noRoomsMessage": "Нет кабинетов",
+  "addRoomTooltip": "Добавить кабинет",
+  "roomsLabel": "Кабинеты",
+  "roomAbbr": "Каб. {number}",
+  "@roomAbbr": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "studentSegment": "Ученик",
+  "groupSegment": "Группа",
+  "selectStudentHint": "Выберите ученика",
+  "noGroupsMessage": "Нет групп",
+  "addSubjectTooltip2": "Добавить предмет",
+  "addLessonTypeTooltip2": "Добавить тип занятия",
+  "lessonsCountQuestion": "Количество занятий:",
+  "mondayAbbr": "Пн",
+  "tuesdayAbbr": "Вт",
+  "wednesdayAbbr": "Ср",
+  "thursdayAbbr": "Чт",
+  "fridayAbbr": "Пт",
+  "saturdayAbbr": "Сб",
+  "sundayAbbr": "Вс",
+  "checkingConflictsLabel": "Проверка конфликтов...",
+  "willCreateLessonsCount": "Будет создано {count} занятий",
+  "@willCreateLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createLessonLabel": "Создать занятие",
+  "roomsBookedMessage": "Кабинеты забронированы",
+  "invalidLabel": "Некорректно",
+  "minLessonDurationMessage": "Минимальная длительность занятия — 15 минут",
+  "lessonsCreatedSkippedCount": "Создано {created} занятий (пропущено: {skipped})",
+  "@lessonsCreatedSkippedCount": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "bookedLabel": "Забронировано",
+  "deleteBookingAction": "Удалить бронь",
+  "selectMinOneRoom": "Выберите минимум один кабинет",
+  "descriptionHintExample": "Например: Репетиция, Мероприятие",
+  "temporaryRoomUntilMessage": "Временно в кабинете {room} до {date}",
+  "@temporaryRoomUntilMessage": {
+    "placeholders": {
+      "room": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "slotWillNotWorkOnDateFull": "Слот не будет действовать {date}.\n\nЭто позволит создать другое занятие в это время.",
+  "@slotWillNotWorkOnDateFull": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "exceptionAddedMessage": "Исключение добавлено",
+  "slotResumedMessage": "Слот возобновлён",
+  "slotDeactivateConfirm": "Слот будет полностью отключён и не будет отображаться в расписании.\n\nВы сможете активировать его снова в карточке ученика.",
+  "slotDeactivatedMessage": "Слот деактивирован",
+  "studentNameLabel": "Ученик: {name}",
+  "@studentNameLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "willBeCreatedCount": "Будет создано: {count} занятий",
+  "@willBeCreatedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createdLessonsCount": "Создано {count} занятий",
+  "@createdLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "applyChangesAction": "Применить изменения",
+  "changeScopeLabel": "Область изменений",
+  "seriesLessonsTitle": "Занятия серии ({count})",
+  "@seriesLessonsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectedLabel": "Выбрано: {count}",
+  "@selectedLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "changesLabel": "Изменения",
+  "updatedLessonsSkipped": "Обновлено {updated} занятий (пропущено: {skipped})",
+  "@updatedLessonsSkipped": {
+    "placeholders": {
+      "updated": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "updatedLessonsCount": "Обновлено {count} занятий",
+  "@updatedLessonsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "allRoomsDisplayed": "Отображаются все кабинеты",
+  "selectedRoomsCount": "Выбрано кабинетов: {count}",
+  "@selectedRoomsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "defaultRoomsLabel": "Кабинеты по умолчанию",
+  "roomSetupFirstTimeHint": "В расписании будут отображаться только выбранные кабинеты. Изменить настройку можно в любой момент через меню фильтров.",
+  "roomSetupHint": "Выберите кабинеты, которые будут отображаться в расписании по умолчанию.",
+  "selectRoomsAction": "Выберите кабинеты",
+  "saveCountAction": "Сохранить ({count})",
+  "@saveCountAction": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "virtualLessonLabel": "Виртуальное занятие",
+  "lessonWillNotShowMessage": "Занятие не будет отображаться на {date}.\n\nЭто не создаст запись в истории занятий.",
+  "@lessonWillNotShowMessage": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "schedulePausedMessage": "Расписание приостановлено",
+  "scheduleResumedSuccessMessage": "Расписание возобновлено",
+  "scheduleDeactivatedMessage": "Расписание деактивировано",
+  "conflictsLabel": "Конфликты: {count}",
+  "@conflictsLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "willBeChangedCount": "Будет изменено: {count} занятий",
+  "@willBeChangedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "conflictsWillBeSkippedLabel": "Конфликты: {count} (будут пропущены)",
+  "@conflictsWillBeSkippedLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@_STUDENT_DETAIL_LOCALIZATION": {},
+  "errorFormat": "Ошибка: {error}",
+  "@errorFormat": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "theseDatesWillBeSkipped": "Эти даты будут пропущены:",
+  "andMore": "...и ещё {count}",
+  "@andMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "@_MEMBER_PERMISSIONS": {},
+  "enabledForAdmin": "Включено для администратора",
+  "teacherSubjectsLabel": "НАПРАВЛЕНИЯ",
+  "teacherSubjectsHint": "Предметы, которые ведёт преподаватель",
+  "noDirectionsHint": "Направления не указаны.\nДобавьте предметы, которые ведёт преподаватель.",
+  "unknownSubject": "Неизвестный",
+  "addDirectionTitle": "Добавить направление",
+  "selectSubjectFor": "Выберите предмет для {name}",
+  "@selectSubjectFor": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "directionAdded": "Направление \"{name}\" добавлено",
+  "@directionAdded": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+
+  "@_ALL_ROOMS_SCHEDULE_SCREEN": {},
+  "newRoom": "Новый кабинет",
+  "fillRoomData": "Заполните данные кабинета",
+  "roomNumberRequired": "Номер кабинета *",
+  "roomNumberHint": "Например: 101",
+  "enterRoomNumber": "Введите номер кабинета",
+  "roomNameOptional": "Название (опционально)",
+  "roomNameHint": "Например: Фортепианный",
+  "createRoom": "Создать кабинет",
+  "newStudent": "Новый ученик",
+  "quickAdd": "Быстрое добавление",
+  "fullNameRequired": "ФИО *",
+  "fullNameHint": "Иванов Иван Иванович",
+  "enterStudentName": "Введите имя ученика",
+  "phone": "Телефон",
+  "createStudent": "Создать ученика",
+  "newSubject": "Новый предмет",
+  "addSubjectDescription": "Добавьте предмет для занятий",
+  "subjectNameField": "Название предмета",
+  "subjectNameHint": "Например: Фортепиано",
+  "enterSubjectName": "Введите название предмета",
+  "createSubject": "Создать предмет",
+  "durationValidationError": "Длительность должна быть от 5 до 480 минут",
+  "newLessonType": "Новый тип занятия",
+  "configureLessonParams": "Настройте параметры занятия",
+  "nameField": "Название",
+  "lessonTypeNameHint": "Например: Индивидуальное занятие",
+  "enterName": "Введите название",
+  "duration": "Длительность",
+  "customDuration": "Своя длительность",
+  "enterMinutes": "Введите минуты",
+  "minSuffix": "мин",
+  "priceOptional": "Цена (необязательно)",
+  "priceHint": "Например: 5000",
+  "createType": "Создать тип",
+  "filters": "Фильтры",
+  "teachers": "Преподаватели",
+  "noName": "Без имени",
+  "lessonTypes": "Типы занятий",
+  "subjects": "Направления",
+  "applyFilters": "Применить фильтры",
+  "showAll": "Показать все",
+  "students": "Ученики",
+  "noStudents": "Нет учеников",
+  "deleted": "Удалён",
+  "studentAddedAsGuest": "{name} добавлен как гость",
+  "@studentAddedAsGuest": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "roomWithNumberDefault": "Кабинет {number}",
+  "@roomWithNumberDefault": {
+    "placeholders": {
+      "number": {"type": "String"}
+    }
+  },
+  "roomAddedMessage": "Кабинет \"{name}\" добавлен",
+  "@roomAddedMessage": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "noOwnStudentsMessage": "У вас нет своих учеников",
+  "showAllStudentsCount": "Показать всех ({count})",
+  "@showAllStudentsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "otherStudentsLabel": "Остальные ученики",
+  "hideLabel": "Скрыть",
+  "studentNameAddedMessage": "Ученик \"{name}\" добавлен",
+  "@studentNameAddedMessage": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "subjectNameAddedMessage": "Предмет \"{name}\" добавлен",
+  "@subjectNameAddedMessage": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "lessonTypeNameAddedMessage": "Тип занятия \"{name}\" добавлен",
+  "@lessonTypeNameAddedMessage": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "durationMinutesLabel": "{minutes} мин",
+  "@durationMinutesLabel": {
+    "placeholders": {
+      "minutes": {"type": "int"}
+    }
+  },
+  "lessonTypeDurationFormat": "{name} ({duration} мин)",
+  "@lessonTypeDurationFormat": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "duration": {"type": "int"}
+    }
+  },
+  "groupMembersCount": "{name} ({count} уч.)",
+  "@groupMembersCount": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+  "whichRoomsDoYouUse": "Какими кабинетами вы пользуетесь?",
+  "roomSetupFirstTimeDescription": "В расписании будут отображаться только выбранные кабинеты. Изменить настройку можно в любой момент через меню фильтров.",
+  "roomSetupDescription": "Выберите кабинеты, которые будут отображаться в расписании по умолчанию.",
+  "saveWithCountLabel": "Сохранить ({count})",
+  "@saveWithCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "selectRoomsLabel": "Выберите кабинеты",
+  "memberDataError": "Не удалось получить данные участника",
+  "allRoomsDisplayedMessage": "Отображаются все кабинеты",
+  "selectedRoomsCountMessage": "Выбрано кабинетов: {count}",
+  "@selectedRoomsCountMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "temporarilyShowingAllRooms": "Временно показаны все",
+  "notConfiguredRooms": "Не настроено",
+  "allRoomsDefault": "Все кабинеты",
+  "noDataAvailableMessage": "Нет данных",
+  "januaryMonth": "Январь",
+  "februaryMonth": "Февраль",
+  "marchMonth": "Март",
+  "aprilMonth": "Апрель",
+  "mayMonth": "Май",
+  "juneMonth": "Июнь",
+  "julyMonth": "Июль",
+  "augustMonth": "Август",
+  "septemberMonth": "Сентябрь",
+  "octoberMonth": "Октябрь",
+  "novemberMonth": "Ноябрь",
+  "decemberMonth": "Декабрь",
+  "selectDatesLabel": "Выберите даты",
+  "lessonTabLabel": "Занятие",
+  "bookingTabLabel": "Бронь",
+  "noRoomsAvailableMessage": "Нет кабинетов",
+  "roomsLabel": "Кабинеты",
+  "roomAbbreviation": "Каб. {number}",
+  "@roomAbbreviation": {
+    "placeholders": {
+      "number": {"type": "String"}
+    }
+  },
+  "selectAtLeastOneRoomMessage": "Выберите хотя бы один кабинет",
+  "descriptionOptionalField": "Описание (опционально)",
+  "eventMeetingHint": "Мероприятие, встреча и т.д.",
+  "studentTabLabel": "Ученик",
+  "groupTabLabel": "Группа",
+  "noStudentsAvailableMessage": "Нет учеников",
+  "selectStudentLabel": "Выберите ученика",
+  "noGroupsAvailableMessage": "Нет групп",
+  "lessonsCountLabel": "Количество занятий:",
+  "lessonTimeTitle": "Время занятий",
+  "selectDatesInCalendarLabel": "Выбрать даты в календаре",
+  "selectedDatesCountLabel": "Выбрано: {count} дат",
+  "@selectedDatesCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "checkingConflictsProgress": "Проверка конфликтов...",
+  "willCreateLessonsCountMessage": "Будет создано {count} занятий",
+  "@willCreateLessonsCountMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "conflictsWillBeSkippedMessage": "Конфликты: {count} (будут пропущены)",
+  "@conflictsWillBeSkippedMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createSchedulesCountLabel": "Создать {count} расписаний",
+  "@createSchedulesCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createScheduleActionLabel": "Создать расписание",
+  "createLessonsCountLabel": "Создать {count} занятий",
+  "@createLessonsCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createLessonActionLabel": "Создать занятие",
+  "minBookingDurationError": "Минимальная длительность брони — 15 минут",
+  "roomsBookedSuccess": "Кабинеты забронированы",
+  "durationHoursMinutesFormat": "{hours} ч {minutes} мин",
+  "@durationHoursMinutesFormat": {
+    "placeholders": {
+      "hours": {"type": "int"},
+      "minutes": {"type": "int"}
+    }
+  },
+  "durationHoursOnlyFormat": "{hours} ч",
+  "@durationHoursOnlyFormat": {
+    "placeholders": {
+      "hours": {"type": "int"}
+    }
+  },
+  "durationMinutesOnlyFormat": "{minutes} мин",
+  "@durationMinutesOnlyFormat": {
+    "placeholders": {
+      "minutes": {"type": "int"}
+    }
+  },
+  "invalidTimeLabel": "Некорректно",
+  "dayStartTimeHelpText": "{day}: Начало занятия",
+  "@dayStartTimeHelpText": {
+    "placeholders": {
+      "day": {"type": "String"}
+    }
+  },
+  "dayEndTimeHelpText": "{day}: Конец занятия",
+  "@dayEndTimeHelpText": {
+    "placeholders": {
+      "day": {"type": "String"}
+    }
+  },
+  "minLessonDurationError": "Минимальная длительность занятия — 15 минут",
+  "permanentSchedulesCreatedMessage": "Создано {count} постоянных расписаний",
+  "@permanentSchedulesCreatedMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "permanentScheduleCreatedMessage": "Постоянное расписание создано",
+  "allDatesOccupiedError": "Все даты заняты",
+  "lessonsCreatedSkippedMessage": "Создано {created} занятий (пропущено: {skipped})",
+  "@lessonsCreatedSkippedMessage": {
+    "placeholders": {
+      "created": {"type": "int"},
+      "skipped": {"type": "int"}
+    }
+  },
+  "lessonsCreatedSuccessMessage": "Создано {count} занятий",
+  "@lessonsCreatedSuccessMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "groupLessonCreatedMessage": "Групповое занятие создано",
+  "lessonCreatedSuccessMessage": "Занятие создано",
+  "groupNameHint": "Например: Группа вокала",
+  "enterGroupName": "Введите название",
+  "unknownUserLabel": "Неизвестный пользователь",
+  "deletingProgress": "Удаление...",
+  "deleteBookingActionLabel": "Удалить бронь",
+  "bookingWillBeDeletedMessage": "Бронирование будет удалено и кабинеты освободятся.",
+  "bookingDeletedSuccess": "Бронь удалена",
+  "deletionErrorMessage": "Ошибка при удалении",
+  "bookRoomsLabel": "Забронировать кабинеты",
+  "selectMinOneRoomMessage": "Выберите минимум один кабинет",
+  "descriptionExampleHint": "Например: Репетиция, Мероприятие",
+  "bookingErrorMessage": "Ошибка бронирования",
+  "slotExceptionMessage": "Слот не будет действовать {date}.\n\nЭто позволит создать другое занятие в это время.",
+  "@slotExceptionMessage": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "exceptionAddedSuccess": "Исключение добавлено",
+  "pauseUntilHelpText": "Приостановить до",
+  "slotPausedUntilMessage": "Слот приостановлен до {date}",
+  "@slotPausedUntilMessage": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "slotResumedSuccess": "Слот возобновлён",
+  "slotDeactivateMessage": "Слот будет полностью отключён и не будет отображаться в расписании.\n\nВы сможете активировать его снова в карточке ученика.",
+  "slotDeactivatedSuccess": "Слот деактивирован",
+  "createLessonsForPeriodTitle": "Создать занятия на период",
+  "studentLabelWithName": "Ученик: {name}",
+  "@studentLabelWithName": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "fromDateLabel": "С даты",
+  "toDateLabelSchedule": "По дату",
+  "willBeCreatedCountMessage": "Будет создано: {count} занятий",
+  "@willBeCreatedCountMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "creatingProgress": "Создание...",
+  "createLessonsActionLabel": "Создать занятия",
+  "noDatesToCreateError": "Нет дат для создания",
+  "roomNotSpecifiedError": "Не указан кабинет",
+  "seriesLoadError": "Ошибка загрузки серии: {error}",
+  "@seriesLoadError": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "editSeriesLabel": "Редактировать серию",
+  "savingProgress": "Сохранение...",
+  "applyChangesLabel": "Применить изменения",
+  "byWeekdaysFilterLabel": "По дням недели",
+  "allLessonsLabel": "Все",
+  "seriesLessonsLabel": "Занятия серии ({count})",
+  "@seriesLessonsLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "selectedCountLabel": "Выбрано: {count}",
+  "@selectedCountLabel": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "changesTitle": "Изменения",
+  "timeChangeLabel": "Время",
+  "roomChangeLabel": "Кабинет",
+  "studentChangeLabel": "Ученик",
+  "subjectChangeLabel": "Предмет",
+  "lessonTypeChangeLabel": "Тип занятия",
+  "currentValueLabel": "текущий",
+  "willBeChangedCountMessage": "Будет изменено: {count} занятий",
+  "@willBeChangedCountMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "noLessonsToUpdateError": "Нет занятий для обновления (все имеют конфликты)",
+  "updatedLessonsSkippedMessage": "Обновлено {updated} занятий (пропущено: {skipped})",
+  "@updatedLessonsSkippedMessage": {
+    "placeholders": {
+      "updated": {"type": "int"},
+      "skipped": {"type": "int"}
+    }
+  },
+  "updatedLessonsSuccessMessage": "Обновлено {count} занятий",
+  "@updatedLessonsSuccessMessage": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "lessonSchedulePaused": "Приостановлено до {date}",
+  "@lessonSchedulePaused": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "lessonScheduleIndefinitePause": "Бессрочная пауза",
+  "temporaryRoomReplacementInfo": "Временно в кабинете {room} до {date}",
+  "@temporaryRoomReplacementInfo": {
+    "placeholders": {
+      "room": {"type": "String"},
+      "date": {"type": "String"}
+    }
+  },
+  "createLessonOnDateLabel": "Создать занятие на {date}",
+  "@createLessonOnDateLabel": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "completeLessonOnDateLabel": "Провести занятие на {date}",
+  "@completeLessonOnDateLabel": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "cancelLessonOnDateLabel": "Отменить занятие на {date}",
+  "@cancelLessonOnDateLabel": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "lessonCompletedSuccess": "Занятие проведено",
+  "lessonWillNotShowOnDate": "Занятие не будет отображаться на {date}.\n\nЭто не создаст запись в истории занятий.",
+  "@lessonWillNotShowOnDate": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "dateSkippedSuccess": "Дата пропущена",
+  "schedulePausedSuccess": "Расписание приостановлено",
+  "scheduleResumedSuccess": "Расписание возобновлено",
+  "scheduleDeactivatedSuccess": "Расписание деактивировано",
+
+  "january": "Январь",
+  "february": "Февраль",
+  "march": "Март",
+  "april": "Апрель",
+  "may": "Май",
+  "june": "Июнь",
+  "july": "Июль",
+  "august": "Август",
+  "september": "Сентябрь",
+  "october": "Октябрь",
+  "november": "Ноябрь",
+  "december": "Декабрь",
+
+  "changes": "Изменения",
+  "editSeries": "Редактировать серию",
+  "saving": "Сохранение...",
+  "applyChanges": "Применить изменения",
+  "all": "Все",
+  "byDaysOfWeek": "По дням недели",
+  "current": "текущий",
+  "noLessonsToUpdate": "Нет занятий для обновления (все имеют конфликты)",
+  "seriesLessonsCount": "Занятия серии ({count})",
+  "@seriesLessonsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "selectedCount": "Выбрано: {count}",
+  "@selectedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "willBeChangedLessons": "Будет изменено: {count} занятий",
+  "@willBeChangedLessons": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "seriesLoadError": "Ошибка загрузки серии: {error}",
+  "@seriesLoadError": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "creating": "Создание...",
+  "createLessonsButton": "Создать занятия",
+  "willBeCreatedLessons": "Будет создано: {count} занятий",
+  "@willBeCreatedLessons": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "noDatesToCreate": "Нет дат для создания",
+  "roomNotSpecified": "Не указан кабинет",
+  "lessonsCreatedCount": "Создано {count} занятий",
+  "@lessonsCreatedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "errorWithDetails": "Ошибка: {details}",
+  "@errorWithDetails": {
+    "placeholders": {
+      "details": {"type": "String"}
+    }
+  },
+
+  "createLessonsForPeriodTitle": "Создать занятия на период",
+  "fromDate": "С даты",
+  "toDate": "По дату",
+
+  "bookRooms": "Забронировать кабинеты",
+  "selectRooms": "Выберите кабинеты",
+  "selectAtLeastOneRoomValidation": "Выберите минимум один кабинет",
+  "descriptionOptionalField": "Описание (необязательно)",
+  "descriptionExampleHint": "Например: Репетиция, Мероприятие",
+  "roomsBooked": "Кабинеты забронированы",
+  "bookingError": "Ошибка бронирования",
+
+  "permanentSchedule": "Постоянное расписание",
+  "createLessonOn": "Создать занятие на {date}",
+  "@createLessonOn": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "pausedUntilDate": "Приостановлено до {date}",
+  "@pausedUntilDate": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "indefinitePause": "Бессрочная пауза",
+  "exceptionMessage": "Слот не будет действовать {date}.\n\nЭто позволит создать другое занятие в это время.",
+  "@exceptionMessage": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "exceptionAdded": "Исключение добавлено",
+  "pauseUntil": "Приостановить до",
+  "slotPausedUntil": "Слот приостановлен до {date}",
+  "@slotPausedUntil": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "slotResumed": "Слот возобновлён",
+  "deactivateSlotMessage": "Слот будет полностью отключён и не будет отображаться в расписании.\n\nВы сможете активировать его снова в карточке ученика.",
+  "slotDeactivated": "Слот деактивирован",
+
+  "temporaryRoomMessage": "Временно в кабинете {room} до {date}",
+  "@temporaryRoomMessage": {
+    "placeholders": {
+      "room": {"type": "String"},
+      "date": {"type": "String"}
+    }
+  },
+
+  "minLessonDuration": "Минимальная длительность занятия — 15 минут",
+  "permanentSchedulesCreated": "Создано {count} постоянных расписаний",
+  "@permanentSchedulesCreated": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "permanentScheduleCreated": "Постоянное расписание создано",
+  "allDatesOccupied": "Все даты заняты",
+  "lessonsCreatedWithSkipped": "Создано {created} занятий (пропущено: {skipped})",
+  "@lessonsCreatedWithSkipped": {
+    "placeholders": {
+      "created": {"type": "int"},
+      "skipped": {"type": "int"}
+    }
+  },
+  "groupLessonCreated": "Групповое занятие создано",
+  "lessonCreatedMessage": "Занятие создано",
+
+  "groupName": "Название группы",
+  "groupNameHint": "Например: Группа вокала",
+  "enterNameValidation": "Введите название",
+
+  "booked": "Забронировано",
+  "unknownUser": "Неизвестный пользователь",
+  "deleting": "Удаление...",
+  "deleteBooking": "Удалить бронь",
+  "bookingDeleted": "Бронь удалена",
+  "deleteError": "Ошибка при удалении",
+  "minBookingDuration": "Минимальная длительность брони — 15 минут",
+
+  "selectDatesInCalendar": "Выбрать даты в календаре",
+  "selectedDatesCount": "Выбрано: {count} дат",
+  "@selectedDatesCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "checkingConflictsMessage": "Проверка конфликтов...",
+  "willCreateLessons": "Будет создано {count} занятий",
+  "@willCreateLessons": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "conflictsWillBeSkipped": "Конфликты: {count} (будут пропущены)",
+  "@conflictsWillBeSkipped": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "createSchedulesCount": "Создать {count} расписаний",
+  "@createSchedulesCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createSchedule": "Создать расписание",
+  "createLessonsCount": "Создать {count} занятий",
+  "@createLessonsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createLessonSingle": "Создать занятие",
+
+  "lessonsUpdatedWithSkipped": "Обновлено {updated} занятий (пропущено: {skipped})",
+  "@lessonsUpdatedWithSkipped": {
+    "placeholders": {
+      "updated": {"type": "int"},
+      "skipped": {"type": "int"}
+    }
+  },
+  "lessonsUpdatedCount": "Обновлено {count} занятий",
+  "@lessonsUpdatedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "memberDataError": "Не удалось получить данные участника",
+  "allRoomsDisplayed": "Отображаются все кабинеты",
+  "roomsSelectedCount": "Выбрано кабинетов: {count}",
+  "@roomsSelectedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "whichRoomsDoYouUse": "Какими кабинетами вы пользуетесь?",
+  "defaultRooms": "Кабинеты по умолчанию",
+  "roomSetupFirstTimeDescription": "В расписании будут отображаться только выбранные кабинеты. Изменить настройку можно в любой момент через меню фильтров.",
+  "roomSetupDefaultDescription": "Выберите кабинеты, которые будут отображаться в расписании по умолчанию.",
+  "selectRoomsPlaceholder": "Выберите кабинеты",
+  "saveWithCount": "Сохранить ({count})",
+  "@saveWithCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "virtualLesson": "Виртуальное занятие",
+  "completeLessonOn": "Провести занятие на {date}",
+  "@completeLessonOn": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "cancelLessonOn": "Отменить занятие на {date}",
+  "@cancelLessonOn": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "lessonCompletedMessage": "Занятие проведено",
+  "skipDateMessage": "Занятие не будет отображаться на {date}.\n\nЭто не создаст запись в истории занятий.",
+  "@skipDateMessage": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "dateSkipped": "Дата пропущена",
+  "schedulePaused": "Расписание приостановлено",
+  "scheduleResumed": "Расписание возобновлено",
+  "scheduleDeactivated": "Расписание деактивировано",
+  "paymentLessonsWithDate": "{count} занятий • {date}",
+  "@paymentLessonsWithDate": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "date": {"type": "String"}
+    }
+  },
+  "subscriptionLessonsProgress": "{remaining} / {total} занятий",
+  "@subscriptionLessonsProgress": {
+    "placeholders": {
+      "remaining": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "daysRemainingShort": "({days} дн.)",
+  "@daysRemainingShort": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  }
+}

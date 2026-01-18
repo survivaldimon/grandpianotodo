@@ -10,6 +10,7 @@ import 'package:kabinet/core/widgets/empty_state.dart';
 import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/features/payment_plans/providers/payment_plan_provider.dart';
 import 'package:kabinet/shared/models/payment_plan.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 
 /// Экран управления тарифами оплаты
 class PaymentPlansScreen extends ConsumerStatefulWidget {
@@ -24,6 +25,7 @@ class PaymentPlansScreen extends ConsumerStatefulWidget {
 class _PaymentPlansScreenState extends ConsumerState<PaymentPlansScreen> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final plansAsync = ref.watch(paymentPlansProvider(widget.institutionId));
     final plans = plansAsync.valueOrNull ?? [];
     final hasPlans = plans.isNotEmpty;
@@ -33,7 +35,7 @@ class _PaymentPlansScreenState extends ConsumerState<PaymentPlansScreen> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, l10n)),
             backgroundColor: Colors.red,
           ),
         );
@@ -42,7 +44,7 @@ class _PaymentPlansScreenState extends ConsumerState<PaymentPlansScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Тарифы оплаты'),
+        title: Text(l10n.paymentPlans),
       ),
       floatingActionButton: hasPlans
           ? FloatingActionButton(
@@ -63,12 +65,12 @@ class _PaymentPlansScreenState extends ConsumerState<PaymentPlansScreen> {
           if (plans.isEmpty) {
             return EmptyState(
               icon: Icons.credit_card_outlined,
-              title: 'Нет тарифов',
-              subtitle: 'Добавьте первый тариф оплаты',
+              title: l10n.noPaymentPlans,
+              subtitle: l10n.addFirstPaymentPlan,
               action: ElevatedButton.icon(
                 onPressed: () => _showAddSheet(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Добавить тариф'),
+                label: Text(l10n.addPaymentPlan),
               ),
             );
           }
@@ -123,6 +125,7 @@ class _PaymentPlanCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final color = plan.color != null
         ? hexToColor(plan.color!)
         : AppColors.primary;
@@ -165,7 +168,7 @@ class _PaymentPlanCard extends ConsumerWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              '${plan.pricePerLesson.toStringAsFixed(0)} ₸/занятие • ${plan.validityDays} дн.',
+              '${l10n.pricePerLesson(plan.pricePerLesson.toStringAsFixed(0))} • ${plan.validityDays} ${l10n.daysShort}',
               style: TextStyle(
                 fontSize: 13,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -184,6 +187,7 @@ class _PaymentPlanCard extends ConsumerWidget {
   }
 
   void _showOptions(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -192,7 +196,7 @@ class _PaymentPlanCard extends ConsumerWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Редактировать'),
+              title: Text(l10n.edit),
               onTap: () {
                 Navigator.pop(context);
                 _showEditSheet(context);
@@ -200,7 +204,7 @@ class _PaymentPlanCard extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+              title: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
                 _showDeleteConfirmation(context, ref);
@@ -225,19 +229,20 @@ class _PaymentPlanCard extends ConsumerWidget {
   }
 
   void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить тариф?'),
+        title: Text(l10n.deletePaymentPlanQuestion),
         content: Text(
-          'Тариф "${plan.name}" будет удалён. Это действие нельзя отменить.',
+          l10n.paymentPlanWillBeDeleted(plan.name),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -246,15 +251,15 @@ class _PaymentPlanCard extends ConsumerWidget {
               final success = await controller.archive(plan.id, institutionId);
               if (success) {
                 scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Тариф удалён'),
+                  SnackBar(
+                    content: Text(l10n.paymentPlanDeleted),
                     backgroundColor: AppColors.error,
                   ),
                 );
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -306,10 +311,11 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
       );
 
       if (plan != null && mounted) {
+        final l10n = AppLocalizations.of(context);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Тариф "${plan.name}" создан'),
+            content: Text(l10n.paymentPlanCreated(plan.name)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -323,6 +329,7 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -373,15 +380,15 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Новый тариф',
-                            style: TextStyle(
+                          Text(
+                            l10n.newPaymentPlan,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Заполните данные тарифа',
+                            l10n.fillPaymentPlanData,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -398,8 +405,8 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название *',
-                    hintText: 'Например: Абонемент на 8 занятий',
+                    labelText: l10n.nameRequired,
+                    hintText: l10n.paymentPlanNameHint,
                     prefixIcon: const Icon(Icons.label_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -408,7 +415,7 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
-                  validator: (v) => v == null || v.isEmpty ? 'Введите название' : null,
+                  validator: (v) => v == null || v.isEmpty ? l10n.enterNameField : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -419,7 +426,7 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                       child: TextFormField(
                         controller: _lessonsController,
                         decoration: InputDecoration(
-                          labelText: 'Занятий *',
+                          labelText: l10n.lessonsRequired,
                           hintText: '8',
                           prefixIcon: const Icon(Icons.event_repeat),
                           border: OutlineInputBorder(
@@ -431,9 +438,9 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Обязательно';
+                          if (v == null || v.isEmpty) return l10n.required;
                           final num = int.tryParse(v);
-                          if (num == null || num <= 0) return 'Ошибка';
+                          if (num == null || num <= 0) return l10n.error;
                           return null;
                         },
                       ),
@@ -443,7 +450,7 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                       child: TextFormField(
                         controller: _priceController,
                         decoration: InputDecoration(
-                          labelText: 'Цена *',
+                          labelText: l10n.priceRequired,
                           hintText: '40000',
                           suffixText: '₸',
                           border: OutlineInputBorder(
@@ -455,9 +462,9 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Обязательно';
+                          if (v == null || v.isEmpty) return l10n.required;
                           final num = double.tryParse(v);
-                          if (num == null || num <= 0) return 'Ошибка';
+                          if (num == null || num <= 0) return l10n.error;
                           return null;
                         },
                       ),
@@ -470,7 +477,7 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                 TextFormField(
                   controller: _validityController,
                   decoration: InputDecoration(
-                    labelText: 'Срок действия (дней) *',
+                    labelText: l10n.validityDaysRequired,
                     hintText: '30',
                     prefixIcon: const Icon(Icons.calendar_today),
                     border: OutlineInputBorder(
@@ -482,9 +489,9 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Введите срок';
+                    if (v == null || v.isEmpty) return l10n.enterValidityDays;
                     final num = int.tryParse(v);
-                    if (num == null || num <= 0) return 'Некорректное значение';
+                    if (num == null || num <= 0) return l10n.invalidValueError;
                     return null;
                   },
                 ),
@@ -506,9 +513,9 @@ class _AddPlanSheetState extends ConsumerState<_AddPlanSheet> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Создать тариф',
-                            style: TextStyle(
+                        : Text(
+                            l10n.createPaymentPlan,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -585,10 +592,11 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
       );
 
       if (success && mounted) {
+        final l10n = AppLocalizations.of(context);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Тариф обновлён'),
+          SnackBar(
+            content: Text(l10n.paymentPlanUpdated),
             backgroundColor: AppColors.success,
           ),
         );
@@ -602,6 +610,7 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -652,15 +661,15 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Редактировать тариф',
-                            style: TextStyle(
+                          Text(
+                            l10n.editPaymentPlan,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'Измените данные тарифа',
+                            l10n.changePaymentPlanData,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
@@ -677,8 +686,8 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Название *',
-                    hintText: 'Например: Абонемент на 8 занятий',
+                    labelText: l10n.nameRequired,
+                    hintText: l10n.paymentPlanNameHint,
                     prefixIcon: const Icon(Icons.label_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -687,7 +696,7 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                   ),
                   textCapitalization: TextCapitalization.sentences,
-                  validator: (v) => v == null || v.isEmpty ? 'Введите название' : null,
+                  validator: (v) => v == null || v.isEmpty ? l10n.enterNameField : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -698,7 +707,7 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                       child: TextFormField(
                         controller: _lessonsController,
                         decoration: InputDecoration(
-                          labelText: 'Занятий *',
+                          labelText: l10n.lessonsRequired,
                           hintText: '8',
                           prefixIcon: const Icon(Icons.event_repeat),
                           border: OutlineInputBorder(
@@ -710,9 +719,9 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Обязательно';
+                          if (v == null || v.isEmpty) return l10n.required;
                           final num = int.tryParse(v);
-                          if (num == null || num <= 0) return 'Ошибка';
+                          if (num == null || num <= 0) return l10n.error;
                           return null;
                         },
                       ),
@@ -722,7 +731,7 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                       child: TextFormField(
                         controller: _priceController,
                         decoration: InputDecoration(
-                          labelText: 'Цена *',
+                          labelText: l10n.priceRequired,
                           hintText: '40000',
                           suffixText: '₸',
                           border: OutlineInputBorder(
@@ -734,9 +743,9 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Обязательно';
+                          if (v == null || v.isEmpty) return l10n.required;
                           final num = double.tryParse(v);
-                          if (num == null || num <= 0) return 'Ошибка';
+                          if (num == null || num <= 0) return l10n.error;
                           return null;
                         },
                       ),
@@ -749,7 +758,7 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                 TextFormField(
                   controller: _validityController,
                   decoration: InputDecoration(
-                    labelText: 'Срок действия (дней) *',
+                    labelText: l10n.validityDaysRequired,
                     hintText: '30',
                     prefixIcon: const Icon(Icons.calendar_today),
                     border: OutlineInputBorder(
@@ -761,9 +770,9 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Введите срок';
+                    if (v == null || v.isEmpty) return l10n.enterValidityDays;
                     final num = int.tryParse(v);
-                    if (num == null || num <= 0) return 'Некорректное значение';
+                    if (num == null || num <= 0) return l10n.invalidValueError;
                     return null;
                   },
                 ),
@@ -771,7 +780,7 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
 
                 // Выбор цвета
                 ColorPickerField(
-                  label: 'Цвет',
+                  label: l10n.color,
                   selectedColor: _selectedColor,
                   onColorChanged: (color) => setState(() => _selectedColor = color),
                 ),
@@ -793,9 +802,9 @@ class _EditPlanSheetState extends ConsumerState<_EditPlanSheet> {
                             height: 24,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text(
-                            'Сохранить',
-                            style: TextStyle(
+                        : Text(
+                            l10n.save,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),

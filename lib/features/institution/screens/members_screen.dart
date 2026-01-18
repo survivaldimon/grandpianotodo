@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/color_picker_field.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
@@ -33,13 +33,14 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
     final institutionAsync = ref.watch(currentInstitutionProvider(widget.institutionId));
     final currentUserId = ref.watch(currentUserIdProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.teamMembers),
+        title: Text(l10n.teamMembers),
       ),
       body: Builder(
         builder: (context) {
@@ -52,8 +53,8 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
 
           // Всегда показываем данные (даже если фоном ошибка)
           if (members.isEmpty) {
-            return const Center(
-              child: Text('Нет участников'),
+            return Center(
+              child: Text(l10n.noMembers),
             );
           }
 
@@ -84,6 +85,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
               final isMemberOwner = member.userId == ownerId;
 
               return _MemberTile(
+                l10n: l10n,
                 member: member,
                 canManageMembers: canManageMembers,
                 isCurrentUser: isCurrentUser,
@@ -101,6 +103,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
 }
 
 class _MemberTile extends ConsumerWidget {
+  final AppLocalizations l10n;
   final InstitutionMember member;
   final bool canManageMembers;
   final bool isCurrentUser;
@@ -110,6 +113,7 @@ class _MemberTile extends ConsumerWidget {
   final String institutionId;
 
   const _MemberTile({
+    required this.l10n,
     required this.member,
     required this.canManageMembers,
     required this.isCurrentUser,
@@ -121,7 +125,7 @@ class _MemberTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name = member.profile?.fullName ?? 'Без имени';
+    final name = member.profile?.fullName ?? l10n.noName;
     final email = member.profile?.email ?? '';
     final isMemberAdmin = member.isAdmin;
 
@@ -192,9 +196,9 @@ class _MemberTile extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
               ),
-              child: const Text(
-                'Админ',
-                style: TextStyle(
+              child: Text(
+                l10n.adminBadge,
+                style: const TextStyle(
                   fontSize: 11,
                   color: AppColors.primary,
                   fontWeight: FontWeight.w500,
@@ -209,9 +213,9 @@ class _MemberTile extends ConsumerWidget {
                 color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Вы',
-                style: TextStyle(
+              child: Text(
+                l10n.you,
+                style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.primary,
                 ),
@@ -283,76 +287,76 @@ class _MemberTile extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Text('Изменить цвет'),
+                        Text(l10n.changeColor),
                       ],
                     ),
                   ),
                 // Направления — себе или админ/владелец любому
                 if (canChangeColor)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'subjects',
                     child: Row(
                       children: [
-                        Icon(Icons.school, size: 20),
-                        SizedBox(width: 8),
-                        Text('Направления'),
+                        const Icon(Icons.school, size: 20),
+                        const SizedBox(width: 8),
+                        Text(l10n.directions),
                       ],
                     ),
                   ),
                 if (canEditThisMember)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'edit',
                     child: Row(
                       children: [
-                        Icon(Icons.edit, size: 20),
-                        SizedBox(width: 8),
-                        Text('Изменить роль'),
+                        const Icon(Icons.edit, size: 20),
+                        const SizedBox(width: 8),
+                        Text(l10n.changeRole),
                       ],
                     ),
                   ),
                 if (canEditThisMember)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'permissions',
                     child: Row(
                       children: [
-                        Icon(Icons.security, size: 20),
-                        SizedBox(width: 8),
-                        Text('Права доступа'),
+                        const Icon(Icons.security, size: 20),
+                        const SizedBox(width: 8),
+                        Text(l10n.accessRights),
                       ],
                     ),
                   ),
                 // Управление занятиями преподавателя (для себя или если есть права)
                 if (canEditThisMember || isCurrentUser)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'manage_lessons',
                     child: Row(
                       children: [
-                        Icon(Icons.event_note, size: 20, color: AppColors.primary),
-                        SizedBox(width: 8),
-                        Text('Управление занятиями'),
+                        const Icon(Icons.event_note, size: 20, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(l10n.manageLessons),
                       ],
                     ),
                   ),
                 // Передача владения - только для владельца
                 if (isViewerOwner && canEditThisMember)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'transfer',
                     child: Row(
                       children: [
-                        Icon(Icons.swap_horiz, size: 20, color: AppColors.warning),
-                        SizedBox(width: 8),
-                        Text('Передать владение', style: TextStyle(color: AppColors.warning)),
+                        const Icon(Icons.swap_horiz, size: 20, color: AppColors.warning),
+                        const SizedBox(width: 8),
+                        Text(l10n.transfer, style: const TextStyle(color: AppColors.warning)),
                       ],
                     ),
                   ),
                 if (canEditThisMember)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'remove',
                     child: Row(
                       children: [
-                        Icon(Icons.person_remove, size: 20, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Удалить', style: TextStyle(color: Colors.red)),
+                        const Icon(Icons.person_remove, size: 20, color: Colors.red),
+                        const SizedBox(width: 8),
+                        Text(l10n.delete, style: const TextStyle(color: Colors.red)),
                       ],
                     ),
                   ),
@@ -373,21 +377,21 @@ class _MemberTile extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Изменить роль'),
+        title: Text(l10n.changeRole),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              member.profile?.fullName ?? 'Участник',
+              member.profile?.fullName ?? l10n.member,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Название роли',
-                hintText: 'Например: Преподаватель, Администратор',
+              decoration: InputDecoration(
+                labelText: l10n.roleName,
+                hintText: l10n.roleNameHint,
               ),
               textCapitalization: TextCapitalization.sentences,
               autofocus: true,
@@ -397,7 +401,7 @@ class _MemberTile extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -409,7 +413,7 @@ class _MemberTile extends ConsumerWidget {
                 Navigator.pop(dialogContext);
               }
             },
-            child: const Text('Сохранить'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -468,7 +472,7 @@ class _MemberTile extends ConsumerWidget {
       if (success && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(color != null ? 'Цвет обновлён' : 'Цвет сброшен'),
+            content: Text(color != null ? l10n.colorUpdated : l10n.colorReset),
             backgroundColor: AppColors.success,
           ),
         );
@@ -477,7 +481,7 @@ class _MemberTile extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithDetails(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -489,14 +493,14 @@ class _MemberTile extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить участника?'),
+        title: Text(l10n.removeMemberQuestion),
         content: Text(
-          'Вы уверены, что хотите удалить ${member.profile?.fullName ?? "участника"} из заведения?',
+          l10n.removeMemberConfirmation(member.profile?.fullName ?? l10n.member),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -505,9 +509,9 @@ class _MemberTile extends ConsumerWidget {
                 Navigator.pop(dialogContext);
               }
             },
-            child: const Text(
-              'Удалить',
-              style: TextStyle(color: Colors.red),
+            child: Text(
+              l10n.delete,
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -526,25 +530,25 @@ class _MemberTile extends ConsumerWidget {
   }
 
   void _showTransferOwnershipDialog(BuildContext context, WidgetRef ref) {
-    final memberName = member.profile?.fullName ?? 'этого участника';
+    final memberName = member.profile?.fullName ?? l10n.member;
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: AppColors.warning),
-            SizedBox(width: 8),
-            Text('Передать владение?'),
+            const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+            const SizedBox(width: 8),
+            Text(l10n.transferOwnershipQuestion),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Вы собираетесь передать права владельца пользователю:',
-              style: TextStyle(fontSize: 14),
+            Text(
+              l10n.transferOwnershipWarning,
+              style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
             Container(
@@ -574,22 +578,20 @@ class _MemberTile extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Внимание!',
-                    style: TextStyle(
+                    l10n.transferWarningTitle,
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: AppColors.error,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
-                    '• Вы потеряете права владельца\n'
-                    '• Новый владелец сможет удалить заведение\n'
-                    '• Это действие нельзя отменить самостоятельно',
-                    style: TextStyle(fontSize: 13, color: AppColors.error),
+                    l10n.transferWarningPoints,
+                    style: const TextStyle(fontSize: 13, color: AppColors.error),
                   ),
                 ],
               ),
@@ -599,7 +601,7 @@ class _MemberTile extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -610,7 +612,7 @@ class _MemberTile extends ConsumerWidget {
               Navigator.pop(dialogContext);
               await _transferOwnership(context, ref);
             },
-            child: const Text('Передать'),
+            child: Text(l10n.transfer),
           ),
         ],
       ),
@@ -631,7 +633,7 @@ class _MemberTile extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Права владельца переданы ${member.profile?.fullName ?? "участнику"}'),
+            content: Text(l10n.ownershipTransferred(member.profile?.fullName ?? l10n.member)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -640,7 +642,7 @@ class _MemberTile extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithDetails(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -654,8 +656,9 @@ class _MemberTile extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => _TeacherBulkActionsSheet(
+        l10n: l10n,
         teacherId: member.userId,
-        teacherName: member.profile?.fullName ?? 'Преподаватель',
+        teacherName: member.profile?.fullName ?? l10n.teacher,
         institutionId: institutionId,
       ),
     );
@@ -664,11 +667,13 @@ class _MemberTile extends ConsumerWidget {
 
 /// BottomSheet для bulk-операций с занятиями преподавателя
 class _TeacherBulkActionsSheet extends ConsumerStatefulWidget {
+  final AppLocalizations l10n;
   final String teacherId;
   final String teacherName;
   final String institutionId;
 
   const _TeacherBulkActionsSheet({
+    required this.l10n,
     required this.teacherId,
     required this.teacherName,
     required this.institutionId,
@@ -716,6 +721,7 @@ class _TeacherBulkActionsSheetState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = widget.l10n;
     final theme = Theme.of(context);
 
     return Container(
@@ -751,7 +757,7 @@ class _TeacherBulkActionsSheetState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Управление занятиями',
+                        l10n.manageLessons,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -789,7 +795,7 @@ class _TeacherBulkActionsSheetState
                             const Icon(Icons.schedule, color: AppColors.primary),
                             const SizedBox(width: 12),
                             Text(
-                              'Будущих занятий: $_futureCount',
+                              l10n.futureLessonsCount(_futureCount ?? 0),
                               style: theme.textTheme.titleSmall,
                             ),
                           ],
@@ -801,9 +807,8 @@ class _TeacherBulkActionsSheetState
                         // Удалить все занятия
                         _ActionButton(
                           icon: Icons.delete_outline,
-                          label: 'Удалить все будущие занятия',
-                          description:
-                              'Занятия будут удалены без изменения баланса учеников',
+                          label: l10n.deleteAllFutureLessons,
+                          description: l10n.deleteAllFutureLessonsDescription,
                           color: AppColors.error,
                           isLoading: _isDeleting,
                           onTap: _showDeleteConfirmation,
@@ -812,9 +817,8 @@ class _TeacherBulkActionsSheetState
                         // Переназначить преподавателя
                         _ActionButton(
                           icon: Icons.swap_horiz,
-                          label: 'Переназначить преподавателя',
-                          description:
-                              'Передать все занятия другому преподавателю',
+                          label: l10n.reassignTeacher,
+                          description: l10n.reassignTeacherDescription,
                           color: AppColors.primary,
                           onTap: _showReassignSheet,
                         ),
@@ -823,7 +827,7 @@ class _TeacherBulkActionsSheetState
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Text(
-                              'Нет будущих занятий для управления',
+                              l10n.noFutureLessonsToManage,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -842,21 +846,22 @@ class _TeacherBulkActionsSheetState
   }
 
   void _showDeleteConfirmation() {
+    final l10n = widget.l10n;
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: AppColors.warning),
-            SizedBox(width: 8),
-            Text('Удалить занятия?'),
+            const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+            const SizedBox(width: 8),
+            Text(l10n.deleteLessonsQuestion),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Будет удалено $_futureCount занятий преподавателя:'),
+            Text(l10n.deleteLessonsCount(_futureCount ?? 0)),
             const SizedBox(height: 8),
             Text(
               widget.teacherName,
@@ -870,10 +875,9 @@ class _TeacherBulkActionsSheetState
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
               ),
-              child: const Text(
-                'Баланс абонементов учеников не изменится.\n'
-                'Это действие нельзя отменить.',
-                style: TextStyle(fontSize: 13),
+              child: Text(
+                l10n.deleteLessonsWarning,
+                style: const TextStyle(fontSize: 13),
               ),
             ),
           ],
@@ -881,7 +885,7 @@ class _TeacherBulkActionsSheetState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -892,7 +896,7 @@ class _TeacherBulkActionsSheetState
               Navigator.pop(dialogContext);
               _deleteAllLessons();
             },
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -901,6 +905,7 @@ class _TeacherBulkActionsSheetState
 
   Future<void> _deleteAllLessons() async {
     setState(() => _isDeleting = true);
+    final l10n = widget.l10n;
 
     try {
       final repo = ref.read(lessonRepositoryProvider);
@@ -915,7 +920,7 @@ class _TeacherBulkActionsSheetState
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Удалено занятий: $deleted'),
+            content: Text(l10n.lessonsDeletedCount(deleted)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -925,7 +930,7 @@ class _TeacherBulkActionsSheetState
         setState(() => _isDeleting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithDetails(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -940,6 +945,7 @@ class _TeacherBulkActionsSheetState
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => _TeacherReassignSheet(
+        l10n: widget.l10n,
         teacherId: widget.teacherId,
         teacherName: widget.teacherName,
         institutionId: widget.institutionId,
@@ -1030,12 +1036,14 @@ class _ActionButton extends StatelessWidget {
 
 /// BottomSheet для переназначения занятий другому преподавателю
 class _TeacherReassignSheet extends ConsumerStatefulWidget {
+  final AppLocalizations l10n;
   final String teacherId;
   final String teacherName;
   final String institutionId;
   final int lessonsCount;
 
   const _TeacherReassignSheet({
+    required this.l10n,
     required this.teacherId,
     required this.teacherName,
     required this.institutionId,
@@ -1057,6 +1065,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = widget.l10n;
     final theme = Theme.of(context);
     final membersAsync = ref.watch(membersStreamProvider(widget.institutionId));
 
@@ -1093,13 +1102,13 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Переназначить занятия',
+                        l10n.reassignLessons,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        '${widget.lessonsCount} занятий от ${widget.teacherName}',
+                        l10n.reassignLessonsFrom(widget.lessonsCount, widget.teacherName),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -1120,13 +1129,13 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                 children: [
                   // Выбор нового преподавателя
                   Text(
-                    'Выберите нового преподавателя:',
+                    l10n.selectNewTeacher,
                     style: theme.textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
                   membersAsync.when(
                     loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Text('Ошибка: $e'),
+                    error: (e, _) => Text(l10n.errorWithDetails(e.toString())),
                     data: (members) {
                       // Фильтруем текущего преподавателя
                       final otherMembers = members
@@ -1134,14 +1143,14 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                           .toList();
 
                       if (otherMembers.isEmpty) {
-                        return const Text('Нет других преподавателей');
+                        return Text(l10n.noOtherTeachers);
                       }
 
                       return DropdownButtonFormField<String>(
                         key: ValueKey(_selectedTeacherId),
                         initialValue: _selectedTeacherId,
                         decoration: InputDecoration(
-                          labelText: 'Преподаватель',
+                          labelText: l10n.teacher,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -1149,7 +1158,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                         items: otherMembers.map((m) {
                           return DropdownMenuItem(
                             value: m.userId,
-                            child: Text(m.profile?.fullName ?? 'Без имени'),
+                            child: Text(m.profile?.fullName ?? l10n.noName),
                           );
                         }).toList(),
                         onChanged: (value) {
@@ -1172,7 +1181,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                     const SizedBox(height: 8),
                     Center(
                       child: Text(
-                        'Проверка конфликтов...',
+                        l10n.checkingConflicts,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -1197,7 +1206,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                                   color: AppColors.warning, size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                'Найдено ${_conflicts.length} конфликтов',
+                                l10n.conflictsFound(_conflicts.length),
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   color: AppColors.warning,
                                   fontWeight: FontWeight.bold,
@@ -1241,7 +1250,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                           if (_conflicts.length > 5) ...[
                             const SizedBox(height: 8),
                             Text(
-                              '...и ещё ${_conflicts.length - 5} конфликтов',
+                              l10n.andMoreConflicts(_conflicts.length - 5),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -1267,7 +1276,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Конфликтов не найдено. Все занятия будут переназначены.',
+                              l10n.noConflictsFound,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: AppColors.success,
                               ),
@@ -1290,7 +1299,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Отмена'),
+                    child: Text(l10n.cancel),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1313,8 +1322,8 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
                             ),
                           )
                         : Text(_conflicts.isNotEmpty
-                            ? 'Пропустить конфликты'
-                            : 'Переназначить'),
+                            ? l10n.skipConflicts
+                            : l10n.reassign),
                   ),
                 ),
               ],
@@ -1327,6 +1336,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
 
   Future<void> _checkConflicts(String newTeacherId) async {
     setState(() => _isCheckingConflicts = true);
+    final l10n = widget.l10n;
 
     try {
       final repo = ref.read(lessonRepositoryProvider);
@@ -1357,7 +1367,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка проверки: $e'),
+            content: Text(l10n.conflictCheckError(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1369,6 +1379,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
     if (_selectedTeacherId == null || _futureLessons == null) return;
 
     setState(() => _isReassigning = true);
+    final l10n = widget.l10n;
 
     try {
       final repo = ref.read(lessonRepositoryProvider);
@@ -1384,8 +1395,8 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
         if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Нет занятий для переназначения'),
+            SnackBar(
+              content: Text(l10n.noLessonsToReassign),
               backgroundColor: AppColors.warning,
             ),
           );
@@ -1399,12 +1410,12 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
 
       if (mounted) {
         Navigator.pop(context);
+        final skippedText = _conflicts.isNotEmpty
+            ? ' (${l10n.skippedConflicts(_conflicts.length)})'
+            : '';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Переназначено занятий: ${lessonsToReassign.length}'
-              '${_conflicts.isNotEmpty ? ' (пропущено: ${_conflicts.length})' : ''}',
-            ),
+            content: Text('${l10n.reassignedCount(lessonsToReassign.length)}$skippedText'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -1414,7 +1425,7 @@ class _TeacherReassignSheetState extends ConsumerState<_TeacherReassignSheet> {
         setState(() => _isReassigning = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorWithDetails(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1445,6 +1456,7 @@ class _SubjectsSelectionSheetState extends ConsumerState<_SubjectsSelectionSheet
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final subjectsAsync = ref.watch(subjectsListProvider(widget.institutionId));
     final teacherSubjectsAsync = ref.watch(teacherSubjectsProvider(
@@ -1494,13 +1506,13 @@ class _SubjectsSelectionSheetState extends ConsumerState<_SubjectsSelectionSheet
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Направления',
+                        l10n.directions,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        widget.member.profile?.fullName ?? 'Участник',
+                        widget.member.profile?.fullName ?? l10n.member,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -1517,7 +1529,7 @@ class _SubjectsSelectionSheetState extends ConsumerState<_SubjectsSelectionSheet
                 else
                   TextButton(
                     onPressed: _hasChanges ? _save : null,
-                    child: const Text('Сохранить'),
+                    child: Text(l10n.save),
                   ),
               ],
             ),
@@ -1527,7 +1539,7 @@ class _SubjectsSelectionSheetState extends ConsumerState<_SubjectsSelectionSheet
           Flexible(
             child: subjectsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Ошибка: $e')),
+              error: (e, _) => Center(child: Text(l10n.errorWithDetails(e.toString()))),
               data: (subjects) {
                 if (subjects.isEmpty) {
                   return Center(
@@ -1543,7 +1555,7 @@ class _SubjectsSelectionSheetState extends ConsumerState<_SubjectsSelectionSheet
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Нет доступных направлений',
+                            l10n.noSubjectsAvailable,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -1639,10 +1651,11 @@ class _SubjectsSelectionSheetState extends ConsumerState<_SubjectsSelectionSheet
     setState(() => _isSaving = false);
 
     if (mounted) {
+      final l10n = AppLocalizations.of(context);
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Направления обновлены'),
+        SnackBar(
+          content: Text(l10n.subjectsUpdated),
           backgroundColor: AppColors.success,
         ),
       );

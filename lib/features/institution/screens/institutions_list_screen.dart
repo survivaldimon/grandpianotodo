@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/widgets/empty_state.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
@@ -35,15 +35,16 @@ class _InstitutionsListScreenState extends ConsumerState<InstitutionsListScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final institutionsAsync = ref.watch(myInstitutionsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.institutions),
+        title: Text(l10n.institutions),
         actions: [
           IconButton(
             icon: const Icon(Icons.archive_outlined),
-            tooltip: 'Архив',
+            tooltip: l10n.archive,
             onPressed: () => _showArchivedInstitutions(context, ref),
           ),
           IconButton(
@@ -78,7 +79,7 @@ class _InstitutionsListScreenState extends ConsumerState<InstitutionsListScreen>
             return const LoadingIndicator();
           }
           if (institutions.isEmpty) {
-            return _buildEmptyState(context);
+            return _buildEmptyState(context, l10n);
           }
           return _buildInstitutionsList(context, ref, institutions);
         },
@@ -86,28 +87,28 @@ class _InstitutionsListScreenState extends ConsumerState<InstitutionsListScreen>
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddOptions(context),
         icon: const Icon(Icons.add),
-        label: const Text(AppStrings.add),
+        label: Text(l10n.add),
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(BuildContext context, AppLocalizations l10n) {
     return EmptyState(
       icon: Icons.business_outlined,
-      title: 'Нет заведений',
-      subtitle: 'Создайте новое заведение или присоединитесь по коду',
+      title: l10n.noInstitutions,
+      subtitle: l10n.createOrJoin,
       action: Column(
         children: [
           ElevatedButton.icon(
             onPressed: () => context.push('/institutions/create'),
             icon: const Icon(Icons.add),
-            label: const Text(AppStrings.createInstitution),
+            label: Text(l10n.createInstitution),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => context.push('/join'),
             icon: const Icon(Icons.group_add),
-            label: const Text(AppStrings.joinInstitution),
+            label: Text(l10n.joinInstitution),
           ),
         ],
       ),
@@ -140,9 +141,10 @@ class _InstitutionsListScreenState extends ConsumerState<InstitutionsListScreen>
   }
 
   void _showAddOptions(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
-      builder: (context) => Padding(
+      builder: (sheetContext) => Padding(
         padding: AppSizes.paddingAllL,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -150,17 +152,17 @@ class _InstitutionsListScreenState extends ConsumerState<InstitutionsListScreen>
           children: [
             ListTile(
               leading: const Icon(Icons.add_business),
-              title: const Text(AppStrings.createInstitution),
+              title: Text(l10n.createInstitution),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 context.push('/institutions/create');
               },
             ),
             ListTile(
               leading: const Icon(Icons.group_add),
-              title: const Text(AppStrings.joinInstitution),
+              title: Text(l10n.joinInstitution),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 context.push('/join');
               },
             ),
@@ -247,6 +249,7 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final archivedAsync = ref.watch(archivedInstitutionsProvider);
     final controllerState = ref.watch(institutionControllerProvider);
     final theme = Theme.of(context);
@@ -256,7 +259,7 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ErrorView.getUserFriendlyMessage(next.error!)),
+            content: Text(ErrorView.getLocalizedErrorMessage(next.error!, l10n)),
             backgroundColor: Colors.red,
           ),
         );
@@ -272,7 +275,7 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
               const Icon(Icons.archive),
               const SizedBox(width: 12),
               Text(
-                'Архив заведений',
+                l10n.archivedInstitutions,
                 style: theme.textTheme.titleLarge,
               ),
             ],
@@ -291,13 +294,13 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
 
               // Всегда показываем данные (даже если фоном ошибка)
               if (institutions.isEmpty) {
-                return const Center(
+                return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text('Архив пуст'),
+                      const Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      Text(l10n.archiveEmpty),
                     ],
                   ),
                 );
@@ -325,7 +328,7 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
                       ),
                       title: Text(institution.name),
                       subtitle: Text(
-                        'Архивировано ${_formatDate(institution.archivedAt)}',
+                        l10n.archivedOn(_formatDate(institution.archivedAt)),
                         style: theme.textTheme.bodySmall,
                       ),
                       trailing: controllerState.isLoading
@@ -336,23 +339,23 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
                             )
                           : IconButton(
                               icon: const Icon(Icons.restore),
-                              tooltip: 'Восстановить',
+                              tooltip: l10n.restore,
                               onPressed: () async {
                                 final confirmed = await showDialog<bool>(
                                   context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Восстановить заведение?'),
+                                  builder: (dialogContext) => AlertDialog(
+                                    title: Text(l10n.restoreInstitutionQuestion),
                                     content: Text(
-                                      'Заведение "${institution.name}" будет восстановлено и появится в основном списке.',
+                                      l10n.restoreInstitutionMessage(institution.name),
                                     ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(context).pop(false),
-                                        child: const Text('Отмена'),
+                                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                                        child: Text(l10n.cancel),
                                       ),
                                       TextButton(
-                                        onPressed: () => Navigator.of(context).pop(true),
-                                        child: const Text('Восстановить'),
+                                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                                        child: Text(l10n.restore),
                                       ),
                                     ],
                                   ),
@@ -365,8 +368,8 @@ class _ArchivedInstitutionsSheet extends ConsumerWidget {
 
                                   if (success && context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Заведение восстановлено'),
+                                      SnackBar(
+                                        content: Text(l10n.institutionRestored),
                                         backgroundColor: Colors.green,
                                       ),
                                     );

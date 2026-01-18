@@ -10,8 +10,9 @@ import 'package:kabinet/app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Инициализация локали для дат
+  // Инициализация локалей для дат (русский + английский)
   await initializeDateFormatting('ru', null);
+  await initializeDateFormatting('en', null);
 
   // Инициализация Hive кэша (Telegram/Instagram-style offline support)
   await CacheService.initialize();

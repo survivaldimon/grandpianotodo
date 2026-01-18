@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:kabinet/core/config/supabase_config.dart';
-import 'package:kabinet/core/constants/app_strings.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 import 'package:kabinet/core/constants/app_sizes.dart';
 import 'package:kabinet/core/theme/app_colors.dart';
 import 'package:kabinet/core/widgets/loading_indicator.dart';
-import 'package:kabinet/core/widgets/error_view.dart';
 import 'package:kabinet/features/institution/providers/institution_provider.dart';
 import 'package:kabinet/features/institution/providers/member_provider.dart';
 import 'package:kabinet/features/payments/providers/payment_provider.dart';
@@ -159,6 +158,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     required List<Subject> subjects,
     required List<InstitutionMember> members,
     required List<PaymentPlan> plans,
+    required AppLocalizations l10n,
   }) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -167,35 +167,35 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
         children: [
           // Кнопка "Ученики"
           _FilterButton(
-            label: 'Ученики',
+            label: l10n.filterStudents,
             isActive: _selectedStudentIds.isNotEmpty,
             onTap: () => _showStudentsSheet(students),
           ),
           const SizedBox(width: 8),
           // Кнопка "Предметы"
           _FilterButton(
-            label: 'Предметы',
+            label: l10n.filterSubjects,
             isActive: _selectedSubjectIds.isNotEmpty,
             onTap: () => _showSubjectsSheet(subjects),
           ),
           const SizedBox(width: 8),
           // Кнопка "Преподаватели"
           _FilterButton(
-            label: 'Преподаватели',
+            label: l10n.filterTeachers,
             isActive: _selectedTeacherIds.isNotEmpty,
             onTap: () => _showTeachersSheet(members),
           ),
           const SizedBox(width: 8),
           // Кнопка "Тарифы"
           _FilterButton(
-            label: 'Тарифы',
+            label: l10n.filterPlans,
             isActive: _selectedPlanIds.isNotEmpty,
             onTap: () => _showPlansSheet(plans),
           ),
           const SizedBox(width: 8),
           // Кнопка "Способ оплаты"
           _FilterButton(
-            label: 'Способ',
+            label: l10n.filterMethod,
             isActive: _selectedPaymentMethods.isNotEmpty,
             onTap: () => _showPaymentMethodsSheet(),
           ),
@@ -205,7 +205,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
             IconButton(
               icon: const Icon(Icons.clear, size: 20),
               onPressed: _resetFilters,
-              tooltip: 'Сбросить фильтры',
+              tooltip: l10n.resetFilters,
               style: IconButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
                 padding: const EdgeInsets.all(8),
@@ -220,6 +220,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
   /// Показывает BottomSheet с выбором учеников
   void _showStudentsSheet(List<Student> students) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -232,13 +233,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Ученики', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(l10n.students, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     TextButton(
                       onPressed: () {
                         setState(() => _selectedStudentIds = {});
                         setSheetState(() {});
                       },
-                      child: const Text('Сбросить'),
+                      child: Text(l10n.reset),
                     ),
                   ],
                 ),
@@ -254,7 +255,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                         setState(() => _selectedStudentIds = {});
                         setSheetState(() {});
                       },
-                      title: const Text('Все'),
+                      title: Text(l10n.all),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     ...students.map((student) {
@@ -287,6 +288,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
   /// Показывает BottomSheet с выбором предметов
   void _showSubjectsSheet(List<Subject> subjects) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -299,13 +301,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Предметы', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(l10n.subjects, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     TextButton(
                       onPressed: () {
                         setState(() => _selectedSubjectIds = {});
                         setSheetState(() {});
                       },
-                      child: const Text('Сбросить'),
+                      child: Text(l10n.reset),
                     ),
                   ],
                 ),
@@ -321,7 +323,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                         setState(() => _selectedSubjectIds = {});
                         setSheetState(() {});
                       },
-                      title: const Text('Все'),
+                      title: Text(l10n.all),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     ...subjects.map((subject) {
@@ -354,6 +356,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
   /// Показывает BottomSheet с выбором преподавателей
   void _showTeachersSheet(List<InstitutionMember> members) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -366,13 +369,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Преподаватели', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(l10n.teachers, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     TextButton(
                       onPressed: () {
                         setState(() => _selectedTeacherIds = {});
                         setSheetState(() {});
                       },
-                      child: const Text('Сбросить'),
+                      child: Text(l10n.reset),
                     ),
                   ],
                 ),
@@ -388,7 +391,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                         setState(() => _selectedTeacherIds = {});
                         setSheetState(() {});
                       },
-                      title: const Text('Все'),
+                      title: Text(l10n.all),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     ...members.map((member) {
@@ -425,6 +428,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
   /// Показывает BottomSheet с выбором тарифов
   void _showPlansSheet(List<PaymentPlan> plans) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -437,13 +441,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Тарифы', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(l10n.paymentPlans, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     TextButton(
                       onPressed: () {
                         setState(() => _selectedPlanIds = {});
                         setSheetState(() {});
                       },
-                      child: const Text('Сбросить'),
+                      child: Text(l10n.reset),
                     ),
                   ],
                 ),
@@ -459,7 +463,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                         setState(() => _selectedPlanIds = {});
                         setSheetState(() {});
                       },
-                      title: const Text('Все'),
+                      title: Text(l10n.all),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     ...plans.map((plan) {
@@ -477,7 +481,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                           setSheetState(() {});
                         },
                         title: Text(plan.name),
-                        subtitle: Text('${plan.lessonsCount} занятий'),
+                        subtitle: Text(l10n.lessonsCountLabel(plan.lessonsCount)),
                         controlAffinity: ListTileControlAffinity.leading,
                       );
                     }),
@@ -493,6 +497,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
   /// Показывает BottomSheet с выбором способа оплаты
   void _showPaymentMethodsSheet() {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -505,13 +510,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Способ оплаты', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(l10n.paymentMethod, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     TextButton(
                       onPressed: () {
                         setState(() => _selectedPaymentMethods = {});
                         setSheetState(() {});
                       },
-                      child: const Text('Сбросить'),
+                      child: Text(l10n.reset),
                     ),
                   ],
                 ),
@@ -524,7 +529,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                   setState(() => _selectedPaymentMethods = {});
                   setSheetState(() {});
                 },
-                title: const Text('Все'),
+                title: Text(l10n.all),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
               CheckboxListTile(
@@ -539,7 +544,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                   });
                   setSheetState(() {});
                 },
-                title: const Text('Карта'),
+                title: Text(l10n.card),
                 secondary: const Icon(Icons.credit_card, color: AppColors.primary),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
@@ -555,7 +560,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                   });
                   setSheetState(() {});
                 },
-                title: const Text('Наличные'),
+                title: Text(l10n.cash),
                 secondary: const Icon(Icons.payments_outlined, color: AppColors.success),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
@@ -574,18 +579,18 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     return getPeriodDates(period, customRange: customRange);
   }
 
-  String _periodLabel(StatsPeriod period) {
+  String _periodLabel(StatsPeriod period, AppLocalizations l10n) {
     switch (period) {
       case StatsPeriod.week:
-        return 'Неделя';
+        return l10n.periodWeek;
       case StatsPeriod.month:
-        return 'Месяц';
+        return l10n.periodMonth;
       case StatsPeriod.quarter:
-        return 'Квартал';
+        return l10n.periodQuarter;
       case StatsPeriod.year:
-        return 'Год';
+        return l10n.periodYear;
       case StatsPeriod.custom:
-        return 'Свой';
+        return l10n.periodCustom;
     }
   }
 
@@ -709,6 +714,8 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     // Получаем период из провайдеров
     final period = ref.watch(paymentsPeriodProvider);
     final customRange = ref.watch(paymentsDateRangeProvider);
@@ -783,7 +790,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.payments),
+        title: Text(l10n.payments),
       ),
       floatingActionButton: canAddPayments
           ? FloatingActionButton(
@@ -804,7 +811,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
-                        label: Text(_periodLabel(p)),
+                        label: Text(_periodLabel(p, l10n)),
                         selected: p == period,
                         onSelected: (_) => _selectPresetPeriod(p),
                       ),
@@ -885,12 +892,14 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                       subjects: subjects,
                       members: members,
                       plans: plans,
+                      l10n: l10n,
                     ),
                     orElse: () => _buildFiltersRow(
                       students: students,
                       subjects: subjects,
                       members: members,
                       plans: [],
+                      l10n: l10n,
                     ),
                   ),
                   orElse: () => _buildFiltersRow(
@@ -898,6 +907,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                     subjects: subjects,
                     members: [],
                     plans: [],
+                    l10n: l10n,
                   ),
                 ),
                 orElse: () => _buildFiltersRow(
@@ -905,6 +915,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                   subjects: [],
                   members: [],
                   plans: [],
+                  l10n: l10n,
                 ),
               ),
               orElse: () => const SizedBox.shrink(),
@@ -923,7 +934,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(canViewAllPayments ? 'Итого:' : 'Итого (ваши ученики):'),
+                  Text(canViewAllPayments ? l10n.total : l10n.totalOwnStudents),
                   visibleTotal != null
                       ? Text(
                           _formatCurrency(visibleTotal),
@@ -946,15 +957,15 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
           // Payments list (НИКОГДА не показываем ошибку - используем valueOrNull)
           Expanded(
             child: !canViewAnyPayments
-                ? const Center(
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.lock_outline, size: 48, color: AppColors.textSecondary),
-                        SizedBox(height: 16),
+                        const Icon(Icons.lock_outline, size: 48, color: AppColors.textSecondary),
+                        const SizedBox(height: 16),
                         Text(
-                          'Нет доступа к просмотру оплат',
-                          style: TextStyle(color: AppColors.textSecondary),
+                          l10n.noAccessToPayments,
+                          style: const TextStyle(color: AppColors.textSecondary),
                         ),
                       ],
                     ),
@@ -977,6 +988,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                         teacherBindingsAsync: teacherBindingsAsync,
                         periodParams: periodParams,
                         institutionId: widget.institutionId,
+                        l10n: l10n,
                       );
                     },
                   ),
@@ -994,6 +1006,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     required AsyncValue<Map<String, Set<String>>> teacherBindingsAsync,
     required PeriodParams periodParams,
     required String institutionId,
+    required AppLocalizations l10n,
   }) {
     // Если нужна фильтрация по своим ученикам, ждём загрузки myStudentIds
     if (!canViewAllPayments && myStudentIdsAsync.isLoading) {
@@ -1030,8 +1043,8 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
       return Center(
         child: Text(
           canViewAllPayments
-              ? 'Нет оплат за этот период'
-              : 'Нет оплат ваших учеников за этот период',
+              ? l10n.noPaymentsForPeriod
+              : l10n.noPaymentsOwnForPeriod,
           style: const TextStyle(color: AppColors.textSecondary),
         ),
       );
@@ -1044,14 +1057,14 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
           children: [
             Icon(Icons.filter_list_off, size: 48, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            const Text(
-              'Нет оплат по заданным фильтрам',
-              style: TextStyle(color: AppColors.textSecondary),
+            Text(
+              l10n.noPaymentsWithFilters,
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 8),
             TextButton(
               onPressed: _resetFilters,
-              child: const Text('Сбросить фильтры'),
+              child: Text(l10n.resetFilters),
             ),
           ],
         ),
@@ -1280,14 +1293,15 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     // Валидация
     if (!_formKey.currentState!.validate()) return;
 
     if (_isFamilyMode) {
       if (_selectedFamilyStudents.length < 2) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Выберите минимум 2 ученика для семейного абонемента'),
+          SnackBar(
+            content: Text(l10n.minTwoParticipantsRequired),
             backgroundColor: Colors.red,
           ),
         );
@@ -1296,8 +1310,8 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
     } else {
       if (_selectedStudent == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Выберите ученика'),
+          SnackBar(
+            content: Text(l10n.selectStudentRequired),
             backgroundColor: Colors.red,
           ),
         );
@@ -1312,7 +1326,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
     if (_hasDiscount && _discountController.text.isNotEmpty) {
       final discount = double.tryParse(_discountController.text) ?? 0;
       if (discount > 0) {
-        final discountNote = 'Скидка: ${discount.toStringAsFixed(0)} ₸';
+        final discountNote = l10n.discountNote(discount.toStringAsFixed(0));
         comment = comment.isEmpty ? discountNote : '$discountNote\n$comment';
       }
     }
@@ -1334,8 +1348,8 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
           if (mounted) {
             setState(() => _isLoading = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Ошибка при объединении учеников'),
+              SnackBar(
+                content: Text(l10n.errorMessage('merge failed')),
                 backgroundColor: Colors.red,
               ),
             );
@@ -1391,11 +1405,11 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
         Navigator.pop(context);
         String message;
         if (_isFamilyMode && _shouldMergeStudents) {
-          message = 'Карточка объединена и оплата добавлена';
+          message = l10n.cardMergedAndPaymentAdded;
         } else if (_isFamilyMode) {
-          message = 'Групповой абонемент добавлен';
+          message = l10n.groupSubscriptionAdded;
         } else {
-          message = 'Оплата добавлена';
+          message = l10n.paymentAdded;
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1409,6 +1423,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // Используем разные провайдеры в зависимости от прав
     final studentsAsync = widget.canAddForAllStudents
         ? ref.watch(studentsProvider(widget.institutionId))
@@ -1484,21 +1499,21 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Добавить оплату',
-                            style: TextStyle(
+                            l10n.addPayment,
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            'Выберите ученика и тариф',
-                            style: TextStyle(
+                            l10n.selectStudentAndPlan,
+                            style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 14,
                             ),
@@ -1533,14 +1548,14 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Групповой абонемент',
-                              style: TextStyle(
+                            Text(
+                              l10n.familySubscriptionOption,
+                              style: const TextStyle(
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             Text(
-                              'Один абонемент на несколько учеников',
+                              l10n.familySubscriptionDescription,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -1587,7 +1602,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           color: AppColors.warning.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text('Сначала добавьте учеников'),
+                        child: Text(l10n.addStudentsFirst),
                       );
                     }
 
@@ -1616,7 +1631,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           Row(
                             children: [
                               Text(
-                                'Выберите участников',
+                                l10n.selectParticipants,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[700],
@@ -1625,7 +1640,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                               ),
                               const Spacer(),
                               Text(
-                                '${_selectedFamilyStudents.length} из ${students.length}',
+                                l10n.participantsOf(_selectedFamilyStudents.length, students.length),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: _selectedFamilyStudents.length >= 2
@@ -1689,7 +1704,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                   Icon(Icons.info_outline, size: 16, color: Colors.orange[700]),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'Выберите минимум 2 ученика',
+                                    l10n.minTwoParticipants,
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.orange[700],
@@ -1720,17 +1735,17 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                       // Предзаполняем имя
                                       final names = _selectedFamilyStudents.map((s) => s.name).toList();
                                       if (names.length == 2) {
-                                        _mergedNameController.text = '${names[0]} и ${names[1]}';
+                                        _mergedNameController.text = '${names[0]} ${l10n.and} ${names[1]}';
                                       } else {
                                         _mergedNameController.text = names.first;
                                       }
                                     }
                                   });
                                 },
-                                title: const Text('Объединить в одну карточку'),
-                                subtitle: const Text(
-                                  'Создаст групповую карточку учеников',
-                                  style: TextStyle(fontSize: 12),
+                                title: Text(l10n.mergeIntoCard),
+                                subtitle: Text(
+                                  l10n.mergeIntoCardDescription,
+                                  style: const TextStyle(fontSize: 12),
                                 ),
                                 secondary: Icon(
                                   Icons.merge,
@@ -1746,8 +1761,8 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                               TextFormField(
                                 controller: _mergedNameController,
                                 decoration: InputDecoration(
-                                  labelText: 'Имя групповой карточки',
-                                  hintText: 'Например: Семья Петровых',
+                                  labelText: l10n.groupCardName,
+                                  hintText: l10n.groupCardNameHint,
                                   prefixIcon: const Icon(Icons.badge_outlined),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -1756,7 +1771,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                   fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                                 ),
                                 validator: _shouldMergeStudents
-                                    ? (v) => v == null || v.isEmpty ? 'Введите имя' : null
+                                    ? (v) => v == null || v.isEmpty ? l10n.enterName : null
                                     : null,
                                 textCapitalization: TextCapitalization.words,
                               ),
@@ -1771,7 +1786,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           : null;
                       return DropdownButtonFormField<Student>(
                         decoration: InputDecoration(
-                          labelText: 'Ученик',
+                          labelText: l10n.student,
                           prefixIcon: const Icon(Icons.person_outline),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1811,7 +1826,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Дата оплаты',
+                              l10n.paidAt,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -1838,7 +1853,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Способ оплаты',
+                      l10n.paymentMethod,
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey[700],
@@ -1849,14 +1864,14 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                     SizedBox(
                       width: double.infinity,
                       child: SegmentedButton<String>(
-                        segments: const [
+                        segments: [
                           ButtonSegment(
                             value: 'card',
-                            label: Text('Карта'),
+                            label: Text(l10n.card),
                           ),
                           ButtonSegment(
                             value: 'cash',
-                            label: Text('Наличные'),
+                            label: Text(l10n.cash),
                           ),
                         ],
                         selected: {_paymentMethod},
@@ -1883,7 +1898,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                         : null;
                     return DropdownButtonFormField<PaymentPlan?>(
                       decoration: InputDecoration(
-                        labelText: 'Тариф',
+                        labelText: l10n.paymentPlan,
                         isDense: true,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -1894,9 +1909,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                       isExpanded: true,
                       initialValue: currentPlan,
                       items: [
-                        const DropdownMenuItem<PaymentPlan?>(
+                        DropdownMenuItem<PaymentPlan?>(
                           value: null,
-                          child: Text('Свой вариант'),
+                          child: Text(l10n.customOption),
                         ),
                         ...plans.map((plan) => DropdownMenuItem<PaymentPlan?>(
                               value: plan,
@@ -1946,9 +1961,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                               size: 20,
                             ),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Скидка',
-                              style: TextStyle(
+                            Text(
+                              l10n.discount,
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -1964,7 +1979,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                   builder: (context) => TextFormField(
                                     controller: _discountController,
                                     decoration: InputDecoration(
-                                      hintText: 'Размер скидки',
+                                      hintText: l10n.discountSize,
                                       suffixText: '₸',
                                       filled: true,
                                       fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -1991,7 +2006,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      'Было: ${_originalPrice.toStringAsFixed(0)} ₸',
+                                      l10n.wasPrice(_originalPrice.toStringAsFixed(0)),
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1999,7 +2014,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                                       ),
                                     ),
                                     Text(
-                                      'Итого: ${_amountController.text} ₸',
+                                      l10n.totalPrice(_amountController.text),
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
@@ -2022,7 +2037,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 TextFormField(
                   controller: _amountController,
                   decoration: InputDecoration(
-                    labelText: 'Сумма',
+                    labelText: l10n.amount,
                     suffixText: '₸',
                     suffixIcon: _selectedPlan != null
                         ? const Icon(Icons.lock, size: 16, color: AppColors.textSecondary)
@@ -2039,8 +2054,8 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                   keyboardType: TextInputType.number,
                   enabled: _selectedPlan == null, // Блокировка при выборе тарифа
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Введите сумму';
-                    if (double.tryParse(v) == null) return 'Неверная сумма';
+                    if (v == null || v.isEmpty) return l10n.enterAmount;
+                    if (double.tryParse(v) == null) return l10n.invalidAmount;
                     return null;
                   },
                 ),
@@ -2053,7 +2068,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                       child: TextFormField(
                         controller: _lessonsController,
                         decoration: InputDecoration(
-                          labelText: 'Занятий',
+                          labelText: l10n.lessonsCountField,
                           isDense: true,
                           suffixIcon: _selectedPlan != null
                               ? const Icon(Icons.lock, size: 14, color: AppColors.textSecondary)
@@ -2069,8 +2084,8 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                         keyboardType: TextInputType.number,
                         enabled: _selectedPlan == null, // Блокировка при выборе тарифа
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Введите';
-                          if (int.tryParse(v) == null) return 'Число';
+                          if (v == null || v.isEmpty) return l10n.enterValue;
+                          if (int.tryParse(v) == null) return l10n.invalidNumber;
                           return null;
                         },
                       ),
@@ -2080,7 +2095,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                       child: TextFormField(
                         controller: _validityController,
                         decoration: InputDecoration(
-                          labelText: 'Срок (дн.)',
+                          labelText: l10n.validityDays,
                           isDense: true,
                           suffixIcon: _selectedPlan != null
                               ? const Icon(Icons.lock, size: 14, color: AppColors.textSecondary)
@@ -2096,9 +2111,9 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                         keyboardType: TextInputType.number,
                         enabled: _selectedPlan == null, // Блокировка при выборе тарифа
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Введите';
+                          if (v == null || v.isEmpty) return l10n.enterValue;
                           final num = int.tryParse(v);
-                          if (num == null || num <= 0) return 'Ошибка';
+                          if (num == null || num <= 0) return l10n.invalidValue;
                           return null;
                         },
                       ),
@@ -2111,7 +2126,7 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                 TextFormField(
                   controller: _commentController,
                   decoration: InputDecoration(
-                    labelText: 'Комментарий (необязательно)',
+                    labelText: l10n.commentOptional,
                     prefixIcon: const Icon(Icons.comment_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -2151,8 +2166,8 @@ class _AddPaymentSheetState extends ConsumerState<_AddPaymentSheet> {
                               const SizedBox(width: 8),
                               Text(
                                 _amountController.text.isNotEmpty
-                                    ? 'Добавить оплату ${_amountController.text} ₸'
-                                    : 'Добавить оплату',
+                                    ? l10n.addPaymentWithAmount(_amountController.text)
+                                    : l10n.addPayment,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -2268,19 +2283,20 @@ class _PaymentCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final formatter = NumberFormat('#,###', 'ru_RU');
     final amountStr = '${formatter.format(payment.amount.toInt())} ₸';
 
     // Для семейных абонементов показываем всех участников
     final displayName = payment.displayMemberNames.isNotEmpty
         ? payment.displayMemberNames
-        : 'Ученик';
+        : l10n.student;
 
     // Сначала проверяем, это оплата занятия (lesson:ID|TYPE_NAME)
     final lessonTypeName = _extractLessonTypeName();
     final planName = lessonTypeName ??
         payment.paymentPlan?.name ??
-        (payment.isCorrection ? 'Корректировка' : 'Свой вариант');
+        (payment.isCorrection ? l10n.correction : l10n.customOption);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -2326,7 +2342,7 @@ class _PaymentCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text('${payment.lessonsCount} занятий'),
+            Text(l10n.lessonsCountLabel(payment.lessonsCount)),
           ],
         ),
         trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
@@ -2489,7 +2505,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
   }
 
   /// Секция выбора участников группового абонемента
-  Widget _buildMembersSection() {
+  Widget _buildMembersSection(AppLocalizations l10n) {
     final studentsAsync = ref.watch(studentsProvider(widget.institutionId));
 
     return Column(
@@ -2497,14 +2513,14 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
       children: [
         Row(
           children: [
-            Icon(
+            const Icon(
               Icons.family_restroom,
               color: AppColors.primary,
               size: 20,
             ),
             const SizedBox(width: 8),
             Text(
-              'Участники абонемента',
+              l10n.subscriptionMembers,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -2513,7 +2529,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
             ),
             const Spacer(),
             Text(
-              '${_selectedMemberIds.length} выбрано',
+              l10n.selectedCount(_selectedMemberIds.length),
               style: TextStyle(
                 fontSize: 12,
                 color: _selectedMemberIds.length >= 2
@@ -2527,10 +2543,10 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
         const SizedBox(height: 12),
         studentsAsync.when(
           loading: () => const LinearProgressIndicator(),
-          error: (e, _) => Text('Ошибка загрузки: $e'),
+          error: (e, _) => Text(l10n.loadingError(e.toString())),
           data: (students) {
             if (students.isEmpty) {
-              return const Text('Нет учеников');
+              return Text(l10n.noStudentsYet);
             }
 
             return Container(
@@ -2589,7 +2605,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                 Icon(Icons.info_outline, size: 16, color: Colors.orange[700]),
                 const SizedBox(width: 4),
                 Text(
-                  'Минимум 2 участника',
+                  l10n.minTwoParticipants,
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.orange[700],
@@ -2603,13 +2619,14 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     // Проверяем минимум 2 участника для семейного абонемента
     if (widget.payment.isFamilySubscription && _selectedMemberIds.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Выберите минимум 2 участника для группового абонемента'),
+        SnackBar(
+          content: Text(l10n.minTwoParticipantsRequired),
           backgroundColor: Colors.orange,
         ),
       );
@@ -2645,7 +2662,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
       if (_hasDiscount && _discountController.text.isNotEmpty) {
         final discount = double.tryParse(_discountController.text) ?? 0;
         if (discount > 0) {
-          final discountNote = 'Скидка: ${discount.toStringAsFixed(0)} ₸';
+          final discountNote = l10n.discountNote(discount.toStringAsFixed(0));
           comment = comment.isEmpty ? discountNote : '$discountNote\n$comment';
         }
       }
@@ -2668,8 +2685,8 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
           widget.onChanged();
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Оплата обновлена'),
+            SnackBar(
+              content: Text(l10n.paymentUpdated),
               backgroundColor: Colors.green,
             ),
           );
@@ -2680,7 +2697,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка: $e'),
+            content: Text(l10n.errorMessage(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -2689,23 +2706,23 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
   }
 
   Future<void> _delete() async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить оплату?'),
+        title: Text(l10n.deletePayment),
         content: Text(
-          'Оплата на сумму ${widget.payment.amount.toInt()} ₸ будет удалена. '
-          'Баланс ученика уменьшится на ${widget.payment.lessonsCount} занятий.',
+          l10n.deletePaymentConfirmation(widget.payment.amount.toInt(), widget.payment.lessonsCount),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -2727,8 +2744,8 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
         widget.onChanged();
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Оплата удалена'),
+          SnackBar(
+            content: Text(l10n.paymentDeleted),
             backgroundColor: Colors.orange,
           ),
         );
@@ -2736,7 +2753,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
         final state = ref.read(paymentControllerProvider);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка удаления: ${state.error}'),
+            content: Text(l10n.errorMessage(state.error?.toString() ?? '')),
             backgroundColor: Colors.red,
           ),
         );
@@ -2746,9 +2763,10 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final displayName = widget.payment.displayMemberNames.isNotEmpty
         ? widget.payment.displayMemberNames
-        : widget.payment.student?.name ?? 'Ученик';
+        : widget.payment.student?.name ?? l10n.student;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
@@ -2818,25 +2836,25 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                   color: AppColors.warning.withValues(alpha: 0.3),
                                 ),
                               ),
-                              child: const Row(
+                              child: Row(
                                 children: [
-                                  Icon(Icons.lock_outline, color: AppColors.warning),
-                                  SizedBox(width: 12),
+                                  const Icon(Icons.lock_outline, color: AppColors.warning),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Нет прав на редактирование',
-                                          style: TextStyle(
+                                          l10n.noEditPermission,
+                                          style: const TextStyle(
                                             fontWeight: FontWeight.w600,
                                             color: AppColors.warning,
                                           ),
                                         ),
-                                        SizedBox(height: 4),
+                                        const SizedBox(height: 4),
                                         Text(
-                                          'Вы можете редактировать только оплаты своих учеников',
-                                          style: TextStyle(fontSize: 12),
+                                          l10n.canEditOwnStudentsOnly,
+                                          style: const TextStyle(fontSize: 12),
                                         ),
                                       ],
                                     ),
@@ -2883,7 +2901,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            'Оплата от ${DateFormat('d MMMM yyyy', 'ru').format(widget.payment.paidAt)}',
+                                            l10n.paymentFrom(DateFormat('d MMMM yyyy', 'ru').format(widget.payment.paidAt)),
                                             style: const TextStyle(
                                               color: AppColors.textSecondary,
                                               fontSize: 14,
@@ -2900,7 +2918,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                 TextFormField(
                                   controller: _amountController,
                                   decoration: InputDecoration(
-                                    labelText: 'Сумма',
+                                    labelText: l10n.amount,
                                     suffixText: '₸',
                                     prefixIcon: const Icon(Icons.payments_outlined),
                                     suffixIcon: widget.payment.paymentPlanId != null
@@ -2917,8 +2935,8 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                   keyboardType: TextInputType.number,
                                   enabled: widget.canManage && widget.payment.paymentPlanId == null,
                                   validator: (v) {
-                                    if (v == null || v.isEmpty) return 'Введите сумму';
-                                    if (double.tryParse(v) == null) return 'Неверная сумма';
+                                    if (v == null || v.isEmpty) return l10n.enterAmount;
+                                    if (double.tryParse(v) == null) return l10n.invalidAmount;
                                     return null;
                                   },
                                 ),
@@ -2928,7 +2946,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                 TextFormField(
                                   controller: _lessonsController,
                                   decoration: InputDecoration(
-                                    labelText: 'Количество занятий',
+                                    labelText: l10n.lessonsCount,
                                     prefixIcon: const Icon(Icons.event),
                                     suffixIcon: widget.payment.paymentPlanId != null
                                         ? const Icon(Icons.lock, size: 18)
@@ -2944,8 +2962,8 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                   keyboardType: TextInputType.number,
                                   enabled: widget.canManage && widget.payment.paymentPlanId == null,
                                   validator: (v) {
-                                    if (v == null || v.isEmpty) return 'Введите количество';
-                                    if (int.tryParse(v) == null) return 'Неверное число';
+                                    if (v == null || v.isEmpty) return l10n.enterValue;
+                                    if (int.tryParse(v) == null) return l10n.invalidNumber;
                                     return null;
                                   },
                                 ),
@@ -2956,7 +2974,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Способ оплаты',
+                                      l10n.paymentMethod,
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: Colors.grey[700],
@@ -2967,14 +2985,14 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                     SizedBox(
                                       width: double.infinity,
                                       child: SegmentedButton<String>(
-                                        segments: const [
+                                        segments: [
                                           ButtonSegment(
                                             value: 'card',
-                                            label: Text('Карта'),
+                                            label: Text(l10n.card),
                                           ),
                                           ButtonSegment(
                                             value: 'cash',
-                                            label: Text('Наличные'),
+                                            label: Text(l10n.cash),
                                           ),
                                         ],
                                         selected: {_selectedMethod},
@@ -3011,7 +3029,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                'Дата оплаты',
+                                                l10n.paidAt,
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   color: Colors.grey[600],
@@ -3070,9 +3088,9 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                               size: 20,
                                             ),
                                             const SizedBox(width: 8),
-                                            const Text(
-                                              'Скидка',
-                                              style: TextStyle(
+                                            Text(
+                                              l10n.discount,
+                                              style: const TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w500,
                                               ),
@@ -3087,7 +3105,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                                 child: TextFormField(
                                                   controller: _discountController,
                                                   decoration: InputDecoration(
-                                                    hintText: 'Размер скидки',
+                                                    hintText: l10n.discountSize,
                                                     suffixText: '₸',
                                                     filled: true,
                                                     fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -3112,7 +3130,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                                 crossAxisAlignment: CrossAxisAlignment.end,
                                                 children: [
                                                   Text(
-                                                    'Было: ${_originalAmount.toStringAsFixed(0)} ₸',
+                                                    l10n.wasPrice(_originalAmount.toStringAsFixed(0)),
                                                     style: TextStyle(
                                                       fontSize: 12,
                                                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -3120,7 +3138,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                                     ),
                                                   ),
                                                   Text(
-                                                    'Итого: ${_amountController.text} ₸',
+                                                    l10n.totalPrice(_amountController.text),
                                                     style: const TextStyle(
                                                       fontSize: 14,
                                                       fontWeight: FontWeight.bold,
@@ -3141,7 +3159,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                 TextFormField(
                                   controller: _commentController,
                                   decoration: InputDecoration(
-                                    labelText: 'Комментарий',
+                                    labelText: l10n.comment,
                                     prefixIcon: const Icon(Icons.comment_outlined),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -3156,7 +3174,7 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                 // Участники группового абонемента
                                 if (widget.payment.isFamilySubscription) ...[
                                   const SizedBox(height: 24),
-                                  _buildMembersSection(),
+                                  _buildMembersSection(l10n),
                                 ],
 
                                 const SizedBox(height: 24),
@@ -3183,14 +3201,14 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                                 valueColor: AlwaysStoppedAnimation(Colors.white),
                                               ),
                                             )
-                                          : const Row(
+                                          : Row(
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
-                                                Icon(Icons.check),
-                                                SizedBox(width: 8),
+                                                const Icon(Icons.check),
+                                                const SizedBox(width: 8),
                                                 Text(
-                                                  'Сохранить изменения',
-                                                  style: TextStyle(
+                                                  l10n.saveChanges,
+                                                  style: const TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -3221,14 +3239,14 @@ class _EditPaymentSheetState extends ConsumerState<_EditPaymentSheet> {
                                                 valueColor: AlwaysStoppedAnimation(Colors.red),
                                               ),
                                             )
-                                          : const Row(
+                                          : Row(
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
-                                                Icon(Icons.delete_outline),
-                                                SizedBox(width: 8),
+                                                const Icon(Icons.delete_outline),
+                                                const SizedBox(width: 8),
                                                 Text(
-                                                  'Удалить оплату',
-                                                  style: TextStyle(
+                                                  l10n.deletePaymentButton,
+                                                  style: const TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.bold,
                                                   ),

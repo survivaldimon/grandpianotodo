@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:kabinet/l10n/app_localizations.dart';
 
 /// iOS-стиль пикер времени с барабанами (CupertinoPicker)
 /// Шаг минут настраивается (по умолчанию 5 минут)
@@ -75,6 +76,7 @@ class _IosTimePickerState extends State<IosTimePicker> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     final hours = List.generate(
       widget.maxHour - widget.minHour + 1,
@@ -98,10 +100,10 @@ class _IosTimePickerState extends State<IosTimePicker> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Отмена'),
+                    child: Text(l10n.cancel),
                   ),
                   Text(
-                    'Выберите время',
+                    l10n.selectTime,
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
@@ -116,9 +118,9 @@ class _IosTimePickerState extends State<IosTimePicker> {
                       );
                       Navigator.pop(context, time);
                     },
-                    child: const Text(
-                      'Готово',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    child: Text(
+                      l10n.done,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
@@ -379,14 +381,14 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
     return endMinutes - startMinutes;
   }
 
-  String get _durationText {
+  String _getDurationText(AppLocalizations l10n) {
     final duration = _durationMinutes;
-    if (duration <= 0) return 'Некорректно';
+    if (duration <= 0) return l10n.invalid;
     final hours = duration ~/ 60;
     final mins = duration % 60;
-    if (hours > 0 && mins > 0) return '$hours ч $mins мин';
-    if (hours > 0) return '$hours ч';
-    return '$mins мин';
+    if (hours > 0 && mins > 0) return l10n.durationFormat(hours, mins);
+    if (hours > 0) return l10n.hoursOnly(hours);
+    return l10n.minutesOnly(mins);
   }
 
   @override
@@ -394,6 +396,7 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     final hours = List.generate(
       widget.maxHour - widget.minHour + 1,
@@ -417,12 +420,12 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Отмена'),
+                    child: Text(l10n.cancel),
                   ),
                   Column(
                     children: [
                       Text(
-                        'Время занятия',
+                        l10n.lessonTime,
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w600,
@@ -431,7 +434,7 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _durationText,
+                        _getDurationText(l10n),
                         style: TextStyle(
                           fontSize: 13,
                           color: _durationMinutes > 0
@@ -458,9 +461,9 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
                             Navigator.pop(context, range);
                           }
                         : null,
-                    child: const Text(
-                      'Готово',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    child: Text(
+                      l10n.done,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
@@ -490,7 +493,7 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              'Начало',
+                              l10n.start,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -588,7 +591,7 @@ class _IosTimeRangePickerState extends State<IosTimeRangePicker> {
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              'Конец',
+                              l10n.end,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
